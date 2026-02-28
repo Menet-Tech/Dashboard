@@ -79,6 +79,43 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Dropdown menu functionality
+    const dropdownItems = document.querySelectorAll('.dropdown-item');
+    dropdownItems.forEach(item => {
+        const link = item.querySelector('.sidebar-link');
+        const dropdownMenu = item.querySelector('.dropdown-menu');
+        
+        if (link && dropdownMenu) {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const isActive = item.classList.contains('active');
+                
+                // Tutup semua dropdown lain
+                dropdownItems.forEach(otherItem => {
+                    if (otherItem !== item) {
+                        otherItem.classList.remove('active');
+                    }
+                });
+                
+                // Toggle dropdown ini
+                if (isActive) {
+                    item.classList.remove('active');
+                } else {
+                    item.classList.add('active');
+                }
+            });
+        }
+    });
+
+    // Tutup dropdown saat klik di luar
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.dropdown-item')) {
+            dropdownItems.forEach(item => {
+                item.classList.remove('active');
+            });
+        }
+    });
+
     // Efek hover pada tombol
     const buttons = document.querySelectorAll('.btn, .btn-login');
     buttons.forEach(btn => {
