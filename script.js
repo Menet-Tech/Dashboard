@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.querySelector('.login-container')) {
         const container = document.querySelector('.login-container');
         container.style.opacity = '0';
-        container.style.transform = 'translateY(20px)';
+        container.style.transform = 'translateY(30px)';
         
         setTimeout(() => {
             container.style.transition = 'all 0.6s ease';

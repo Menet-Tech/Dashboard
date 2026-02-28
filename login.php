@@ -43,54 +43,58 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <div class="login-container">
-        <div class="login-header">
-            <i class="fas fa-shield-alt" style="font-size: 3rem; color: #667eea; margin-bottom: 15px;"></i>
-            <h1>Sistem Billing</h1>
-            <p>Masuk ke dashboard manajemen</p>
-        </div>
-
-        <?php if ($error): ?>
-            <div class="message error">
-                <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($success): ?>
-            <div class="message success">
-                <i class="fas fa-check-circle"></i> <?php echo $success; ?>
-            </div>
-        <?php endif; ?>
-
-        <form method="POST" action="">
-            <div class="form-group">
-                <label for="username">
-                    <i class="fas fa-user"></i> Username
-                </label>
-                <input type="text" id="username" name="username" placeholder="Masukkan username" required>
+<body class="login-page-body">
+    <div class="login-page">
+        <div class="login-container">
+            <div class="login-header">
+                <div class="brand-logo-large">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h1>Sistem Billing</h1>
+                <p>Masuk ke dashboard manajemen</p>
             </div>
 
-            <div class="form-group">
-                <label for="password">
-                    <i class="fas fa-lock"></i> Password
-                </label>
-                <input type="password" id="password" name="password" placeholder="Masukkan password" required>
+            <?php if ($error): ?>
+                <div class="message error">
+                    <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($success): ?>
+                <div class="message success">
+                    <i class="fas fa-check-circle"></i> <?php echo $success; ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="POST" action="">
+                <div class="form-group">
+                    <label for="username">
+                        <i class="fas fa-user"></i> Username
+                    </label>
+                    <input type="text" id="username" name="username" placeholder="Masukkan username" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">
+                        <i class="fas fa-lock"></i> Password
+                    </label>
+                    <input type="password" id="password" name="password" placeholder="Masukkan password" required>
+                </div>
+
+                <button type="submit" class="btn-login">
+                    <i class="fas fa-sign-in-alt"></i> Masuk
+                </button>
+            </form>
+
+            <div class="demo-info">
+                <strong>Info Demo:</strong><br>
+                Username: admin<br>
+                Password: 12345
             </div>
 
-            <button type="submit" class="btn-login">
-                <i class="fas fa-sign-in-alt"></i> Masuk
-            </button>
-        </form>
-
-        <div class="demo-info">
-            <strong>Info Demo:</strong><br>
-            Username: admin<br>
-            Password: 12345
-        </div>
-
-        <div class="login-footer">
-            &copy; <?php echo date('Y'); ?> Sistem Billing. Dibuat dengan PHP.
+            <div class="login-footer">
+                &copy; <?php echo date('Y'); ?> Sistem Billing. Dibuat dengan PHP.
+            </div>
         </div>
     </div>
 
