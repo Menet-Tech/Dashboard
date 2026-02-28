@@ -50,62 +50,11 @@ $menus = [
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Sidebar Navigation -->
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <div class="brand">
-                <div class="brand-logo">
-                    <i class="fas fa-shield-alt"></i>
-                </div>
-                <div class="brand-info">
-                    <h2>Sistem Billing</h2>
-                    <span>Dashboard Management</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="sidebar-menu">
-            <?php foreach ($menus as $menu): ?>
-                <a href="<?php echo $menu['link']; ?>" class="sidebar-item">
-                    <i class="fas <?php echo $menu['icon']; ?>"></i>
-                    <span><?php echo $menu['name']; ?></span>
-                </a>
-            <?php endforeach; ?>
-        </div>
-        
-        <div class="sidebar-footer">
-            <div class="user-info">
-                <div class="user-avatar">U</div>
-                <div class="user-details">
-                    <span class="username">User</span>
-                    <span class="user-role">Administrator</span>
-                </div>
-            </div>
-            <a href="login.php" class="logout-btn">
-                <i class="fas fa-sign-out-alt"></i>
-                <span>Logout</span>
-            </a>
-        </div>
-    </div>
+    <?php include 'navbar.php'; ?>
 
     <!-- Main Content Area -->
     <div class="main-content">
-        <div class="content-header">
-            <div class="welcome-section">
-                <h1>Selamat Datang</h1>
-                <p>Dashboard Manajemen Sistem Billing</p>
-            </div>
-            <div class="header-actions">
-                <div class="date-time">
-                    <i class="fas fa-calendar-alt"></i>
-                    <span id="current-date"></span>
-                </div>
-                <div class="notifications">
-                    <i class="fas fa-bell"></i>
-                    <span class="badge">3</span>
-                </div>
-            </div>
-        </div>
+        <?php include 'header.php'; ?>
 
         <div class="content-body">
             <div class="menu-grid">

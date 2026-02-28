@@ -1,0 +1,13 @@
+-- Perintah MySQL untuk membuat database dan tabel IP Pool
+-- Jalankan perintah ini di command line MySQL:
+
+mysql -u root -p < create_ip_pools_table.sql
+
+-- Atau bisa juga dengan cara:
+-- 1. Buka MySQL Command Line Client
+-- 2. Masukkan password
+-- 3. Jalankan perintah berikut:
+
+SOURCE create_ip_pools_table.sql;
+
+-- Atau copy-paste seluruh isi file create_ip_pools_table.sql ke MySQL client
