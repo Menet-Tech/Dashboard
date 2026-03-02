@@ -70,22 +70,35 @@ if (isset($_POST['edit_pool'])) {
         if (!validateIP($start_ip) || !validateIP($end_ip)) {
             $message = "Format IP address tidak valid!";
             $message_type = "error";
-        } else {
-            $sql = "UPDATE ip_pools SET name = ?, start_ip = ?, end_ip = ? WHERE id = ?";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sssi", $name, $start_ip, $end_ip, $id);
+        } 
+        else {
+            // Cek apakah pool dengan nama yang sama sudah ada (kecuali pool yang sedang diedit)
+            $checkStmt = $conn->prepare("SELECT id FROM ip_pools WHERE name = ? AND id != ?");
+            $checkStmt->bind_param("si", $name, $id);
+            $checkStmt->execute();
+            $checkStmt->store_result();
 
-            if ($stmt->execute()) {
-                $message = "IP Pool berhasil diperbarui!";
-                $message_type = "success";
-                // Redirect untuk refresh halaman dan data
-                header("Location: pool.php");
-                exit();
-            } else {
-                $message = "Error: " . $stmt->error;
+            if ($checkStmt->num_rows > 0) {
+                $message = "IP Pool dengan nama tersebut sudah ada!";
                 $message_type = "error";
+            } else {
+                $sql = "UPDATE ip_pools SET name = ?, start_ip = ?, end_ip = ? WHERE id = ?";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("sssi", $name, $start_ip, $end_ip, $id);
+
+                if ($stmt->execute()) {
+                    $message = "IP Pool berhasil diperbarui!";
+                    $message_type = "success";
+                    // Redirect untuk refresh halaman dan data
+                    header("Location: pool.php");
+                    exit();
+                } else {
+                    $message = "Error: " . $stmt->error;
+                    $message_type = "error";
+                }
+                $stmt->close();
             }
-            $stmt->close();
+            $checkStmt->close();
         }
     } else {
         $message = "Semua field harus diisi!";
@@ -122,8 +135,8 @@ if ($result->num_rows > 0) {
         $pools[] = [
             'name' => $row['name'],
             'ranges' => $row['start_ip'] . '-' . $row['end_ip'],
-            'next_pool' => '', // bisa ditambahkan field next_pool di database jika diperlukan
-            'comment' => 'Pool ' . $row['name'] . ' (' . $row['start_ip'] . ' - ' . $row['end_ip'] . ')'
+            'gateway' => $row['gateway'],
+            'comment' => 'Pool ' . $row['name'] . ' (' . $row['start_ip'] . ' - ' . $row['end_ip'] . ') - Gateway: ' . $row['gateway']
         ];
     }
 }
@@ -191,20 +204,24 @@ if ($result->num_rows > 0) {
                 </div>
                 <form id="add-pool-form" method="POST" action="">
                     <div id="add-pool-error" class="error-message" style="display: none; color: #d32f2f; margin-bottom: 10px; padding: 10px; background-color: #ffebee; border-left: 4px solid #d32f2f; border-radius: 4px;"></div>
-                    <div class="form-group">
-                        <div>
-                            <label for="add-name">Nama Pool:</label>
-                            <input type="text" id="add-name" name="name" placeholder="Contoh: pool-dhcp-1" required>
-                        </div>
-                        <div>
-                            <label for="add-start-ip">Start IP:</label>
-                            <input type="text" id="add-start-ip" name="start_ip" placeholder="Contoh: 192.168.1.100" required>
-                        </div>
-                        <div>
-                            <label for="add-end-ip">End IP:</label>
-                            <input type="text" id="add-end-ip" name="end_ip" placeholder="Contoh: 192.168.1.200" required>
-                        </div>
-                    </div>
+<div class="form-group">
+    <div>
+        <label for="add-name">Nama Pool:</label>
+        <input type="text" id="add-name" name="name" placeholder="Contoh: pool-dhcp-1" required>
+    </div>
+    <div>
+        <label for="add-start-ip">Start IP:</label>
+        <input type="text" id="add-start-ip" name="start_ip" placeholder="Contoh: 192.168.1.100" required>
+    </div>
+    <div>
+        <label for="add-end-ip">End IP:</label>
+        <input type="text" id="add-end-ip" name="end_ip" placeholder="Contoh: 192.168.1.200" required>
+    </div>
+    <div>
+        <label for="add-gateway">Gateway:</label>
+        <input type="text" id="add-gateway" name="gateway" placeholder="Contoh: 192.168.1.1" required>
+    </div>
+</div>
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save"></i> Simpan
@@ -216,7 +233,7 @@ if ($result->num_rows > 0) {
                 </form>
             </div>
 
-            <!-- Edit Pool Form -->
+<!-- Edit Pool Form -->
             <div id="edit-form-container" class="form-container" style="display: none;">
                 <div class="form-header">
                     <h3>Edit IP Pool</h3>
@@ -224,20 +241,25 @@ if ($result->num_rows > 0) {
                 </div>
                 <form id="edit-pool-form" method="POST" action="">
                     <input type="hidden" id="edit-id" name="id">
-                    <div class="form-group">
-                        <div>
-                            <label for="edit-name">Nama Pool:</label>
-                            <input type="text" id="edit-name" name="name" required>
-                        </div>
-                        <div>
-                            <label for="edit-start-ip">Start IP:</label>
-                            <input type="text" id="edit-start-ip" name="start_ip" required>
-                        </div>
-                        <div>
-                            <label for="edit-end-ip">End IP:</label>
-                            <input type="text" id="edit-end-ip" name="end_ip" required>
-                        </div>
-                    </div>
+                    <div id="edit-pool-error" class="error-message" style="display: none; color: #d32f2f; margin-bottom: 10px; padding: 10px; background-color: #ffebee; border-left: 4px solid #d32f2f; border-radius: 4px;"></div>
+<div class="form-group">
+    <div>
+        <label for="edit-name">Nama Pool:</label>
+        <input type="text" id="edit-name" name="name" required>
+    </div>
+    <div>
+        <label for="edit-start-ip">Start IP:</label>
+        <input type="text" id="edit-start-ip" name="start_ip" required>
+    </div>
+    <div>
+        <label for="edit-end-ip">End IP:</label>
+        <input type="text" id="edit-end-ip" name="end_ip" required>
+    </div>
+    <div>
+        <label for="edit-gateway">Gateway:</label>
+        <input type="text" id="edit-gateway" name="gateway" required>
+    </div>
+</div>
                     <div class="form-actions">
                         <button type="submit" name="edit_pool" class="btn btn-success">
                             <i class="fas fa-save"></i> Perbarui
@@ -272,62 +294,62 @@ if ($result->num_rows > 0) {
             </div>
 
             <!-- Pool Table -->
-            <div class="pool-table">
-                <div class="table-header">
-                    <div>Nama Pool</div>
-                    <div>Range IP</div>
-                    <div>Next Pool</div>
-                    <div>Keterangan</div>
-                    <div>Aksi</div>
-                </div>
-                <div class="table-body">
-                    <?php if (empty($pools)): ?>
-                        <div class="empty-state">
-                            <i class="fas fa-layer-group"></i>
-                            <p>Belum ada pool yang dikonfigurasi</p>
-                        </div>
-                    <?php else: ?>
-                        <?php foreach ($pools as $index => $pool): ?>
-                            <?php
-                            // Ambil ID dari database untuk setiap pool
-                            $sql_id = "SELECT id FROM ip_pools WHERE name = ? AND start_ip = ? AND end_ip = ?";
-                            $stmt_id = $conn->prepare($sql_id);
-                            $start_ip = explode('-', $pool['ranges'])[0];
-                            $end_ip = explode('-', $pool['ranges'])[1];
-                            $stmt_id->bind_param("sss", $pool['name'], $start_ip, $end_ip);
-                            $stmt_id->execute();
-                            $result_id = $stmt_id->get_result();
-                            $pool_data = $result_id->fetch_assoc();
-                            $pool_id = $pool_data['id'] ?? ($index + 1);
-                            $stmt_id->close();
-                            ?>
-                            <div class="pool-row" data-id="<?php echo $pool_id; ?>">
-                                <div class="pool-name">
-                                    <i class="fas fa-layer-group"></i>
-                                    <?php echo htmlspecialchars($pool['name']); ?>
-                                </div>
-                                <div class="pool-range">
-                                    <?php echo htmlspecialchars($pool['ranges']); ?>
-                                </div>
-                                <div class="pool-next <?php echo empty($pool['next_pool']) ? 'empty' : ''; ?>">
-                                    <?php echo empty($pool['next_pool']) ? 'Tidak ada' : htmlspecialchars($pool['next_pool']); ?>
-                                </div>
-                                <div class="pool-comment">
-                                    <?php echo htmlspecialchars($pool['comment']); ?>
-                                </div>
-                                <div class="actions">
-                                    <a href="#" class="action-btn btn-edit">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </a>
-                                    <a href="#" class="action-btn btn-delete">
-                                        <i class="fas fa-trash"></i> Hapus
-                                    </a>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
+<div class="pool-table">
+    <div class="table-header">
+        <div>Nama Pool</div>
+        <div>Range IP</div>
+        <div>Gateway</div>
+        <div>Keterangan</div>
+        <div>Aksi</div>
+    </div>
+    <div class="table-body">
+        <?php if (empty($pools)): ?>
+            <div class="empty-state">
+                <i class="fas fa-layer-group"></i>
+                <p>Belum ada pool yang dikonfigurasi</p>
             </div>
+        <?php else: ?>
+            <?php foreach ($pools as $index => $pool): ?>
+                <?php
+                // Ambil ID dari database untuk setiap pool
+                $sql_id = "SELECT id FROM ip_pools WHERE name = ? AND start_ip = ? AND end_ip = ? AND gateway = ?";
+                $stmt_id = $conn->prepare($sql_id);
+                $start_ip = explode('-', $pool['ranges'])[0];
+                $end_ip = explode('-', $pool['ranges'])[1];
+                $stmt_id->bind_param("ssss", $pool['name'], $start_ip, $end_ip, $pool['gateway']);
+                $stmt_id->execute();
+                $result_id = $stmt_id->get_result();
+                $pool_data = $result_id->fetch_assoc();
+                $pool_id = $pool_data['id'] ?? ($index + 1);
+                $stmt_id->close();
+                ?>
+                <div class="pool-row" data-id="<?php echo $pool_id; ?>">
+                    <div class="pool-name">
+                        <i class="fas fa-layer-group"></i>
+                        <?php echo htmlspecialchars($pool['name']); ?>
+                    </div>
+                    <div class="pool-range">
+                        <?php echo htmlspecialchars($pool['ranges']); ?>
+                    </div>
+                    <div class="pool-gateway">
+                        <?php echo htmlspecialchars($pool['gateway']); ?>
+                    </div>
+                    <div class="pool-comment">
+                        <?php echo htmlspecialchars($pool['comment']); ?>
+                    </div>
+                    <div class="actions">
+                        <a href="#" class="action-btn btn-edit">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <a href="#" class="action-btn btn-delete">
+                            <i class="fas fa-trash"></i> Hapus
+                        </a>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+</div>
         </div>
     </div>
 

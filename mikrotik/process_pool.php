@@ -18,10 +18,11 @@ if (isset($_POST['action']) && $_POST['action'] == 'add') {
     $name = cleanInput($_POST['name']);
     $start_ip = cleanInput($_POST['start_ip']);
     $end_ip = cleanInput($_POST['end_ip']);
-    
-    if (!empty($name) && !empty($start_ip) && !empty($end_ip)) {
+    $gateway = cleanInput($_POST['gateway']);
+
+    if (!empty($name) && !empty($start_ip) && !empty($end_ip) && !empty($gateway)) {
         // Validasi format IP
-        if (!validateIP($start_ip) || !validateIP($end_ip)) {
+        if (!validateIP($start_ip) || !validateIP($end_ip) || !validateIP($gateway)) {
             echo json_encode(['success' => false, 'message' => 'Format IP address tidak valid!']);
             exit();
         } elseif (!validateIPRange($start_ip, $end_ip)) {
@@ -40,9 +41,9 @@ if (isset($_POST['action']) && $_POST['action'] == 'add') {
                     exit();
                 }
                 $cek_stmt->close();
-            $sql = "INSERT INTO ip_pools (name, start_ip, end_ip) VALUES (?, ?, ?)";
+            $sql = "INSERT INTO ip_pools (name, start_ip, end_ip, gateway) VALUES (?, ?, ?, ?)";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sss", $name, $start_ip, $end_ip);
+            $stmt->bind_param("ssss", $name, $start_ip, $end_ip, $gateway);
             
             if ($stmt->execute()) {
                 echo json_encode(['success' => true, 'message' => 'IP Pool berhasil ditambahkan!']);
@@ -63,17 +64,31 @@ if (isset($_POST['action']) && $_POST['action'] == 'edit') {
     $name = cleanInput($_POST['name']);
     $start_ip = cleanInput($_POST['start_ip']);
     $end_ip = cleanInput($_POST['end_ip']);
-    
-    if (!empty($id) && !empty($name) && !empty($start_ip) && !empty($end_ip)) {
+    $gateway = cleanInput($_POST['gateway']);
+
+    if (!empty($id) && !empty($name) && !empty($start_ip) && !empty($end_ip) && !empty($gateway)) {
         // Validasi format IP
-        if (!validateIP($start_ip) || !validateIP($end_ip)) {
+        if (!validateIP($start_ip) || !validateIP($end_ip) || !validateIP($gateway)) {
             echo json_encode(['success' => false, 'message' => 'Format IP address tidak valid!']);
             exit();
         } else {
-            $sql = "UPDATE ip_pools SET name = ?, start_ip = ?, end_ip = ? WHERE id = ?";
+            // Cek apakah pool dengan nama yang sama sudah ada (kecuali pool yang sedang diedit)
+            $cek_sql = "SELECT id FROM ip_pools WHERE name = ? AND id != ?";
+            $cek_stmt = $conn->prepare($cek_sql);
+            $cek_stmt->bind_param("si", $name, $id);
+            $cek_stmt->execute();
+            $cek_stmt->store_result();
+            if ($cek_stmt->num_rows > 0) {
+                echo json_encode(['success' => false, 'message' => 'Pool dengan nama tersebut sudah ada!']);
+                $cek_stmt->close();
+                exit();
+            }
+            $cek_stmt->close();
+
+            $sql = "UPDATE ip_pools SET name = ?, start_ip = ?, end_ip = ?, gateway = ? WHERE id = ?";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sssi", $name, $start_ip, $end_ip, $id);
-            
+            $stmt->bind_param("ssssi", $name, $start_ip, $end_ip, $gateway, $id);
+
             if ($stmt->execute()) {
                 echo json_encode(['success' => true, 'message' => 'IP Pool berhasil diperbarui!']);
             } else {
@@ -114,7 +129,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_pools') {
                 'name' => $row['name'],
                 'ranges' => $row['start_ip'] . '-' . $row['end_ip'],
                 'next_pool' => '',
-                'comment' => 'Pool ' . $row['name'] . ' (' . $row['start_ip'] . ' - ' . $row['end_ip'] . ')'
+                'comment' => 'Pool ' . $row['name'] . ' (' . $row['start_ip'] . ' - ' . $row['end_ip'] . ') - Gateway: ' . $row['gateway']
             ];
         }
     }
