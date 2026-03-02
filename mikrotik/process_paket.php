@@ -16,17 +16,18 @@ if (isset($_POST['action']) && $_POST['action'] == 'add') {
     $local_address = cleanInput($_POST['local_address']);
     $remote_address = cleanInput($_POST['remote_address']);
     $speed_limit = cleanInput($_POST['speed_limit']);
-    
+
     if (!empty($name) && !empty($local_address) && !empty($remote_address) && !empty($speed_limit)) {
         // Validasi format IP hanya untuk local_address
         if (!validateIP($local_address)) {
             echo json_encode(['success' => false, 'message' => 'Format Local Address tidak valid!']);
             exit();
         } else {
+            // Tidak validasi IP untuk remote_address karena bisa berupa nama pool
             $sql = "INSERT INTO paket_bandwidth (name, local_address, remote_address, speed_limit) VALUES (?, ?, ?, ?)";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("ssss", $name, $local_address, $remote_address, $speed_limit);
-            
+
             if ($stmt->execute()) {
                 echo json_encode(['success' => true, 'message' => 'Paket bandwidth berhasil ditambahkan!']);
             } else {
@@ -39,7 +40,6 @@ if (isset($_POST['action']) && $_POST['action'] == 'add') {
     }
     exit();
 }
-
 // Handle edit paket
 if (isset($_POST['action']) && $_POST['action'] == 'edit') {
     $id = cleanInput($_POST['id']);
@@ -47,17 +47,18 @@ if (isset($_POST['action']) && $_POST['action'] == 'edit') {
     $local_address = cleanInput($_POST['local_address']);
     $remote_address = cleanInput($_POST['remote_address']);
     $speed_limit = cleanInput($_POST['speed_limit']);
-    
+
     if (!empty($id) && !empty($name) && !empty($local_address) && !empty($remote_address) && !empty($speed_limit)) {
         // Validasi format IP hanya untuk local_address
         if (!validateIP($local_address)) {
             echo json_encode(['success' => false, 'message' => 'Format Local Address tidak valid!']);
             exit();
         } else {
+            // Tidak validasi IP untuk remote_address karena bisa berupa nama pool
             $sql = "UPDATE paket_bandwidth SET name = ?, local_address = ?, remote_address = ?, speed_limit = ? WHERE id = ?";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("ssssi", $name, $local_address, $remote_address, $speed_limit, $id);
-            
+
             if ($stmt->execute()) {
                 echo json_encode(['success' => true, 'message' => 'Paket bandwidth berhasil diperbarui!']);
             } else {
@@ -70,7 +71,6 @@ if (isset($_POST['action']) && $_POST['action'] == 'edit') {
     }
     exit();
 }
-
 // Handle hapus paket
 if (isset($_GET['action']) && $_GET['action'] == 'delete') {
     $id = cleanInput($_GET['id']);
