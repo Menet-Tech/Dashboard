@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Cek apakah ini tombol edit untuk pool atau paket
                 const poolName = row.querySelector('.pool-name').textContent.trim();
                 const poolRange = row.querySelector('.pool-range').textContent.trim();
-                const poolGateway = row.querySelector('.pool-gateway').textContent.trim();
+                const poolGateway = row.querySelector('.pool-gateway') ? row.querySelector('.pool-gateway').textContent.trim() : '';
 
                 // Jika ini pool, gunakan logika pool
                 if (poolRange.includes('-')) {
@@ -103,18 +103,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Isi form edit
                     document.getElementById('edit-name').value = poolName;
                     document.getElementById('edit-local-address').value = localAddress;
-
-                    // Set remote address di dropdown
-                    const remoteSelect = document.getElementById('edit-remote-address');
-                    for (let i = 0; i < remoteSelect.options.length; i++) {
-                        if (remoteSelect.options[i].value === remoteAddress) {
-                            remoteSelect.selectedIndex = i;
-                            break;
-                        }
-                    }
-
                     document.getElementById('edit-speed-limit').value = speedLimit;
                     document.getElementById('edit-id').value = paketId;
+
+                    // Set remote address di dropdown berdasarkan ID
+                    const remoteSelect = document.getElementById('edit-remote-address');
+                    const remoteAddressId = row.getAttribute('data-remote-id') || row.getAttribute('data-id');
+                    
+                    if (remoteAddressId) {
+                        for (let i = 0; i < remoteSelect.options.length; i++) {
+                            if (remoteSelect.options[i].value === remoteAddressId.toString()) {
+                                remoteSelect.selectedIndex = i;
+                                // Set local address dari gateway
+                                const gateway = remoteSelect.options[i].getAttribute('data-gateway');
+                                if (gateway) {
+                                    document.getElementById('edit-local-address').value = gateway;
+                                }
+                                break;
+                            }
+                        }
+                    }
 
                     // Tampilkan form edit
                     showEditForm();
@@ -285,15 +293,14 @@ if (document.getElementById('edit-pool-form')) {
 
     // Validasi form tambah (Paket) - HAPUS FUNGSI INI KARENA FORM SUDAH PAKAI SUBMIT LANGSUNG
 
-    // Event listener untuk dropdown remote address (tambah)
+// Event listener untuk dropdown remote address (tambah)
     if (document.getElementById('add-remote-address')) {
         document.getElementById('add-remote-address').addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
-            const startIP = selectedOption.getAttribute('data-start-ip');
+            const gateway = selectedOption.getAttribute('data-gateway');
             
-            if (startIP) {
-                const localAddress = generateLocalAddress(startIP);
-                document.getElementById('add-local-address').value = localAddress;
+            if (gateway) {
+                document.getElementById('add-local-address').value = gateway;
             }
         });
     }
@@ -302,11 +309,10 @@ if (document.getElementById('edit-pool-form')) {
     if (document.getElementById('edit-remote-address')) {
         document.getElementById('edit-remote-address').addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
-            const startIP = selectedOption.getAttribute('data-start-ip');
+            const gateway = selectedOption.getAttribute('data-gateway');
             
-            if (startIP) {
-                const localAddress = generateLocalAddress(startIP);
-                document.getElementById('edit-local-address').value = localAddress;
+            if (gateway) {
+                document.getElementById('edit-local-address').value = gateway;
             }
         });
     }

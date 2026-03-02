@@ -13,20 +13,44 @@ require_once '../config.php';
 // Handle tambah paket
 if (isset($_POST['action']) && $_POST['action'] == 'add') {
     $name = cleanInput($_POST['name']);
-    $local_address = cleanInput($_POST['local_address']);
     $remote_address = cleanInput($_POST['remote_address']);
     $speed_limit = cleanInput($_POST['speed_limit']);
 
-    if (!empty($name) && !empty($local_address) && !empty($remote_address) && !empty($speed_limit)) {
-        // Validasi format IP hanya untuk local_address
-        if (!validateIP($local_address)) {
+    if (!empty($name) && !empty($remote_address) && !empty($speed_limit)) {
+        // Ambil data pool berdasarkan ID
+        $poolStmt = $conn->prepare("SELECT id, gateway FROM ip_pools WHERE id = ?");
+        $poolStmt->bind_param("i", $remote_address);
+        $poolStmt->execute();
+        $poolStmt->bind_result($pool_id, $gateway);
+        
+        if ($poolStmt->fetch()) {
+            $poolStmt->close();
+        } else {
+            $poolStmt->close();
+            echo json_encode(['success' => false, 'message' => 'Pool tidak ditemukan!']);
+            exit();
+        }
+
+        if (!validateIP($gateway)) {
             echo json_encode(['success' => false, 'message' => 'Format Local Address tidak valid!']);
             exit();
         } else {
-            // Tidak validasi IP untuk remote_address karena bisa berupa nama pool
-            $sql = "INSERT INTO paket_bandwidth (name, local_address, remote_address, speed_limit) VALUES (?, ?, ?, ?)";
+            // Cek apakah nama paket sudah ada
+            $checkStmt = $conn->prepare("SELECT id FROM paket_bandwidth WHERE name = ?");
+            $checkStmt->bind_param("s", $name);
+            $checkStmt->execute();
+            $checkStmt->store_result();
+
+            if ($checkStmt->num_rows > 0) {
+                echo json_encode(['success' => false, 'message' => 'Nama paket bandwidth sudah ada!']);
+                $checkStmt->close();
+                exit();
+            }
+            $checkStmt->close();
+
+            $sql = "INSERT INTO paket_bandwidth (name, id_local_address, id_remote_address, speed_limit) VALUES (?, ?, ?, ?)";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("ssss", $name, $local_address, $remote_address, $speed_limit);
+            $stmt->bind_param("siss", $name, $pool_id, $pool_id, $speed_limit);
 
             if ($stmt->execute()) {
                 echo json_encode(['success' => true, 'message' => 'Paket bandwidth berhasil ditambahkan!']);
@@ -44,20 +68,43 @@ if (isset($_POST['action']) && $_POST['action'] == 'add') {
 if (isset($_POST['action']) && $_POST['action'] == 'edit') {
     $id = cleanInput($_POST['id']);
     $name = cleanInput($_POST['name']);
-    $local_address = cleanInput($_POST['local_address']);
     $remote_address = cleanInput($_POST['remote_address']);
     $speed_limit = cleanInput($_POST['speed_limit']);
 
-    if (!empty($id) && !empty($name) && !empty($local_address) && !empty($remote_address) && !empty($speed_limit)) {
-        // Validasi format IP hanya untuk local_address
-        if (!validateIP($local_address)) {
+    if (!empty($id) && !empty($name) && !empty($remote_address) && !empty($speed_limit)) {
+        // Ambil data pool berdasarkan ID
+        $poolStmt = $conn->prepare("SELECT id, gateway FROM ip_pools WHERE id = ?");
+        $poolStmt->bind_param("i", $remote_address);
+        $poolStmt->execute();
+        $poolStmt->bind_result($pool_id, $gateway);
+        
+        if ($poolStmt->fetch()) {
+            $poolStmt->close();
+        } else {
+            $poolStmt->close();
+            echo json_encode(['success' => false, 'message' => 'Pool tidak ditemukan!']);
+            exit();
+        }
+
+        if (!validateIP($gateway)) {
             echo json_encode(['success' => false, 'message' => 'Format Local Address tidak valid!']);
             exit();
         } else {
-            // Tidak validasi IP untuk remote_address karena bisa berupa nama pool
-            $sql = "UPDATE paket_bandwidth SET name = ?, local_address = ?, remote_address = ?, speed_limit = ? WHERE id = ?";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("ssssi", $name, $local_address, $remote_address, $speed_limit, $id);
+            // Cek apakah nama paket sudah ada (kecuali paket yang sedang diedit)
+            $checkStmt = $conn->prepare("SELECT id FROM paket_bandwidth WHERE name = ? AND id != ?");
+            $checkStmt->bind_param("si", $name, $id);
+            $checkStmt->execute();
+            $checkStmt->store_result();
+
+            if ($checkStmt->num_rows > 0) {
+                echo json_encode(['success' => false, 'message' => 'Nama paket bandwidth sudah ada!']);
+                $checkStmt->close();
+                exit();
+            }
+            $checkStmt->close();
+
+            $sql = "UPDATE paket_bandwidth SET name = ?, id_local_address = ?, id_remote_address = ?, speed_limit = ? WHERE id = ?";            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("sissi", $name, $pool_id, $pool_id, $speed_limit, $id);
 
             if ($stmt->execute()) {
                 echo json_encode(['success' => true, 'message' => 'Paket bandwidth berhasil diperbarui!']);
@@ -89,7 +136,10 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete') {
 
 // Ambil data paket untuk refresh
 if (isset($_GET['action']) && $_GET['action'] == 'get_pakets') {
-    $sql = "SELECT * FROM paket_bandwidth ORDER BY name";
+    $sql = "SELECT p.*, ip.name as pool_name, ip.gateway 
+            FROM paket_bandwidth p 
+            LEFT JOIN ip_pools ip ON p.id_remote_address = ip.id 
+            ORDER BY p.name";
     $result = $conn->query($sql);
     $pakets = [];
     if ($result->num_rows > 0) {
@@ -97,8 +147,8 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_pakets') {
             $pakets[] = [
                 'id' => $row['id'],
                 'name' => $row['name'],
-                'local_address' => $row['local_address'],
-                'remote_address' => $row['remote_address'],
+                'local_address' => $row['gateway'],
+                'remote_address' => $row['pool_name'],
                 'speed_limit' => $row['speed_limit']
             ];
         }

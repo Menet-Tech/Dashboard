@@ -90,6 +90,13 @@ if (isset($_POST['action']) && $_POST['action'] == 'edit') {
             $stmt->bind_param("ssssi", $name, $start_ip, $end_ip, $gateway, $id);
 
             if ($stmt->execute()) {
+                // Update semua paket yang menggunakan pool ini
+                $update_pakets_sql = "UPDATE paket_bandwidth SET local_address = ? WHERE remote_address = ?";
+                $update_pakets_stmt = $conn->prepare($update_pakets_sql);
+                $update_pakets_stmt->bind_param("ss", $gateway, $name);
+                $update_pakets_stmt->execute();
+                $update_pakets_stmt->close();
+
                 echo json_encode(['success' => true, 'message' => 'IP Pool berhasil diperbarui!']);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Error: ' . $stmt->error]);
