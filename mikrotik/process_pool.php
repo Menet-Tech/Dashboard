@@ -7,6 +7,9 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Set header untuk JSON response
+header('Content-Type: application/json');
+
 // Include file konfigurasi database
 require_once '../config.php';
 
@@ -25,6 +28,18 @@ if (isset($_POST['action']) && $_POST['action'] == 'add') {
             echo json_encode(['success' => false, 'message' => 'Start IP harus lebih kecil dari End IP!']);
             exit();
         } else {
+                // Cek apakah pool dengan nama yang sama sudah ada
+                $cek_sql = "SELECT id FROM ip_pools WHERE name = ?";
+                $cek_stmt = $conn->prepare($cek_sql);
+                $cek_stmt->bind_param("s", $name);
+                $cek_stmt->execute();
+                $cek_stmt->store_result();
+                if ($cek_stmt->num_rows > 0) {
+                    echo json_encode(['success' => false, 'message' => 'Pool dengan nama tersebut sudah ada!']);
+                    $cek_stmt->close();
+                    exit();
+                }
+                $cek_stmt->close();
             $sql = "INSERT INTO ip_pools (name, start_ip, end_ip) VALUES (?, ?, ?)";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("sss", $name, $start_ip, $end_ip);

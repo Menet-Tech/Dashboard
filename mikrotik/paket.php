@@ -18,7 +18,7 @@ if (isset($_POST['add_paket'])) {
     $local_address = cleanInput($_POST['local_address']);
     $remote_address = cleanInput($_POST['remote_address']);
     $speed_limit = cleanInput($_POST['speed_limit']);
-    
+
     if (!empty($name) && !empty($local_address) && !empty($remote_address) && !empty($speed_limit)) {
         // Validasi format IP hanya untuk local_address
         if (!validateIP($local_address)) {
@@ -44,21 +44,33 @@ if (isset($_POST['add_paket'])) {
                 $message = "Format Remote Address tidak valid!";
                 $message_type = "error";
             } else {
-                $sql = "INSERT INTO paket_bandwidth (name, local_address, remote_address, speed_limit) VALUES (?, ?, ?, ?)";
-                $stmt = $conn->prepare($sql);
-                $stmt->bind_param("ssss", $name, $local_address, $remote_address, $speed_limit);
+                // Cek apakah paket sudah ada
+                $checkStmt = $conn->prepare("SELECT id FROM paket_bandwidth WHERE name = ? OR (local_address = ? AND remote_address = ?)");
+                $checkStmt->bind_param("sss", $name, $local_address, $remote_address);
+                $checkStmt->execute();
+                $checkStmt->store_result();
 
-                if ($stmt->execute()) {
-                    $message = "Paket bandwidth berhasil ditambahkan!";
-                    $message_type = "success";
-                    // Redirect untuk refresh halaman dan data
-                    header("Location: paket.php");
-                    exit();
-                } else {
-                    $message = "Error: " . $stmt->error;
+                if ($checkStmt->num_rows > 0) {
+                    $message = "Paket bandwidth sudah ada!";
                     $message_type = "error";
+                } else {
+                    $sql = "INSERT INTO paket_bandwidth (name, local_address, remote_address, speed_limit) VALUES (?, ?, ?, ?)";
+                    $stmt = $conn->prepare($sql);
+                    $stmt->bind_param("ssss", $name, $local_address, $remote_address, $speed_limit);
+
+                    if ($stmt->execute()) {
+                        $message = "Paket bandwidth berhasil ditambahkan!";
+                        $message_type = "success";
+                        // Redirect untuk refresh halaman dan data
+                        header("Location: paket.php");
+                        exit();
+                    } else {
+                        $message = "Error: " . $stmt->error;
+                        $message_type = "error";
+                    }
+                    $stmt->close();
                 }
-                $stmt->close();
+                $checkStmt->close();
             }
         }
     } else {

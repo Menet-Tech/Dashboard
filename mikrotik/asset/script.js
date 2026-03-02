@@ -171,8 +171,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const startIP = document.getElementById('add-start-ip').value.trim();
             const endIP = document.getElementById('add-end-ip').value.trim();
 
+            const errorDiv = document.getElementById('add-pool-error');
+            
             if (!validateIP(startIP) || !validateIP(endIP)) {
                 console.error('Format IP address tidak valid!');
+                if (errorDiv) {
+                    errorDiv.textContent = 'Format IP address tidak valid!';
+                    errorDiv.style.display = 'block';
+                }
                 return;
             }
 
@@ -190,14 +196,25 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    if (errorDiv) {
+                        errorDiv.textContent = '';
+                        errorDiv.style.display = 'none';
+                    }
                     hideAddForm();
                     refreshPools();
                 } else {
-                    console.error('Error:', data.message);
+                    if (errorDiv) {
+                        errorDiv.textContent = data.message || 'Terjadi kesalahan.';
+                        errorDiv.style.display = 'block';
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
+                if (errorDiv) {
+                    errorDiv.textContent = 'Gagal menghubungi server.';
+                    errorDiv.style.display = 'block';
+                }
             });
         });
     }
