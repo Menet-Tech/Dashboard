@@ -17,28 +17,40 @@ if (isset($_POST['add_pool'])) {
     $name = cleanInput($_POST['name']);
     $start_ip = cleanInput($_POST['start_ip']);
     $end_ip = cleanInput($_POST['end_ip']);
-    
+
     if (!empty($name) && !empty($start_ip) && !empty($end_ip)) {
         // Validasi format IP
         if (!validateIP($start_ip) || !validateIP($end_ip)) {
             $message = "Format IP address tidak valid!";
             $message_type = "error";
         } else {
-            $sql = "INSERT INTO ip_pools (name, start_ip, end_ip) VALUES (?, ?, ?)";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sss", $name, $start_ip, $end_ip);
-            
-            if ($stmt->execute()) {
-                $message = "IP Pool berhasil ditambahkan!";
-                $message_type = "success";
-                // Redirect untuk refresh halaman dan data
-                header("Location: pool.php");
-                exit();
-            } else {
-                $message = "Error: " . $stmt->error;
+            // Cek apakah pool sudah ada
+            $checkStmt = $conn->prepare("SELECT id FROM ip_pools WHERE name = ? OR (start_ip = ? AND end_ip = ?)");
+            $checkStmt->bind_param("sss", $name, $start_ip, $end_ip);
+            $checkStmt->execute();
+            $checkStmt->store_result();
+
+            if ($checkStmt->num_rows > 0) {
+                $message = "IP Pool sudah ada!";
                 $message_type = "error";
+            } else {
+                $sql = "INSERT INTO ip_pools (name, start_ip, end_ip) VALUES (?, ?, ?)";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("sss", $name, $start_ip, $end_ip);
+
+                if ($stmt->execute()) {
+                    $message = "IP Pool berhasil ditambahkan!";
+                    $message_type = "success";
+                    // Redirect untuk refresh halaman dan data
+                    // header("Location: pool.php");
+                    // exit();
+                } else {
+                    $message = "Error: " . $stmt->error;
+                    $message_type = "error";
+                }
+                $stmt->close();
             }
-            $stmt->close();
+            $checkStmt->close();
         }
     } else {
         $message = "Semua field harus diisi!";
@@ -52,7 +64,7 @@ if (isset($_POST['edit_pool'])) {
     $name = cleanInput($_POST['name']);
     $start_ip = cleanInput($_POST['start_ip']);
     $end_ip = cleanInput($_POST['end_ip']);
-    
+
     if (!empty($id) && !empty($name) && !empty($start_ip) && !empty($end_ip)) {
         // Validasi format IP
         if (!validateIP($start_ip) || !validateIP($end_ip)) {
@@ -62,7 +74,7 @@ if (isset($_POST['edit_pool'])) {
             $sql = "UPDATE ip_pools SET name = ?, start_ip = ?, end_ip = ? WHERE id = ?";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("sssi", $name, $start_ip, $end_ip, $id);
-            
+
             if ($stmt->execute()) {
                 $message = "IP Pool berhasil diperbarui!";
                 $message_type = "success";
@@ -87,7 +99,7 @@ if (isset($_GET['delete'])) {
     $sql = "DELETE FROM ip_pools WHERE id = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $id);
-    
+
     if ($stmt->execute()) {
         $message = "IP Pool berhasil dihapus!";
         $message_type = "success";
@@ -178,6 +190,7 @@ if ($result->num_rows > 0) {
                     <button class="close-btn" onclick="hideAddForm()">&times;</button>
                 </div>
                 <form id="add-pool-form" method="POST" action="">
+                    <div id="add-pool-error" class="error-message" style="display: none; color: #d32f2f; margin-bottom: 10px; padding: 10px; background-color: #ffebee; border-left: 4px solid #d32f2f; border-radius: 4px;"></div>
                     <div class="form-group">
                         <div>
                             <label for="add-name">Nama Pool:</label>
@@ -275,7 +288,7 @@ if ($result->num_rows > 0) {
                         </div>
                     <?php else: ?>
                         <?php foreach ($pools as $index => $pool): ?>
-                            <?php 
+                            <?php
                             // Ambil ID dari database untuk setiap pool
                             $sql_id = "SELECT id FROM ip_pools WHERE name = ? AND start_ip = ? AND end_ip = ?";
                             $stmt_id = $conn->prepare($sql_id);
