@@ -15,30 +15,41 @@ $message = '';
 $message_type = '';
 if (isset($_POST['add_paket'])) {
     $name = cleanInput($_POST['name']);
-    $local_address = cleanInput($_POST['local_address']);
     $remote_address = cleanInput($_POST['remote_address']);
     $speed_limit = cleanInput($_POST['speed_limit']);
 
-    if (!empty($name) && !empty($local_address) && !empty($remote_address) && !empty($speed_limit)) {
-        // Validasi format IP hanya untuk local_address
-        if (!validateIP($local_address)) {
+    if (!empty($name) && !empty($remote_address) && !empty($speed_limit)) {
+        // Ambil data pool berdasarkan ID
+        $poolStmt = $conn->prepare("SELECT id, gateway FROM ip_pools WHERE id = ?");
+        $poolStmt->bind_param("i", $remote_address);
+        $poolStmt->execute();
+        $poolStmt->bind_result($pool_id, $gateway);
+        
+        if ($poolStmt->fetch()) {
+            $poolStmt->close();
+        } else {
+            $poolStmt->close();
+            $message = "Pool tidak ditemukan!";
+            $message_type = "error";
+        }
+
+        if (!validateIP($gateway)) {
             $message = "Format Local Address tidak valid!";
             $message_type = "error";
         } else {
-            // Tidak validasi IP untuk remote_address karena bisa berupa nama pool
-            // Cek apakah paket sudah ada
-            $checkStmt = $conn->prepare("SELECT id FROM paket_bandwidth WHERE name = ? OR (local_address = ? AND remote_address = ?)");
-            $checkStmt->bind_param("sss", $name, $local_address, $remote_address);
+            // Cek apakah nama paket sudah ada
+            $checkStmt = $conn->prepare("SELECT id FROM paket_bandwidth WHERE name = ?");
+            $checkStmt->bind_param("s", $name);
             $checkStmt->execute();
             $checkStmt->store_result();
 
             if ($checkStmt->num_rows > 0) {
-                $message = "Paket bandwidth sudah ada!";
+                $message = "Nama paket bandwidth sudah ada!";
                 $message_type = "error";
             } else {
-                $sql = "INSERT INTO paket_bandwidth (name, local_address, remote_address, speed_limit) VALUES (?, ?, ?, ?)";
+                $sql = "INSERT INTO paket_bandwidth (name, id_local_address, id_remote_address, speed_limit) VALUES (?, ?, ?, ?)";
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("ssss", $name, $local_address, $remote_address, $speed_limit);
+                $stmt->bind_param("siss", $name, $pool_id, $pool_id, $speed_limit);
 
                 if ($stmt->execute()) {
                     $message = "Paket bandwidth berhasil ditambahkan!";
@@ -64,32 +75,55 @@ if (isset($_POST['add_paket'])) {
 if (isset($_POST['edit_paket'])) {
     $id = cleanInput($_POST['id']);
     $name = cleanInput($_POST['name']);
-    $local_address = cleanInput($_POST['local_address']);
     $remote_address = cleanInput($_POST['remote_address']);
     $speed_limit = cleanInput($_POST['speed_limit']);
 
-    if (!empty($id) && !empty($name) && !empty($local_address) && !empty($remote_address) && !empty($speed_limit)) {
-        // Validasi format IP hanya untuk local_address
-        if (!validateIP($local_address)) {
+    if (!empty($id) && !empty($name) && !empty($remote_address) && !empty($speed_limit)) {
+        // Ambil data pool berdasarkan ID
+        $poolStmt = $conn->prepare("SELECT id, gateway FROM ip_pools WHERE id = ?");
+        $poolStmt->bind_param("i", $remote_address);
+        $poolStmt->execute();
+        $poolStmt->bind_result($pool_id, $gateway);
+        
+        if ($poolStmt->fetch()) {
+            $poolStmt->close();
+        } else {
+            $poolStmt->close();
+            $message = "Pool tidak ditemukan!";
+            $message_type = "error";
+        }
+
+        if (!validateIP($gateway)) {
             $message = "Format Local Address tidak valid!";
             $message_type = "error";
         } else {
-            // Tidak validasi IP untuk remote_address karena bisa berupa nama pool
-            $sql = "UPDATE paket_bandwidth SET name = ?, local_address = ?, remote_address = ?, speed_limit = ? WHERE id = ?";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("ssssi", $name, $local_address, $remote_address, $speed_limit, $id);
+            // Cek apakah nama paket sudah ada (kecuali paket yang sedang diedit)
+            $checkStmt = $conn->prepare("SELECT id FROM paket_bandwidth WHERE name = ? AND id != ?");
+            $checkStmt->bind_param("si", $name, $id);
+            $checkStmt->execute();
+            $checkStmt->store_result();
 
-            if ($stmt->execute()) {
-                $message = "Paket bandwidth berhasil diperbarui!";
-                $message_type = "success";
-                // Redirect untuk refresh halaman dan data
-                header("Location: paket.php");
-                exit();
-            } else {
-                $message = "Error: " . $stmt->error;
+            if ($checkStmt->num_rows > 0) {
+                $message = "Nama paket bandwidth sudah ada!";
                 $message_type = "error";
+            } else {
+                $sql = "UPDATE paket_bandwidth SET name = ?, id_local_address = ?, id_remote_address = ?, speed_limit = ? WHERE id = ?";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("sissi", $name, $pool_id, $pool_id, $speed_limit, $id);
+
+                if ($stmt->execute()) {
+                    $message = "Paket bandwidth berhasil diperbarui!";
+                    $message_type = "success";
+                    // Redirect untuk refresh halaman dan data
+                    header("Location: paket.php");
+                    exit();
+                } else {
+                    $message = "Error: " . $stmt->error;
+                    $message_type = "error";
+                }
+                $stmt->close();
             }
-            $stmt->close();
+            $checkStmt->close();
         }
     } else {
         $message = "Semua field harus diisi!";
@@ -118,7 +152,10 @@ if (isset($_GET['delete'])) {
 }
 
 // Ambil data paket dari database
-$sql = "SELECT * FROM paket_bandwidth ORDER BY name";
+$sql = "SELECT p.*, ip.name as pool_name, ip.gateway 
+        FROM paket_bandwidth p 
+        LEFT JOIN ip_pools ip ON p.id_remote_address = ip.id 
+        ORDER BY p.name";
 $result = $conn->query($sql);
 $pakets = [];
 if ($result->num_rows > 0) {
@@ -126,25 +163,44 @@ if ($result->num_rows > 0) {
         $pakets[] = [
             'id' => $row['id'],
             'name' => $row['name'],
-            'local_address' => $row['local_address'],
-            'remote_address' => $row['remote_address'],
+            'local_address' => $row['gateway'],
+            'remote_address' => $row['pool_name'],
             'speed_limit' => $row['speed_limit']
         ];
     }
 }
 
 // Ambil data IP Pool untuk dropdown
-$sql_pools = "SELECT name, start_ip, end_ip FROM ip_pools ORDER BY name";
+$sql_pools = "SELECT id, name, gateway FROM ip_pools ORDER BY name";
 $result_pools = $conn->query($sql_pools);
 $ip_pools = [];
 if ($result_pools->num_rows > 0) {
     while($row = $result_pools->fetch_assoc()) {
         $ip_pools[] = [
+            'id' => $row['id'],
             'name' => $row['name'],
-            'start_ip' => $row['start_ip'],
-            'end_ip' => $row['end_ip']
+            'gateway' => $row['gateway']
         ];
     }
+}
+
+// Ambil data paket untuk edit (untuk mengisi dropdown remote address)
+$edit_paket = null;
+if (isset($_GET['edit_id'])) {
+    $edit_id = cleanInput($_GET['edit_id']);
+    $sql_edit = "SELECT p.*, ip.name as pool_name, ip.gateway 
+                 FROM paket_bandwidth p 
+                 LEFT JOIN ip_pools ip ON p.id_remote_address = ip.id 
+                 WHERE p.id = ?";
+    $stmt_edit = $conn->prepare($sql_edit);
+    $stmt_edit->bind_param("i", $edit_id);
+    $stmt_edit->execute();
+    $result_edit = $stmt_edit->get_result();
+    
+    if ($result_edit->num_rows > 0) {
+        $edit_paket = $result_edit->fetch_assoc();
+    }
+    $stmt_edit->close();
 }
 ?>
 
@@ -216,17 +272,16 @@ if ($result_pools->num_rows > 0) {
                         </div>
                         <div>
                             <label for="add-local-address">Local Address:</label>
-                            <input type="text" id="add-local-address" name="local_address" placeholder="Contoh: 192.168.1.1" required>
+                            <input type="text" id="add-local-address" name="local_address" placeholder="Contoh: 192.168.1.1" required readonly>
                         </div>
                         <div>
                             <label for="add-remote-address">Remote Address:</label>
                             <select id="add-remote-address" name="remote_address" required class="form-control">
                                 <option value="">Pilih IP Pool</option>
                                 <?php foreach ($ip_pools as $pool): ?>
-                                    <option value="<?php echo htmlspecialchars($pool['name']); ?>"
-                                            data-start-ip="<?php echo htmlspecialchars($pool['start_ip']); ?>"
-                                            data-end-ip="<?php echo htmlspecialchars($pool['end_ip']); ?>">
-                                        <?php echo htmlspecialchars($pool['name']); ?> (<?php echo htmlspecialchars($pool['start_ip']); ?> - <?php echo htmlspecialchars($pool['end_ip']); ?>)
+                                    <option value="<?php echo htmlspecialchars($pool['id']); ?>"
+                                            data-gateway="<?php echo htmlspecialchars($pool['gateway']); ?>">
+                                        <?php echo htmlspecialchars($pool['name']); ?> (Gateway: <?php echo htmlspecialchars($pool['gateway']); ?>)
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -262,17 +317,16 @@ if ($result_pools->num_rows > 0) {
                         </div>
                         <div>
                             <label for="edit-local-address">Local Address:</label>
-                            <input type="text" id="edit-local-address" name="local_address" required>
+                            <input type="text" id="edit-local-address" name="local_address" required readonly>
                         </div>
                         <div>
                             <label for="edit-remote-address">Remote Address:</label>
                             <select id="edit-remote-address" name="remote_address" required class="form-control">
                                 <option value="">Pilih IP Pool</option>
                                 <?php foreach ($ip_pools as $pool): ?>
-                                    <option value="<?php echo htmlspecialchars($pool['name']); ?>"
-                                            data-start-ip="<?php echo htmlspecialchars($pool['start_ip']); ?>"
-                                            data-end-ip="<?php echo htmlspecialchars($pool['end_ip']); ?>">
-                                        <?php echo htmlspecialchars($pool['name']); ?> (<?php echo htmlspecialchars($pool['start_ip']); ?> - <?php echo htmlspecialchars($pool['end_ip']); ?>)
+                                    <option value="<?php echo htmlspecialchars($pool['id']); ?>"
+                                            data-gateway="<?php echo htmlspecialchars($pool['gateway']); ?>">
+                                        <?php echo htmlspecialchars($pool['name']); ?> (Gateway: <?php echo htmlspecialchars($pool['gateway']); ?>)
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -340,7 +394,7 @@ if ($result_pools->num_rows > 0) {
                         </div>
                     <?php else: ?>
                         <?php foreach ($pakets as $paket): ?>
-                            <div class="pool-row" data-id="<?php echo $paket['id']; ?>">
+                            <div class="pool-row" data-id="<?php echo $paket['id']; ?>" data-remote-id="<?php echo $paket['id']; ?>">
                                 <div class="pool-name">
                                     <i class="fas fa-gem"></i>
                                     <?php echo htmlspecialchars($paket['name']); ?>
