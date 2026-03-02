@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Event delegation untuk tombol edit dan delete
+// Event delegation untuk tombol edit dan delete
     document.addEventListener('click', function(e) {
         if (e.target && e.target.classList.contains('btn-edit')) {
             e.preventDefault();
@@ -73,20 +73,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Cek apakah ini tombol edit untuk pool atau paket
                 const poolName = row.querySelector('.pool-name').textContent.trim();
                 const poolRange = row.querySelector('.pool-range').textContent.trim();
-                
+                const poolGateway = row.querySelector('.pool-gateway').textContent.trim();
+
                 // Jika ini pool, gunakan logika pool
                 if (poolRange.includes('-')) {
                     const [startIP, endIP] = poolRange.split('-');
-                    
+
                     // Ambil ID dari data attribute atau cari dari database
                     const poolId = row.getAttribute('data-id') || (index + 1);
-                    
+
                     // Isi form edit
                     document.getElementById('edit-name').value = poolName;
                     document.getElementById('edit-start-ip').value = startIP.trim();
                     document.getElementById('edit-end-ip').value = endIP.trim();
+                    document.getElementById('edit-gateway').value = poolGateway.trim();
                     document.getElementById('edit-id').value = poolId;
-                    
+
                     // Tampilkan form edit
                     showEditForm();
                 } else {
@@ -94,14 +96,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     const localAddress = poolRange;
                     const remoteAddress = row.querySelector('.pool-next').textContent.trim();
                     const speedLimit = row.querySelector('.pool-comment').textContent.trim();
-                    
+
                     // Ambil ID dari data attribute
                     const paketId = row.getAttribute('data-id');
-                    
+
                     // Isi form edit
                     document.getElementById('edit-name').value = poolName;
                     document.getElementById('edit-local-address').value = localAddress;
-                    
+
                     // Set remote address di dropdown
                     const remoteSelect = document.getElementById('edit-remote-address');
                     for (let i = 0; i < remoteSelect.options.length; i++) {
@@ -110,10 +112,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             break;
                         }
                     }
-                    
+
                     document.getElementById('edit-speed-limit').value = speedLimit;
                     document.getElementById('edit-id').value = paketId;
-                    
+
                     // Tampilkan form edit
                     showEditForm();
                 }
@@ -163,31 +165,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Validasi form tambah (Pool)
-    if (document.getElementById('add-pool-form')) {
-        document.getElementById('add-pool-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const name = document.getElementById('add-name').value.trim();
-            const startIP = document.getElementById('add-start-ip').value.trim();
-            const endIP = document.getElementById('add-end-ip').value.trim();
+// Validasi form tambah (Pool)
+if (document.getElementById('add-pool-form')) {
+    document.getElementById('add-pool-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const name = document.getElementById('add-name').value.trim();
+        const startIP = document.getElementById('add-start-ip').value.trim();
+        const endIP = document.getElementById('add-end-ip').value.trim();
+        const gateway = document.getElementById('add-gateway').value.trim();
 
-            const errorDiv = document.getElementById('add-pool-error');
-            
-            if (!validateIP(startIP) || !validateIP(endIP)) {
-                console.error('Format IP address tidak valid!');
-                if (errorDiv) {
-                    errorDiv.textContent = 'Format IP address tidak valid!';
-                    errorDiv.style.display = 'block';
-                }
-                return;
+        const errorDiv = document.getElementById('add-pool-error');
+
+        if (!validateIP(startIP) || !validateIP(endIP) || !validateIP(gateway)) {
+            console.error('Format IP address tidak valid!');
+            if (errorDiv) {
+                errorDiv.textContent = 'Format IP address tidak valid!';
+                errorDiv.style.display = 'block';
             }
+            return;
+        }
 
-            // Submit via AJAX
+// Submit via AJAX
             const formData = new FormData();
             formData.append('action', 'add');
             formData.append('name', name);
             formData.append('start_ip', startIP);
             formData.append('end_ip', endIP);
+            formData.append('gateway', gateway);
 
             fetch('process_pool.php', {
                 method: 'POST',
@@ -219,27 +223,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Validasi form edit (Pool)
-    if (document.getElementById('edit-pool-form')) {
-        document.getElementById('edit-pool-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const id = document.getElementById('edit-id').value;
-            const name = document.getElementById('edit-name').value.trim();
-            const startIP = document.getElementById('edit-start-ip').value.trim();
-            const endIP = document.getElementById('edit-end-ip').value.trim();
+// Validasi form edit (Pool)
+if (document.getElementById('edit-pool-form')) {
+    document.getElementById('edit-pool-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const id = document.getElementById('edit-id').value;
+        const name = document.getElementById('edit-name').value.trim();
+        const startIP = document.getElementById('edit-start-ip').value.trim();
+        const endIP = document.getElementById('edit-end-ip').value.trim();
+        const gateway = document.getElementById('edit-gateway').value.trim();
 
-            if (!validateIP(startIP) || !validateIP(endIP)) {
-                console.error('Format IP address tidak valid!');
-                return;
+        const errorDiv = document.getElementById('edit-pool-error');
+
+        if (!validateIP(startIP) || !validateIP(endIP) || !validateIP(gateway)) {
+            console.error('Format IP address tidak valid!');
+            if (errorDiv) {
+                errorDiv.textContent = 'Format IP address tidak valid!';
+                errorDiv.style.display = 'block';
             }
+            return;
+        }
 
-            // Submit via AJAX
+// Submit via AJAX
             const formData = new FormData();
             formData.append('action', 'edit');
             formData.append('id', id);
             formData.append('name', name);
             formData.append('start_ip', startIP);
             formData.append('end_ip', endIP);
+            formData.append('gateway', gateway);
 
             fetch('process_pool.php', {
                 method: 'POST',
@@ -248,14 +260,25 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    if (errorDiv) {
+                        errorDiv.textContent = '';
+                        errorDiv.style.display = 'none';
+                    }
                     hideEditForm();
                     refreshPools();
                 } else {
-                    console.error('Error:', data.message);
+                    if (errorDiv) {
+                        errorDiv.textContent = data.message || 'Terjadi kesalahan.';
+                        errorDiv.style.display = 'block';
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
+                if (errorDiv) {
+                    errorDiv.textContent = 'Gagal menghubungi server.';
+                    errorDiv.style.display = 'block';
+                }
             });
         });
     }

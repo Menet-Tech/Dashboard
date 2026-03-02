@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Waktu pembuatan: 28 Feb 2026 pada 15.10
+-- Waktu pembuatan: 02 Mar 2026 pada 10.54
 -- Versi server: 10.4.32-MariaDB
 -- Versi PHP: 8.2.12
 
@@ -41,36 +41,9 @@ CREATE TABLE `ip_pools` (
 --
 
 INSERT INTO `ip_pools` (`id`, `name`, `start_ip`, `end_ip`, `created_at`, `updated_at`) VALUES
-(4, 'pool-wifi-1', '172.16.1.50', '172.16.1.100', '2026-02-28 12:21:57', '2026-02-28 12:21:57'),
-(6, 'test', '172.16.1.50', '172.16.1.100', '2026-02-28 12:21:57', '2026-02-28 12:21:57'),
-(7, 'zx', '172.16.1.1', '172.16.1.100', '2026-02-28 13:58:21', '2026-02-28 13:58:21'),
-(8, 'coba 1', '192.168.10.1', '192.168.10.100', '2026-02-28 13:58:50', '2026-02-28 13:58:50'),
-(9, '1', '172.16.1.1', '172.16.1.50', '2026-02-28 14:06:17', '2026-02-28 14:06:17');
-
--- --------------------------------------------------------
-
---
--- Struktur dari tabel `paket_bandwidth`
---
-
-CREATE TABLE `paket_bandwidth` (
-  `id` int(11) NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `local_address` varchar(15) NOT NULL,
-  `remote_address` varchar(15) NOT NULL,
-  `speed_limit` varchar(50) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data untuk tabel `paket_bandwidth`
---
-
-INSERT INTO `paket_bandwidth` (`id`, `name`, `local_address`, `remote_address`, `speed_limit`, `created_at`, `updated_at`) VALUES
-(1, 'Paket 10 Mbps', '192.168.1.1', '192.168.1.254', '10M/10M', '2026-02-28 14:44:52', '2026-02-28 14:44:52'),
-(2, 'Paket 20 Mbps', '192.168.2.1', '192.168.2.254', '20M/20M', '2026-02-28 14:44:52', '2026-02-28 14:44:52'),
-(3, 'Paket 50 Mbps', '192.168.3.1', '192.168.3.254', '50M/50M', '2026-02-28 14:44:52', '2026-02-28 14:44:52');
+(90, '10MB/s1', '192.168.10.1', '192.168.10.253', '2026-03-02 09:42:31', '2026-03-02 09:50:51'),
+(91, '20MB/s', '192.168.20.1', '192.168.20.253', '2026-03-02 09:42:53', '2026-03-02 09:45:20'),
+(92, '30MB/s', '192.168.30.1', '192.168.30.253', '2026-03-02 09:43:07', '2026-03-02 09:45:37');
 
 --
 -- Trigger `ip_pools`
@@ -100,6 +73,31 @@ END
 $$
 DELIMITER ;
 
+-- --------------------------------------------------------
+
+--
+-- Struktur dari tabel `paket_bandwidth`
+--
+
+CREATE TABLE `paket_bandwidth` (
+  `id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `local_address` varchar(15) NOT NULL,
+  `remote_address` varchar(100) NOT NULL,
+  `speed_limit` varchar(50) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data untuk tabel `paket_bandwidth`
+--
+
+INSERT INTO `paket_bandwidth` (`id`, `name`, `local_address`, `remote_address`, `speed_limit`, `created_at`, `updated_at`) VALUES
+(27, 'Paket 10 Mbps', '192.168.10.254', '10MB/s', '10M/10M', '2026-03-02 09:46:40', '2026-03-02 09:47:39'),
+(28, 'Paket 20 Mbps', '192.168.20.254', '20MB/s', '20M/20M', '2026-03-02 09:46:59', '2026-03-02 09:46:59'),
+(29, 'Paket 30 Mbps', '192.168.30.254', '30MB/s', '50M/50M', '2026-03-02 09:47:12', '2026-03-02 09:47:12');
+
 --
 -- Trigger `paket_bandwidth`
 --
@@ -111,13 +109,8 @@ $$
 DELIMITER ;
 DELIMITER $$
 CREATE TRIGGER `validate_paket_ip_format` BEFORE INSERT ON `paket_bandwidth` FOR EACH ROW BEGIN
-    -- Validasi format IP address
-    IF NOT NEW.local_address REGEXP '^([0-9]{1,3}.){3}[0-9]{1,3}$' THEN
+    IF NOT NEW.local_address REGEXP '^([0-9]{1,3}\.){3}[0-9]{1,3}$' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Format Local Address tidak valid';
-    END IF;
-    
-    IF NOT NEW.remote_address REGEXP '^([0-9]{1,3}.){3}[0-9]{1,3}$' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Format Remote Address tidak valid';
     END IF;
 END
 $$
@@ -155,13 +148,13 @@ ALTER TABLE `paket_bandwidth`
 -- AUTO_INCREMENT untuk tabel `ip_pools`
 --
 ALTER TABLE `ip_pools`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=93;
 
 --
 -- AUTO_INCREMENT untuk tabel `paket_bandwidth`
 --
 ALTER TABLE `paket_bandwidth`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
