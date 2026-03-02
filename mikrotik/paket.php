@@ -25,53 +25,34 @@ if (isset($_POST['add_paket'])) {
             $message = "Format Local Address tidak valid!";
             $message_type = "error";
         } else {
-            // Pastikan remote_address berformat IP. Jika user memilih nama pool,
-            // coba ambil start_ip dari tabel ip_pools.
-            if (!validateIP($remote_address)) {
-                $poolStmt = $conn->prepare("SELECT start_ip FROM ip_pools WHERE name = ? LIMIT 1");
-                if ($poolStmt) {
-                    $poolStmt->bind_param("s", $remote_address);
-                    $poolStmt->execute();
-                    $poolStmt->bind_result($start_ip);
-                    if ($poolStmt->fetch()) {
-                        $remote_address = $start_ip;
-                    }
-                    $poolStmt->close();
-                }
-            }
+            // Tidak validasi IP untuk remote_address karena bisa berupa nama pool
+            // Cek apakah paket sudah ada
+            $checkStmt = $conn->prepare("SELECT id FROM paket_bandwidth WHERE name = ? OR (local_address = ? AND remote_address = ?)");
+            $checkStmt->bind_param("sss", $name, $local_address, $remote_address);
+            $checkStmt->execute();
+            $checkStmt->store_result();
 
-            if (!validateIP($remote_address)) {
-                $message = "Format Remote Address tidak valid!";
+            if ($checkStmt->num_rows > 0) {
+                $message = "Paket bandwidth sudah ada!";
                 $message_type = "error";
             } else {
-                // Cek apakah paket sudah ada
-                $checkStmt = $conn->prepare("SELECT id FROM paket_bandwidth WHERE name = ? OR (local_address = ? AND remote_address = ?)");
-                $checkStmt->bind_param("sss", $name, $local_address, $remote_address);
-                $checkStmt->execute();
-                $checkStmt->store_result();
+                $sql = "INSERT INTO paket_bandwidth (name, local_address, remote_address, speed_limit) VALUES (?, ?, ?, ?)";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("ssss", $name, $local_address, $remote_address, $speed_limit);
 
-                if ($checkStmt->num_rows > 0) {
-                    $message = "Paket bandwidth sudah ada!";
-                    $message_type = "error";
+                if ($stmt->execute()) {
+                    $message = "Paket bandwidth berhasil ditambahkan!";
+                    $message_type = "success";
+                    // Redirect untuk refresh halaman dan data
+                    header("Location: paket.php");
+                    exit();
                 } else {
-                    $sql = "INSERT INTO paket_bandwidth (name, local_address, remote_address, speed_limit) VALUES (?, ?, ?, ?)";
-                    $stmt = $conn->prepare($sql);
-                    $stmt->bind_param("ssss", $name, $local_address, $remote_address, $speed_limit);
-
-                    if ($stmt->execute()) {
-                        $message = "Paket bandwidth berhasil ditambahkan!";
-                        $message_type = "success";
-                        // Redirect untuk refresh halaman dan data
-                        header("Location: paket.php");
-                        exit();
-                    } else {
-                        $message = "Error: " . $stmt->error;
-                        $message_type = "error";
-                    }
-                    $stmt->close();
+                    $message = "Error: " . $stmt->error;
+                    $message_type = "error";
                 }
-                $checkStmt->close();
+                $stmt->close();
             }
+            $checkStmt->close();
         }
     } else {
         $message = "Semua field harus diisi!";
@@ -86,48 +67,29 @@ if (isset($_POST['edit_paket'])) {
     $local_address = cleanInput($_POST['local_address']);
     $remote_address = cleanInput($_POST['remote_address']);
     $speed_limit = cleanInput($_POST['speed_limit']);
-    
+
     if (!empty($id) && !empty($name) && !empty($local_address) && !empty($remote_address) && !empty($speed_limit)) {
         // Validasi format IP hanya untuk local_address
         if (!validateIP($local_address)) {
             $message = "Format Local Address tidak valid!";
             $message_type = "error";
         } else {
-            // Pastikan remote_address berformat IP. Jika user memilih nama pool,
-            // coba ambil start_ip dari tabel ip_pools.
-            if (!validateIP($remote_address)) {
-                $poolStmt = $conn->prepare("SELECT start_ip FROM ip_pools WHERE name = ? LIMIT 1");
-                if ($poolStmt) {
-                    $poolStmt->bind_param("s", $remote_address);
-                    $poolStmt->execute();
-                    $poolStmt->bind_result($start_ip);
-                    if ($poolStmt->fetch()) {
-                        $remote_address = $start_ip;
-                    }
-                    $poolStmt->close();
-                }
-            }
+            // Tidak validasi IP untuk remote_address karena bisa berupa nama pool
+            $sql = "UPDATE paket_bandwidth SET name = ?, local_address = ?, remote_address = ?, speed_limit = ? WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ssssi", $name, $local_address, $remote_address, $speed_limit, $id);
 
-            if (!validateIP($remote_address)) {
-                $message = "Format Remote Address tidak valid!";
-                $message_type = "error";
+            if ($stmt->execute()) {
+                $message = "Paket bandwidth berhasil diperbarui!";
+                $message_type = "success";
+                // Redirect untuk refresh halaman dan data
+                header("Location: paket.php");
+                exit();
             } else {
-                $sql = "UPDATE paket_bandwidth SET name = ?, local_address = ?, remote_address = ?, speed_limit = ? WHERE id = ?";
-                $stmt = $conn->prepare($sql);
-                $stmt->bind_param("ssssi", $name, $local_address, $remote_address, $speed_limit, $id);
-
-                if ($stmt->execute()) {
-                    $message = "Paket bandwidth berhasil diperbarui!";
-                    $message_type = "success";
-                    // Redirect untuk refresh halaman dan data
-                    header("Location: paket.php");
-                    exit();
-                } else {
-                    $message = "Error: " . $stmt->error;
-                    $message_type = "error";
-                }
-                $stmt->close();
+                $message = "Error: " . $stmt->error;
+                $message_type = "error";
             }
+            $stmt->close();
         }
     } else {
         $message = "Semua field harus diisi!";
@@ -141,10 +103,10 @@ if (isset($_GET['delete'])) {
     $sql = "DELETE FROM paket_bandwidth WHERE id = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $id);
-    
+
     if ($stmt->execute()) {
         $message = "Paket bandwidth berhasil dihapus!";
-        $message_type = "success";/*  */
+        $message_type = "success";
         // Redirect untuk refresh halaman dan data
         header("Location: paket.php");
         exit();
@@ -261,7 +223,7 @@ if ($result_pools->num_rows > 0) {
                             <select id="add-remote-address" name="remote_address" required class="form-control">
                                 <option value="">Pilih IP Pool</option>
                                 <?php foreach ($ip_pools as $pool): ?>
-                                    <option value="<?php echo htmlspecialchars($pool['name']); ?>" 
+                                    <option value="<?php echo htmlspecialchars($pool['name']); ?>"
                                             data-start-ip="<?php echo htmlspecialchars($pool['start_ip']); ?>"
                                             data-end-ip="<?php echo htmlspecialchars($pool['end_ip']); ?>">
                                         <?php echo htmlspecialchars($pool['name']); ?> (<?php echo htmlspecialchars($pool['start_ip']); ?> - <?php echo htmlspecialchars($pool['end_ip']); ?>)
@@ -307,7 +269,7 @@ if ($result_pools->num_rows > 0) {
                             <select id="edit-remote-address" name="remote_address" required class="form-control">
                                 <option value="">Pilih IP Pool</option>
                                 <?php foreach ($ip_pools as $pool): ?>
-                                    <option value="<?php echo htmlspecialchars($pool['name']); ?>" 
+                                    <option value="<?php echo htmlspecialchars($pool['name']); ?>"
                                             data-start-ip="<?php echo htmlspecialchars($pool['start_ip']); ?>"
                                             data-end-ip="<?php echo htmlspecialchars($pool['end_ip']); ?>">
                                         <?php echo htmlspecialchars($pool['name']); ?> (<?php echo htmlspecialchars($pool['start_ip']); ?> - <?php echo htmlspecialchars($pool['end_ip']); ?>)
@@ -387,7 +349,29 @@ if ($result_pools->num_rows > 0) {
                                     <?php echo htmlspecialchars($paket['local_address']); ?>
                                 </div>
                                 <div class="pool-next">
-                                    <?php echo htmlspecialchars($paket['remote_address']); ?>
+                                    <?php
+                                    // Cek apakah remote_address adalah nama pool atau IP
+                                    if (validateIP($paket['remote_address'])) {
+                                        // Jika IP, cari nama pool yang sesuai
+                                        $poolStmt = $conn->prepare("SELECT name FROM ip_pools WHERE start_ip = ? OR end_ip = ? OR name = ? LIMIT 1");
+                                        if ($poolStmt) {
+                                            $poolStmt->bind_param("sss", $paket['remote_address'], $paket['remote_address'], $paket['remote_address']);
+                                            $poolStmt->execute();
+                                            $poolStmt->bind_result($pool_name);
+                                            if ($poolStmt->fetch()) {
+                                                echo htmlspecialchars($pool_name);
+                                            } else {
+                                                echo htmlspecialchars($paket['remote_address']);
+                                            }
+                                            $poolStmt->close();
+                                        } else {
+                                            echo htmlspecialchars($paket['remote_address']);
+                                        }
+                                    } else {
+                                        // Jika bukan IP, tampilkan langsung (sudah nama pool)
+                                        echo htmlspecialchars($paket['remote_address']);
+                                    }
+                                    ?>
                                 </div>
                                 <div class="pool-comment">
                                     <?php echo htmlspecialchars($paket['speed_limit']); ?>
@@ -409,7 +393,7 @@ if ($result_pools->num_rows > 0) {
     </div>
 
     <script src="asset/script.js"></script>
-    
+
     <!-- Tambahkan fungsi validasi -->
     <script>
     // Validasi form tambah
@@ -418,13 +402,13 @@ if ($result_pools->num_rows > 0) {
         const localAddress = document.getElementById('add-local-address').value.trim();
         const remoteAddress = document.getElementById('add-remote-address').value.trim();
         const speedLimit = document.getElementById('add-speed-limit').value.trim();
-        
+
         if (!name || !localAddress || !remoteAddress || !speedLimit) {
             e.preventDefault();
             alert('Semua field harus diisi!');
             return false;
         }
-        
+
         // Validasi format IP hanya untuk local_address
         const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
         if (!ipRegex.test(localAddress)) {
@@ -432,23 +416,23 @@ if ($result_pools->num_rows > 0) {
             alert('Format Local Address tidak valid!');
             return false;
         }
-        
+
         return true;
     });
-    
+
     // Validasi form edit
     document.getElementById('edit-paket-form').addEventListener('submit', function(e) {
         const name = document.getElementById('edit-name').value.trim();
         const localAddress = document.getElementById('edit-local-address').value.trim();
         const remoteAddress = document.getElementById('edit-remote-address').value.trim();
         const speedLimit = document.getElementById('edit-speed-limit').value.trim();
-        
+
         if (!name || !localAddress || !remoteAddress || !speedLimit) {
             e.preventDefault();
             alert('Semua field harus diisi!');
             return false;
         }
-        
+
         // Validasi format IP hanya untuk local_address
         const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
         if (!ipRegex.test(localAddress)) {
@@ -456,7 +440,7 @@ if ($result_pools->num_rows > 0) {
             alert('Format Local Address tidak valid!');
             return false;
         }
-        
+
         return true;
     });
     </script>
