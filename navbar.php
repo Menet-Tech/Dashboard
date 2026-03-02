@@ -13,7 +13,7 @@
     </div>
     
     <div class="sidebar-menu">
-        <a href="dashboard.php" class="sidebar-item">
+        <a href="http://localhost/billing/dashboard.php" class="sidebar-item">
             <i class="fas fa-home"></i>
             <span>Dashboard</span>
         </a>
@@ -36,11 +36,11 @@
                 <i class="fas fa-chevron-down dropdown-arrow"></i>
             </a>
             <div class="dropdown-menu">
-                <a href="mikrotik/pool.php" class="dropdown-item-link">
+                <a href="http://localhost/billing/mikrotik/pool.php" class="dropdown-item-link">
                     <i class="fas fa-layer-group"></i>
                     <span>IP Pool</span>
                 </a>
-                                <a href="mikrotik/paket.php" class="dropdown-item-link">
+                                <a href="http://localhost/billing/mikrotik/paket.php" class="dropdown-item-link">
                     <i class="fas fa-layer-group"></i>
                     <span>Paket Bandwith</span>
                 </a>
