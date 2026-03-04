@@ -87,6 +87,7 @@ CREATE TABLE `paket_bandwidth` (
   `id_local_address` int(11) NOT NULL,
   `id_remote_address` int(11) NOT NULL,
   `speed_limit` varchar(50) NOT NULL,
+  `price` int(11) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -95,14 +96,13 @@ CREATE TABLE `paket_bandwidth` (
 -- Dumping data untuk tabel `paket_bandwidth`
 --
 
-INSERT INTO `paket_bandwidth` (`id`, `name`, `id_local_address`, `id_remote_address`, `speed_limit`, `created_at`, `updated_at`) VALUES
-(27, 'Paket 10 Mbps', 90, 90, '10M/10M', '2026-03-02 09:46:40', '2026-03-02 12:35:38'),
-(28, 'Paket 20 Mbps', 91, 91, '20M/20M', '2026-03-02 09:46:59', '2026-03-02 09:46:59'),
-(29, 'Paket 30 Mbps', 92, 92, '50M/50M', '2026-03-02 09:47:12', '2026-03-02 09:47:12'),
-(30, 'Paket 10 Mbps1', 90, 90, '50M/50M', '2026-03-02 10:36:01', '2026-03-02 12:21:08'),
-(32, 'Paket 50 Mbps', 94, 94, '50M/50M', '2026-03-02 12:11:11', '2026-03-02 12:11:11'),
-(33, 'Paket 10 Mbps2', 90, 90, '10M/10M', '2026-03-02 12:22:08', '2026-03-02 12:22:08');
-
+INSERT INTO `paket_bandwidth` (`id`, `name`, `id_local_address`, `id_remote_address`, `speed_limit`, `price`, `created_at`, `updated_at`) VALUES
+(27, 'Paket 10 Mbps', 90, 90, '10M/10M', 0, '2026-03-02 09:46:40', '2026-03-02 12:35:38'),
+(28, 'Paket 20 Mbps', 91, 91, '20M/20M', 0, '2026-03-02 09:46:59', '2026-03-02 09:46:59'),
+(29, 'Paket 30 Mbps', 92, 92, '50M/50M', 0, '2026-03-02 09:47:12', '2026-03-02 09:47:12'),
+(30, 'Paket 10 Mbps1', 90, 90, '50M/50M', 0, '2026-03-02 10:36:01', '2026-03-02 12:21:08'),
+(32, 'Paket 50 Mbps', 94, 94, '50M/50M', 0, '2026-03-02 12:11:11', '2026-03-02 12:11:11'),
+(33, 'Paket 10 Mbps2', 90, 90, '10M/10M', 0, '2026-03-02 12:22:08', '2026-03-02 12:22:08');
 
 --
 -- Trigger `paket_bandwidth`
@@ -110,6 +110,11 @@ INSERT INTO `paket_bandwidth` (`id`, `name`, `id_local_address`, `id_remote_addr
 DELIMITER $$
 CREATE TRIGGER `update_paket_timestamp` BEFORE UPDATE ON `paket_bandwidth` FOR EACH ROW BEGIN
     SET NEW.updated_at = CURRENT_TIMESTAMP;
+    
+    -- Validasi harga harus lebih dari 0 saat update
+    IF NEW.price <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Harga harus lebih dari 0';
+    END IF;
 END
 $$
 DELIMITER ;
@@ -131,6 +136,11 @@ CREATE TRIGGER `validate_paket_id_format` BEFORE INSERT ON `paket_bandwidth` FOR
     
     IF NOT EXISTS (SELECT 1 FROM ip_pools WHERE id = NEW.id_remote_address) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ID Remote Address tidak ditemukan di tabel ip_pools';
+    END IF;
+    
+    -- Validasi harga harus lebih dari 0
+    IF NEW.price <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Harga harus lebih dari 0';
     END IF;
 END
 $$

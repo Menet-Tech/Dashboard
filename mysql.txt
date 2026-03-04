@@ -1,44 +1,9 @@
--- SQL Migration Script for Paket Bandwidth Table
--- Perubahan: Mengganti kolom local_address dan remote_address menjadi id_local_address dan id_remote_address
+-- Tambahkan field price pada tabel paket_bandwidth
+ALTER TABLE paket_bandwidth ADD COLUMN price INT NOT NULL DEFAULT 0 AFTER speed_limit;
 
--- 1. Hapus foreign key constraints lama
-ALTER TABLE paket_bandwidth DROP FOREIGN KEY fk_paket_remote_address;
-ALTER TABLE paket_bandwidth DROP FOREIGN KEY fk_paket_local_address;
-
--- 2. Hapus index lama
-ALTER TABLE paket_bandwidth DROP INDEX idx_local_address;
-ALTER TABLE paket_bandwidth DROP INDEX idx_remote_address;
-
--- 3. Ubah struktur tabel
-ALTER TABLE paket_bandwidth 
-CHANGE COLUMN local_address id_local_address INT(11) NOT NULL,
-CHANGE COLUMN remote_address id_remote_address INT(11) NOT NULL;
-
--- 4. Tambahkan foreign key constraints baru
--- Catatan: Jika error foreign key constraint, coba tanpa constraint terlebih dahulu
--- ALTER TABLE paket_bandwidth 
--- ADD CONSTRAINT fk_paket_remote_address FOREIGN KEY (id_remote_address) REFERENCES ip_pools(id) ON DELETE CASCADE ON UPDATE CASCADE,
--- ADD CONSTRAINT fk_paket_local_address FOREIGN KEY (id_local_address) REFERENCES ip_pools(id) ON DELETE CASCADE ON UPDATE CASCADE;
-
--- Alternatif: Tambahkan constraint satu per satu jika masih error
--- ALTER TABLE paket_bandwidth ADD CONSTRAINT fk_paket_remote_address FOREIGN KEY (id_remote_address) REFERENCES ip_pools(id);
--- ALTER TABLE paket_bandwidth ADD CONSTRAINT fk_paket_local_address FOREIGN KEY (id_local_address) REFERENCES ip_pools(id);
-
--- Jika masih error, coba pendekatan ini:
--- ALTER TABLE paket_bandwidth ADD CONSTRAINT fk_paket_remote_address FOREIGN KEY (id_remote_address) REFERENCES ip_pools(id) ON DELETE CASCADE ON UPDATE CASCADE;
--- ALTER TABLE paket_bandwidth ADD CONSTRAINT fk_paket_local_address FOREIGN KEY (id_local_address) REFERENCES ip_pools(id) ON DELETE CASCADE ON UPDATE CASCADE;
-
--- 5. Tambahkan index baru
-ALTER TABLE paket_bandwidth 
-ADD INDEX idx_id_local_address (id_local_address),
-ADD INDEX idx_id_remote_address (id_remote_address);
-
--- 6. Update trigger validasi (hapus trigger lama dan buat baru)
-DROP TRIGGER IF EXISTS validate_paket_ip_format;
-
+-- Perbarui trigger untuk validasi harga
 DELIMITER $$
-CREATE TRIGGER validate_paket_id_format BEFORE INSERT ON paket_bandwidth FOR EACH ROW 
-BEGIN
+CREATE TRIGGER `validate_paket_id_format` BEFORE INSERT ON `paket_bandwidth` FOR EACH ROW BEGIN
     -- Validasi bahwa id_local_address dan id_remote_address adalah integer positif
     IF NEW.id_local_address <= 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ID Local Address harus lebih besar dari 0';
@@ -56,57 +21,24 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM ip_pools WHERE id = NEW.id_remote_address) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ID Remote Address tidak ditemukan di tabel ip_pools';
     END IF;
-END$$
+    
+    -- Validasi harga harus lebih dari 0
+    IF NEW.price <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Harga harus lebih dari 0';
+    END IF;
+END
+$$
 DELIMITER ;
 
--- 7. Update trigger validasi untuk UPDATE
-DROP TRIGGER IF EXISTS validate_paket_ip_format_update;
-
+-- Perbarui trigger untuk update harga
 DELIMITER $$
-CREATE TRIGGER validate_paket_id_format_update BEFORE UPDATE ON paket_bandwidth FOR EACH ROW 
-BEGIN
-    -- Validasi bahwa id_local_address dan id_remote_address adalah integer positif
-    IF NEW.id_local_address <= 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ID Local Address harus lebih besar dari 0';
-    END IF;
+CREATE TRIGGER `update_paket_timestamp` BEFORE UPDATE ON `paket_bandwidth` FOR EACH ROW BEGIN
+    SET NEW.updated_at = CURRENT_TIMESTAMP;
     
-    IF NEW.id_remote_address <= 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ID Remote Address harus lebih besar dari 0';
+    -- Validasi harga harus lebih dari 0 saat update
+    IF NEW.price <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Harga harus lebih dari 0';
     END IF;
-    
-    -- Validasi bahwa ID yang dimasukkan ada di tabel ip_pools
-    IF NOT EXISTS (SELECT 1 FROM ip_pools WHERE id = NEW.id_local_address) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ID Local Address tidak ditemukan di tabel ip_pools';
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM ip_pools WHERE id = NEW.id_remote_address) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ID Remote Address tidak ditemukan di tabel ip_pools';
-    END IF;
-END$$
+END
+$$
 DELIMITER ;
-
--- 8. Update data yang ada (opsional, jika ingin mengisi ID berdasarkan data lama)
--- Catatan: Ini hanya contoh, karena data lama menggunakan nama pool, perlu mapping manual
--- UPDATE paket_bandwidth SET id_local_address = (SELECT id FROM ip_pools WHERE name = 'nama_pool_lama' LIMIT 1);
--- UPDATE paket_bandwidth SET id_remote_address = id_local_address;
-
--- 9. Verifikasi perubahan
-SELECT 
-    COLUMN_NAME,
-    COLUMN_TYPE,
-    IS_NULLABLE,
-    COLUMN_KEY,
-    CONSTRAINT_NAME,
-    REFERENCED_TABLE_NAME,
-    REFERENCED_COLUMN_NAME
-FROM information_schema.COLUMNS 
-WHERE TABLE_SCHEMA = 'dashboard' AND TABLE_NAME = 'paket_bandwidth'
-ORDER BY ORDINAL_POSITION;
-
-SELECT 
-    CONSTRAINT_NAME,
-    COLUMN_NAME,
-    REFERENCED_TABLE_NAME,
-    REFERENCED_COLUMN_NAME
-FROM information_schema.KEY_COLUMN_USAGE 
-WHERE TABLE_SCHEMA = 'dashboard' AND TABLE_NAME = 'paket_bandwidth' AND REFERENCED_TABLE_NAME IS NOT NULL;

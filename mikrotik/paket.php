@@ -17,8 +17,9 @@ if (isset($_POST['add_paket'])) {
     $name = cleanInput($_POST['name']);
     $remote_address = cleanInput($_POST['remote_address']);
     $speed_limit = cleanInput($_POST['speed_limit']);
+    $price = cleanInput($_POST['price']);
 
-    if (!empty($name) && !empty($remote_address) && !empty($speed_limit)) {
+    if (!empty($name) && !empty($remote_address) && !empty($speed_limit) && !empty($price)) {
         // Ambil data pool berdasarkan ID
         $poolStmt = $conn->prepare("SELECT id, gateway FROM ip_pools WHERE id = ?");
         $poolStmt->bind_param("i", $remote_address);
@@ -47,9 +48,9 @@ if (isset($_POST['add_paket'])) {
                 $message = "Nama paket bandwidth sudah ada!";
                 $message_type = "error";
             } else {
-                $sql = "INSERT INTO paket_bandwidth (name, id_local_address, id_remote_address, speed_limit) VALUES (?, ?, ?, ?)";
+                $sql = "INSERT INTO paket_bandwidth (name, id_local_address, id_remote_address, speed_limit, price) VALUES (?, ?, ?, ?, ?)";
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("siss", $name, $pool_id, $pool_id, $speed_limit);
+                $stmt->bind_param("sissi", $name, $pool_id, $pool_id, $speed_limit, $price);
 
                 if ($stmt->execute()) {
                     $message = "Paket bandwidth berhasil ditambahkan!";
@@ -77,8 +78,9 @@ if (isset($_POST['edit_paket'])) {
     $name = cleanInput($_POST['name']);
     $remote_address = cleanInput($_POST['remote_address']);
     $speed_limit = cleanInput($_POST['speed_limit']);
+    $price = cleanInput($_POST['price']);
 
-    if (!empty($id) && !empty($name) && !empty($remote_address) && !empty($speed_limit)) {
+    if (!empty($id) && !empty($name) && !empty($remote_address) && !empty($speed_limit) && !empty($price)) {
         // Ambil data pool berdasarkan ID
         $poolStmt = $conn->prepare("SELECT id, gateway FROM ip_pools WHERE id = ?");
         $poolStmt->bind_param("i", $remote_address);
@@ -107,9 +109,9 @@ if (isset($_POST['edit_paket'])) {
                 $message = "Nama paket bandwidth sudah ada!";
                 $message_type = "error";
             } else {
-                $sql = "UPDATE paket_bandwidth SET name = ?, id_local_address = ?, id_remote_address = ?, speed_limit = ? WHERE id = ?";
+                $sql = "UPDATE paket_bandwidth SET name = ?, id_local_address = ?, id_remote_address = ?, speed_limit = ?, price = ? WHERE id = ?";
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("sissi", $name, $pool_id, $pool_id, $speed_limit, $id);
+                $stmt->bind_param("sissii", $name, $pool_id, $pool_id, $speed_limit, $price, $id);
 
                 if ($stmt->execute()) {
                     $message = "Paket bandwidth berhasil diperbarui!";
@@ -165,7 +167,8 @@ if ($result->num_rows > 0) {
             'name' => $row['name'],
             'local_address' => $row['gateway'],
             'remote_address' => $row['pool_name'],
-            'speed_limit' => $row['speed_limit']
+            'speed_limit' => $row['speed_limit'],
+            'price' => $row['price'] ?? 0
         ];
     }
 }
@@ -252,6 +255,15 @@ if (isset($_GET['edit_id'])) {
                             <span>Dengan Alamat</span>
                         </div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3><?php echo count(array_filter($pakets, function($p) { return !empty($p['price']); })); ?></h3>
+                            <span>Dengan Harga</span>
+                        </div>
+                    </div>
                 </div>
                 <button class="btn btn-add" onclick="showAddForm()">
                     <i class="fas fa-plus"></i> Tambah Paket
@@ -289,6 +301,10 @@ if (isset($_GET['edit_id'])) {
                         <div>
                             <label for="add-speed-limit">Speed Limit:</label>
                             <input type="text" id="add-speed-limit" name="speed_limit" placeholder="Contoh: 10M/10M" required>
+                        </div>
+                        <div>
+                            <label for="add-price">Harga (Rp):</label>
+                            <input type="number" id="add-price" name="price" placeholder="Contoh: 100000" required>
                         </div>
                     </div>
             <div class="form-actions">
@@ -334,6 +350,10 @@ if (isset($_GET['edit_id'])) {
                         <div>
                             <label for="edit-speed-limit">Speed Limit:</label>
                             <input type="text" id="edit-speed-limit" name="speed_limit" required>
+                        </div>
+                        <div>
+                            <label for="edit-price">Harga (Rp):</label>
+                            <input type="number" id="edit-price" name="price" required>
                         </div>
                     </div>
             <div class="form-actions">
@@ -384,6 +404,7 @@ if (isset($_GET['edit_id'])) {
                     <div>Local Address</div>
                     <div>Remote Address</div>
                     <div>Speed Limit</div>
+                    <div>Harga</div>
                     <div>Aksi</div>
                 </div>
                 <div class="table-body">
@@ -430,6 +451,9 @@ if (isset($_GET['edit_id'])) {
                                 <div class="pool-comment">
                                     <?php echo htmlspecialchars($paket['speed_limit']); ?>
                                 </div>
+                                <div class="pool-price">
+                                    <?php echo 'Rp ' . number_format($paket['price'], 0, ',', '.'); ?>
+                                </div>
                                 <div class="actions">
                                     <a href="#" class="action-btn btn-edit">
                                         <i class="fas fa-edit"></i> Edit
@@ -449,15 +473,16 @@ if (isset($_GET['edit_id'])) {
     <script src="asset/script.js"></script>
 
     <!-- Tambahkan fungsi validasi -->
-    <script>
+            <script>
     // Validasi form tambah
     document.getElementById('add-paket-form').addEventListener('submit', function(e) {
         const name = document.getElementById('add-name').value.trim();
         const localAddress = document.getElementById('add-local-address').value.trim();
         const remoteAddress = document.getElementById('add-remote-address').value.trim();
         const speedLimit = document.getElementById('add-speed-limit').value.trim();
+        const price = document.getElementById('add-price').value.trim();
 
-        if (!name || !localAddress || !remoteAddress || !speedLimit) {
+        if (!name || !localAddress || !remoteAddress || !speedLimit || !price) {
             e.preventDefault();
             alert('Semua field harus diisi!');
             return false;
@@ -468,6 +493,13 @@ if (isset($_GET['edit_id'])) {
         if (!ipRegex.test(localAddress)) {
             e.preventDefault();
             alert('Format Local Address tidak valid!');
+            return false;
+        }
+
+        // Validasi harga harus lebih dari 0
+        if (parseInt(price) <= 0) {
+            e.preventDefault();
+            alert('Harga harus lebih dari 0!');
             return false;
         }
 
@@ -480,8 +512,9 @@ if (isset($_GET['edit_id'])) {
         const localAddress = document.getElementById('edit-local-address').value.trim();
         const remoteAddress = document.getElementById('edit-remote-address').value.trim();
         const speedLimit = document.getElementById('edit-speed-limit').value.trim();
+        const price = document.getElementById('edit-price').value.trim();
 
-        if (!name || !localAddress || !remoteAddress || !speedLimit) {
+        if (!name || !localAddress || !remoteAddress || !speedLimit || !price) {
             e.preventDefault();
             alert('Semua field harus diisi!');
             return false;
@@ -492,6 +525,13 @@ if (isset($_GET['edit_id'])) {
         if (!ipRegex.test(localAddress)) {
             e.preventDefault();
             alert('Format Local Address tidak valid!');
+            return false;
+        }
+
+        // Validasi harga harus lebih dari 0
+        if (parseInt(price) <= 0) {
+            e.preventDefault();
+            alert('Harga harus lebih dari 0!');
             return false;
         }
 
