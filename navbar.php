@@ -25,9 +25,9 @@
             <i class="fas fa-map-marked-alt"></i>
             <span>Maps</span>
         </a>
-        <a href="dashboard.php" class="sidebar-item">
+        <a href="http://localhost/billing/pelanggan.php" class="sidebar-item">
             <i class="fas fa-users"></i>
-            <span>User</span>
+            <span>Pelanggan</span>
         </a>
         <div class="sidebar-item dropdown-item">
             <a href="dashboard.php" class="sidebar-link">
