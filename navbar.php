@@ -17,9 +17,9 @@
             <i class="fas fa-home"></i>
             <span>Dashboard</span>
         </a>
-        <a href="dashboard.php" class="sidebar-item">
+        <a href="http://localhost/billing/tagihan.php" class="sidebar-item">
             <i class="fas fa-file-invoice-dollar"></i>
-            <span>Billing</span>
+            <span>Tagihan</span>
         </a>
         <a href="../dashboard.php" class="sidebar-item">
             <i class="fas fa-map-marked-alt"></i>
