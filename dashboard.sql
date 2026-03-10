@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Waktu pembuatan: 09 Mar 2026 pada 16.04
+-- Waktu pembuatan: 10 Mar 2026 pada 09.08
 -- Versi server: 10.4.32-MariaDB
 -- Versi PHP: 8.2.12
 
@@ -168,10 +168,10 @@ CREATE TABLE `pelanggan` (
 --
 
 INSERT INTO `pelanggan` (`id`, `nama`, `user_pppoe`, `password_pppoe`, `paket_id`, `jatuh_tempo`, `harga`, `status`, `created_at`, `updated_at`) VALUES
-(2, 'elam', 'elam', '12345', 32, 9, 250000, 'active', '2026-03-09 14:09:31', '2026-03-09 15:03:56'),
-(3, 'Irfan Dharmawan', 'irfan', '12345', 32, 28, 250000, 'limit', '2026-03-09 14:15:07', '2026-03-09 15:04:02'),
+(2, 'elam', 'elam', '12345', 32, 7, 250000, 'active', '2026-03-09 14:09:31', '2026-03-09 20:47:42'),
+(3, 'Irfan Dharmawan', 'irfan', '12345', 32, 2, 250000, 'inactive', '2026-03-09 14:15:07', '2026-03-09 21:01:57'),
 (5, 'Mursidahi', 'mur', '12345', 28, 9, 130000, 'inactive', '2026-03-09 14:38:31', '2026-03-09 15:04:09'),
-(6, 'test', 'admin', '12345', 28, 2, 130000, 'limit', '2026-03-09 14:42:55', '2026-03-09 14:54:12'),
+(6, 'test', 'admin', '12345', 28, 12, 130000, 'active', '2026-03-09 14:42:55', '2026-03-09 20:41:41'),
 (7, 'asd', 'admin45', '12345', 28, 3, 130000, 'tertunda', '2026-03-09 14:49:05', '2026-03-09 15:03:50'),
 (8, '1213qwe', 'qweas', '12345', 28, 3, 130000, 'tertunda', '2026-03-09 14:54:45', '2026-03-09 15:03:46');
 
@@ -215,6 +215,50 @@ END
 $$
 DELIMITER ;
 
+-- --------------------------------------------------------
+
+--
+-- Struktur dari tabel `tagihan`
+--
+
+CREATE TABLE `tagihan` (
+  `id` int(11) NOT NULL,
+  `pelanggan_id` int(11) NOT NULL,
+  `tanggal_tagihan` date NOT NULL,
+  `tanggal_jatuh_tempo` date NOT NULL,
+  `status_bayar` enum('belum','sudah') DEFAULT 'belum',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data untuk tabel `tagihan`
+--
+
+INSERT INTO `tagihan` (`id`, `pelanggan_id`, `tanggal_tagihan`, `tanggal_jatuh_tempo`, `status_bayar`, `created_at`, `updated_at`) VALUES
+(11, 2, '2026-03-04', '2026-03-07', 'belum', '2026-03-09 20:59:54', '2026-03-09 20:59:54'),
+(12, 6, '2026-03-09', '2026-03-12', 'belum', '2026-03-09 20:59:54', '2026-03-09 20:59:54'),
+(13, 3, '2026-02-27', '2026-03-02', 'belum', '2026-03-09 21:01:57', '2026-03-09 21:01:57');
+
+--
+-- Trigger `tagihan`
+--
+DELIMITER $$
+CREATE TRIGGER `update_tagihan_timestamp` BEFORE UPDATE ON `tagihan` FOR EACH ROW BEGIN
+    SET NEW.updated_at = CURRENT_TIMESTAMP;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `validate_tagihan_dates` BEFORE INSERT ON `tagihan` FOR EACH ROW BEGIN
+    -- Validasi tanggal jatuh tempo harus lebih besar dari tanggal tagihan
+    IF NEW.tanggal_jatuh_tempo <= NEW.tanggal_tagihan THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tanggal jatuh tempo harus lebih besar dari tanggal tagihan';
+    END IF;
+END
+$$
+DELIMITER ;
+
 --
 -- Indexes for dumped tables
 --
@@ -252,6 +296,16 @@ ALTER TABLE `pelanggan`
   ADD KEY `idx_status` (`status`);
 
 --
+-- Indeks untuk tabel `tagihan`
+--
+ALTER TABLE `tagihan`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_pelanggan_id` (`pelanggan_id`),
+  ADD KEY `idx_tanggal_tagihan` (`tanggal_tagihan`),
+  ADD KEY `idx_tanggal_jatuh_tempo` (`tanggal_jatuh_tempo`),
+  ADD KEY `idx_status_bayar` (`status_bayar`);
+
+--
 -- AUTO_INCREMENT untuk tabel yang dibuang
 --
 
@@ -274,6 +328,12 @@ ALTER TABLE `pelanggan`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
+-- AUTO_INCREMENT untuk tabel `tagihan`
+--
+ALTER TABLE `tagihan`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+
+--
 -- Ketidakleluasaan untuk tabel pelimpahan (Dumped Tables)
 --
 
@@ -282,6 +342,12 @@ ALTER TABLE `pelanggan`
 --
 ALTER TABLE `pelanggan`
   ADD CONSTRAINT `fk_paket_id` FOREIGN KEY (`paket_id`) REFERENCES `paket_bandwidth` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Ketidakleluasaan untuk tabel `tagihan`
+--
+ALTER TABLE `tagihan`
+  ADD CONSTRAINT `fk_tagihan_pelanggan_id` FOREIGN KEY (`pelanggan_id`) REFERENCES `pelanggan` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

@@ -483,14 +483,17 @@ if (isset($_GET['edit_id'])) {
                                 <div class="pool-price">
                                     <?php echo 'Rp ' . number_format($pelanggan['harga'], 0, ',', '.'); ?>
                                 </div>
-                                <div class="actions">
-                                    <a href="#" class="action-btn btn-edit">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </a>
-                                    <a href="#" class="action-btn btn-delete">
-                                        <i class="fas fa-trash"></i> Hapus
-                                    </a>
-                                </div>
+            <div class="actions">
+                <a href="#" class="action-btn btn-edit">
+                    <i class="fas fa-edit"></i> Edit
+                </a>
+                <a href="#" class="action-btn btn-delete">
+                    <i class="fas fa-trash"></i> Hapus
+                </a>
+                <a href="tagihan.php" class="action-btn btn-generate">
+                    <i class="fas fa-file-invoice"></i> Lihat Tagihan
+                </a>
+            </div>
                             </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
