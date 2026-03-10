@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Waktu pembuatan: 10 Mar 2026 pada 09.08
+-- Waktu pembuatan: 10 Mar 2026 pada 10.41
 -- Versi server: 10.4.32-MariaDB
 -- Versi PHP: 8.2.12
 
@@ -168,12 +168,12 @@ CREATE TABLE `pelanggan` (
 --
 
 INSERT INTO `pelanggan` (`id`, `nama`, `user_pppoe`, `password_pppoe`, `paket_id`, `jatuh_tempo`, `harga`, `status`, `created_at`, `updated_at`) VALUES
-(2, 'elam', 'elam', '12345', 32, 7, 250000, 'active', '2026-03-09 14:09:31', '2026-03-09 20:47:42'),
-(3, 'Irfan Dharmawan', 'irfan', '12345', 32, 2, 250000, 'inactive', '2026-03-09 14:15:07', '2026-03-09 21:01:57'),
-(5, 'Mursidahi', 'mur', '12345', 28, 9, 130000, 'inactive', '2026-03-09 14:38:31', '2026-03-09 15:04:09'),
-(6, 'test', 'admin', '12345', 28, 12, 130000, 'active', '2026-03-09 14:42:55', '2026-03-09 20:41:41'),
-(7, 'asd', 'admin45', '12345', 28, 3, 130000, 'tertunda', '2026-03-09 14:49:05', '2026-03-09 15:03:50'),
-(8, '1213qwe', 'qweas', '12345', 28, 3, 130000, 'tertunda', '2026-03-09 14:54:45', '2026-03-09 15:03:46');
+(2, 'elam', 'elam', '12345', 32, 16, 250000, 'active', '2026-03-09 14:09:31', '2026-03-10 09:33:23'),
+(3, 'Irfan Dharmawan', 'irfan', '12345', 32, 9, 250000, 'active', '2026-03-09 14:15:07', '2026-03-10 09:33:20'),
+(5, 'Mursidahi', 'mur', '12345', 28, 9, 130000, 'active', '2026-03-09 14:38:31', '2026-03-10 09:33:18'),
+(6, 'test', 'admin', '12345', 28, 12, 130000, 'active', '2026-03-09 14:42:55', '2026-03-10 09:33:21'),
+(7, 'asd', 'admin45', '12345', 28, 3, 130000, 'active', '2026-03-09 14:49:05', '2026-03-10 09:33:13'),
+(8, '1213qwe', 'qweas', '12345', 28, 3, 130000, 'active', '2026-03-09 14:54:45', '2026-03-10 09:33:16');
 
 --
 -- Trigger `pelanggan`
@@ -227,7 +227,7 @@ CREATE TABLE `tagihan` (
   `tanggal_tagihan` date NOT NULL,
   `tanggal_jatuh_tempo` date NOT NULL,
   `status_bayar` enum('belum','sudah') DEFAULT 'belum',
-  `tanggal_bayar` date NULL,
+  `tanggal_bayar` date DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -236,10 +236,23 @@ CREATE TABLE `tagihan` (
 -- Dumping data untuk tabel `tagihan`
 --
 
-INSERT INTO `tagihan` (`id`, `pelanggan_id`, `tanggal_tagihan`, `tanggal_jatuh_tempo`, `status_bayar`, `created_at`, `updated_at`) VALUES
-(11, 2, '2026-03-04', '2026-03-07', 'belum', '2026-03-09 20:59:54', '2026-03-09 20:59:54'),
-(12, 6, '2026-03-09', '2026-03-12', 'belum', '2026-03-09 20:59:54', '2026-03-09 20:59:54'),
-(13, 3, '2026-02-27', '2026-03-02', 'belum', '2026-03-09 21:01:57', '2026-03-09 21:01:57');
+INSERT INTO `tagihan` (`id`, `pelanggan_id`, `tanggal_tagihan`, `tanggal_jatuh_tempo`, `status_bayar`, `tanggal_bayar`, `created_at`, `updated_at`) VALUES
+(30, 2, '2026-03-13', '2026-03-16', 'sudah', NULL, '2026-03-10 09:14:56', '2026-03-10 09:15:56'),
+(31, 3, '2026-03-06', '2026-03-09', 'sudah', NULL, '2026-03-10 09:14:56', '2026-03-10 09:15:59'),
+(32, 5, '2026-03-06', '2026-03-09', 'sudah', NULL, '2026-03-10 09:14:56', '2026-03-10 09:16:01'),
+(33, 6, '2026-03-09', '2026-03-12', 'sudah', NULL, '2026-03-10 09:14:56', '2026-03-10 09:15:58'),
+(34, 7, '2026-02-28', '2026-03-03', 'sudah', NULL, '2026-03-10 09:14:56', '2026-03-10 09:16:05'),
+(35, 8, '2026-02-28', '2026-03-03', 'sudah', NULL, '2026-03-10 09:14:56', '2026-03-10 09:16:03'),
+(36, 2, '2026-04-13', '2026-04-16', 'sudah', '2026-04-07', '2026-03-10 09:19:05', '2026-03-10 09:22:34'),
+(37, 3, '2026-04-06', '2026-04-09', 'sudah', '2026-04-10', '2026-03-10 09:19:05', '2026-03-10 09:23:59'),
+(38, 5, '2026-04-06', '2026-04-09', 'sudah', '2026-04-10', '2026-03-10 09:19:05', '2026-03-10 09:23:57'),
+(39, 6, '2026-04-09', '2026-04-12', 'sudah', '2026-04-10', '2026-03-10 09:19:05', '2026-03-10 09:23:53'),
+(40, 7, '2026-03-31', '2026-04-03', 'sudah', '2026-03-10', '2026-03-10 09:19:05', '2026-03-10 09:33:13'),
+(41, 8, '2026-03-31', '2026-04-03', 'sudah', '2026-03-10', '2026-03-10 09:19:05', '2026-03-10 09:33:16'),
+(42, 2, '2026-05-13', '2026-05-16', 'sudah', '2026-03-10', '2026-03-10 09:24:13', '2026-03-10 09:33:23'),
+(43, 3, '2026-05-06', '2026-05-09', 'sudah', '2026-03-10', '2026-03-10 09:24:13', '2026-03-10 09:33:20'),
+(44, 5, '2026-05-06', '2026-05-09', 'sudah', '2026-03-10', '2026-03-10 09:24:13', '2026-03-10 09:33:18'),
+(45, 6, '2026-05-09', '2026-05-12', 'sudah', '2026-03-10', '2026-03-10 09:24:13', '2026-03-10 09:33:21');
 
 --
 -- Trigger `tagihan`
@@ -332,7 +345,7 @@ ALTER TABLE `pelanggan`
 -- AUTO_INCREMENT untuk tabel `tagihan`
 --
 ALTER TABLE `tagihan`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=46;
 
 --
 -- Ketidakleluasaan untuk tabel pelimpahan (Dumped Tables)
