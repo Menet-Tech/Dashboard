@@ -227,6 +227,7 @@ CREATE TABLE `tagihan` (
   `tanggal_tagihan` date NOT NULL,
   `tanggal_jatuh_tempo` date NOT NULL,
   `status_bayar` enum('belum','sudah') DEFAULT 'belum',
+  `tanggal_bayar` date NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

@@ -154,6 +154,31 @@ $result = $conn->query($sql);
 $pelanggans = [];
 if ($result->num_rows > 0) {
     while($row = $result->fetch_assoc()) {
+        $pelanggan_id = $row['id'];
+        
+        // Hitung tertunggak (ada tagihan belum bayar yang lewat jatuh tempo)
+        $today = getCurrentDateTimeObject()->format('Y-m-d');
+        $sql_tagihan = "SELECT tanggal_jatuh_tempo 
+                       FROM tagihan 
+                       WHERE pelanggan_id = ? AND status_bayar = 'belum' AND tanggal_jatuh_tempo < ?
+                       ORDER BY tanggal_jatuh_tempo ASC
+                       LIMIT 1";
+        $stmt_tagihan = $conn->prepare($sql_tagihan);
+        $stmt_tagihan->bind_param("is", $pelanggan_id, $today);
+        $stmt_tagihan->execute();
+        $result_tagihan = $stmt_tagihan->get_result();
+        $tagihan_tertunggak = $result_tagihan->fetch_assoc();
+        $stmt_tagihan->close();
+        
+        $tertunggak_info = '-';
+        if ($tagihan_tertunggak) {
+            $tanggal_jatuh = new DateTime($tagihan_tertunggak['tanggal_jatuh_tempo']);
+            $today_obj = new DateTime($today);
+            $selisih = $today_obj->diff($tanggal_jatuh);
+            $hari_tertunggak = $selisih->days;
+            $tertunggak_info = "Tertunggak " . $hari_tertunggak . " hari";
+        }
+        
         $pelanggans[] = [
             'id' => $row['id'],
             'nama' => $row['nama'],
@@ -162,7 +187,8 @@ if ($result->num_rows > 0) {
             'paket_name' => $row['paket_name'],
             'jatuh_tempo' => $row['jatuh_tempo'],
             'harga' => $row['price'] ?? 0,
-            'status' => $row['status'] ?? 'active'
+            'status' => $row['status'] ?? 'active',
+            'tertunggak_info' => $tertunggak_info
         ];
     }
 }
@@ -418,6 +444,7 @@ if (isset($_GET['edit_id'])) {
                     <div>Paket</div>
                     <div>Jatuh Tempo</div>
                     <div>Status</div>
+                    <div>Tertunggak</div>
                     <div>Harga</div>
                     <div>Aksi</div>
                 </div>
@@ -481,6 +508,15 @@ if (isset($_GET['edit_id'])) {
                                     </span>
                                 </div>
                                 <div class="pool-price">
+                                    <?php 
+                                    if ($pelanggan['tertunggak_info'] !== '-') {
+                                        echo "<span style='color: red; font-weight: bold;'>" . $pelanggan['tertunggak_info'] . "</span>";
+                                    } else {
+                                        echo "<span style='color: green;'>-</span>";
+                                    }
+                                    ?>
+                                </div>
+                                <div class="pool-price">
                                     <?php echo 'Rp ' . number_format($pelanggan['harga'], 0, ',', '.'); ?>
                                 </div>
             <div class="actions">
@@ -490,7 +526,7 @@ if (isset($_GET['edit_id'])) {
                 <a href="#" class="action-btn btn-delete">
                     <i class="fas fa-trash"></i> Hapus
                 </a>
-                <a href="tagihan.php" class="action-btn btn-generate">
+                <a href="tagihan.php?pelanggan_id=<?php echo $pelanggan['id']; ?>" class="action-btn btn-generate">
                     <i class="fas fa-file-invoice"></i> Lihat Tagihan
                 </a>
             </div>
