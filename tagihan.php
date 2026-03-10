@@ -18,13 +18,58 @@ if (isset($_POST['bayar_tagihan'])) {
     $status_bayar = cleanInput($_POST['status_bayar']);
 
     if (!empty($tagihan_id) && !empty($status_bayar)) {
-        $sql = "UPDATE tagihan SET status_bayar = ? WHERE id = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("si", $status_bayar, $tagihan_id);
+        // Ambil pelanggan_id dari tagihan
+        $get_pelanggan_sql = "SELECT pelanggan_id FROM tagihan WHERE id = ?";
+        $get_pelanggan_stmt = $conn->prepare($get_pelanggan_sql);
+        $get_pelanggan_stmt->bind_param("i", $tagihan_id);
+        $get_pelanggan_stmt->execute();
+        $get_pelanggan_result = $get_pelanggan_stmt->get_result();
+        $tagihan_row = $get_pelanggan_result->fetch_assoc();
+        $pelanggan_id = $tagihan_row['pelanggan_id'];
+        $get_pelanggan_stmt->close();
+
+        // Update status pembayaran tagihan
+        $sql = "UPDATE tagihan SET status_bayar = ?";
+        
+        // Jika status bayar berubah menjadi "sudah", tambahkan tanggal_bayar
+        if ($status_bayar === 'sudah') {
+            $tanggal_bayar = formatCustomDate('Y-m-d');
+            $sql .= ", tanggal_bayar = ?";
+            $stmt = $conn->prepare($sql . " WHERE id = ?");
+            $stmt->bind_param("ssi", $status_bayar, $tanggal_bayar, $tagihan_id);
+        } else {
+            $stmt = $conn->prepare($sql . " WHERE id = ?");
+            $stmt->bind_param("si", $status_bayar, $tagihan_id);
+        }
 
         if ($stmt->execute()) {
             $message = "Status pembayaran berhasil diperbarui!";
             $message_type = "success";
+            
+            // Jika status bayar berubah menjadi "sudah", cek dan update status pelanggan
+            if ($status_bayar === 'sudah') {
+                // Cek apakah masih ada tagihan yang belum dibayar untuk pelanggan ini
+                $check_unpaid_sql = "SELECT COUNT(*) as unpaid_count FROM tagihan WHERE pelanggan_id = ? AND status_bayar = 'belum'";
+                $check_unpaid_stmt = $conn->prepare($check_unpaid_sql);
+                $check_unpaid_stmt->bind_param("i", $pelanggan_id);
+                $check_unpaid_stmt->execute();
+                $check_unpaid_result = $check_unpaid_stmt->get_result();
+                $unpaid_check = $check_unpaid_result->fetch_assoc();
+                $check_unpaid_stmt->close();
+
+                // Jika tidak ada tagihan yang belum dibayar, ubah status pelanggan menjadi active
+                if ($unpaid_check['unpaid_count'] == 0) {
+                    $update_pelanggan_sql = "UPDATE pelanggan SET status = 'active' WHERE id = ?";
+                    $update_pelanggan_stmt = $conn->prepare($update_pelanggan_sql);
+                    $update_pelanggan_stmt->bind_param("i", $pelanggan_id);
+                    $update_pelanggan_stmt->execute();
+                    $update_pelanggan_stmt->close();
+                    
+                    $message .= " Pelanggan dikembalikan ke status Active.";
+                }
+            }
+            
+            $stmt->close();
             // Redirect untuk refresh halaman dan data
             header("Location: tagihan.php");
             exit();
@@ -40,12 +85,25 @@ if (isset($_POST['bayar_tagihan'])) {
 }
 
 // Ambil data tagihan dari database
-// Query untuk menampilkan tagihan 3 hari sebelum jatuh tempo
+// Cek apakah ada filter pelanggan dari URL
+$filter_pelanggan_id = null;
+if (isset($_GET['pelanggan_id'])) {
+    $filter_pelanggan_id = cleanInput($_GET['pelanggan_id']);
+}
+
+// Query untuk menampilkan tagihan
 $sql = "SELECT t.*, p.nama, pb.name as paket_name, pb.price 
         FROM tagihan t 
         LEFT JOIN pelanggan p ON t.pelanggan_id = p.id 
-        LEFT JOIN paket_bandwidth pb ON p.paket_id = pb.id 
-        ORDER BY t.tanggal_tagihan DESC, p.nama";
+        LEFT JOIN paket_bandwidth pb ON p.paket_id = pb.id ";
+
+// Tambahkan WHERE clause jika ada filter
+if ($filter_pelanggan_id) {
+    $sql .= "WHERE t.pelanggan_id = " . intval($filter_pelanggan_id) . " ";
+}
+
+$sql .= "ORDER BY t.tanggal_tagihan DESC, p.nama";
+
 $result = $conn->query($sql);
 $tagihans = [];
 if ($result->num_rows > 0) {
@@ -57,6 +115,7 @@ if ($result->num_rows > 0) {
             'paket_name' => $row['paket_name'],
             'tanggal_tagihan' => $row['tanggal_tagihan'],
             'tanggal_jatuh_tempo' => $row['tanggal_jatuh_tempo'],
+            'tanggal_bayar' => $row['tanggal_bayar'] ?? null,
             'harga' => $row['price'] ?? 0,
             'status_bayar' => $row['status_bayar'] ?? 'belum'
         ];
@@ -228,6 +287,17 @@ if ($result_pelanggans->num_rows > 0) {
         <?php include 'header.php'; ?>
 
         <div class="content-body">
+            <!-- Filter Info -->
+            <?php if ($filter_pelanggan_id): ?>
+            <div style="padding: 15px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px; margin-bottom: 20px;">
+                <i class="fas fa-info-circle"></i>
+                <strong>Filter Aktif:</strong> Menampilkan tagihan dari pelanggan ini saja
+                <a href="pelanggan.php" style="margin-left: 15px; text-decoration: none; color: #2196F3; font-weight: bold;">
+                    <i class="fas fa-arrow-left"></i> Kembali ke Pelanggan
+                </a>
+            </div>
+            <?php endif; ?>
+
             <!-- Tagihan Header -->
             <div class="tagihan-header">
                 <div class="tagihan-stats">
@@ -264,7 +334,7 @@ if ($result_pelanggans->num_rows > 0) {
                         </div>
                         <div class="stat-info">
                             <h3><?php echo count(array_filter($tagihans, function($t) { 
-                                $today = date('Y-m-d');
+                                $today = formatCustomDate('Y-m-d');
                                 $jatuh_tempo = $t['tanggal_jatuh_tempo'];
                                 return strtotime($jatuh_tempo) >= strtotime($today) && strtotime($jatuh_tempo) <= strtotime($today . ' + 3 days');
                             })); ?></h3>
@@ -327,13 +397,47 @@ if ($result_pelanggans->num_rows > 0) {
                     <?php else: ?>
                         <?php foreach ($tagihans as $tagihan): ?>
                             <?php 
-                            $today = new DateTime();
-                            $jatuh_tempo = new DateTime($tagihan['tanggal_jatuh_tempo']);
-                            $interval = $today->diff($jatuh_tempo);
-                            $sisa_hari = $interval->days;
-                            
-                            // Tentukan apakah jatuh tempo sudah lewat atau belum
-                            $is_past_due = $jatuh_tempo < $today;
+                            // Hitung info pembayaran
+                            if ($tagihan['status_bayar'] == 'belum') {
+                                $today = getCurrentDateTimeObject();
+                                $jatuh_tempo = new DateTime($tagihan['tanggal_jatuh_tempo']);
+                                $interval = $today->diff($jatuh_tempo);
+                                $sisa_hari = $interval->days;
+                                $is_past_due = $jatuh_tempo < $today;
+                                
+                                // Jika telat, hitung berapa hari tertunggak
+                                if ($is_past_due) {
+                                    $payment_info = "✗ Tertunggak " . $sisa_hari . " hari";
+                                    $payment_class = "color: red;";
+                                } else {
+                                    $payment_info = "";
+                                }
+                            } else {
+                                // Jika sudah dibayar
+                                $sisa_hari = 0;
+                                $is_past_due = false;
+                                
+                                // Hitung info telat/lebih dulu
+                                if ($tagihan['tanggal_bayar']) {
+                                    $tanggal_bayar = new DateTime($tagihan['tanggal_bayar']);
+                                    $tanggal_jatuh_tempo = new DateTime($tagihan['tanggal_jatuh_tempo']);
+                                    $selisih = $tanggal_bayar->diff($tanggal_jatuh_tempo);
+                                    $hari_selisih = $selisih->days;
+                                    
+                                    if ($tanggal_bayar <= $tanggal_jatuh_tempo) {
+                                        // Bayar sebelum jatuh tempo
+                                        $payment_info = "✓ Lebih dulu " . $hari_selisih . " hari";
+                                        $payment_class = "color: green;";
+                                    } else {
+                                        // Bayar setelah jatuh tempo (telat)
+                                        $payment_info = "✗ Telat " . $hari_selisih . " hari";
+                                        $payment_class = "color: red;";
+                                    }
+                                } else {
+                                    $payment_info = "✓ Sudah Dibayar";
+                                    $payment_class = "color: green;";
+                                }
+                            }
                             ?>
                             <div class="pool-row" 
                                  data-nama="<?php echo strtolower($tagihan['nama']); ?>"
@@ -364,10 +468,15 @@ if ($result_pelanggans->num_rows > 0) {
                                 </div>
                                 <div class="pool-price">
                                     <?php 
-                                    if ($is_past_due) {
-                                        echo "<span style='color: red;'>-$sisa_hari hari</span>";
+                                    if ($tagihan['status_bayar'] == 'sudah') {
+                                        echo "<span style='font-weight: bold; " . ($payment_class ?? 'color: green;') . "'>" . ($payment_info ?? '✓ Sudah Dibayar') . "</span>";
                                     } else {
-                                        echo "<span style='color: green;'>+$sisa_hari hari</span>";
+                                        if ($is_past_due) {
+                                            // Tampilkan info tertunggak
+                                            echo "<span style='font-weight: bold; " . ($payment_class ?? 'color: red;') . "'>" . ($payment_info ?? "✗ Tertunggak $sisa_hari hari") . "</span>";
+                                        } else {
+                                            echo "<span style='color: green;'>+$sisa_hari hari</span>";
+                                        }
                                     }
                                     ?>
                                 </div>
