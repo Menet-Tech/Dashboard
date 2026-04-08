@@ -149,15 +149,15 @@ if ($result->num_rows > 0) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pool - Mikrotik Management</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
     <div class="overlay" id="overlay"></div>
-    <?php include '../navbar.php'; ?>
+    <?php include '../includes/navbar.php'; ?>
 
     <!-- Main Content Area -->
     <div class="main-content">
-        <?php include '../header.php'; ?>
+        <?php include '../includes/header.php'; ?>
 
         <div class="content-body">
             <!-- Pool Header -->
@@ -353,6 +353,6 @@ if ($result->num_rows > 0) {
         </div>
     </div>
 
-    <script src="asset/script.js"></script>
+    <script src="../assets/js/mikrotik.js"></script>
 </body>
 </html>

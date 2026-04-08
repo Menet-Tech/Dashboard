@@ -3,12 +3,12 @@ session_start();
 
 // Cek apakah user sudah login
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit();
 }
 
 // Include file konfigurasi database
-require_once 'config.php';
+require_once '../config.php';
 
 // Handle tambah pelanggan
 $message = '';
@@ -234,15 +234,15 @@ if (isset($_GET['edit_id'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pelanggan - Mikrotik Management</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
     <!-- Overlay removed to prevent blocking clicks -->
-    <?php include 'navbar.php'; ?>
+    <?php include '../includes/navbar.php'; ?>
 
     <!-- Main Content Area -->
     <div class="main-content">
-        <?php include 'header.php'; ?>
+        <?php include '../includes/header.php'; ?>
 
         <div class="content-body">
             <!-- Pelanggan Header -->

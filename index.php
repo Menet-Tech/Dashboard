@@ -3,7 +3,7 @@ session_start();
 
 // Redirect ke dashboard jika sudah login
 if (isset($_SESSION['user_id'])) {
-    header("Location: dashboard.php");
+    header("Location: pages/dashboard.php");
     exit();
 }
 

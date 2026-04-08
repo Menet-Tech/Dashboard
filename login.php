@@ -3,7 +3,7 @@ session_start();
 
 // Jika user sudah login, redirect ke dashboard
 if (isset($_SESSION['user_id'])) {
-    header("Location: dashboard.php");
+    header("Location: pages/dashboard.php");
     exit();
 }
 
@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_SESSION['username'] = $username;
             $_SESSION['login_time'] = time();
             
-            header("Location: dashboard.php");
+            header("Location: pages/dashboard.php");
             exit();
         } else {
             $error = 'Username atau password salah';
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Billing System</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="login-page-body">
     <div class="login-page">
@@ -98,6 +98,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="assets/js/script.js"></script>
 </body>
 </html>
