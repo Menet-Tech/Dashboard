@@ -1,7 +1,7 @@
 <!-- Main Content Header -->
 <?php 
 // Include config untuk mendapatkan custom date
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/../config.php';
 
 // Dapatkan custom date dan format untuk ditampilkan
 $current_datetime = getCurrentDateTime();

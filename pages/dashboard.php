@@ -3,7 +3,7 @@ session_start();
 
 // Cek apakah user sudah login
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit();
 }
 
@@ -47,14 +47,14 @@ $menus = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Billing System</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
-    <?php include 'navbar.php'; ?>
+    <?php include '../includes/navbar.php'; ?>
 
     <!-- Main Content Area -->
     <div class="main-content">
-        <?php include 'header.php'; ?>
+        <?php include '../includes/header.php'; ?>
 
         <div class="content-body">
             <div class="menu-grid">
@@ -72,6 +72,6 @@ $menus = [
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="../assets/js/script.js"></script>
 </body>
 </html>

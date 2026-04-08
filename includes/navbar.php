@@ -13,36 +13,36 @@
     </div>
     
     <div class="sidebar-menu">
-        <a href="http://localhost/billing/dashboard.php" class="sidebar-item">
+        <a href="/Dashboard/pages/dashboard.php" class="sidebar-item">
             <i class="fas fa-home"></i>
             <span>Dashboard</span>
         </a>
-        <a href="http://localhost/billing/tagihan.php" class="sidebar-item">
+        <a href="/Dashboard/pages/tagihan.php" class="sidebar-item">
             <i class="fas fa-file-invoice-dollar"></i>
             <span>Tagihan</span>
         </a>
-        <a href="../dashboard.php" class="sidebar-item">
+        <a href="/Dashboard/pages/dashboard.php" class="sidebar-item">
             <i class="fas fa-map-marked-alt"></i>
             <span>Maps</span>
         </a>
-        <a href="http://localhost/billing/pelanggan.php" class="sidebar-item">
+        <a href="/Dashboard/pages/pelanggan.php" class="sidebar-item">
             <i class="fas fa-users"></i>
             <span>Pelanggan</span>
         </a>
         <div class="sidebar-item dropdown-item">
-            <a href="dashboard.php" class="sidebar-link">
+            <a href="/Dashboard/pages/dashboard.php" class="sidebar-link">
                 <i class="fas fa-network-wired"></i>
                 <span>Mikrotik</span>
                 <i class="fas fa-chevron-down dropdown-arrow"></i>
             </a>
             <div class="dropdown-menu">
-                <a href="http://localhost/billing/mikrotik/pool.php" class="dropdown-item-link">
+                <a href="/Dashboard/mikrotik/pool.php" class="dropdown-item-link">
                     <i class="fas fa-layer-group"></i>
                     <span>IP Pool</span>
                 </a>
-                                <a href="http://localhost/billing/mikrotik/paket.php" class="dropdown-item-link">
+                <a href="/Dashboard/mikrotik/paket.php" class="dropdown-item-link">
                     <i class="fas fa-layer-group"></i>
-                    <span>Paket Bandwith</span>
+                    <span>Paket Bandwidth</span>
                 </a>
             </div>
         </div>
@@ -56,7 +56,7 @@
                 <span class="user-role">Administrator</span>
             </div>
         </div>
-        <a href="../login.php" class="logout-btn">
+        <a href="/Dashboard/login.php" class="logout-btn">
             <i class="fas fa-sign-out-alt"></i>
             <span>Logout</span>
         </a>
