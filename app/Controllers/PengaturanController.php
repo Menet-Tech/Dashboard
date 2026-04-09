@@ -15,6 +15,7 @@ class PengaturanController extends Controller
 {
     public function index(): void
     {
+        $this->requireAdmin();
         $this->view('pengaturan/index', [
             'title' => 'Pengaturan',
             'rows' => (new Pengaturan())->all(),
@@ -24,6 +25,7 @@ class PengaturanController extends Controller
     public function save(): void
     {
         verify_csrf();
+        $this->requireAdmin();
 
         $descriptions = [
             'nama_isp' => 'Nama ISP yang ditampilkan di header',
@@ -39,9 +41,14 @@ class PengaturanController extends Controller
             'discord_application_id' => 'Application ID Discord bot',
             'discord_guild_id' => 'Guild ID Discord untuk register slash command',
             'mikrotik_host' => 'Host API MikroTik',
+            'mikrotik_port' => 'Port API MikroTik',
             'mikrotik_user' => 'Username API MikroTik',
             'mikrotik_pass' => 'Password API MikroTik',
             'mikrotik_test_username' => 'Username dummy untuk tes MikroTik',
+            'billing_auto_generate_enabled' => 'Aktifkan generate tagihan otomatis bulanan',
+            'billing_auto_generate_day' => 'Hari generate tagihan otomatis',
+            'billing_auto_generate_time' => 'Jam generate tagihan otomatis',
+            'backup_retention_days' => 'Retensi backup otomatis',
         ];
 
         $rows = [];
@@ -60,6 +67,7 @@ class PengaturanController extends Controller
     public function testWhatsapp(): void
     {
         verify_csrf();
+        $this->requireAdmin();
 
         $targetNumber = preg_replace('/\D+/', '', (string) Pengaturan::get('wa_test_number', ''));
         if ($targetNumber === '') {
@@ -91,6 +99,7 @@ class PengaturanController extends Controller
     public function testDiscord(): void
     {
         verify_csrf();
+        $this->requireAdmin();
 
         $webhook = Pengaturan::get('discord_alert_url') ?: Pengaturan::get('discord_billing_url');
         if (!$webhook) {
@@ -111,6 +120,7 @@ class PengaturanController extends Controller
     public function testMikrotik(): void
     {
         verify_csrf();
+        $this->requireAdmin();
 
         $testUsername = trim((string) Pengaturan::get('mikrotik_test_username', ''));
         $result = (new MikroTikAPI())->testConnection($testUsername !== '' ? $testUsername : null);

@@ -49,6 +49,7 @@
                     <td><span class="badge text-bg-<?= $row['status'] === 'lunas' ? 'success' : ($row['status'] === 'menunggu_wa' ? 'warning' : 'secondary') ?>"><?= htmlspecialchars($row['status']) ?></span></td>
                     <td>
                         <?php if ($row['status'] !== 'lunas'): ?><button class="btn btn-sm btn-primary ajax-paid" data-id="<?= (int) $row['id'] ?>">Lunas</button><?php endif; ?>
+                        <a href="<?= base_url('/tagihan/show?id=' . $row['id']) ?>" class="btn btn-sm btn-outline-primary">Detail Tagihan</a>
                         <a href="<?= base_url('/pelanggan/show?id=' . $row['id_pelanggan']) ?>" class="btn btn-sm btn-outline-secondary">Info Pelanggan</a>
                         <a href="<?= htmlspecialchars($waMeUrl) ?>" target="_blank" class="btn btn-sm btn-outline-success">WA Me</a>
                         <button class="btn btn-sm btn-outline-dark ajax-wa" data-id="<?= (int) $row['id'] ?>" data-trigger="<?= $row['status'] === 'lunas' ? 'lunas' : 'jatuh_tempo' ?>">WA Gateway</button>

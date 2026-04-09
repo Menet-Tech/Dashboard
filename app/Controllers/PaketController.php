@@ -25,6 +25,7 @@ class PaketController extends Controller
     public function save(): void
     {
         verify_csrf();
+        $this->requireAdmin();
         (new Paket())->save([
             'id' => $this->input('id') ? (int) $this->input('id') : null,
             'nama_paket' => trim((string) $this->input('nama_paket')),
@@ -40,6 +41,7 @@ class PaketController extends Controller
     public function delete(): void
     {
         verify_csrf();
+        $this->requireAdmin();
         $model = new Paket();
         $id = (int) $this->input('id');
         if ($model->isUsed($id)) {

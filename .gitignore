@@ -3,8 +3,10 @@
 /discord-bot/node_modules/
 /.phpunit.cache/
 /.phpunit.result.cache
-# /tests/_reports/
-# /coverage/
+/tests/_reports/
+/coverage/
+/storage/backups/*.sql
+/public/uploads/payment-proofs/*
 /*.log
 /storage/*.log
 Thumbs.db

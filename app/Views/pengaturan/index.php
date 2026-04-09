@@ -13,7 +13,7 @@ foreach ($rows as $key => $row) {
         <div class="col-md-6"><label class="form-label">Nama ISP</label><input type="text" name="nama_isp" class="form-control" value="<?= htmlspecialchars((string) ($settings['nama_isp'] ?? '')) ?>"></div>
         <div class="col-md-6"><label class="form-label">No Rekening</label><input type="text" name="no_rekening" class="form-control" value="<?= htmlspecialchars((string) ($settings['no_rekening'] ?? '')) ?>"></div>
         <div class="col-md-6"><label class="form-label">WA Gateway URL</label><input type="url" name="wa_gateway_url" class="form-control" value="<?= htmlspecialchars((string) (\App\Models\Pengaturan::get('wa_gateway_url', 'http://localhost:3000'))) ?>"></div>
-        <div class="col-md-6"><label class="form-label">WA API Key</label><input type="text" name="wa_api_key" class="form-control" value="<?= htmlspecialchars((string) (\App\Models\Pengaturan::get('wa_api_key', ''))) ?>"></div>
+        <div class="col-md-6"><label class="form-label">WA API Key</label><input type="password" name="wa_api_key" class="form-control" value="<?= htmlspecialchars((string) (\App\Models\Pengaturan::get('wa_api_key', ''))) ?>"></div>
         <div class="col-md-6"><label class="form-label">WA Account ID</label><input type="text" name="wa_account_id" class="form-control" value="<?= htmlspecialchars((string) (\App\Models\Pengaturan::get('wa_account_id', 'default'))) ?>"></div>
         <div class="col-md-6"><label class="form-label">Nomor Test WhatsApp</label><input type="text" name="wa_test_number" class="form-control" value="<?= htmlspecialchars((string) ($settings['wa_test_number'] ?? '')) ?>" placeholder="628xxxx"></div>
         <div class="col-md-6">
@@ -24,13 +24,24 @@ foreach ($rows as $key => $row) {
         </div>
         <div class="col-md-6"><label class="form-label">Discord Billing URL</label><input type="url" name="discord_billing_url" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_billing_url'] ?? '')) ?>"></div>
         <div class="col-md-6"><label class="form-label">Discord Alert URL</label><input type="url" name="discord_alert_url" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_alert_url'] ?? '')) ?>"></div>
-        <div class="col-md-4"><label class="form-label">Discord Bot Token</label><input type="text" name="discord_bot_token" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_bot_token'] ?? '')) ?>"></div>
+        <div class="col-md-4"><label class="form-label">Discord Bot Token</label><input type="password" name="discord_bot_token" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_bot_token'] ?? '')) ?>"></div>
         <div class="col-md-4"><label class="form-label">Discord Application ID</label><input type="text" name="discord_application_id" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_application_id'] ?? '')) ?>"></div>
         <div class="col-md-4"><label class="form-label">Discord Guild ID</label><input type="text" name="discord_guild_id" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_guild_id'] ?? '')) ?>"></div>
-        <div class="col-md-4"><label class="form-label">MikroTik Host</label><input type="text" name="mikrotik_host" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_host'] ?? '')) ?>"></div>
-        <div class="col-md-4"><label class="form-label">MikroTik User</label><input type="text" name="mikrotik_user" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_user'] ?? '')) ?>"></div>
-        <div class="col-md-4"><label class="form-label">MikroTik Pass</label><input type="text" name="mikrotik_pass" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_pass'] ?? '')) ?>"></div>
+        <div class="col-md-3"><label class="form-label">MikroTik Host</label><input type="text" name="mikrotik_host" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_host'] ?? '')) ?>"></div>
+        <div class="col-md-3"><label class="form-label">MikroTik Port</label><input type="number" name="mikrotik_port" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_port'] ?? '8728')) ?>"></div>
+        <div class="col-md-3"><label class="form-label">MikroTik User</label><input type="text" name="mikrotik_user" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_user'] ?? '')) ?>"></div>
+        <div class="col-md-3"><label class="form-label">MikroTik Pass</label><input type="password" name="mikrotik_pass" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_pass'] ?? '')) ?>"></div>
         <div class="col-md-6"><label class="form-label">Username Test MikroTik</label><input type="text" name="mikrotik_test_username" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_test_username'] ?? '')) ?>" placeholder="contoh: test_pppoe"></div>
+        <div class="col-md-3">
+            <label class="form-label">Auto Generate Billing</label>
+            <select name="billing_auto_generate_enabled" class="form-select">
+                <option value="true" <?= (($settings['billing_auto_generate_enabled'] ?? 'true') === 'true') ? 'selected' : '' ?>>Aktif</option>
+                <option value="false" <?= (($settings['billing_auto_generate_enabled'] ?? 'true') === 'false') ? 'selected' : '' ?>>Nonaktif</option>
+            </select>
+        </div>
+        <div class="col-md-3"><label class="form-label">Hari Auto Generate</label><input type="number" name="billing_auto_generate_day" min="1" max="28" class="form-control" value="<?= htmlspecialchars((string) ($settings['billing_auto_generate_day'] ?? '1')) ?>"></div>
+        <div class="col-md-3"><label class="form-label">Jam Auto Generate</label><input type="time" name="billing_auto_generate_time" class="form-control" value="<?= htmlspecialchars((string) ($settings['billing_auto_generate_time'] ?? '00:05')) ?>"></div>
+        <div class="col-md-3"><label class="form-label">Retensi Backup (hari)</label><input type="number" name="backup_retention_days" min="1" class="form-control" value="<?= htmlspecialchars((string) ($settings['backup_retention_days'] ?? '14')) ?>"></div>
         <div class="col-12 d-flex justify-content-end"><button class="btn btn-primary">Simpan Pengaturan</button></div>
     </form>
 </div>
