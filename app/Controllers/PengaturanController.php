@@ -35,6 +35,9 @@ class PengaturanController extends Controller
             'wa_test_number' => 'Nomor tujuan untuk tes WhatsApp',
             'discord_billing_url' => 'Webhook billing Discord',
             'discord_alert_url' => 'Webhook alert Discord',
+            'discord_bot_token' => 'Token bot Discord',
+            'discord_application_id' => 'Application ID Discord bot',
+            'discord_guild_id' => 'Guild ID Discord untuk register slash command',
             'mikrotik_host' => 'Host API MikroTik',
             'mikrotik_user' => 'Username API MikroTik',
             'mikrotik_pass' => 'Password API MikroTik',
@@ -73,6 +76,13 @@ class PengaturanController extends Controller
         } else {
             $extra = !empty($result['fallback_url']) ? ' Fallback wa.me tersedia.' : '';
             Session::flash('error', 'Test WhatsApp gagal: ' . ($result['error'] ?? 'Unknown error') . $extra);
+            discordNotify(
+                'Test WhatsApp Gagal',
+                'Pengujian WhatsApp dari halaman pengaturan gagal.',
+                [['name' => 'Detail', 'value' => $result['error'] ?? 'Unknown error', 'inline' => false]],
+                'alert',
+                'danger'
+            );
         }
 
         redirect('/pengaturan');
@@ -104,6 +114,15 @@ class PengaturanController extends Controller
 
         $testUsername = trim((string) Pengaturan::get('mikrotik_test_username', ''));
         $result = (new MikroTikAPI())->testConnection($testUsername !== '' ? $testUsername : null);
+        if (!$result['success']) {
+            discordNotify(
+                'Test MikroTik Gagal',
+                'Pengujian MikroTik dari halaman pengaturan gagal.',
+                [['name' => 'Detail', 'value' => $result['message'], 'inline' => false]],
+                'alert',
+                'danger'
+            );
+        }
 
         Session::flash($result['success'] ? 'success' : 'error', $result['message']);
         redirect('/pengaturan');

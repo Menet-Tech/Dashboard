@@ -25,3 +25,39 @@ Aplikasi billing ISP native PHP berbasis MVC sederhana, dibangun mengikuti `blue
 ## Cron
 
 Jalankan scheduler di [cron/scheduler.php](D:\xampp\htdocs\Dashboard\cron\scheduler.php) setiap menit sesuai blueprint.
+
+## Discord Webhook dan Bot
+
+Project ini sekarang punya dua lapisan integrasi Discord:
+
+1. Webhook alerts dari aplikasi PHP
+   Dipakai untuk log generate tagihan, pembayaran lunas, jatuh tempo, heartbeat dashboard, dan alert kegagalan integrasi.
+
+2. Discord bot
+   Lokasinya di [discord-bot](D:\xampp\htdocs\Dashboard\discord-bot) dan membaca database yang sama untuk command operasional.
+
+### Konfigurasi yang perlu diisi
+
+Di halaman Pengaturan atau `.env`:
+
+- `discord_billing_url`
+- `discord_alert_url`
+- `discord_bot_token`
+- `discord_application_id`
+- `discord_guild_id`
+
+### Menjalankan bot
+
+1. Install dependency bot:
+   `cd discord-bot && npm install`
+2. Register slash commands ke guild:
+   `npm run register`
+3. Jalankan bot:
+   `npm start`
+
+### Slash commands bawaan
+
+- `/summary`
+- `/tagihan`
+- `/pelanggan`
+- `/health`

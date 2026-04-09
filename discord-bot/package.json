@@ -1,0 +1,16 @@
+{
+  "name": "menet-tech-discord-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Discord bot for Menet-Tech ISP dashboard",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "register": "node src/register-commands.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.19.3",
+    "dotenv": "^16.4.5",
+    "mysql2": "^3.11.3"
+  }
+}

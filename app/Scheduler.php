@@ -24,9 +24,35 @@ class Scheduler
 
     public function run(): void
     {
+        $this->checkIntegrations();
         $this->processMenungguWa();
         $this->processJatuhTempo();
         $this->processReminder7Hari();
+    }
+
+    public function checkIntegrations(): void
+    {
+        $waHealth = $this->whatsApp->checkHealth();
+        if (!$waHealth['success']) {
+            discordNotify(
+                'WhatsApp Gateway Bermasalah',
+                'Scheduler mendeteksi WhatsApp Gateway tidak sehat.',
+                [['name' => 'Detail', 'value' => $waHealth['message'], 'inline' => false]],
+                'alert',
+                'danger'
+            );
+        }
+
+        $mikroTik = $this->mikroTik->testConnection(Pengaturan::get('mikrotik_test_username'));
+        if (!$mikroTik['success']) {
+            discordNotify(
+                'MikroTik Bermasalah',
+                'Scheduler mendeteksi konfigurasi atau koneksi MikroTik tidak siap.',
+                [['name' => 'Detail', 'value' => $mikroTik['message'], 'inline' => false]],
+                'alert',
+                'danger'
+            );
+        }
     }
 
     public function processMenungguWa(): void
@@ -38,7 +64,17 @@ class Scheduler
             $message = TemplateWA::parse($template['isi_pesan'] ?? 'Pembayaran berhasil.', $bill);
             $result = $this->whatsApp->sendText((string) $bill['no_wa'], $message);
             ActionLog::create((int) $bill['id_pelanggan'], 'WA_SENT', $result['success'] ? 'success' : 'failed', $result['error'] ?? ($result['message_id'] ?? 'WA sent'));
-            sendDiscord(Pengaturan::get('discord_billing_url'), "Pembayaran lunas: {$bill['nama']}");
+            discordNotify(
+                'Pembayaran Lunas Otomatis',
+                "Tagihan pelanggan {$bill['nama']} diproses lunas oleh scheduler.",
+                [
+                    ['name' => 'Pelanggan', 'value' => $bill['nama']],
+                    ['name' => 'Periode', 'value' => date('F Y', strtotime($bill['periode']))],
+                    ['name' => 'Nominal', 'value' => 'Rp ' . number_format((float) $bill['harga'], 0, ',', '.')],
+                ],
+                'billing',
+                'success'
+            );
         }
     }
 
@@ -54,7 +90,26 @@ class Scheduler
                 $message = TemplateWA::parse($template['isi_pesan'] ?? 'Tagihan jatuh tempo.', $customer);
                 $result = $this->whatsApp->sendText((string) $customer['no_wa'], $message);
                 ActionLog::create((int) $customer['id'], 'WA_SENT', $result['success'] ? 'success' : 'failed', $result['error'] ?? ($result['message_id'] ?? 'WA sent'));
-                sendDiscord(Pengaturan::get('discord_alert_url'), "User {$customer['nama']} dilimit otomatis.");
+                discordNotify(
+                    'Pelanggan Dilimit Otomatis',
+                    "Pelanggan {$customer['nama']} melewati jatuh tempo dan dilimit oleh scheduler.",
+                    [
+                        ['name' => 'Pelanggan', 'value' => $customer['nama']],
+                        ['name' => 'Jatuh Tempo', 'value' => date('d/m/Y', strtotime($customer['due_date'] ?? date('Y-m-d')))],
+                        ['name' => 'Profile Limit', 'value' => (string) $customer['profile_limit_mikrotik']],
+                    ],
+                    'alert',
+                    'warning'
+                );
+                if (!$result['success']) {
+                    discordNotify(
+                        'Pengiriman WA Gagal',
+                        "Notifikasi WA jatuh tempo gagal terkirim untuk {$customer['nama']}.",
+                        [['name' => 'Error', 'value' => $result['error'] ?? 'Unknown error', 'inline' => false]],
+                        'alert',
+                        'danger'
+                    );
+                }
             }
         }
     }
@@ -67,6 +122,15 @@ class Scheduler
             $message = TemplateWA::parse($template['isi_pesan'] ?? 'Reminder 7 hari.', $customer);
             $result = $this->whatsApp->sendText((string) $customer['no_wa'], $message);
             ActionLog::create((int) $customer['id'], 'WA_SENT', $result['success'] ? 'success' : 'failed', $result['error'] ?? 'Reminder 7 hari');
+            if (!$result['success']) {
+                discordNotify(
+                    'Reminder WA Gagal',
+                    "Reminder 7 hari gagal dikirim untuk {$customer['nama']}.",
+                    [['name' => 'Error', 'value' => $result['error'] ?? 'Unknown error', 'inline' => false]],
+                    'alert',
+                    'danger'
+                );
+            }
         }
     }
 }

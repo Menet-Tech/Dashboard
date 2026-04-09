@@ -24,6 +24,9 @@ foreach ($rows as $key => $row) {
         </div>
         <div class="col-md-6"><label class="form-label">Discord Billing URL</label><input type="url" name="discord_billing_url" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_billing_url'] ?? '')) ?>"></div>
         <div class="col-md-6"><label class="form-label">Discord Alert URL</label><input type="url" name="discord_alert_url" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_alert_url'] ?? '')) ?>"></div>
+        <div class="col-md-4"><label class="form-label">Discord Bot Token</label><input type="text" name="discord_bot_token" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_bot_token'] ?? '')) ?>"></div>
+        <div class="col-md-4"><label class="form-label">Discord Application ID</label><input type="text" name="discord_application_id" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_application_id'] ?? '')) ?>"></div>
+        <div class="col-md-4"><label class="form-label">Discord Guild ID</label><input type="text" name="discord_guild_id" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_guild_id'] ?? '')) ?>"></div>
         <div class="col-md-4"><label class="form-label">MikroTik Host</label><input type="text" name="mikrotik_host" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_host'] ?? '')) ?>"></div>
         <div class="col-md-4"><label class="form-label">MikroTik User</label><input type="text" name="mikrotik_user" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_user'] ?? '')) ?>"></div>
         <div class="col-md-4"><label class="form-label">MikroTik Pass</label><input type="text" name="mikrotik_pass" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_pass'] ?? '')) ?>"></div>

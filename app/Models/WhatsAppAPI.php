@@ -62,6 +62,35 @@ class WhatsAppAPI
         return $this->fallback($to, $message, $data['message'] ?? 'Unknown error');
     }
 
+    public function checkHealth(): array
+    {
+        if ($this->baseUrl === '' || $this->apiKey === '') {
+            return ['success' => false, 'message' => 'WA Gateway belum dikonfigurasi'];
+        }
+
+        $ch = curl_init(rtrim($this->baseUrl, '/') . '/health');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            return ['success' => false, 'message' => 'cURL Error: ' . $error];
+        }
+
+        $data = json_decode((string) $response, true);
+        if ($httpCode >= 200 && $httpCode < 300 && ($data['status'] ?? '') === 'ok') {
+            return ['success' => true, 'message' => 'WA Gateway sehat'];
+        }
+
+        return ['success' => false, 'message' => 'WA Gateway tidak merespons sehat'];
+    }
+
     private function fallback(string $to, string $message, string $error): array
     {
         if (Pengaturan::get('wa_fallback_wa_me', 'true') === 'true') {
