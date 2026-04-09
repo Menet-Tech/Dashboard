@@ -37,4 +37,24 @@ abstract class Controller
     {
         return $_POST[$key] ?? $_GET[$key] ?? $default;
     }
+
+    protected function user(): array
+    {
+        return Session::get('user', []);
+    }
+
+    protected function userId(): ?int
+    {
+        $user = $this->user();
+        return isset($user['id']) ? (int) $user['id'] : null;
+    }
+
+    protected function requireAdmin(): void
+    {
+        $user = $this->user();
+        if (($user['role'] ?? 'petugas') !== 'admin') {
+            Session::flash('error', 'Aksi ini hanya bisa dilakukan admin.');
+            redirect('/dashboard');
+        }
+    }
 }

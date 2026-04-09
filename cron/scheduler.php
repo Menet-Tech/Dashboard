@@ -23,6 +23,19 @@ file_put_contents($lockFile, (string) getmypid());
 try {
     (new \App\Scheduler())->run();
     echo '[' . date('Y-m-d H:i:s') . "] Cron finished.\n";
+} catch (Throwable $throwable) {
+    \App\Models\Pengaturan::set('cron_last_run_at', date('Y-m-d H:i:s'));
+    \App\Models\Pengaturan::set('cron_last_status', 'failed');
+    (new \App\Models\SystemHealthCheck())->record('cron', 'failed', $throwable->getMessage());
+    discordNotify(
+        'Scheduler Gagal',
+        'Cron scheduler mengalami kegagalan.',
+        [['name' => 'Error', 'value' => $throwable->getMessage(), 'inline' => false]],
+        'alert',
+        'danger'
+    );
+    echo '[' . date('Y-m-d H:i:s') . '] Cron failed: ' . $throwable->getMessage() . "\n";
+    throw $throwable;
 } finally {
     if (file_exists($lockFile)) {
         unlink($lockFile);

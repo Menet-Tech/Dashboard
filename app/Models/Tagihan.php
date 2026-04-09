@@ -79,7 +79,7 @@ class Tagihan extends BaseModel
 
     public function find(int $id): ?array
     {
-        $stmt = $this->db->prepare("SELECT t.*, p.nama, p.no_wa, p.tgl_jatuh_tempo, p.id AS id_pelanggan, pk.nama_paket
+        $stmt = $this->db->prepare("SELECT t.*, p.nama, p.no_wa, p.user_pppoe, p.tgl_jatuh_tempo, p.id AS id_pelanggan, pk.nama_paket
             FROM tagihan t
             JOIN pelanggan p ON p.id = t.id_pelanggan
             JOIN paket pk ON pk.id = p.id_paket
@@ -100,6 +100,31 @@ class Tagihan extends BaseModel
     {
         $stmt = $this->db->prepare("UPDATE tagihan SET status = 'lunas', tgl_bayar = NOW(), redo_expired_at = NULL WHERE id = :id");
         $stmt->execute(['id' => $id]);
+    }
+
+    public function registerPayment(int $id, array $data): void
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE tagihan
+             SET status = 'lunas',
+                 tgl_bayar = :tgl_bayar,
+                 metode_bayar = :metode_bayar,
+                 catatan_pembayaran = :catatan_pembayaran,
+                 bukti_pembayaran = :bukti_pembayaran,
+                 paid_by_user_id = :paid_by_user_id,
+                 updated_by_user_id = :updated_by_user_id,
+                 redo_expired_at = NULL
+             WHERE id = :id"
+        );
+        $stmt->execute([
+            'id' => $id,
+            'tgl_bayar' => $data['tgl_bayar'],
+            'metode_bayar' => $data['metode_bayar'],
+            'catatan_pembayaran' => $data['catatan_pembayaran'],
+            'bukti_pembayaran' => $data['bukti_pembayaran'],
+            'paid_by_user_id' => $data['paid_by_user_id'],
+            'updated_by_user_id' => $data['updated_by_user_id'],
+        ]);
     }
 
     public function redo(int $id): void
@@ -129,5 +154,22 @@ class Tagihan extends BaseModel
             $row['tgl_jatuh_tempo'] = Pelanggan::resolveDueDateFromStored($row['tgl_jatuh_tempo'] ?? null, $row['periode'] ?? null);
             return $row;
         }, $rows);
+    }
+
+    public function latestUnpaid(int $limit = 10): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT t.*, p.nama, pk.nama_paket
+             FROM tagihan t
+             JOIN pelanggan p ON p.id = t.id_pelanggan
+             JOIN paket pk ON pk.id = p.id_paket
+             WHERE t.status = "belum_bayar"
+             ORDER BY t.periode ASC, t.created_at ASC
+             LIMIT :limit'
+        );
+        $stmt->bindValue('limit', $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll();
     }
 }

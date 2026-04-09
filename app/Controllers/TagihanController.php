@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Core\Session;
 use App\Models\ActionLog;
+use App\Models\PaymentHistory;
 use App\Models\Tagihan;
 use App\Models\TemplateWA;
 use App\Models\WhatsAppAPI;
@@ -36,9 +37,27 @@ class TagihanController extends Controller
         ])]);
     }
 
+    public function show(): void
+    {
+        $id = (int) $this->input('id');
+        $bill = (new Tagihan())->find($id);
+
+        if (!$bill) {
+            Session::flash('error', 'Tagihan tidak ditemukan.');
+            redirect('/tagihan');
+        }
+
+        $this->view('tagihan/show', [
+            'title' => 'Detail Tagihan',
+            'row' => $bill,
+            'paymentHistory' => (new PaymentHistory())->byBill($id),
+        ]);
+    }
+
     public function generate(): void
     {
         verify_csrf();
+        $this->requireAdmin();
         $periode = (string) $this->input('periode_generate', date('Y-m'));
         $created = (new Tagihan())->generateForPeriod($periode);
         discordNotify(
@@ -66,7 +85,26 @@ class TagihanController extends Controller
         $model->markPaid($id);
         $row = $model->find($id);
         if ($row) {
-            ActionLog::create((int) $row['id_pelanggan'], 'TAGIHAN_LUNAS', 'success', 'Tagihan ditandai lunas secara manual');
+            $userId = $this->userId();
+            $model->registerPayment($id, [
+                'tgl_bayar' => date('Y-m-d H:i:s'),
+                'metode_bayar' => 'manual',
+                'catatan_pembayaran' => 'Pelunasan cepat dari daftar tagihan',
+                'bukti_pembayaran' => null,
+                'paid_by_user_id' => $userId,
+                'updated_by_user_id' => $userId,
+            ]);
+            (new PaymentHistory())->create([
+                'tagihan_id' => $id,
+                'id_pelanggan' => (int) $row['id_pelanggan'],
+                'metode_bayar' => 'manual',
+                'jumlah_bayar' => (float) $row['harga'],
+                'dibayar_pada' => date('Y-m-d H:i:s'),
+                'catatan' => 'Pelunasan cepat dari daftar tagihan',
+                'bukti_pembayaran' => null,
+                'created_by_user_id' => $userId,
+            ]);
+            ActionLog::create((int) $row['id_pelanggan'], 'TAGIHAN_LUNAS', 'success', 'Tagihan ditandai lunas secara manual', $userId);
             discordNotify(
                 'Pembayaran Ditandai Lunas',
                 "Petugas menandai pembayaran {$row['nama']} sebagai lunas.",
@@ -80,6 +118,70 @@ class TagihanController extends Controller
             );
         }
         $this->json(['success' => true, 'message' => 'Tagihan berhasil ditandai lunas.', 'row' => $row]);
+    }
+
+    public function pay(): void
+    {
+        verify_csrf();
+        $id = (int) $this->input('id');
+        $model = new Tagihan();
+        $bill = $model->find($id);
+
+        if (!$bill) {
+            Session::flash('error', 'Tagihan tidak ditemukan.');
+            redirect('/tagihan');
+        }
+
+        $proofPath = null;
+        if (!empty($_FILES['bukti_pembayaran']['tmp_name']) && is_uploaded_file($_FILES['bukti_pembayaran']['tmp_name'])) {
+            $extension = pathinfo($_FILES['bukti_pembayaran']['name'], PATHINFO_EXTENSION) ?: 'bin';
+            $filename = 'payment-proof-' . $id . '-' . time() . '.' . strtolower($extension);
+            $target = BASE_PATH . '/public/uploads/payment-proofs/' . $filename;
+            if (!move_uploaded_file($_FILES['bukti_pembayaran']['tmp_name'], $target)) {
+                Session::flash('error', 'Upload bukti pembayaran gagal.');
+                redirect('/tagihan/show?id=' . $id);
+            }
+            $proofPath = 'uploads/payment-proofs/' . $filename;
+        }
+
+        $paidAt = $this->input('dibayar_pada', date('Y-m-d\TH:i'));
+        $userId = $this->userId();
+
+        $model->registerPayment($id, [
+            'tgl_bayar' => date('Y-m-d H:i:s', strtotime((string) $paidAt)),
+            'metode_bayar' => (string) $this->input('metode_bayar', 'manual'),
+            'catatan_pembayaran' => trim((string) $this->input('catatan_pembayaran', '')),
+            'bukti_pembayaran' => $proofPath,
+            'paid_by_user_id' => $userId,
+            'updated_by_user_id' => $userId,
+        ]);
+
+        (new PaymentHistory())->create([
+            'tagihan_id' => $id,
+            'id_pelanggan' => (int) $bill['id_pelanggan'],
+            'metode_bayar' => (string) $this->input('metode_bayar', 'manual'),
+            'jumlah_bayar' => (float) $bill['harga'],
+            'dibayar_pada' => date('Y-m-d H:i:s', strtotime((string) $paidAt)),
+            'catatan' => trim((string) $this->input('catatan_pembayaran', '')),
+            'bukti_pembayaran' => $proofPath,
+            'created_by_user_id' => $userId,
+        ]);
+
+        ActionLog::create((int) $bill['id_pelanggan'], 'PAYMENT_RECORDED', 'success', 'Pembayaran dicatat lengkap', $userId);
+        discordNotify(
+            'Pembayaran Dicatat',
+            "Pembayaran {$bill['nama']} dicatat lengkap melalui form detail tagihan.",
+            [
+                ['name' => 'Metode', 'value' => (string) $this->input('metode_bayar', 'manual')],
+                ['name' => 'Nominal', 'value' => 'Rp ' . number_format((float) $bill['harga'], 0, ',', '.')],
+                ['name' => 'Operator', 'value' => (string) ($this->user()['nama_lengkap'] ?? 'Petugas')],
+            ],
+            'billing',
+            'success'
+        );
+
+        Session::flash('success', 'Pembayaran berhasil dicatat.');
+        redirect('/tagihan/show?id=' . $id);
     }
 
     public function redo(): void

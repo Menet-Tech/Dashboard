@@ -8,6 +8,8 @@ use App\Models\ActionLog;
 use App\Models\MikroTikAPI;
 use App\Models\Pelanggan;
 use App\Models\Pengaturan;
+use App\Models\PaymentHistory;
+use App\Models\SystemHealthCheck;
 use App\Models\Tagihan;
 use App\Models\TemplateWA;
 use App\Models\WhatsAppAPI;
@@ -24,10 +26,45 @@ class Scheduler
 
     public function run(): void
     {
+        $this->processMonthlyBilling();
         $this->checkIntegrations();
         $this->processMenungguWa();
         $this->processJatuhTempo();
         $this->processReminder7Hari();
+        Pengaturan::set('cron_last_run_at', date('Y-m-d H:i:s'));
+        Pengaturan::set('cron_last_status', 'success');
+        (new SystemHealthCheck())->record('cron', 'ok', 'Scheduler berjalan normal');
+    }
+
+    public function processMonthlyBilling(): void
+    {
+        if (Pengaturan::get('billing_auto_generate_enabled', 'true') !== 'true') {
+            return;
+        }
+
+        $targetDay = (int) Pengaturan::get('billing_auto_generate_day', '1');
+        $targetTime = (string) Pengaturan::get('billing_auto_generate_time', '00:05');
+        $currentDay = (int) date('j');
+        $currentTime = date('H:i');
+
+        if ($currentDay !== $targetDay || $currentTime < $targetTime) {
+            return;
+        }
+
+        $periode = date('Y-m');
+        $created = (new Tagihan())->generateForPeriod($periode);
+        ActionLog::create(null, 'AUTO_GENERATE_TAGIHAN', 'success', "Generate otomatis periode {$periode}: {$created} tagihan");
+
+        discordNotify(
+            'Generate Tagihan Otomatis',
+            'Scheduler menjalankan generate tagihan otomatis bulanan.',
+            [
+                ['name' => 'Periode', 'value' => $periode],
+                ['name' => 'Tagihan Baru', 'value' => (string) $created],
+            ],
+            'billing',
+            $created > 0 ? 'success' : 'warning'
+        );
     }
 
     public function checkIntegrations(): void
@@ -64,6 +101,16 @@ class Scheduler
             $message = TemplateWA::parse($template['isi_pesan'] ?? 'Pembayaran berhasil.', $bill);
             $result = $this->whatsApp->sendText((string) $bill['no_wa'], $message);
             ActionLog::create((int) $bill['id_pelanggan'], 'WA_SENT', $result['success'] ? 'success' : 'failed', $result['error'] ?? ($result['message_id'] ?? 'WA sent'));
+            (new PaymentHistory())->create([
+                'tagihan_id' => (int) $bill['id'],
+                'id_pelanggan' => (int) $bill['id_pelanggan'],
+                'metode_bayar' => (string) ($bill['metode_bayar'] ?? 'manual'),
+                'jumlah_bayar' => (float) $bill['harga'],
+                'dibayar_pada' => date('Y-m-d H:i:s'),
+                'catatan' => 'Pembayaran diproses oleh scheduler dari status menunggu_wa',
+                'bukti_pembayaran' => $bill['bukti_pembayaran'] ?? null,
+                'created_by_user_id' => $bill['paid_by_user_id'] ?? null,
+            ]);
             discordNotify(
                 'Pembayaran Lunas Otomatis',
                 "Tagihan pelanggan {$bill['nama']} diproses lunas oleh scheduler.",

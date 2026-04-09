@@ -62,7 +62,7 @@ class WhatsAppAPI
         return $this->fallback($to, $message, $data['message'] ?? 'Unknown error');
     }
 
-    public function checkHealth(): array
+    public function checkHealth(bool $record = true): array
     {
         if ($this->baseUrl === '' || $this->apiKey === '') {
             return ['success' => false, 'message' => 'WA Gateway belum dikonfigurasi'];
@@ -85,9 +85,17 @@ class WhatsAppAPI
 
         $data = json_decode((string) $response, true);
         if ($httpCode >= 200 && $httpCode < 300 && ($data['status'] ?? '') === 'ok') {
+            Pengaturan::set('wa_status_panel_last_check', 'online ' . date('Y-m-d H:i:s'));
+            if ($record) {
+                (new SystemHealthCheck())->record('wa_gateway', 'ok', 'WA Gateway sehat');
+            }
             return ['success' => true, 'message' => 'WA Gateway sehat'];
         }
 
+        Pengaturan::set('wa_status_panel_last_check', 'offline ' . date('Y-m-d H:i:s'));
+        if ($record) {
+            (new SystemHealthCheck())->record('wa_gateway', 'failed', 'WA Gateway tidak merespons sehat');
+        }
         return ['success' => false, 'message' => 'WA Gateway tidak merespons sehat'];
     }
 

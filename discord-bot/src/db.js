@@ -41,3 +41,9 @@ export async function query(sql, params = []) {
   const [rows] = await db.query(sql, params);
   return rows;
 }
+
+export async function execute(sql, params = []) {
+  const db = getDb();
+  const [result] = await db.execute(sql, params);
+  return result;
+}

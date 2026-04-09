@@ -6,17 +6,23 @@
         <p>Operasional pelanggan, tagihan, dan notifikasi dalam satu panel.</p>
     </div>
     <nav class="nav flex-column sidebar-nav">
+        <?php $user = Session::get('user', []); $isAdmin = ($user['role'] ?? 'petugas') === 'admin'; ?>
         <a class="nav-link" href="<?= base_url('/dashboard') ?>">Dashboard</a>
         <a class="nav-link" href="<?= base_url('/pelanggan') ?>">Pelanggan</a>
         <a class="nav-link" href="<?= base_url('/tagihan') ?>">Tagihan</a>
+        <a class="nav-link" href="<?= base_url('/laporan') ?>">Laporan</a>
         <a class="nav-link" href="<?= base_url('/maps') ?>">Maps</a>
         <a class="nav-link" href="<?= base_url('/template-wa') ?>">Template WA</a>
         <a class="nav-link" href="<?= base_url('/paket') ?>">Master Paket</a>
-        <a class="nav-link" href="<?= base_url('/pengaturan') ?>">Pengaturan</a>
+        <?php if ($isAdmin): ?>
+            <a class="nav-link" href="<?= base_url('/users') ?>">Manajemen User</a>
+            <a class="nav-link" href="<?= base_url('/monitoring') ?>">Monitoring</a>
+            <a class="nav-link" href="<?= base_url('/backup') ?>">Backup</a>
+            <a class="nav-link" href="<?= base_url('/pengaturan') ?>">Pengaturan</a>
+        <?php endif; ?>
     </nav>
     <div class="sidebar-user">
         <div>
-            <?php $user = Session::get('user', []); ?>
             <strong><?= htmlspecialchars((string) ($user['nama_lengkap'] ?? 'Petugas')) ?></strong>
             <small class="d-block text-white-50"><?= htmlspecialchars((string) ($user['role'] ?? 'petugas')) ?></small>
         </div>

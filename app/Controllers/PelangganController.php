@@ -102,6 +102,7 @@ class PelangganController extends Controller
     public function delete(): void
     {
         verify_csrf();
+        $this->requireAdmin();
         (new Pelanggan())->softDelete((int) $this->input('id'));
         Session::flash('success', 'Pelanggan berhasil dihapus.');
         redirect('/pelanggan');

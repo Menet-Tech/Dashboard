@@ -59,4 +59,18 @@ class Pengaturan extends BaseModel
             ]);
         }
     }
+
+    public static function set(string $key, string $value, ?string $description = null): void
+    {
+        $instance = new self();
+        $stmt = $instance->db->prepare(
+            'INSERT INTO pengaturan (`key`, `value`, `description`) VALUES (:key, :value, :description)
+             ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `description` = COALESCE(VALUES(`description`), `description`)'
+        );
+        $stmt->execute([
+            'key' => $key,
+            'value' => $value,
+            'description' => $description,
+        ]);
+    }
 }

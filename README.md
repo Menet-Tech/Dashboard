@@ -2,6 +2,8 @@
 
 Aplikasi billing ISP native PHP berbasis MVC sederhana, dibangun mengikuti `blueprint.md`, memakai MySQL, Bootstrap 5, Chart.js, DataTables, Leaflet, integrasi WhatsApp Gateway internal, dan scheduler PHP.
 
+Untuk AI agent atau developer yang ingin cepat paham konteks project tanpa membaca seluruh repo, mulai dari [AGENTS.md](/D:/xampp/htdocs/Dashboard/AGENTS.md).
+
 ## Jalankan
 
 1. Pastikan Apache dan MySQL XAMPP aktif.

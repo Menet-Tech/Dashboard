@@ -3,11 +3,15 @@
 use App\Controllers\AuthController;
 use App\Controllers\DashboardController;
 use App\Controllers\MapsController;
+use App\Controllers\MonitoringController;
 use App\Controllers\PaketController;
 use App\Controllers\PelangganController;
 use App\Controllers\PengaturanController;
+use App\Controllers\ReportController;
 use App\Controllers\TagihanController;
 use App\Controllers\TemplateController;
+use App\Controllers\BackupController;
+use App\Controllers\UserController;
 
 $router->get('/', [DashboardController::class, 'index'], true);
 
@@ -27,12 +31,21 @@ $router->post('/pelanggan/delete', [PelangganController::class, 'delete'], true)
 
 $router->get('/tagihan', [TagihanController::class, 'index'], true);
 $router->get('/tagihan/data', [TagihanController::class, 'data'], true);
+$router->get('/tagihan/show', [TagihanController::class, 'show'], true);
 $router->post('/tagihan/generate', [TagihanController::class, 'generate'], true);
 $router->post('/tagihan/lunas', [TagihanController::class, 'markPaid'], true);
+$router->post('/tagihan/pay', [TagihanController::class, 'pay'], true);
 $router->post('/tagihan/redo', [TagihanController::class, 'redo'], true);
 $router->post('/tagihan/send-wa', [TagihanController::class, 'sendWhatsapp'], true);
 
 $router->get('/maps', [MapsController::class, 'index'], true);
+$router->get('/laporan', [ReportController::class, 'index'], true);
+$router->get('/laporan/export', [ReportController::class, 'export'], true);
+$router->get('/monitoring', [MonitoringController::class, 'index'], true);
+$router->get('/backup', [BackupController::class, 'index'], true);
+$router->post('/backup/create', [BackupController::class, 'create'], true);
+$router->get('/users', [UserController::class, 'index'], true);
+$router->post('/users/save', [UserController::class, 'save'], true);
 
 $router->get('/template-wa', [TemplateController::class, 'index'], true);
 $router->post('/template-wa/save', [TemplateController::class, 'save'], true);

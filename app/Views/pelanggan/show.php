@@ -22,8 +22,8 @@
         <div class="surface-card h-100">
             <div class="section-title"><h3>Profil Pelanggan</h3></div>
             <div class="detail-grid">
-                <div><span>Nomor WA</span><strong><?= htmlspecialchars($row['no_wa']) ?></strong></div>
-                <div><span>SN ONT</span><strong><?= htmlspecialchars((string) ($row['sn_ont'] ?: '-')) ?></strong></div>
+                <div><span>Nomor WA</span><strong><?= htmlspecialchars(mask_value($row['no_wa'] ?? '', 4, 3)) ?></strong></div>
+                <div><span>SN ONT</span><strong><?= htmlspecialchars(mask_value((string) ($row['sn_ont'] ?: ''), 3, 3)) ?></strong></div>
                 <div><span>Profile MikroTik</span><strong><?= htmlspecialchars($row['profile_mikrotik']) ?></strong></div>
                 <div><span>Profile Limit</span><strong><?= htmlspecialchars($row['profile_limit_mikrotik']) ?></strong></div>
                 <div><span>Latitude</span><strong><?= htmlspecialchars((string) ($row['latitude'] ?: '-')) ?></strong></div>

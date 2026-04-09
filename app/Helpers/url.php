@@ -52,3 +52,17 @@ function remember_old_inputs(array $inputs): void
         Session::flash('old_' . $key, $value);
     }
 }
+
+function mask_value(?string $value, int $visibleStart = 2, int $visibleEnd = 2): string
+{
+    if ($value === null || $value === '') {
+        return '-';
+    }
+
+    $length = strlen($value);
+    if ($length <= ($visibleStart + $visibleEnd)) {
+        return str_repeat('*', $length);
+    }
+
+    return substr($value, 0, $visibleStart) . str_repeat('*', max(4, $length - ($visibleStart + $visibleEnd))) . substr($value, -$visibleEnd);
+}
