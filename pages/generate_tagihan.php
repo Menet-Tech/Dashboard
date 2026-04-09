@@ -183,10 +183,27 @@ if (isset($_POST['generate_tagihan'])) {
     if ($result['success']) {
         $message = "Tagihan berhasil dibuat! Dibuat: {$result['generated']} tagihan, Dilewati: {$result['skipped']} tagihan";
         $message_type = "success";
+        
+        // Trigger Discord Notification
+        require_once '../includes/discord_helper.php';
+        $total_active_sql = "SELECT COUNT(*) as total FROM pelanggan WHERE status IN ('active', 'limit')";
+        $total_active_res = $conn->query($total_active_sql);
+        $total_active_row = $total_active_res->fetch_assoc();
+        $total_active = $total_active_row['total'] ?? 0;
+        
+        notifyDiscordGenerateTagihan($conn, $result['generated'], $result['skipped'], $total_active);
     } else {
         $message = $result['message'];
         $message_type = "error";
     }
+}
+
+// Check for flash messages from cek_jatuh_tempo.php
+if (isset($_SESSION['flash_message'])) {
+    $message = $_SESSION['flash_message'];
+    $message_type = $_SESSION['flash_type'];
+    unset($_SESSION['flash_message']);
+    unset($_SESSION['flash_type']);
 }
 
 // Handle pembayaran tagihan
@@ -435,6 +452,9 @@ if ($result->num_rows > 0) {
                         <i class="fas fa-plus-circle"></i> Generate Tagihan
                     </button>
                 </form>
+                <a href="cek_jatuh_tempo.php?redirect=generate_tagihan.php" class="btn-generate" style="background-color: #6c757d; text-decoration: none; display: inline-block; margin-left: 10px;">
+                    <i class="fas fa-search-dollar"></i> Cek Jatuh Tempo (Discord Alert)
+                </a>
             </div>
 
             <!-- Message Display -->

@@ -92,7 +92,7 @@ if (isset($_GET['pelanggan_id'])) {
 }
 
 // Query untuk menampilkan tagihan
-$sql = "SELECT t.*, p.nama, pb.name as paket_name, pb.price 
+$sql = "SELECT t.*, p.nama, p.no_wa, pb.name as paket_name, pb.price 
         FROM tagihan t 
         LEFT JOIN pelanggan p ON t.pelanggan_id = p.id 
         LEFT JOIN paket_bandwidth pb ON p.paket_id = pb.id ";
@@ -112,6 +112,7 @@ if ($result->num_rows > 0) {
             'id' => $row['id'],
             'pelanggan_id' => $row['pelanggan_id'],
             'nama' => $row['nama'],
+            'no_wa' => $row['no_wa'],
             'paket_name' => $row['paket_name'],
             'tanggal_tagihan' => $row['tanggal_tagihan'],
             'tanggal_jatuh_tempo' => $row['tanggal_jatuh_tempo'],
@@ -253,7 +254,7 @@ if ($result_pelanggans->num_rows > 0) {
         }
         
         .table-body .pool-row {
-            grid-template-columns: 150px 150px 150px 150px 150px 150px 150px 200px;
+            grid-template-columns: 150px 140px 140px 140px 140px 130px 140px 240px;
         }
         
         @media (max-width: 1200px) {
@@ -487,11 +488,27 @@ if ($result_pelanggans->num_rows > 0) {
                                                 <input type="hidden" name="tagihan_id" value="<?php echo $tagihan['id']; ?>">
                                                 <input type="hidden" name="status_bayar" value="sudah">
                                                 <button type="submit" name="bayar_tagihan" class="btn-bayar" onclick="return confirm('Yakin ingin menandai tagihan ini sebagai sudah dibayar?')">
-                                                    <i class="fas fa-check"></i> Sudah
+                                                    <i class="fas fa-check"></i> Sudah Bayar
                                                 </button>
                                             </form>
+                                            <?php if (!empty($tagihan['no_wa'])): ?>
+                                                <?php if ($is_past_due): ?>
+                                                    <a href="build_wa.php?id=<?php echo $tagihan['id']; ?>&jenis=peringatan" target="_blank" class="btn-bayar" style="background-color: #ffc107; color: #000; text-decoration: none;">
+                                                        <i class="fab fa-whatsapp"></i> WA Peringatan
+                                                    </a>
+                                                <?php else: ?>
+                                                    <a href="build_wa.php?id=<?php echo $tagihan['id']; ?>&jenis=tagihan" target="_blank" class="btn-bayar" style="background-color: #17a2b8; text-decoration: none;">
+                                                        <i class="fab fa-whatsapp"></i> WA Tagihan
+                                                    </a>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
                                         <?php else: ?>
-                                            <span style="color: green; font-weight: bold;">LUNAS</span>
+                                            <span style="color: green; font-weight: bold; margin-right: 10px;">LUNAS</span>
+                                            <?php if (!empty($tagihan['no_wa'])): ?>
+                                                <a href="build_wa.php?id=<?php echo $tagihan['id']; ?>&jenis=pembayaran" target="_blank" class="btn-bayar" style="background-color: #28a745; text-decoration: none;">
+                                                    <i class="fab fa-whatsapp"></i> WA Kwitansi
+                                                </a>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                     </div>
                                 </div>
