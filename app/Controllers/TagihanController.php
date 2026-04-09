@@ -41,6 +41,17 @@ class TagihanController extends Controller
         verify_csrf();
         $periode = (string) $this->input('periode_generate', date('Y-m'));
         $created = (new Tagihan())->generateForPeriod($periode);
+        discordNotify(
+            'Generate Tagihan Manual',
+            'Petugas menjalankan generate tagihan manual dari dashboard.',
+            [
+                ['name' => 'Periode', 'value' => $periode],
+                ['name' => 'Tagihan Baru', 'value' => (string) $created],
+                ['name' => 'Operator', 'value' => (string) ((Session::get('user')['nama_lengkap'] ?? 'Petugas'))],
+            ],
+            'billing',
+            $created > 0 ? 'success' : 'warning'
+        );
         Session::flash('success', $created > 0
             ? "Berhasil generate {$created} tagihan untuk periode {$periode}."
             : "Tidak ada tagihan baru untuk periode {$periode}. Semua pelanggan yang memenuhi sudah punya tagihan.");
@@ -56,6 +67,17 @@ class TagihanController extends Controller
         $row = $model->find($id);
         if ($row) {
             ActionLog::create((int) $row['id_pelanggan'], 'TAGIHAN_LUNAS', 'success', 'Tagihan ditandai lunas secara manual');
+            discordNotify(
+                'Pembayaran Ditandai Lunas',
+                "Petugas menandai pembayaran {$row['nama']} sebagai lunas.",
+                [
+                    ['name' => 'Pelanggan', 'value' => $row['nama']],
+                    ['name' => 'Periode', 'value' => date('F Y', strtotime($row['periode']))],
+                    ['name' => 'Nominal', 'value' => 'Rp ' . number_format((float) $row['harga'], 0, ',', '.')],
+                ],
+                'billing',
+                'success'
+            );
         }
         $this->json(['success' => true, 'message' => 'Tagihan berhasil ditandai lunas.', 'row' => $row]);
     }
@@ -81,6 +103,15 @@ class TagihanController extends Controller
         $message = TemplateWA::parse($template['isi_pesan'] ?? 'Halo {nama}', $row);
         $result = (new WhatsAppAPI())->sendText((string) $row['no_wa'], $message);
         ActionLog::create((int) $row['id_pelanggan'], 'WA_SENT', $result['success'] ? 'success' : 'failed', $result['error'] ?? ($result['message_id'] ?? 'Manual send'));
+        if (!$result['success']) {
+            discordNotify(
+                'Pengiriman WA Manual Gagal',
+                "Pengiriman WA manual dari halaman tagihan gagal untuk {$row['nama']}.",
+                [['name' => 'Error', 'value' => $result['error'] ?? 'Unknown error', 'inline' => false]],
+                'alert',
+                'danger'
+            );
+        }
 
         $this->json([
             'success' => $result['success'],
