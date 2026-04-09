@@ -1,0 +1,12 @@
+/.env
+/vendor/
+/.phpunit.cache/
+/.phpunit.result.cache
+# /tests/_reports/
+# /coverage/
+/*.log
+/storage/*.log
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/
