@@ -46,6 +46,14 @@
                 </a>
             </div>
         </div>
+        <a href="/Dashboard/pages/templates.php" class="sidebar-item">
+            <i class="fas fa-file-code"></i>
+            <span>Template WA</span>
+        </a>
+        <a href="/Dashboard/pages/settings.php" class="sidebar-item">
+            <i class="fas fa-cog"></i>
+            <span>Pengaturan</span>
+        </a>
     </div>
     
     <div class="sidebar-footer">

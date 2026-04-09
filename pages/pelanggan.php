@@ -17,6 +17,8 @@ if (isset($_POST['add_pelanggan'])) {
     $nama = cleanInput($_POST['nama']);
     $user_pppoe = cleanInput($_POST['user_pppoe']);
     $password_pppoe = cleanInput($_POST['password_pppoe']);
+    $no_wa = cleanInput($_POST['no_wa']);
+    $serial_number_ont = cleanInput($_POST['serial_number_ont']);
     $paket_id = cleanInput($_POST['paket_id']);
     $jatuh_tempo = cleanInput($_POST['jatuh_tempo']);
     $status = cleanInput($_POST['status']);
@@ -45,9 +47,9 @@ if (isset($_POST['add_pelanggan'])) {
             $paketStmt->fetch();
             $paketStmt->close();
 
-            $sql = "INSERT INTO pelanggan (nama, user_pppoe, password_pppoe, paket_id, jatuh_tempo, harga, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO pelanggan (nama, no_wa, serial_number_ont, user_pppoe, password_pppoe, paket_id, jatuh_tempo, harga, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sssiiis", $nama, $user_pppoe, $password_pppoe, $paket_id, $jatuh_tempo, $price, $status);
+            $stmt->bind_param("sssssiiis", $nama, $no_wa, $serial_number_ont, $user_pppoe, $password_pppoe, $paket_id, $jatuh_tempo, $price, $status);
 
             if ($stmt->execute()) {
                 $message = "Pelanggan berhasil ditambahkan!";
@@ -74,6 +76,8 @@ if (isset($_POST['edit_pelanggan'])) {
     $nama = cleanInput($_POST['nama']);
     $user_pppoe = cleanInput($_POST['user_pppoe']);
     $password_pppoe = cleanInput($_POST['password_pppoe']);
+    $no_wa = cleanInput($_POST['no_wa']);
+    $serial_number_ont = cleanInput($_POST['serial_number_ont']);
     $paket_id = cleanInput($_POST['paket_id']);
     $jatuh_tempo = cleanInput($_POST['jatuh_tempo']);
     $status = cleanInput($_POST['status']);
@@ -102,9 +106,9 @@ if (isset($_POST['edit_pelanggan'])) {
             $paketStmt->fetch();
             $paketStmt->close();
 
-            $sql = "UPDATE pelanggan SET nama = ?, user_pppoe = ?, password_pppoe = ?, paket_id = ?, jatuh_tempo = ?, harga = ?, status = ? WHERE id = ?";
+            $sql = "UPDATE pelanggan SET nama = ?, no_wa = ?, serial_number_ont = ?, user_pppoe = ?, password_pppoe = ?, paket_id = ?, jatuh_tempo = ?, harga = ?, status = ? WHERE id = ?";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sssiissi", $nama, $user_pppoe, $password_pppoe, $paket_id, $jatuh_tempo, $price, $status, $id);
+            $stmt->bind_param("ssssssiisi", $nama, $no_wa, $serial_number_ont, $user_pppoe, $password_pppoe, $paket_id, $jatuh_tempo, $price, $status, $id);
 
             if ($stmt->execute()) {
                 $message = "Pelanggan berhasil diperbarui!";
@@ -182,6 +186,8 @@ if ($result->num_rows > 0) {
         $pelanggans[] = [
             'id' => $row['id'],
             'nama' => $row['nama'],
+            'no_wa' => $row['no_wa'],
+            'serial_number_ont' => $row['serial_number_ont'],
             'user_pppoe' => $row['user_pppoe'],
             'password_pppoe' => $row['password_pppoe'],
             'paket_name' => $row['paket_name'],
@@ -307,6 +313,14 @@ if (isset($_GET['edit_id'])) {
                             <input type="text" id="add-user-pppoe" name="user_pppoe" placeholder="Contoh: johndoe" required>
                         </div>
                         <div>
+                            <label for="add-no-wa">No WhatsApp:</label>
+                            <input type="text" id="add-no-wa" name="no_wa" placeholder="Contoh: 628123456789">
+                        </div>
+                        <div>
+                            <label for="add-serial-number-ont">Serial Number ONT:</label>
+                            <input type="text" id="add-serial-number-ont" name="serial_number_ont" placeholder="Contoh: ZNTE123456">
+                        </div>
+                        <div>
                             <label for="add-password-pppoe">Password PPPoE:</label>
                             <input type="password" id="add-password-pppoe" name="password_pppoe" placeholder="Kosongkan untuk menggunakan format otomatis">
                         </div>
@@ -363,6 +377,14 @@ if (isset($_GET['edit_id'])) {
                         <div>
                             <label for="edit-user-pppoe">User PPPoE:</label>
                             <input type="text" id="edit-user-pppoe" name="user_pppoe" required>
+                        </div>
+                        <div>
+                            <label for="edit-no-wa">No WhatsApp:</label>
+                            <input type="text" id="edit-no-wa" name="no_wa">
+                        </div>
+                        <div>
+                            <label for="edit-serial-number-ont">Serial Number ONT:</label>
+                            <input type="text" id="edit-serial-number-ont" name="serial_number_ont">
                         </div>
                         <div>
                             <label for="edit-password-pppoe">Password PPPoE:</label>
@@ -439,8 +461,9 @@ if (isset($_GET['edit_id'])) {
             <div class="pool-table">
                 <div class="table-header">
                     <div>Nama</div>
+                    <div>No WA</div>
                     <div>User PPPoE</div>
-                    <div>Password PPPoE</div>
+                    <div>SN ONT</div>
                     <div>Paket</div>
                     <div>Jatuh Tempo</div>
                     <div>Status</div>
@@ -462,10 +485,13 @@ if (isset($_GET['edit_id'])) {
                                     <?php echo htmlspecialchars($pelanggan['nama']); ?>
                                 </div>
                                 <div class="pool-range">
+                                    <?php echo htmlspecialchars($pelanggan['no_wa']); ?>
+                                </div>
+                                <div class="pool-range">
                                     <?php echo htmlspecialchars($pelanggan['user_pppoe']); ?>
                                 </div>
                                 <div class="pool-next">
-                                    <?php echo htmlspecialchars($pelanggan['password_pppoe']); ?>
+                                    <?php echo htmlspecialchars($pelanggan['serial_number_ont']); ?>
                                 </div>
                                 <div class="pool-comment">
                                     <?php echo htmlspecialchars($pelanggan['paket_name']); ?>
@@ -595,9 +621,11 @@ if (isset($_GET['edit_id'])) {
             document.getElementById('add-form-container').style.display = 'none';
         }
 
-        function showEditForm(id, nama, user_pppoe, password_pppoe, paket_id, jatuh_tempo, status) {
+        function showEditForm(id, nama, no_wa, serial_number_ont, user_pppoe, password_pppoe, paket_id, jatuh_tempo, status) {
             document.getElementById('edit-id').value = id;
             document.getElementById('edit-nama').value = nama;
+            document.getElementById('edit-no-wa').value = no_wa;
+            document.getElementById('edit-serial-number-ont').value = serial_number_ont;
             document.getElementById('edit-user-pppoe').value = user_pppoe;
             document.getElementById('edit-password-pppoe').value = password_pppoe;
             document.getElementById('edit-paket-id').value = paket_id;
@@ -647,21 +675,19 @@ if (isset($_GET['edit_id'])) {
                 const row = this.closest('.pool-row');
                 const id = row.dataset.id;
                 const nama = row.querySelector('.pool-name').textContent.replace('👤 ', '').trim();
-                const user_pppoe = row.querySelector('.pool-range').textContent.trim();
-                const password_pppoe = row.querySelector('.pool-next').textContent.trim();
-                const paket = row.querySelector('.pool-comment').textContent.trim();
-                const jatuh_tempo = row.querySelector('.pool-price').textContent.replace('Tanggal ', '').trim();
+                const columns = row.querySelectorAll('div:not(.actions)');
+                const no_wa = columns[1].textContent.trim();
+                const user_pppoe = columns[2].textContent.trim();
+                const serial_number_ont = columns[3].textContent.trim();
+                const password_pppoe = row.dataset.password || ''; // Assuming we might want to keep password somewhere
+                const paket = columns[4].textContent.trim();
+                const jatuh_tempo = columns[5].textContent.replace('Tanggal ', '').trim();
                 
                 // Ambil status dari data attribute atau dari badge
                 let status = row.dataset.status;
                 if (!status) {
                     status = row.querySelector('.pool-status .status-badge').textContent.trim().toLowerCase();
                 }
-                
-                // Debug: Tampilkan status yang diambil
-                console.log('Status yang diambil:', status);
-                console.log('Data status:', row.dataset.status);
-                console.log('Badge text:', row.querySelector('.pool-status .status-badge').textContent.trim().toLowerCase());
                 
                 // Cari ID paket berdasarkan nama
                 let paket_id = '';
@@ -671,7 +697,7 @@ if (isset($_GET['edit_id'])) {
                     }
                 <?php endforeach; ?>
                 
-                showEditForm(id, nama, user_pppoe, password_pppoe, paket_id, jatuh_tempo, status);
+                showEditForm(id, nama, no_wa, serial_number_ont, user_pppoe, password_pppoe, paket_id, jatuh_tempo, status);
             });
         });
 
