@@ -6,11 +6,15 @@ Untuk AI agent atau developer yang ingin cepat paham konteks project tanpa memba
 
 ## Jalankan
 
-1. Pastikan Apache dan MySQL XAMPP aktif.
-2. Database default: `dashboard`.
-3. Konfigurasi koneksi ada di [`.env`](D:\xampp\htdocs\Dashboard\.env).
-4. Buka aplikasi dari [public/index.php](D:\xampp\htdocs\Dashboard\public\index.php) melalui URL:
-   `http://localhost/Dashboard/public`
+1. Setelah clone, jalankan `./install.sh` dari root project.
+2. Installer akan:
+   - membuat file `.env` dari `.env.example`
+   - menginstall dependency PHP (`composer install`)
+   - mengimpor schema `database.sql` ke MySQL
+   - membuat direktori upload dan storage
+   - menyiapkan unit systemd untuk web, scheduler, dan bot (opsional)
+3. Aplikasi default tersedia di `http://127.0.0.1:8080` jika service web diaktifkan.
+4. Jika tidak menggunakan installer, database default adalah `dashboard`.
 
 ## Default Login
 
