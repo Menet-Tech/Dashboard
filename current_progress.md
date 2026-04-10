@@ -23,9 +23,7 @@ Paket pekerjaan yang sedang diimplementasikan:
 - tombol test WA / Discord / MikroTik sudah ada
 - AGENTS.md sudah ada
 
-## Progress Turn Ini
-
-### Sudah dikerjakan
+## Progress Turn Sebelumnya (turn ke-2)
 
 1. Menambah fondasi schema extension:
    - file migration dibuat di [database/migrations/20260409_production_upgrade.sql](/D:/xampp/htdocs/Dashboard/database/migrations/20260409_production_upgrade.sql)
@@ -39,71 +37,75 @@ Paket pekerjaan yang sedang diimplementasikan:
    - [app/Models/Report.php](/D:/xampp/htdocs/Dashboard/app/Models/Report.php)
 
 3. Fondasi auth/security sudah mulai diikat:
-   - [app/Controllers/AuthController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/AuthController.php)
-   - login rate limiting mulai diimplementasikan memakai `login_attempts`
-   - login/logout sudah mulai dicatat ke `action_log`
+   - login rate limiting memakai `login_attempts`
+   - login/logout dicatat ke `action_log`
 
 4. Fondasi role restriction mulai ditambahkan:
-   - [app/Core/Controller.php](/D:/xampp/htdocs/Dashboard/app/Core/Controller.php)
    - ada helper `requireAdmin()`
 
 5. Fondasi payment workflow mulai diubah:
-   - [app/Models/Tagihan.php](/D:/xampp/htdocs/Dashboard/app/Models/Tagihan.php)
-   - sudah ada `registerPayment()`
-   - sudah ada `latestUnpaid()`
+   - sudah ada `registerPayment()` dan `latestUnpaid()`
 
-6. Routing awal untuk modul baru sudah ditambahkan di [routes.php](/D:/xampp/htdocs/Dashboard/routes.php):
-   - `/tagihan/show`
-   - `/tagihan/pay`
-   - `/laporan`
-   - `/laporan/export`
-   - `/monitoring`
-   - `/backup`
-   - `/backup/create`
+6. Routing awal untuk modul baru sudah ditambahkan:
+   - `/tagihan/show`, `/tagihan/pay`, `/laporan`, `/laporan/export`, `/monitoring`, `/backup`, `/backup/create`
 
 7. Modul tambahan sekarang sudah dibuat:
-   - [app/Controllers/ReportController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/ReportController.php)
-   - [app/Controllers/MonitoringController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/MonitoringController.php)
-   - [app/Controllers/BackupController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/BackupController.php)
-   - [app/Controllers/UserController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/UserController.php)
+   - ReportController, MonitoringController, BackupController, UserController
 
 8. View tambahan sudah dibuat:
-   - [app/Views/tagihan/show.php](/D:/xampp/htdocs/Dashboard/app/Views/tagihan/show.php)
-   - [app/Views/laporan/index.php](/D:/xampp/htdocs/Dashboard/app/Views/laporan/index.php)
-   - [app/Views/monitoring/index.php](/D:/xampp/htdocs/Dashboard/app/Views/monitoring/index.php)
-   - [app/Views/backup/index.php](/D:/xampp/htdocs/Dashboard/app/Views/backup/index.php)
-   - [app/Views/users/index.php](/D:/xampp/htdocs/Dashboard/app/Views/users/index.php)
+   - tagihan/show, laporan/index, monitoring/index, backup/index, users/index
 
-9. Payment workflow sekarang sudah mulai lengkap:
-   - detail tagihan sudah ada
-   - histori pembayaran sudah ada
-   - metode bayar sudah ada
-   - upload bukti bayar sudah ada
-   - audit operator bayar mulai dicatat
+9. Payment workflow sekarang sudah mulai lengkap dengan detail + histori + upload bukti bayar
 
-10. Monitoring dan observability sudah mulai hidup:
-   - panel status dashboard untuk WA / MikroTik / Discord bot / cron
-   - halaman monitoring
-   - health check table sudah dipakai
-   - cron heartbeat + failure status sudah dicatat
+10. Monitoring & backup dasar sudah ada
 
-11. Backup database sudah mulai ada:
-   - halaman backup
-   - log backup
-   - generator backup via `mysqldump`
+11. MikroTik stub sudah diganti dengan client RouterOS API real berbasis socket
 
-12. User management dasar sudah ada:
-   - admin bisa buat user baru
-   - role admin / petugas mulai dipakai untuk gating fitur sensitif
+## Progress Turn Ini (turn ke-3) — Bug Fix & Feature Improvement
 
-13. Integrasi MikroTik stub sudah diganti menjadi client RouterOS API berbasis socket:
-   - file: [app/Models/MikroTikAPI.php](/D:/xampp/htdocs/Dashboard/app/Models/MikroTikAPI.php)
-   - method penting:
-     - `testConnection()`
-     - `limitUser()`
-     - `activateUser()`
-     - `kickUser()`
-     - `syncStatus()`
+### Bug yang diperbaiki
+
+1. **Bug WA template** — tombol `WA Me` dan `WA Gateway` di halaman tagihan selalu
+   memakai template `jatuh_tempo` meskipun tagihan sudah `lunas`.
+   - Fix di: [app/Views/tagihan/index.php](/D:/xampp/htdocs/Dashboard/app/Views/tagihan/index.php)
+   - Sekarang trigger dipilih berdasarkan `$row['status']`:
+     - `lunas` → trigger `lunas`
+     - `belum_bayar` → trigger `jatuh_tempo`
+
+2. **Status badge tagihan** tidak menampilkan label yang lengkap (tidak ada "Jatuh Tempo" / "Menunggak").
+   - Fix di: [app/Models/Tagihan.php](/D:/xampp/htdocs/Dashboard/app/Models/Tagihan.php) + view
+
+### Fitur baru
+
+3. **Computed display status** di Tagihan:
+   - Method baru: `computeDisplayStatus(array $row): string`
+   - Method baru: `displayStatusBadge(string $displayStatus): string`
+   - Method baru: `displayStatusLabel(string $displayStatus): string`
+   - Method baru: `countUnpaidForCustomer(int $pelangganId): int`
+   - Logika:
+     - `belum_bayar` + jatuh tempo belum lewat → **Belum Bayar** (badge secondary)
+     - `belum_bayar` + jatuh tempo sudah lewat + 1 tagihan belum bayar → **Jatuh Tempo** (badge warning)
+     - `belum_bayar` + jatuh tempo sudah lewat + 2+ tagihan belum bayar → **Menunggak** (badge danger)
+     - `lunas` → **Lunas** (badge success)
+   - Query `all()` sekarang menyertakan subquery `total_unpaid_count` per pelanggan
+
+4. **Status pelanggan otomatis kembali ke `active`** setelah pelunasan:
+   - Fix di: [app/Controllers/TagihanController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/TagihanController.php)
+   - Helper baru: `restorePelangganStatusIfPaid(int $pelangganId, Tagihan $model): void`
+   - Dipanggil di `markPaid()` dan `pay()`
+   - Jika tidak ada tagihan belum bayar → status pelanggan dikembalikan ke `active`
+   - Jika masih ada tunggakan lain → status pelanggan tetap `limit`
+
+5. **Log dashboard lebih detail & scrollable**:
+   - Model: [app/Models/ActionLog.php](/D:/xampp/htdocs/Dashboard/app/Models/ActionLog.php) — `latest()` sekarang JOIN ke tabel `pelanggan`
+   - View: [app/Views/dashboard/index.php](/D:/xampp/htdocs/Dashboard/app/Views/dashboard/index.php) — tampilkan nama pelanggan, label aksi dalam Bahasa Indonesia, badge status berwarna, pesan detail, waktu relatif
+   - CSS: [public/assets/css/app.css](/D:/xampp/htdocs/Dashboard/public/assets/css/app.css) — `.log-list` sekarang scrollable (`max-height: 420px; overflow-y: auto`)
+   - Limit log dinaikkan dari 10 ke 20
+
+6. **Unit test** sekarang ada 30 test, 46 assertions, semua pass:
+   - Test baru: [tests/Unit/TagihanStatusTest.php](/D:/xampp/htdocs/Dashboard/tests/Unit/TagihanStatusTest.php) — 11 test
+   - Test diupdate: [tests/Unit/TemplateWATest.php](/D:/xampp/htdocs/Dashboard/tests/Unit/TemplateWATest.php) — 3 test tambahan
+   - Test diupdate: [tests/Unit/PelangganDueDateTest.php](/D:/xampp/htdocs/Dashboard/tests/Unit/PelangganDueDateTest.php) — 7 test tambahan
 
 ### Belum selesai / masih pending
 
@@ -144,23 +146,23 @@ Paket pekerjaan yang sedang diimplementasikan:
 
 ## File Yang Sedang Paling Relevan
 
-- [routes.php](/D:/xampp/htdocs/Dashboard/routes.php)
-- [app/Controllers/AuthController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/AuthController.php)
 - [app/Models/Tagihan.php](/D:/xampp/htdocs/Dashboard/app/Models/Tagihan.php)
-- [app/Models/MikroTikAPI.php](/D:/xampp/htdocs/Dashboard/app/Models/MikroTikAPI.php)
-- [database/migrations/20260409_production_upgrade.sql](/D:/xampp/htdocs/Dashboard/database/migrations/20260409_production_upgrade.sql)
-- [database/migrate.php](/D:/xampp/htdocs/Dashboard/database/migrate.php)
+- [app/Controllers/TagihanController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/TagihanController.php)
+- [app/Views/tagihan/index.php](/D:/xampp/htdocs/Dashboard/app/Views/tagihan/index.php)
+- [app/Views/dashboard/index.php](/D:/xampp/htdocs/Dashboard/app/Views/dashboard/index.php)
+- [app/Models/ActionLog.php](/D:/xampp/htdocs/Dashboard/app/Models/ActionLog.php)
+- [public/assets/css/app.css](/D:/xampp/htdocs/Dashboard/public/assets/css/app.css)
+- [tests/Unit/TagihanStatusTest.php](/D:/xampp/htdocs/Dashboard/tests/Unit/TagihanStatusTest.php)
 
 ## Rekomendasi Langkah Berikutnya
 
 Urutan paling aman untuk melanjutkan:
 
 1. Uji manual route baru sebagai admin:
-   - `/tagihan/show`
-   - `/laporan`
-   - `/monitoring`
-   - `/backup`
-   - `/users`
+   - `/tagihan` — cek badge Jatuh Tempo / Menunggak
+   - `/tagihan` — klik WA Me pada tagihan lunas, pastikan template pesan benar
+   - tandai tagihan lunas → cek apakah status pelanggan kembali `active` di `/pelanggan`
+   - dashboard → cek log scrollable dengan nama pelanggan
 2. Isi konfigurasi:
    - MikroTik host/port/user/pass
    - WA gateway

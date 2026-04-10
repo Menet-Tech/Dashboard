@@ -32,7 +32,8 @@ class Tagihan extends BaseModel
 
     public function all(array $filters = []): array
     {
-        $sql = "SELECT t.*, p.nama, p.no_wa, p.tgl_jatuh_tempo, p.id AS id_pelanggan, pk.nama_paket
+        $sql = "SELECT t.*, p.nama, p.no_wa, p.tgl_jatuh_tempo, p.id AS id_pelanggan, pk.nama_paket,
+                    (SELECT COUNT(*) FROM tagihan t2 WHERE t2.id_pelanggan = t.id_pelanggan AND t2.status = 'belum_bayar') AS total_unpaid_count
                 FROM tagihan t
                 JOIN pelanggan p ON p.id = t.id_pelanggan
                 JOIN paket pk ON pk.id = p.id_paket
@@ -52,6 +53,7 @@ class Tagihan extends BaseModel
 
         return array_map(function (array $row): array {
             $row['tgl_jatuh_tempo'] = Pelanggan::resolveDueDateFromStored($row['tgl_jatuh_tempo'] ?? null, $row['periode'] ?? null);
+            $row['display_status'] = self::computeDisplayStatus($row);
             return $row;
         }, $stmt->fetchAll());
     }
@@ -171,5 +173,78 @@ class Tagihan extends BaseModel
         $stmt->execute();
 
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Count the number of unpaid (belum_bayar) bills for a specific customer.
+     * Used to decide whether to restore pelanggan status to 'active' after payment.
+     */
+    public function countUnpaidForCustomer(int $pelangganId): int
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) FROM tagihan WHERE id_pelanggan = :id AND status = 'belum_bayar'"
+        );
+        $stmt->execute(['id' => $pelangganId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Compute a human-readable display status for a tagihan row.
+     *
+     * Rules:
+     *  - 'lunas'        -> 'lunas'
+     *  - 'belum_bayar'  + due date not yet passed -> 'belum_bayar'
+     *  - 'belum_bayar'  + due date passed + 1 unpaid bill total  -> 'jatuh_tempo'
+     *  - 'belum_bayar'  + due date passed + 2+ unpaid bills total-> 'menunggak'
+     *
+     * Expects $row to contain:
+     *  - 'status'             : DB status string
+     *  - 'tgl_jatuh_tempo'    : already-resolved due date (Y-m-d), as set by all()
+     *  - 'total_unpaid_count' : subquery count from all(); defaults to 1 if missing
+     */
+    public static function computeDisplayStatus(array $row): string
+    {
+        $status = $row['status'] ?? 'belum_bayar';
+
+        if ($status !== 'belum_bayar') {
+            return $status;
+        }
+
+        $dueDate = $row['tgl_jatuh_tempo'] ?? null;
+        if (!$dueDate || $dueDate > date('Y-m-d')) {
+            return 'belum_bayar';
+        }
+
+        // Past due — check how many total unpaid bills this customer has
+        $totalUnpaid = (int) ($row['total_unpaid_count'] ?? 1);
+
+        return $totalUnpaid >= 2 ? 'menunggak' : 'jatuh_tempo';
+    }
+
+    /**
+     * Map a display status to a Bootstrap badge colour class.
+     */
+    public static function displayStatusBadge(string $displayStatus): string
+    {
+        return match ($displayStatus) {
+            'lunas'       => 'success',
+            'jatuh_tempo' => 'warning',
+            'menunggak'   => 'danger',
+            default       => 'secondary',   // belum_bayar / menunggu_wa
+        };
+    }
+
+    /**
+     * Map a display status to a human-readable Indonesian label.
+     */
+    public static function displayStatusLabel(string $displayStatus): string
+    {
+        return match ($displayStatus) {
+            'lunas'       => 'Lunas',
+            'jatuh_tempo' => 'Jatuh Tempo',
+            'menunggak'   => 'Menunggak',
+            'menunggu_wa' => 'Menunggu WA',
+            default       => 'Belum Bayar',
+        };
     }
 }

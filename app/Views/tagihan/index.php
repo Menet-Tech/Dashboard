@@ -21,8 +21,8 @@
         <div class="col-md-3">
             <select name="status" class="form-select">
                 <option value="">Semua status</option>
-                <?php foreach (['belum_bayar', 'menunggu_wa', 'lunas'] as $status): ?>
-                    <option value="<?= $status ?>" <?= $filters['status'] === $status ? 'selected' : '' ?>><?= ucfirst(str_replace('_', ' ', $status)) ?></option>
+                <?php foreach (['belum_bayar' => 'Belum Bayar', 'lunas' => 'Lunas'] as $val => $label): ?>
+                    <option value="<?= $val ?>" <?= $filters['status'] === $val ? 'selected' : '' ?>><?= $label ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -34,9 +34,16 @@
             <tbody>
             <?php foreach ($rows as $row): ?>
                 <?php
-                $template = \App\Models\TemplateWA::getByTrigger('jatuh_tempo');
-                $msg = \App\Models\TemplateWA::parse($template['isi_pesan'] ?? 'Halo {nama}', $row);
-                $waMeUrl = 'https://wa.me/' . $row['no_wa'] . '?text=' . urlencode($msg);
+                // Resolve display status (belum_bayar / jatuh_tempo / menunggak / lunas)
+                $displayStatus = $row['display_status'] ?? \App\Models\Tagihan::computeDisplayStatus($row);
+                $badgeClass    = \App\Models\Tagihan::displayStatusBadge($displayStatus);
+                $badgeLabel    = \App\Models\Tagihan::displayStatusLabel($displayStatus);
+
+                // Pick WA trigger based on display status
+                $waTrigger = $row['status'] === 'lunas' ? 'lunas' : 'jatuh_tempo';
+                $template  = \App\Models\TemplateWA::getByTrigger($waTrigger);
+                $msg       = \App\Models\TemplateWA::parse($template['isi_pesan'] ?? 'Halo {nama}', $row);
+                $waMeUrl   = 'https://wa.me/' . $row['no_wa'] . '?text=' . urlencode($msg);
                 ?>
                 <tr>
                     <td>
@@ -46,13 +53,13 @@
                     <td><?= date('F Y', strtotime($row['periode'])) ?></td>
                     <td><?= date('d/m/Y', strtotime($row['tgl_jatuh_tempo'])) ?></td>
                     <td>Rp <?= number_format((float) $row['harga'], 0, ',', '.') ?></td>
-                    <td><span class="badge text-bg-<?= $row['status'] === 'lunas' ? 'success' : ($row['status'] === 'menunggu_wa' ? 'warning' : 'secondary') ?>"><?= htmlspecialchars($row['status']) ?></span></td>
+                    <td><span class="badge text-bg-<?= $badgeClass ?>"><?= $badgeLabel ?></span></td>
                     <td>
                         <?php if ($row['status'] !== 'lunas'): ?><button class="btn btn-sm btn-primary ajax-paid" data-id="<?= (int) $row['id'] ?>">Lunas</button><?php endif; ?>
                         <a href="<?= base_url('/tagihan/show?id=' . $row['id']) ?>" class="btn btn-sm btn-outline-primary">Detail Tagihan</a>
                         <a href="<?= base_url('/pelanggan/show?id=' . $row['id_pelanggan']) ?>" class="btn btn-sm btn-outline-secondary">Info Pelanggan</a>
                         <a href="<?= htmlspecialchars($waMeUrl) ?>" target="_blank" class="btn btn-sm btn-outline-success">WA Me</a>
-                        <button class="btn btn-sm btn-outline-dark ajax-wa" data-id="<?= (int) $row['id'] ?>" data-trigger="<?= $row['status'] === 'lunas' ? 'lunas' : 'jatuh_tempo' ?>">WA Gateway</button>
+                        <button class="btn btn-sm btn-outline-dark ajax-wa" data-id="<?= (int) $row['id'] ?>" data-trigger="<?= htmlspecialchars($waTrigger) ?>">WA Gateway</button>
                     </td>
                 </tr>
             <?php endforeach; ?>

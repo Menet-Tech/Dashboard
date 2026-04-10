@@ -8,6 +8,7 @@ use App\Core\Controller;
 use App\Core\Session;
 use App\Models\ActionLog;
 use App\Models\PaymentHistory;
+use App\Models\Pelanggan;
 use App\Models\Tagihan;
 use App\Models\TemplateWA;
 use App\Models\WhatsAppAPI;
@@ -116,6 +117,7 @@ class TagihanController extends Controller
                 'billing',
                 'success'
             );
+            $this->restorePelangganStatusIfPaid((int) $row['id_pelanggan'], $model);
         }
         $this->json(['success' => true, 'message' => 'Tagihan berhasil ditandai lunas.', 'row' => $row]);
     }
@@ -180,8 +182,20 @@ class TagihanController extends Controller
             'success'
         );
 
+        $this->restorePelangganStatusIfPaid((int) $bill['id_pelanggan'], $model);
         Session::flash('success', 'Pembayaran berhasil dicatat.');
         redirect('/tagihan/show?id=' . $id);
+    }
+
+    /**
+     * If the customer has no remaining unpaid bills after a payment,
+     * restore their pelanggan status from 'limit' to 'active'.
+     */
+    private function restorePelangganStatusIfPaid(int $pelangganId, Tagihan $model): void
+    {
+        if ($model->countUnpaidForCustomer($pelangganId) === 0) {
+            (new Pelanggan())->updateStatus($pelangganId, 'active');
+        }
     }
 
     public function redo(): void

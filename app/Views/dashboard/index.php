@@ -34,17 +34,49 @@
         </div>
     </div>
     <div class="col-lg-4">
-        <div class="surface-card">
-            <div class="section-title"><h3>Log Terbaru</h3></div>
+        <div class="surface-card h-100">
+            <div class="section-title"><h3>Log Terbaru</h3><small class="text-muted">20 aktivitas</small></div>
             <div class="log-list">
                 <?php foreach ($latestLogs as $log): ?>
+                    <?php
+                    // Map action types to readable labels & icon colours
+                    $aksiLabels = [
+                        'TAGIHAN_LUNAS'    => ['label' => 'Pembayaran Lunas',    'color' => 'success'],
+                        'PAYMENT_RECORDED' => ['label' => 'Pembayaran Dicatat',  'color' => 'success'],
+                        'WA_SENT'          => ['label' => 'WA Terkirim',         'color' => 'info'],
+                        'PELANGGAN_LIMIT'  => ['label' => 'Pelanggan Dilimit',   'color' => 'warning'],
+                        'LOGIN'            => ['label' => 'Login',               'color' => 'secondary'],
+                        'LOGOUT'           => ['label' => 'Logout',              'color' => 'secondary'],
+                        'GENERATE_TAGIHAN' => ['label' => 'Generate Tagihan',    'color' => 'primary'],
+                    ];
+                    $aksiMeta = $aksiLabels[$log['tipe_aksi']] ?? ['label' => $log['tipe_aksi'], 'color' => 'secondary'];
+                    $statusBadge = $log['status'] === 'success' ? 'success' : ($log['status'] === 'failed' ? 'danger' : 'warning');
+
+                    // Relative time
+                    $ts = strtotime($log['created_at']);
+                    $diff = time() - $ts;
+                    if ($diff < 60) $relTime = 'Baru saja';
+                    elseif ($diff < 3600) $relTime = (int)($diff/60) . ' mnt lalu';
+                    elseif ($diff < 86400) $relTime = (int)($diff/3600) . ' jam lalu';
+                    else $relTime = date('d/m/Y H:i', $ts);
+                    ?>
                     <div class="log-item">
-                        <strong><?= htmlspecialchars($log['tipe_aksi']) ?></strong>
-                        <span class="badge text-bg-<?= $log['status'] === 'success' ? 'success' : 'danger' ?>"><?= htmlspecialchars($log['status']) ?></span>
-                        <p><?= htmlspecialchars((string) ($log['pesan'] ?? '-')) ?></p>
-                        <small><?= htmlspecialchars($log['created_at']) ?></small>
+                        <div class="log-item-header">
+                            <span class="badge text-bg-<?= $aksiMeta['color'] ?> log-action-badge"><?= htmlspecialchars($aksiMeta['label']) ?></span>
+                            <span class="badge text-bg-<?= $statusBadge ?>"><?= htmlspecialchars($log['status']) ?></span>
+                        </div>
+                        <?php if (!empty($log['nama_pelanggan'])): ?>
+                            <div class="log-customer"><i class="bi bi-person-fill"></i> <?= htmlspecialchars($log['nama_pelanggan']) ?></div>
+                        <?php endif; ?>
+                        <?php if (!empty($log['pesan'])): ?>
+                            <p class="log-detail"><?= htmlspecialchars((string) $log['pesan']) ?></p>
+                        <?php endif; ?>
+                        <small class="log-time text-muted"><?= $relTime ?></small>
                     </div>
                 <?php endforeach; ?>
+                <?php if (empty($latestLogs)): ?>
+                    <div class="text-center text-muted py-4 small">Belum ada aktivitas.</div>
+                <?php endif; ?>
             </div>
         </div>
     </div>

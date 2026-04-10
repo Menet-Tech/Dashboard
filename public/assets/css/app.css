@@ -41,8 +41,15 @@ body {
 .surface-card { background: var(--surface-strong); }
 .section-title { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 18px; }
 .section-subtitle { color: var(--muted); margin: 6px 0 0; }
-.log-list { display: grid; gap: 14px; }
-.log-item { padding: 14px; border-radius: 18px; background: rgba(15,118,110,0.06); }
+.log-list { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: rgba(15,118,110,0.3) transparent; }
+.log-list::-webkit-scrollbar { width: 5px; }
+.log-list::-webkit-scrollbar-thumb { background: rgba(15,118,110,0.3); border-radius: 999px; }
+.log-item { padding: 12px 14px; border-radius: 16px; background: rgba(15,118,110,0.06); border: 1px solid rgba(15,118,110,0.08); }
+.log-item-header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.log-action-badge { font-size: 0.78rem; }
+.log-customer { font-size: 0.84rem; font-weight: 600; color: var(--brand-deep); margin-bottom: 4px; }
+.log-detail { font-size: 0.82rem; color: var(--muted); margin: 4px 0 6px; line-height: 1.4; }
+.log-time { font-size: 0.76rem; }
 .toast-holder { position: fixed; top: 20px; right: 20px; z-index: 1080; width: min(360px, calc(100vw - 32px)); }
 .chart-shell { position: relative; height: 360px; }
 .map-card { height: 340px; border-radius: 24px; overflow: hidden; }
