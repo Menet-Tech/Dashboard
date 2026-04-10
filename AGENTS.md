@@ -241,6 +241,7 @@ Key penting:
 - **[baru]** status pelanggan otomatis kembali ke `active` setelah semua tagihan dilunasi
 - **[baru]** log dashboard sekarang menampilkan nama pelanggan, label aksi, waktu relatif, dan bisa di-scroll
 - **[baru]** unit test ada 30 test, 46 assertion, semua pass
+- **[baru]** jam dan tanggal live di sidebar dengan estetika premium
 
 ## 8. Known Limitation
 

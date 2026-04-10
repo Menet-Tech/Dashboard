@@ -36,7 +36,11 @@ Paket pekerjaan yang sedang diimplementasikan:
    - [app/Models/BackupLog.php](/D:/xampp/htdocs/Dashboard/app/Models/BackupLog.php)
    - [app/Models/Report.php](/D:/xampp/htdocs/Dashboard/app/Models/Report.php)
 
-3. Fondasi auth/security sudah mulai diikat:
+4. **Sidebar Clock**:
+   - Menambahkan fitur jam dan tanggal live di sidebar untuk estetika premium dan kemudahan operasional.
+   - Perubahan di: `sidebar.php`, `app.css`, dan `app.js`.
+
+5. **Fondasi auth/security sudah mulai diikat**:
    - login rate limiting memakai `login_attempts`
    - login/logout dicatat ke `action_log`
 

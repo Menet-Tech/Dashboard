@@ -4,6 +4,10 @@
         <div class="brand-kicker">Billing ISP</div>
         <h1><?= htmlspecialchars(\App\Models\Pengaturan::get('nama_isp', 'Menet-Tech')) ?></h1>
         <p>Operasional pelanggan, tagihan, dan notifikasi dalam satu panel.</p>
+        <div id="sidebar-clock" class="sidebar-clock mt-3">
+            <span class="d-block clock-date"><?= date('d F Y') ?></span>
+            <span class="clock-time"><?= date('H:i') ?></span>
+        </div>
     </div>
     <nav class="nav flex-column sidebar-nav">
         <?php $user = Session::get('user', []); $isAdmin = ($user['role'] ?? 'petugas') === 'admin'; ?>
