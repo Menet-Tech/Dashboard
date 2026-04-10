@@ -26,6 +26,39 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+guess_public_ip() {
+  local ip
+  if command_exists ip; then
+    ip=$(ip route get 1.1.1.1 2>/dev/null | awk '/src/ {for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -n1)
+  fi
+  if [ -z "$ip" ] && command_exists hostname; then
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  fi
+  printf '%s' "$ip"
+}
+
+guess_public_url() {
+  local ip
+  ip=$(guess_public_ip)
+  if [ -n "$ip" ]; then
+    printf 'http://%s' "$ip"
+  else
+    printf 'http://0.0.0.0'
+  fi
+}
+
+resolve_display_url() {
+  if [ "$APP_URL" = "http://0.0.0.0" ]; then
+    local suggested
+    suggested=$(guess_public_url)
+    if [ "$suggested" != "$APP_URL" ]; then
+      printf '%s' "$suggested"
+      return
+    fi
+  fi
+  printf '%s' "$APP_URL"
+}
+
 prompt() {
   local prompt_text="$1"
   local default_value="$2"
@@ -327,7 +360,7 @@ fi
 
 APP_ENV="production"
 APP_DEBUG="false"
-APP_URL="http://0.0.0.0"
+APP_URL="$(guess_public_url)"
 APP_TIMEZONE="Asia/Jakarta"
 DB_HOST="localhost"
 DB_PORT="3306"
@@ -349,6 +382,20 @@ if [ -f "$ENV_FILE" ]; then
     DB_USER="$(get_env_value 'DB_USER' || echo "$DB_USER")"
     DB_PASS="$(get_env_value 'DB_PASS' || echo "$DB_PASS")"
     APP_URL="$(get_env_value 'APP_URL' || echo "$APP_URL")"
+    if [ "$APP_URL" = "http://0.0.0.0" ]; then
+      suggested_url=$(guess_public_url)
+      if [ "$suggested_url" != "$APP_URL" ]; then
+        echo "Warning: APP_URL is currently set to http://0.0.0.0 in .env, which is not reachable from a browser."
+        if confirm "Update APP_URL in .env to $suggested_url?" "y"; then
+          APP_URL="$suggested_url"
+          if sed -i "s|^APP_URL=.*|APP_URL=$APP_URL|" "$ENV_FILE"; then
+            echo ".env updated with APP_URL=$APP_URL"
+          else
+            echo "Could not update .env automatically; please change APP_URL manually."
+          fi
+        fi
+      fi
+    fi
   fi
 fi
 
@@ -577,7 +624,11 @@ WantedBy=multi-user.target"
 fi
 
 printf '%s\n' ''
-printf '%s\n' "- Akses aplikasi di: $APP_URL"
+DISPLAY_URL="$(resolve_display_url)"
+printf '%s\n' "- Akses aplikasi di: $DISPLAY_URL"
+if [ "$APP_URL" = "http://0.0.0.0" ]; then
+  echo "  (Use your host IP or domain in the browser; 0.0.0.0 is bind address only.)"
+fi
 printf '%s\n' '- Jika layanan app dijalankan oleh systemd, periksa: systemctl status menettech-app.service'
 printf '%s\n' '- Scheduler berjalan dari: systemctl status menettech-cron.timer'
 
