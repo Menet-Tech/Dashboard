@@ -61,10 +61,127 @@ ensure_command() {
   fi
 }
 
+detect_package_manager() {
+  if command_exists apt-get; then
+    printf 'apt'
+  elif command_exists dnf; then
+    printf 'dnf'
+  elif command_exists yum; then
+    printf 'yum'
+  elif command_exists zypper; then
+    printf 'zypper'
+  else
+    printf ''
+  fi
+}
+
+install_packages() {
+  local manager="$1"
+  shift
+  local packages=()
+  case "$manager" in
+    apt)
+      packages=("$@" )
+      sudo apt-get update
+      sudo apt-get install -y "${packages[@]}"
+      ;;
+    dnf)
+      packages=("$@" )
+      sudo dnf install -y "${packages[@]}"
+      ;;
+    yum)
+      packages=("$@" )
+      sudo yum install -y "${packages[@]}"
+      ;;
+    zypper)
+      packages=("$@" )
+      sudo zypper refresh
+      sudo zypper install -y "${packages[@]}"
+      ;;
+    *)
+      fail "Unsupported package manager: $manager"
+      ;;
+  esac
+}
+
+install_composer() {
+  if [ -n "$PHP_BIN" ]; then
+    echo "Installing Composer..."
+    curl -sS https://getcomposer.org/installer | "$PHP_BIN" -- --install-dir=/usr/local/bin --filename=composer
+  fi
+}
+
+refresh_bin_paths() {
+  PHP_BIN="$(command -v php || true)"
+  COMPOSER_BIN="$(command -v composer || true)"
+  MYSQL_BIN="$(command -v mysql || true)"
+  NPM_BIN="$(command -v npm 2>/dev/null || true)"
+}
+
+install_system_dependencies() {
+  local manager
+  manager="$(detect_package_manager)"
+  if [ -z "$manager" ]; then
+    echo "No supported package manager found. Please install dependencies manually."
+    return 1
+  fi
+
+  echo "Detected package manager: $manager"
+
+  local pkg_list=()
+  case "$manager" in
+    apt)
+      pkg_list=(php php-cli php-mbstring php-xml php-zip php-curl php-mysql unzip curl git default-mysql-client nodejs npm)
+      ;;
+    dnf|yum)
+      pkg_list=(php php-cli php-mbstring php-xml php-zip php-curl php-mysqlnd unzip curl git mariadb nodejs npm)
+      ;;
+    zypper)
+      pkg_list=(php7 php7-cli php7-mbstring php7-xml php7-zip php7-curl php7-mysql unzip curl git mariadb nodejs npm)
+      ;;
+  esac
+
+  echo "Installing required OS packages: ${pkg_list[*]}"
+  install_packages "$manager" "${pkg_list[@]}"
+
+  refresh_bin_paths
+
+  if [ -z "$COMPOSER_BIN" ]; then
+    install_composer
+    refresh_bin_paths
+  fi
+
+  if [ -z "$MYSQL_BIN" ]; then
+    echo "MySQL client still not found after package installation."
+    return 1
+  fi
+
+  if ! command_exists mysqld; then
+    if confirm "Local MariaDB server is not installed. Install it now?" "y"; then
+      case "$manager" in
+        apt)
+          sudo apt-get install -y mariadb-server
+          ;;
+        dnf|yum)
+          sudo "$manager" install -y mariadb-server
+          ;;
+        zypper)
+          sudo zypper install -y mariadb-server
+          ;;
+      esac
+    fi
+  fi
+}
+
 printf '\n== Menet-Tech Dashboard installer ==\n\n'
 
 if [ "$(uname -s)" != "Linux" ]; then
   printf 'Warning: this installer is designed for Linux.\n\n'
+fi
+
+if ! install_system_dependencies; then
+  echo "Please install PHP, Composer, MySQL client, and other dependencies manually."
+  exit 1
 fi
 
 ensure_command "$PHP_BIN"
