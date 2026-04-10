@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$ROOT_DIR/.env"
 EXAMPLE_ENV="$ROOT_DIR/.env.example"
-DB_SQL="$ROOT_DIR/database.sql"
+DB_SQL="$ROOT_DIR/database1.sql"
 CURRENT_USER="${SUDO_USER:-$(id -un)}"
 PHP_BIN="$(command -v php || true)"
 COMPOSER_BIN="$(command -v composer || true)"
@@ -294,7 +294,7 @@ if [ ! -d "$ROOT_DIR/discord-bot/node_modules" ]; then
 fi
 
 if [ ! -f "$DB_SQL" ]; then
-  fail "database.sql file not found in project root."
+  fail "database1.sql file not found in project root."
 fi
 
 echo "Configuring MySQL database..."
