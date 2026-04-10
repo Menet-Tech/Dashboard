@@ -24,6 +24,9 @@ body {
 .brand-block, .hero-banner, .surface-card, .stat-card, .login-card { backdrop-filter: blur(18px); box-shadow: 0 16px 40px rgba(34, 26, 18, 0.08); }
 .brand-block h1, .hero-banner h2, .section-title h3, .login-card h1 { font-weight: 800; }
 .brand-kicker { text-transform: uppercase; letter-spacing: 0.16em; font-size: 0.72rem; color: var(--accent); margin-bottom: 10px; }
+.sidebar-clock { background: rgba(255, 255, 255, 0.1); padding: 12px 16px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(8px); }
+.clock-date { font-size: 0.82rem; opacity: 0.8; letter-spacing: 0.05em; font-weight: 500; }
+.clock-time { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.02em; }
 .sidebar-nav .nav-link { color: rgba(255,255,255,0.82); padding: 12px 16px; border-radius: 14px; margin-bottom: 6px; }
 .sidebar-nav .nav-link:hover { background: rgba(255,255,255,0.1); color: #fff; }
 .sidebar-user { margin-top: auto; background: rgba(255,255,255,0.08); padding: 18px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; }

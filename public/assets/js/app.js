@@ -126,4 +126,17 @@ document.addEventListener('DOMContentLoaded', () => {
       Swal.fire({ icon: result.success ? 'success' : 'warning', title: result.message || 'Selesai' });
     });
   });
+
+  const clockEl = document.getElementById('sidebar-clock');
+  if (clockEl) {
+    const dateEl = clockEl.querySelector('.clock-date');
+    const timeEl = clockEl.querySelector('.clock-time');
+    const updateClock = () => {
+      const now = new Date();
+      if (dateEl) dateEl.textContent = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+      if (timeEl) timeEl.textContent = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+    };
+    setInterval(updateClock, 10000);
+    updateClock();
+  }
 });
