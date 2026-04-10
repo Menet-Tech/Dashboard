@@ -8,6 +8,7 @@ Untuk AI agent atau developer yang ingin cepat paham konteks project tanpa memba
 
 1. Setelah clone, jalankan `./install.sh` dari root project.
 2. Installer akan:
+   - memasang dependensi sistem yang dibutuhkan (PHP, Composer, MySQL client, Node.js, npm, dan lainnya) jika belum ada
    - membuat file `.env` dari `.env.example`
    - menginstall dependency PHP (`composer install`)
    - mengimpor schema `database.sql` ke MySQL
