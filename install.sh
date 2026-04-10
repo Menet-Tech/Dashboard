@@ -6,10 +6,14 @@ ENV_FILE="$ROOT_DIR/.env"
 EXAMPLE_ENV="$ROOT_DIR/.env.example"
 DB_SQL="$ROOT_DIR/database.sql"
 CURRENT_USER="${SUDO_USER:-$(id -un)}"
-PHP_BIN="$(command -v php)"
-COMPOSER_BIN="$(command -v composer)"
-MYSQL_BIN="$(command -v mysql)"
+PHP_BIN="$(command -v php || true)"
+COMPOSER_BIN="$(command -v composer || true)"
+MYSQL_BIN="$(command -v mysql || true)"
 NPM_BIN="$(command -v npm 2>/dev/null || true)"
+SUDO_CMD=""
+if [ "${EUID:-0}" -ne 0 ]; then
+  SUDO_CMD="sudo"
+fi
 
 fail() {
   echo "ERROR: $*" >&2
@@ -82,21 +86,21 @@ install_packages() {
   case "$manager" in
     apt)
       packages=("$@" )
-      sudo apt-get update
-      sudo apt-get install -y "${packages[@]}"
+      ${SUDO_CMD:+$SUDO_CMD }apt-get update
+      ${SUDO_CMD:+$SUDO_CMD }apt-get install -y "${packages[@]}"
       ;;
     dnf)
       packages=("$@" )
-      sudo dnf install -y "${packages[@]}"
+      ${SUDO_CMD:+$SUDO_CMD }dnf install -y "${packages[@]}"
       ;;
     yum)
       packages=("$@" )
-      sudo yum install -y "${packages[@]}"
+      ${SUDO_CMD:+$SUDO_CMD }yum install -y "${packages[@]}"
       ;;
     zypper)
       packages=("$@" )
-      sudo zypper refresh
-      sudo zypper install -y "${packages[@]}"
+      ${SUDO_CMD:+$SUDO_CMD }zypper refresh
+      ${SUDO_CMD:+$SUDO_CMD }zypper install -y "${packages[@]}"
       ;;
     *)
       fail "Unsupported package manager: $manager"
@@ -119,6 +123,11 @@ refresh_bin_paths() {
 }
 
 install_system_dependencies() {
+  echo "Starting system dependency installation."
+  echo "Current user: $(id -un), EUID=$EUID"
+  echo "Detected binaries: PHP=$PHP_BIN, Composer=$COMPOSER_BIN, MySQL=$MYSQL_BIN, NPM=$NPM_BIN"
+  echo "Using sudo: ${SUDO_CMD:-none}"
+
   local manager
   manager="$(detect_package_manager)"
   if [ -z "$manager" ]; then
@@ -160,13 +169,13 @@ install_system_dependencies() {
     if confirm "Local MariaDB server is not installed. Install it now?" "y"; then
       case "$manager" in
         apt)
-          sudo apt-get install -y mariadb-server
+          ${SUDO_CMD:+$SUDO_CMD }apt-get install -y mariadb-server
           ;;
         dnf|yum)
-          sudo "$manager" install -y mariadb-server
+          ${SUDO_CMD:+$SUDO_CMD }$manager install -y mariadb-server
           ;;
         zypper)
-          sudo zypper install -y mariadb-server
+          ${SUDO_CMD:+$SUDO_CMD }zypper install -y mariadb-server
           ;;
       esac
     fi
