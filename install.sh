@@ -576,10 +576,10 @@ WantedBy=multi-user.target"
   configure_firewall
 fi
 
-printf '\nInstallasi selesai.\n'
-printf '- Akses aplikasi di: %s\n' "$APP_URL"
-printf '- Jika layanan app dijalankan oleh systemd, periksa: systemctl status menettech-app.service\n'
-printf '- Scheduler berjalan dari: systemctl status menettech-cron.timer\n'
+printf '%s\n' ''
+printf '%s\n' "- Akses aplikasi di: $APP_URL"
+printf '%s\n' '- Jika layanan app dijalankan oleh systemd, periksa: systemctl status menettech-app.service'
+printf '%s\n' '- Scheduler berjalan dari: systemctl status menettech-cron.timer'
 
 touch "$INSTALL_MARKER"
 
