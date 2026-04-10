@@ -14,7 +14,7 @@ Untuk AI agent atau developer yang ingin cepat paham konteks project tanpa memba
    - mengimpor schema `database.sql` ke MySQL
    - membuat direktori upload dan storage
    - menyiapkan unit systemd untuk web, scheduler, dan bot (opsional)
-3. Aplikasi default tersedia di `http://127.0.0.1:8080` jika service web diaktifkan.
+3. Aplikasi default tersedia di `http://0.0.0.0` jika service web diaktifkan dan bind ke semua interface.
 4. Jika tidak menggunakan installer, database default adalah `dashboard`.
 
 ## Default Login
