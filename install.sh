@@ -543,7 +543,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$ROOT_DIR
-ExecStart=$PHP_BIN -S 0.0.0.0:80 '$ROOT_DIR/public/router.php'
+ExecStart=$PHP_BIN -S 0.0.0.0:80 -t $ROOT_DIR/public $ROOT_DIR/public/router.php
 Restart=on-failure
 User=root
 
@@ -557,7 +557,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$ROOT_DIR
-ExecStart=$PHP_BIN '$ROOT_DIR/cron/scheduler.php'
+ExecStart=$PHP_BIN $ROOT_DIR/cron/scheduler.php
 Restart=on-failure
 User=$APP_USER
 
