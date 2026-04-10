@@ -184,8 +184,15 @@ EOF
 
 ensure_install_marker() {
   if [ -f "$INSTALL_MARKER" ]; then
-    echo "Previous install detected, resuming where possible..."
+    echo "Previous completed install detected. Running in resume-safe mode."
   fi
+}
+
+should_skip_provisioning() {
+  if [ -f "$INSTALL_MARKER" ]; then
+    return 0
+  fi
+  return 1
 }
 
 ensure_mysql_running() {
@@ -238,6 +245,12 @@ install_system_dependencies() {
   fi
 
   echo "Detected package manager: $manager"
+
+  if should_skip_provisioning; then
+    echo "Skipping package installation because a previous install was detected."
+    refresh_bin_paths
+    return 0
+  fi
 
   local pkg_list=()
   case "$manager" in
@@ -419,14 +432,18 @@ if [ "$DB_HOST" != "localhost" ]; then
   MYSQL_ROOT_CMD+=( -h "$DB_HOST" -P "$DB_PORT" )
 fi
 
-create_database_and_admin
-
-if db_has_tables "$DB_NAME"; then
-  echo "Database $DB_NAME already contains tables; skipping import."
+if should_skip_provisioning; then
+  echo "Skipping database provisioning because a previous install was detected."
 else
-  printf '%s\n' "Importing database schema as admin..."
-  "${MYSQL_CMD[@]}" "$DB_NAME" < "$DB_SQL"
-  echo "Database imported."
+  create_database_and_admin
+
+  if db_has_tables "$DB_NAME"; then
+    echo "Database $DB_NAME already contains tables; skipping import."
+  else
+    printf '%s\n' "Importing database schema as admin..."
+    "${MYSQL_CMD[@]}" "$DB_NAME" < "$DB_SQL"
+    echo "Database imported."
+  fi
 fi
 
 mkdir -p "$ROOT_DIR/public/uploads/payment-proofs"
@@ -447,6 +464,12 @@ if confirm "Install systemd services for web, scheduler, and bot? (requires root
       fail "Port 80 is still in use after stopping common web servers. Please free port 80 and retry."
     fi
   fi
+
+  SERVICE_PATH="/etc/systemd/system"
+  WEB_SERVICE="$SERVICE_PATH/menettech-app.service"
+  CRON_SERVICE="$SERVICE_PATH/menettech-cron.service"
+  CRON_TIMER="$SERVICE_PATH/menettech-cron.timer"
+  BOT_SERVICE="$SERVICE_PATH/menettech-bot.service"
 
   install_service_file() {
     local dest="$1"
