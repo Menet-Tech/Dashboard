@@ -7,9 +7,12 @@ use App\Core\Session;
 function base_url(string $path = ''): string
 {
     $base = rtrim($_ENV['APP_URL'] ?? '', '/');
-    $path = ltrim($path, '/');
+    if ($base === '' || preg_match('#^https?://(0\.0\.0\.0|127\.0\.0\.1|localhost)(:\\d+)?$#', $base)) {
+        $base = '';
+    }
 
-    return $path === '' ? $base : "{$base}/{$path}";
+    $path = ltrim($path, '/');
+    return $path === '' ? $base : ($base === '' ? "/{$path}" : "{$base}/{$path}");
 }
 
 function redirect(string $path): never
