@@ -293,9 +293,9 @@ WantedBy=multi-user.target"
   echo "Systemd services installed and enabled."
 fi
 
-printf '\nInstallasi selesai.\n'
-printf '- Akses aplikasi di: %s\n' "$APP_URL"
-printf '- Jika layanan app dijalankan oleh systemd, periksa: systemctl status menettech-app.service\n'
-printf '- Scheduler berjalan dari: systemctl status menettech-cron.timer\n'
+echo "\nInstallasi selesai."
+echo "- Akses aplikasi di: $APP_URL"
+echo "- Jika layanan app dijalankan oleh systemd, periksa: systemctl status menettech-app.service"
+echo "- Scheduler berjalan dari: systemctl status menettech-cron.timer"
 
 exit 0
