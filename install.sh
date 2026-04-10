@@ -335,6 +335,7 @@ DB_NAME="dashboard"
 DB_USER="admin"
 DB_PASS="admin122"
 SESSION_NAME="menettech_session"
+APP_USER="$CURRENT_USER"
 
 if [ -f "$ENV_FILE" ]; then
   echo ".env already exists."
