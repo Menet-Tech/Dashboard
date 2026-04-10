@@ -10,6 +10,7 @@ PHP_BIN="$(command -v php || true)"
 COMPOSER_BIN="$(command -v composer || true)"
 MYSQL_BIN="$(command -v mysql || true)"
 NPM_BIN="$(command -v npm 2>/dev/null || true)"
+INSTALL_MARKER="$ROOT_DIR/.install_complete"
 MYSQL_ROOT_CMD=()
 SUDO_CMD=""
 if [ "${EUID:-0}" -ne 0 ]; then
@@ -158,6 +159,35 @@ configure_firewall() {
   fi
 }
 
+db_has_tables() {
+  local db="$1"
+  local count
+  count=$("${MYSQL_ROOT_CMD[@]}" -N -s -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$db';" 2>/dev/null || true)
+  if [ -n "$count" ] && [ "$count" -gt 0 ]; then
+    return 0
+  fi
+  return 1
+}
+
+create_database_and_admin() {
+  echo "Ensuring database $DB_NAME and admin user exist..."
+  local setup_sql
+  setup_sql=$(cat <<EOF
+CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'admin'@'localhost' IDENTIFIED BY 'admin122';
+GRANT ALL PRIVILEGES ON $DB_NAME.* TO 'admin'@'localhost' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+EOF
+)
+  printf '%s\n' "$setup_sql" | "${MYSQL_ROOT_CMD[@]}"
+}
+
+ensure_install_marker() {
+  if [ -f "$INSTALL_MARKER" ]; then
+    echo "Previous install detected, resuming where possible..."
+  fi
+}
+
 ensure_mysql_running() {
   if command_exists systemctl; then
     if systemctl is-active --quiet mariadb 2>/dev/null; then
@@ -273,6 +303,7 @@ fi
 ensure_command "$PHP_BIN"
 ensure_command "$COMPOSER_BIN"
 ensure_command "$MYSQL_BIN"
+ensure_install_marker
 
 if [ ! -f "$EXAMPLE_ENV" ]; then
   fail ".env.example not found in project root."
@@ -388,18 +419,15 @@ if [ "$DB_HOST" != "localhost" ]; then
   MYSQL_ROOT_CMD+=( -h "$DB_HOST" -P "$DB_PORT" )
 fi
 
-SQL_ADMIN_SETUP=$(cat <<'EOF'
-CREATE DATABASE IF NOT EXISTS `$DB_NAME` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'admin'@'localhost' IDENTIFIED BY 'admin122';
-GRANT ALL PRIVILEGES ON `$DB_NAME`.* TO 'admin'@'localhost';
-FLUSH PRIVILEGES;
-EOF
-)
-printf '%s\n' "$SQL_ADMIN_SETUP" | "${MYSQL_ROOT_CMD[@]}"
-printf '%s\n' "Importing database schema as admin..."
-"${MYSQL_CMD[@]}" "$DB_NAME" < "$DB_SQL"
+create_database_and_admin
 
-echo "Database imported."
+if db_has_tables "$DB_NAME"; then
+  echo "Database $DB_NAME already contains tables; skipping import."
+else
+  printf '%s\n' "Importing database schema as admin..."
+  "${MYSQL_CMD[@]}" "$DB_NAME" < "$DB_SQL"
+  echo "Database imported."
+fi
 
 mkdir -p "$ROOT_DIR/public/uploads/payment-proofs"
 mkdir -p "$ROOT_DIR/storage/backups"
@@ -525,5 +553,7 @@ printf '\nInstallasi selesai.\n'
 printf '- Akses aplikasi di: %s\n' "$APP_URL"
 printf '- Jika layanan app dijalankan oleh systemd, periksa: systemctl status menettech-app.service\n'
 printf '- Scheduler berjalan dari: systemctl status menettech-cron.timer\n'
+
+touch "$INSTALL_MARKER"
 
 exit 0
