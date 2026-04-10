@@ -255,7 +255,10 @@ install_system_dependencies() {
   local pkg_list=()
   case "$manager" in
     apt)
-      pkg_list=(php php-cli php-mbstring php-xml php-zip php-curl php-mysql unzip curl git default-mysql-client nodejs npm)
+      pkg_list=(php php-cli php-mbstring php-xml php-zip php-curl php-mysql unzip curl git nodejs npm)
+      if ! dpkg -s mariadb-server >/dev/null 2>&1 && ! dpkg -s mysql-server >/dev/null 2>&1; then
+        pkg_list+=(mariadb-server)
+      fi
       ;;
     dnf|yum)
       pkg_list=(php php-cli php-mbstring php-xml php-zip php-curl php-mysqlnd unzip curl git mariadb nodejs npm)
