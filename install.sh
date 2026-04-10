@@ -177,7 +177,8 @@ if [ -n "$DB_PASS" ]; then
   MYSQL_CMD+=( -p"$DB_PASS" )
 fi
 
-"${MYSQL_CMD[@]}" -e "CREATE DATABASE IF NOT EXISTS \\`$DB_NAME\\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+SQL_CREATE_DB=$(printf 'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;' "$DB_NAME")
+printf '%s\n' "$SQL_CREATE_DB" | "${MYSQL_CMD[@]}"
 "${MYSQL_CMD[@]}" "$DB_NAME" < "$DB_SQL"
 
 echo "Database imported."
