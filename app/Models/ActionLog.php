@@ -24,9 +24,15 @@ class ActionLog extends BaseModel
         ]);
     }
 
-    public function latest(int $limit = 10): array
+    public function latest(int $limit = 20): array
     {
-        $stmt = $this->db->prepare('SELECT * FROM action_log ORDER BY created_at DESC LIMIT :limit');
+        $stmt = $this->db->prepare(
+            'SELECT al.*, p.nama AS nama_pelanggan
+             FROM action_log al
+             LEFT JOIN pelanggan p ON p.id = al.id_pelanggan
+             ORDER BY al.created_at DESC
+             LIMIT :limit'
+        );
         $stmt->bindValue('limit', $limit, \PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();

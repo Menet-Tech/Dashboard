@@ -127,12 +127,34 @@ Method penting:
 - `Tagihan::generateForPeriod()`
 - `Tagihan::markPaid()`
 - `Tagihan::forCustomer()`
+- `Tagihan::countUnpaidForCustomer()` — hitung tagihan belum bayar per pelanggan
+- `Tagihan::computeDisplayStatus()` — computed display status (lihat bawah)
+- `Tagihan::displayStatusBadge()` — badge Bootstrap class untuk display status
+- `Tagihan::displayStatusLabel()` — label Bahasa Indonesia untuk display status
+
+### Status Display Tagihan (computed, bukan disimpan di DB)
+
+Status DB hanya `belum_bayar` dan `lunas`. Display status dihitung di PHP:
+
+| Kondisi | Display Status | Badge |
+|---------|---------------|-------|
+| `lunas` | Lunas | success (hijau) |
+| `belum_bayar` + jatuh tempo belum lewat | Belum Bayar | secondary (abu) |
+| `belum_bayar` + jatuh tempo sudah lewat + 1 tagihan belum bayar | Jatuh Tempo | warning (kuning) |
+| `belum_bayar` + jatuh tempo sudah lewat + 2+ tagihan belum bayar | Menunggak | danger (merah) |
+
+**Penting:** `menunggak` baru muncul jika pelanggan punya **2 atau lebih** tagihan belum bayar yang sudah jatuh tempo.
+
+Query `Tagihan::all()` sudah menyertakan subquery `total_unpaid_count` per pelanggan untuk efisiensi.
 
 ### Pelunasan
 
 - tombol `Lunas` sekarang langsung mengubah status tagihan ke `lunas`
 - tidak lagi memakai alur `menunggu_wa` sebagai alur utama operasional web
 - event pelunasan juga dikirim ke Discord
+- **setelah pelunasan, status pelanggan otomatis dikembalikan ke `active`** jika tidak ada tagihan belum bayar lain
+- jika masih ada tunggakan lain, status pelanggan tetap `limit`
+- lihat `TagihanController::restorePelangganStatusIfPaid()`
 
 ### Detail pelanggan
 
@@ -214,15 +236,22 @@ Key penting:
 - test button untuk WA, Discord, dan MikroTik sudah ada
 - webhook dan bot Discord sudah ditambahkan
 - `.gitignore` sudah disiapkan untuk push ke GitHub
+- **[baru]** badge status tagihan sekarang menampilkan Jatuh Tempo / Menunggak berdasarkan kondisi nyata
+- **[baru]** bug WA template diperbaiki: tombol WA Me / WA Gateway sekarang pakai template yang sesuai status (lunas → template lunas, belum bayar → jatuh_tempo)
+- **[baru]** status pelanggan otomatis kembali ke `active` setelah semua tagihan dilunasi
+- **[baru]** log dashboard sekarang menampilkan nama pelanggan, label aksi, waktu relatif, dan bisa di-scroll
+- **[baru]** unit test ada 30 test, 46 assertion, semua pass
 
 ## 8. Known Limitation
 
-- MikroTik belum real
+- MikroTik belum real (socket API sudah ada tapi belum diuji ke router nyata)
 - bot Discord belum bisa menjalankan aksi mutasi data seperti generate tagihan atau tandai lunas
 - scheduler masih punya flow `processMenungguWa()`, tapi operasional web sekarang lebih menekankan `lunas` langsung
-- belum ada upload bukti bayar
+- upload bukti bayar sudah ada di form detail tagihan, tapi belum diuji di production
 - belum ada role/permission mendalam
-- belum ada export laporan Excel/PDF
+- belum ada export laporan PDF (CSV sudah ada)
+- status `menunggak` / `jatuh_tempo` adalah **display only** — tidak disimpan di DB `tagihan.status`
+- filter di halaman tagihan hanya bisa filter berdasarkan DB status (`belum_bayar` / `lunas`), belum bisa filter computed status
 
 ## 9. Cara Verifikasi Cepat
 
@@ -270,10 +299,14 @@ Urutan prioritas yang paling masuk akal:
   - [app/Models/Tagihan.php](/D:/xampp/htdocs/Dashboard/app/Models/Tagihan.php)
   - [app/Controllers/TagihanController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/TagihanController.php)
   - [app/Views/tagihan/index.php](/D:/xampp/htdocs/Dashboard/app/Views/tagihan/index.php)
+- status tagihan di DB hanya `belum_bayar` dan `lunas`; status `jatuh_tempo` dan `menunggak` adalah **computed display** via `Tagihan::computeDisplayStatus()`
+- jangan simpan `jatuh_tempo`/`menunggak` ke kolom `status` di DB
+- perubahan status pelanggan ke `active` terjadi otomatis di `TagihanController`, jangan duplikasi logika ini di tempat lain
 - kalau menyentuh Discord, cek dua sisi:
   - PHP webhook layer
   - Node bot layer
 - sebelum menambah fitur besar, cek apakah route, view, controller, model, dan pengaturan terkait sudah konsisten
+- jalankan `vendor\bin\phpunit` setelah membuat perubahan untuk memastikan tidak ada regresi
 
 ## 12. Dokumen Referensi Besar
 
