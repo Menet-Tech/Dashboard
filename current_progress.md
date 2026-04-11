@@ -131,6 +131,66 @@ Paket pekerjaan yang sedang diimplementasikan:
 
 6. Perlu verifikasi `mysqldump` di environment target
 
+## Progress Turn Ini (turn ke-4) - Performance, Discord Routing, Invoice
+
+1. **Performa dashboard dan monitoring ditingkatkan**
+   - bottleneck utama sebelumnya berasal dari health check WA Gateway dan MikroTik yang selalu dipanggil live saat halaman dibuka
+   - dashboard dan monitoring sekarang membaca status cache terakhir dari pengaturan + `system_health_checks`
+   - monitoring sekarang punya refresh manual live di route `/monitoring/refresh`
+   - file utama:
+     - [app/Controllers/DashboardController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/DashboardController.php)
+     - [app/Controllers/MonitoringController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/MonitoringController.php)
+     - [app/Models/SystemHealthCheck.php](/D:/xampp/htdocs/Dashboard/app/Models/SystemHealthCheck.php)
+     - [app/Models/MikroTikAPI.php](/D:/xampp/htdocs/Dashboard/app/Models/MikroTikAPI.php)
+
+2. **Discord webhook sekarang bisa diatur per event**
+   - helper Discord sekarang mendukung pilihan route:
+     - nonaktif
+     - alert saja
+     - billing saja
+     - keduanya
+   - test Discord dari halaman Pengaturan sekarang menembak webhook `alert` dan `billing` sekaligus
+   - event yang bisa diatur:
+     - dashboard dibuka
+     - generate tagihan
+     - pembayaran lunas
+     - pelanggan jatuh tempo
+     - masalah WhatsApp
+     - masalah MikroTik
+     - cron gagal
+   - file utama:
+     - [app/Helpers/discord.php](/D:/xampp/htdocs/Dashboard/app/Helpers/discord.php)
+     - [app/Controllers/PengaturanController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/PengaturanController.php)
+     - [app/Views/pengaturan/index.php](/D:/xampp/htdocs/Dashboard/app/Views/pengaturan/index.php)
+
+3. **Invoice untuk tagihan lunas**
+   - detail tagihan sekarang punya tombol `Invoice` jika status sudah `lunas`
+   - route baru:
+     - `/tagihan/invoice?id=...`
+   - invoice bisa dicetak langsung dari browser
+   - file utama:
+     - [app/Controllers/TagihanController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/TagihanController.php)
+     - [app/Views/tagihan/show.php](/D:/xampp/htdocs/Dashboard/app/Views/tagihan/show.php)
+     - [app/Views/tagihan/invoice.php](/D:/xampp/htdocs/Dashboard/app/Views/tagihan/invoice.php)
+
+4. **Stabilisasi Discord bot + tambahan test**
+   - crash bot `ECONNREFUSED ::1:3306` ditangani dengan normalisasi host database:
+     - `localhost`
+     - `::1`
+     - kosong
+     menjadi `127.0.0.1`
+   - startup bot sekarang memberi log error yang lebih jelas tentang target DB
+   - test baru ditambahkan untuk:
+     - helper Discord
+     - formatter status layanan
+     - konfigurasi DB bot Node
+   - file utama:
+     - [discord-bot/src/db.js](/D:/xampp/htdocs/Dashboard/discord-bot/src/db.js)
+     - [discord-bot/src/index.js](/D:/xampp/htdocs/Dashboard/discord-bot/src/index.js)
+     - [discord-bot/tests/db.test.js](/D:/xampp/htdocs/Dashboard/discord-bot/tests/db.test.js)
+     - [tests/Unit/DiscordHelperTest.php](/D:/xampp/htdocs/Dashboard/tests/Unit/DiscordHelperTest.php)
+     - [tests/Unit/ServiceStatusTest.php](/D:/xampp/htdocs/Dashboard/tests/Unit/ServiceStatusTest.php)
+
 ## Status Teknis Penting
 
 - `php database/migrate.php` sempat dijalankan

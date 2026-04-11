@@ -12,6 +12,90 @@ function discordWebhookUrl(string $channel = 'alert'): ?string
     };
 }
 
+function discordRouteOptions(): array
+{
+    return [
+        'none' => 'Nonaktif',
+        'alert' => 'Alert saja',
+        'billing' => 'Billing saja',
+        'both' => 'Keduanya',
+    ];
+}
+
+function discordAlertPreferenceDefinitions(): array
+{
+    return [
+        'dashboard_heartbeat' => [
+            'label' => 'Dashboard dibuka',
+            'description' => 'Dipakai saat dashboard web berhasil diakses.',
+            'default' => 'none',
+        ],
+        'billing_generated' => [
+            'label' => 'Generate tagihan',
+            'description' => 'Log generate tagihan manual maupun otomatis.',
+            'default' => 'billing',
+        ],
+        'payment_paid' => [
+            'label' => 'Pembayaran lunas',
+            'description' => 'Tagihan ditandai lunas atau pembayaran dicatat lengkap.',
+            'default' => 'billing',
+        ],
+        'pelanggan_jatuh_tempo' => [
+            'label' => 'Pelanggan jatuh tempo',
+            'description' => 'Pelanggan melewati jatuh tempo dan masuk limit.',
+            'default' => 'alert',
+        ],
+        'wa_failed' => [
+            'label' => 'Masalah WhatsApp',
+            'description' => 'WA gateway gagal, reminder gagal, atau kirim WA bermasalah.',
+            'default' => 'alert',
+        ],
+        'mikrotik_failed' => [
+            'label' => 'Masalah MikroTik',
+            'description' => 'Tes atau koneksi MikroTik gagal.',
+            'default' => 'alert',
+        ],
+        'cron_failed' => [
+            'label' => 'Cron / scheduler gagal',
+            'description' => 'Alert saat scheduler gagal berjalan.',
+            'default' => 'alert',
+        ],
+    ];
+}
+
+function discordAlertPreferenceKey(string $eventKey): string
+{
+    return 'discord_route_' . $eventKey;
+}
+
+function discordChannelsFromPreference(string $value, string $fallbackChannel = 'alert'): array
+{
+    return match (strtolower(trim($value))) {
+        'none' => [],
+        'billing' => ['billing'],
+        'both' => ['alert', 'billing'],
+        'alert' => ['alert'],
+        default => [$fallbackChannel],
+    };
+}
+
+function discordAlertPreferenceValue(string $eventKey): string
+{
+    $definitions = discordAlertPreferenceDefinitions();
+    $default = $definitions[$eventKey]['default'] ?? 'alert';
+
+    return strtolower((string) Pengaturan::get(discordAlertPreferenceKey($eventKey), $default));
+}
+
+function discordResolveChannels(?string $eventKey, string $fallbackChannel = 'alert'): array
+{
+    if ($eventKey === null || $eventKey === '') {
+        return [$fallbackChannel];
+    }
+
+    return discordChannelsFromPreference(discordAlertPreferenceValue($eventKey), $fallbackChannel);
+}
+
 function sendDiscord(?string $webhookUrl, string $message, array $options = []): bool
 {
     if (!$webhookUrl) {
@@ -48,6 +132,51 @@ function sendDiscord(?string $webhookUrl, string $message, array $options = []):
     return $httpCode >= 200 && $httpCode < 300;
 }
 
+function sendDiscordToChannels(array $channels, string $message, array $options = []): array
+{
+    $results = [];
+    $targets = [];
+
+    foreach ($channels as $channel) {
+        $url = discordWebhookUrl((string) $channel);
+        if (!$url) {
+            $results[] = [
+                'channel' => (string) $channel,
+                'success' => false,
+                'configured' => false,
+                'url' => null,
+            ];
+            continue;
+        }
+
+        $targets[$url] ??= [
+            'url' => $url,
+            'channels' => [],
+        ];
+        $targets[$url]['channels'][] = (string) $channel;
+    }
+
+    foreach ($targets as $target) {
+        $success = sendDiscord($target['url'], $message, $options);
+        $results[] = [
+            'channel' => implode('+', $target['channels']),
+            'success' => $success,
+            'configured' => true,
+            'url' => $target['url'],
+        ];
+    }
+
+    $configured = array_values(array_filter($results, static fn (array $result): bool => $result['configured'] === true));
+    $successCount = count(array_filter($configured, static fn (array $result): bool => $result['success'] === true));
+
+    return [
+        'results' => $results,
+        'attempted' => count($configured),
+        'success_count' => $successCount,
+        'success' => $successCount > 0 && $successCount === count($configured),
+    ];
+}
+
 function discordColor(string $level): int
 {
     return match ($level) {
@@ -58,7 +187,7 @@ function discordColor(string $level): int
     };
 }
 
-function discordNotify(string $title, string $description, array $fields = [], string $channel = 'alert', string $level = 'info'): bool
+function discordBroadcast(string $title, string $description, array $fields = [], array $channels = ['alert'], string $level = 'info'): array
 {
     $embedFields = array_map(static function (array $field): array {
         return [
@@ -68,7 +197,7 @@ function discordNotify(string $title, string $description, array $fields = [], s
         ];
     }, $fields);
 
-    return sendDiscord(discordWebhookUrl($channel), '', [
+    return sendDiscordToChannels($channels, '', [
         'username' => 'Menet-Tech Alert',
         'embeds' => [[
             'title' => $title,
@@ -78,4 +207,20 @@ function discordNotify(string $title, string $description, array $fields = [], s
             'timestamp' => gmdate('c'),
         ]],
     ]);
+}
+
+function discordNotify(
+    string $title,
+    string $description,
+    array $fields = [],
+    string $channel = 'alert',
+    string $level = 'info',
+    ?string $eventKey = null
+): bool {
+    $channels = discordResolveChannels($eventKey, $channel);
+    if ($channels === []) {
+        return false;
+    }
+
+    return discordBroadcast($title, $description, $fields, $channels, $level)['success'];
 }

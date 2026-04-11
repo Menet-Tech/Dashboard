@@ -9,6 +9,7 @@ use App\Core\Session;
 use App\Models\ActionLog;
 use App\Models\PaymentHistory;
 use App\Models\Pelanggan;
+use App\Models\Pengaturan;
 use App\Models\Tagihan;
 use App\Models\TemplateWA;
 use App\Models\WhatsAppAPI;
@@ -55,6 +56,30 @@ class TagihanController extends Controller
         ]);
     }
 
+    public function invoice(): void
+    {
+        $id = (int) $this->input('id');
+        $bill = (new Tagihan())->find($id);
+
+        if (!$bill) {
+            Session::flash('error', 'Tagihan tidak ditemukan.');
+            redirect('/tagihan');
+        }
+
+        if (($bill['status'] ?? 'belum_bayar') !== 'lunas') {
+            Session::flash('error', 'Invoice hanya tersedia untuk tagihan yang sudah lunas.');
+            redirect('/tagihan/show?id=' . $id);
+        }
+
+        $this->view('tagihan/invoice', [
+            'title' => 'Invoice',
+            'row' => $bill,
+            'paymentHistory' => (new PaymentHistory())->byBill($id),
+            'namaIsp' => Pengaturan::get('nama_isp', 'Menet-Tech'),
+            'noRekening' => Pengaturan::get('no_rekening', '-'),
+        ]);
+    }
+
     public function generate(): void
     {
         verify_csrf();
@@ -70,7 +95,8 @@ class TagihanController extends Controller
                 ['name' => 'Operator', 'value' => (string) ((Session::get('user')['nama_lengkap'] ?? 'Petugas'))],
             ],
             'billing',
-            $created > 0 ? 'success' : 'warning'
+            $created > 0 ? 'success' : 'warning',
+            'billing_generated'
         );
         Session::flash('success', $created > 0
             ? "Berhasil generate {$created} tagihan untuk periode {$periode}."
@@ -115,7 +141,8 @@ class TagihanController extends Controller
                     ['name' => 'Nominal', 'value' => 'Rp ' . number_format((float) $row['harga'], 0, ',', '.')],
                 ],
                 'billing',
-                'success'
+                'success',
+                'payment_paid'
             );
             $this->restorePelangganStatusIfPaid((int) $row['id_pelanggan'], $model);
         }
@@ -179,7 +206,8 @@ class TagihanController extends Controller
                 ['name' => 'Operator', 'value' => (string) ($this->user()['nama_lengkap'] ?? 'Petugas')],
             ],
             'billing',
-            'success'
+            'success',
+            'payment_paid'
         );
 
         $this->restorePelangganStatusIfPaid((int) $bill['id_pelanggan'], $model);
@@ -225,7 +253,8 @@ class TagihanController extends Controller
                 "Pengiriman WA manual dari halaman tagihan gagal untuk {$row['nama']}.",
                 [['name' => 'Error', 'value' => $result['error'] ?? 'Unknown error', 'inline' => false]],
                 'alert',
-                'danger'
+                'danger',
+                'wa_failed'
             );
         }
 

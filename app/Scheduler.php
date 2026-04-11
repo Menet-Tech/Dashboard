@@ -63,7 +63,8 @@ class Scheduler
                 ['name' => 'Tagihan Baru', 'value' => (string) $created],
             ],
             'billing',
-            $created > 0 ? 'success' : 'warning'
+            $created > 0 ? 'success' : 'warning',
+            'billing_generated'
         );
     }
 
@@ -76,7 +77,8 @@ class Scheduler
                 'Scheduler mendeteksi WhatsApp Gateway tidak sehat.',
                 [['name' => 'Detail', 'value' => $waHealth['message'], 'inline' => false]],
                 'alert',
-                'danger'
+                'danger',
+                'wa_failed'
             );
         }
 
@@ -87,7 +89,8 @@ class Scheduler
                 'Scheduler mendeteksi konfigurasi atau koneksi MikroTik tidak siap.',
                 [['name' => 'Detail', 'value' => $mikroTik['message'], 'inline' => false]],
                 'alert',
-                'danger'
+                'danger',
+                'mikrotik_failed'
             );
         }
     }
@@ -120,7 +123,8 @@ class Scheduler
                     ['name' => 'Nominal', 'value' => 'Rp ' . number_format((float) $bill['harga'], 0, ',', '.')],
                 ],
                 'billing',
-                'success'
+                'success',
+                'payment_paid'
             );
         }
     }
@@ -146,7 +150,8 @@ class Scheduler
                         ['name' => 'Profile Limit', 'value' => (string) $customer['profile_limit_mikrotik']],
                     ],
                     'alert',
-                    'warning'
+                    'warning',
+                    'pelanggan_jatuh_tempo'
                 );
                 if (!$result['success']) {
                     discordNotify(
@@ -154,7 +159,8 @@ class Scheduler
                         "Notifikasi WA jatuh tempo gagal terkirim untuk {$customer['nama']}.",
                         [['name' => 'Error', 'value' => $result['error'] ?? 'Unknown error', 'inline' => false]],
                         'alert',
-                        'danger'
+                        'danger',
+                        'wa_failed'
                     );
                 }
             }
@@ -175,7 +181,8 @@ class Scheduler
                     "Reminder 7 hari gagal dikirim untuk {$customer['nama']}.",
                     [['name' => 'Error', 'value' => $result['error'] ?? 'Unknown error', 'inline' => false]],
                     'alert',
-                    'danger'
+                    'danger',
+                    'wa_failed'
                 );
             }
         }

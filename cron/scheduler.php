@@ -32,7 +32,8 @@ try {
         'Cron scheduler mengalami kegagalan.',
         [['name' => 'Error', 'value' => $throwable->getMessage(), 'inline' => false]],
         'alert',
-        'danger'
+        'danger',
+        'cron_failed'
     );
     echo '[' . date('Y-m-d H:i:s') . '] Cron failed: ' . $throwable->getMessage() . "\n";
     throw $throwable;
