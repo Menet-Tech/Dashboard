@@ -51,6 +51,10 @@ class PengaturanController extends Controller
             'backup_retention_days' => 'Retensi backup otomatis',
         ];
 
+        foreach (discordAlertPreferenceDefinitions() as $eventKey => $definition) {
+            $descriptions[discordAlertPreferenceKey($eventKey)] = $definition['description'];
+        }
+
         $rows = [];
         foreach ($descriptions as $key => $description) {
             $rows[$key] = [
@@ -89,7 +93,8 @@ class PengaturanController extends Controller
                 'Pengujian WhatsApp dari halaman pengaturan gagal.',
                 [['name' => 'Detail', 'value' => $result['error'] ?? 'Unknown error', 'inline' => false]],
                 'alert',
-                'danger'
+                'danger',
+                'wa_failed'
             );
         }
 
@@ -101,19 +106,41 @@ class PengaturanController extends Controller
         verify_csrf();
         $this->requireAdmin();
 
-        $webhook = Pengaturan::get('discord_alert_url') ?: Pengaturan::get('discord_billing_url');
-        if (!$webhook) {
+        if (!Pengaturan::get('discord_alert_url') && !Pengaturan::get('discord_billing_url')) {
             Session::flash('error', 'Isi dulu Discord webhook URL di pengaturan.');
             redirect('/pengaturan');
         }
 
-        $message = 'Test Discord webhook dari panel pengaturan Menet-Tech pada ' . date('d/m/Y H:i:s');
-        $success = sendDiscord($webhook, $message);
-        ActionLog::create(null, 'DISCORD_TEST', $success ? 'success' : 'failed', $success ? 'Discord test sent' : 'Discord webhook test failed');
+        $response = discordBroadcast(
+            'Test Discord Webhook',
+            'Tes webhook dikirim dari halaman pengaturan Menet-Tech.',
+            [
+                ['name' => 'Waktu', 'value' => date('d/m/Y H:i:s')],
+                ['name' => 'Operator', 'value' => (string) ($this->user()['nama_lengkap'] ?? 'Admin')],
+            ],
+            ['alert', 'billing'],
+            'info'
+        );
 
-        Session::flash($success ? 'success' : 'error', $success
-            ? 'Test Discord berhasil dikirim.'
-            : 'Test Discord gagal. Periksa webhook URL dan koneksi server.');
+        $attempted = $response['attempted'];
+        $successCount = $response['success_count'];
+        $detail = implode(', ', array_map(
+            static fn (array $result): string => $result['channel'] . ':' . ($result['success'] ? 'ok' : ($result['configured'] ? 'failed' : 'missing')),
+            $response['results']
+        ));
+
+        ActionLog::create(null, 'DISCORD_TEST', $response['success'] ? 'success' : 'failed', $detail);
+
+        if ($attempted === 0) {
+            Session::flash('error', 'Webhook Discord belum lengkap. Isi minimal salah satu URL alert atau billing.');
+        } elseif ($successCount === $attempted) {
+            Session::flash('success', "Test Discord berhasil dikirim ke {$successCount} webhook.");
+        } elseif ($successCount > 0) {
+            Session::flash('success', "Sebagian webhook berhasil: {$successCount}/{$attempted}. Cek URL yang gagal.");
+        } else {
+            Session::flash('error', 'Test Discord gagal ke semua webhook. Periksa URL dan koneksi server.');
+        }
+
         redirect('/pengaturan');
     }
 
@@ -130,7 +157,8 @@ class PengaturanController extends Controller
                 'Pengujian MikroTik dari halaman pengaturan gagal.',
                 [['name' => 'Detail', 'value' => $result['message'], 'inline' => false]],
                 'alert',
-                'danger'
+                'danger',
+                'mikrotik_failed'
             );
         }
 

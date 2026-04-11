@@ -6,6 +6,9 @@
             <p class="section-subtitle">Kelola pembayaran, bukti bayar, histori, dan tindak lanjut notifikasi dari satu halaman.</p>
         </div>
         <div class="d-flex gap-2">
+            <?php if (($row['status'] ?? 'belum_bayar') === 'lunas'): ?>
+                <a href="<?= base_url('/tagihan/invoice?id=' . $row['id']) ?>" class="btn btn-primary">Invoice</a>
+            <?php endif; ?>
             <a href="<?= base_url('/pelanggan/show?id=' . $row['id_pelanggan']) ?>" class="btn btn-outline-secondary">Info Pelanggan</a>
             <a href="<?= base_url('/tagihan') ?>" class="btn btn-outline-secondary">Kembali</a>
         </div>
@@ -27,6 +30,9 @@
                     <h3>Catat Pembayaran</h3>
                 </div>
             </div>
+            <?php if (($row['status'] ?? 'belum_bayar') === 'lunas'): ?>
+                <div class="alert alert-success">Tagihan ini sudah lunas. Histori tetap tersedia, dan invoice bisa dicetak dari tombol di atas.</div>
+            <?php endif; ?>
             <form method="post" action="<?= base_url('/tagihan/pay') ?>" enctype="multipart/form-data" class="row g-3">
                 <?= csrf_field() ?>
                 <input type="hidden" name="id" value="<?= (int) $row['id'] ?>">

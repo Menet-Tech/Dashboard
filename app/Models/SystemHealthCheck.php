@@ -29,4 +29,14 @@ class SystemHealthCheck extends BaseModel
 
         return $this->db->query($sql)->fetchAll();
     }
+
+    public function latestMap(): array
+    {
+        $map = [];
+        foreach ($this->latestByService() as $row) {
+            $map[$row['service_name']] = $row;
+        }
+
+        return $map;
+    }
 }

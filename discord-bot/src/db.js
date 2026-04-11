@@ -10,17 +10,31 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 let pool;
 
+export function normalizeDbHost(host) {
+  const normalized = String(host || '').trim().toLowerCase();
+
+  if (normalized === '' || normalized === 'localhost' || normalized === '::1') {
+    return '127.0.0.1';
+  }
+
+  return String(host).trim();
+}
+
+export function buildDbConfig(env = process.env) {
+  return {
+    host: normalizeDbHost(env.DB_HOST || '127.0.0.1'),
+    port: Number(env.DB_PORT || 3306),
+    database: env.DB_NAME || 'dashboard',
+    user: env.DB_USER || 'root',
+    password: env.DB_PASS || '',
+    waitForConnections: true,
+    connectionLimit: 10
+  };
+}
+
 export function getDb() {
   if (!pool) {
-    pool = mysql.createPool({
-      host: process.env.DB_HOST || '127.0.0.1',
-      port: Number(process.env.DB_PORT || 3306),
-      database: process.env.DB_NAME || 'dashboard',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASS || '',
-      waitForConnections: true,
-      connectionLimit: 10
-    });
+    pool = mysql.createPool(buildDbConfig(process.env));
   }
 
   return pool;

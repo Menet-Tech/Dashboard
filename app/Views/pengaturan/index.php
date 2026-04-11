@@ -3,6 +3,8 @@ $settings = [];
 foreach ($rows as $key => $row) {
     $settings[$key] = $row['value'];
 }
+$discordPreferences = discordAlertPreferenceDefinitions();
+$discordRouteOptions = discordRouteOptions();
 ?>
 <div class="surface-card">
     <div class="section-title">
@@ -27,6 +29,28 @@ foreach ($rows as $key => $row) {
         <div class="col-md-4"><label class="form-label">Discord Bot Token</label><input type="password" name="discord_bot_token" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_bot_token'] ?? '')) ?>"></div>
         <div class="col-md-4"><label class="form-label">Discord Application ID</label><input type="text" name="discord_application_id" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_application_id'] ?? '')) ?>"></div>
         <div class="col-md-4"><label class="form-label">Discord Guild ID</label><input type="text" name="discord_guild_id" class="form-control" value="<?= htmlspecialchars((string) ($settings['discord_guild_id'] ?? '')) ?>"></div>
+        <div class="col-12">
+            <div class="integration-test-card">
+                <h4>Routing Alert Discord</h4>
+                <p>Pilih event mana yang masuk ke channel `alert`, `billing`, keduanya, atau dimatikan.</p>
+                <div class="row g-3">
+                    <?php foreach ($discordPreferences as $eventKey => $definition): ?>
+                        <?php $settingKey = discordAlertPreferenceKey($eventKey); ?>
+                        <div class="col-md-6">
+                            <label class="form-label"><?= htmlspecialchars($definition['label']) ?></label>
+                            <select name="<?= htmlspecialchars($settingKey) ?>" class="form-select">
+                                <?php foreach ($discordRouteOptions as $value => $label): ?>
+                                    <option value="<?= htmlspecialchars($value) ?>" <?= (($settings[$settingKey] ?? $definition['default']) === $value) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($label) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text"><?= htmlspecialchars($definition['description']) ?></div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
         <div class="col-md-3"><label class="form-label">MikroTik Host</label><input type="text" name="mikrotik_host" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_host'] ?? '')) ?>"></div>
         <div class="col-md-3"><label class="form-label">MikroTik Port</label><input type="number" name="mikrotik_port" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_port'] ?? '8728')) ?>"></div>
         <div class="col-md-3"><label class="form-label">MikroTik User</label><input type="text" name="mikrotik_user" class="form-control" value="<?= htmlspecialchars((string) ($settings['mikrotik_user'] ?? '')) ?>"></div>
@@ -70,7 +94,7 @@ foreach ($rows as $key => $row) {
                 <?= csrf_field() ?>
                 <div class="integration-test-card">
                     <h4>Test Discord</h4>
-                    <p>Mengirim pesan ke webhook alert, atau webhook billing jika alert kosong.</p>
+                    <p>Mengirim test ke webhook `alert` dan `billing` sekaligus, lalu menampilkan hasilnya.</p>
                     <button class="btn btn-outline-primary w-100">Kirim Test Discord</button>
                 </div>
             </form>

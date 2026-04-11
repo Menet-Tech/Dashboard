@@ -25,6 +25,7 @@ class MikroTikAPI
             }
 
             $this->disconnect();
+            Pengaturan::set('mikrotik_status_panel_last_check', 'online ' . date('Y-m-d H:i:s') . ' - ' . $message);
             if ($record) {
                 ActionLog::create(null, 'MIKROTIK_TEST', 'success', $message);
                 (new SystemHealthCheck())->record('mikrotik', 'ok', $message);
@@ -34,6 +35,7 @@ class MikroTikAPI
         } catch (\Throwable $throwable) {
             $this->disconnect();
             $message = 'Koneksi MikroTik gagal: ' . $throwable->getMessage();
+            Pengaturan::set('mikrotik_status_panel_last_check', 'offline ' . date('Y-m-d H:i:s') . ' - ' . $message);
             if ($record) {
                 ActionLog::create(null, 'MIKROTIK_TEST', 'failed', $message);
                 (new SystemHealthCheck())->record('mikrotik', 'failed', $message);

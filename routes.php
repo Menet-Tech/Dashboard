@@ -32,6 +32,7 @@ $router->post('/pelanggan/delete', [PelangganController::class, 'delete'], true)
 $router->get('/tagihan', [TagihanController::class, 'index'], true);
 $router->get('/tagihan/data', [TagihanController::class, 'data'], true);
 $router->get('/tagihan/show', [TagihanController::class, 'show'], true);
+$router->get('/tagihan/invoice', [TagihanController::class, 'invoice'], true);
 $router->post('/tagihan/generate', [TagihanController::class, 'generate'], true);
 $router->post('/tagihan/lunas', [TagihanController::class, 'markPaid'], true);
 $router->post('/tagihan/pay', [TagihanController::class, 'pay'], true);
@@ -42,6 +43,7 @@ $router->get('/maps', [MapsController::class, 'index'], true);
 $router->get('/laporan', [ReportController::class, 'index'], true);
 $router->get('/laporan/export', [ReportController::class, 'export'], true);
 $router->get('/monitoring', [MonitoringController::class, 'index'], true);
+$router->post('/monitoring/refresh', [MonitoringController::class, 'refresh'], true);
 $router->get('/backup', [BackupController::class, 'index'], true);
 $router->post('/backup/create', [BackupController::class, 'create'], true);
 $router->get('/users', [UserController::class, 'index'], true);
