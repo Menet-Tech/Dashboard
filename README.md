@@ -2,10 +2,10 @@
 
 Dashboard billing ISP berbasis PHP native MVC untuk mengelola pelanggan, paket, tagihan bulanan, pembayaran, WhatsApp notification, Discord alert, monitoring, dan Discord bot operasional.
 
-Mulai cepat:
-- Konteks project untuk AI agent ada di [AGENTS.md](/D:/xampp/htdocs/Dashboard/AGENTS.md)
-- Status kerja terakhir ada di [current_progress.md](/D:/xampp/htdocs/Dashboard/current_progress.md)
-- Blueprint bisnis ada di [blueprint.md](/D:/xampp/htdocs/Dashboard/blueprint.md)
+Dokumen penting:
+- Konteks cepat untuk AI agent: [AGENTS.md](/D:/xampp/htdocs/Dashboard/AGENTS.md)
+- Progress kerja terbaru: [current_progress.md](/D:/xampp/htdocs/Dashboard/current_progress.md)
+- Blueprint bisnis: [blueprint.md](/D:/xampp/htdocs/Dashboard/blueprint.md)
 
 ## Fitur Utama
 
@@ -13,7 +13,7 @@ Mulai cepat:
 - Generate tagihan manual per periode
 - Otomasi generate tagihan bulanan via scheduler
 - Status tagihan computed: `Belum Bayar`, `Jatuh Tempo`, `Menunggak`, `Lunas`
-- Pembayaran lengkap dengan metode bayar, histori, bukti bayar, dan audit operator
+- Pembayaran lengkap dengan metode bayar, histori, bukti bayar, audit operator
 - Invoice cetak untuk tagihan yang sudah lunas
 - Monitoring status WA Gateway, MikroTik, Discord bot, dan cron
 - Discord webhook dengan routing per event: `alert`, `billing`, `keduanya`, atau `nonaktif`
@@ -40,21 +40,89 @@ Mulai cepat:
 - Tagihan: [app/Controllers/TagihanController.php](/D:/xampp/htdocs/Dashboard/app/Controllers/TagihanController.php)
 - Discord helper: [app/Helpers/discord.php](/D:/xampp/htdocs/Dashboard/app/Helpers/discord.php)
 - Discord bot: [discord-bot/src/index.js](/D:/xampp/htdocs/Dashboard/discord-bot/src/index.js)
+- Installer Linux: [install.sh](/D:/xampp/htdocs/Dashboard/install.sh)
+- Template systemd: [systemd](/D:/xampp/htdocs/Dashboard/systemd)
 
-## Setup
+## Deployment Ubuntu Linux
 
-### 1. Clone dan install dependency
+Project ini sudah disiapkan untuk deployment Ubuntu, dan jalur paling disarankan adalah memakai installer:
 
 ```bash
-composer install
-cd discord-bot && npm install
+chmod +x install.sh
+./install.sh
 ```
 
-### 2. Siapkan environment
+`install.sh` akan:
+- menginstall dependency sistem yang dibutuhkan
+- membuat `.env` dari `.env.example` jika belum ada
+- menginstall dependency PHP via Composer
+- menginstall dependency Discord bot via npm jika dipilih
+- memastikan MySQL/MariaDB jalan
+- membuat database `dashboard`
+- membuat user database `admin` dengan password default `admin122`
+- import schema dari [database/database.sql](/D:/xampp/htdocs/Dashboard/database/database.sql)
+- membuat folder runtime:
+  - `public/uploads/payment-proofs`
+  - `storage/backups`
+- menginstall service `systemd` untuk app, scheduler, dan opsional Discord bot
 
-Buat `.env` dari `.env.example`, lalu isi minimal:
+### Paket yang diinstall di Ubuntu
+
+Installer akan mencoba memasang:
+- `php`
+- `php-cli`
+- `php-mbstring`
+- `php-xml`
+- `php-zip`
+- `php-curl`
+- `php-mysql`
+- `unzip`
+- `curl`
+- `git`
+- `nodejs`
+- `npm`
+- `mariadb-server` jika MySQL/MariaDB belum ada
+
+### Service systemd yang dibuat
+
+Jika kamu memilih install service:
+- `menettech-app.service`
+- `menettech-cron.service`
+- `menettech-cron.timer`
+- `menettech-bot.service` jika bot Discord diaktifkan
+
+Perilaku penting installer:
+- app dijalankan memakai built-in PHP server pada `0.0.0.0:80`
+- scheduler dijalankan via `systemd timer` tiap 1 menit
+- bot Discord dijalankan via `npm start`
+- installer bisa menawarkan stop `apache2`, `httpd`, atau `nginx` jika port 80 sudah dipakai
+- installer juga bisa membuka port `80/tcp` di UFW
+
+### Setelah install
+
+Cek status service:
+
+```bash
+systemctl status menettech-app.service
+systemctl status menettech-cron.timer
+systemctl status menettech-bot.service
+```
+
+Log Discord bot:
+
+```bash
+journalctl -u menettech-bot -f
+```
+
+## Konfigurasi Environment
+
+Contoh dasar `.env.example`:
 
 ```env
+APP_NAME="Menet-Tech Dashboard"
+APP_ENV=local
+APP_DEBUG=true
+APP_URL=http://localhost/Dashboard/public
 APP_TIMEZONE=Asia/Jakarta
 
 DB_HOST=127.0.0.1
@@ -64,22 +132,31 @@ DB_USER=root
 DB_PASS=
 ```
 
-Catatan:
-- untuk Discord bot, gunakan `DB_HOST=127.0.0.1`, jangan `localhost`, supaya tidak jatuh ke `::1`
+Catatan penting untuk production Linux:
+- untuk Discord bot, gunakan `DB_HOST=127.0.0.1`, jangan `localhost`
+- ini penting agar koneksi tidak jatuh ke `::1:3306`
 - bot sekarang memang menormalisasi `localhost` ke `127.0.0.1`, tapi tetap lebih aman mengisi IPv4 eksplisit
 
-### 3. Import database
+Catatan installer:
+- jika `.env` dibuat lewat `install.sh`, default yang ditawarkan adalah:
+  - `APP_ENV=production`
+  - `APP_DEBUG=false`
+  - `DB_HOST=localhost`
+  - `DB_NAME=dashboard`
+  - `DB_USER=admin`
+  - `DB_PASS=admin122`
 
-Import schema dari:
-- [database.sql](/D:/xampp/htdocs/Dashboard/database.sql)
+Jika bot Discord dipakai, saya sarankan ubah `DB_HOST` di `.env` menjadi:
 
-Jika sudah memakai migration upgrade production, pastikan tabel tambahan seperti `payment_history`, `system_health_checks`, `login_attempts`, dan `backup_logs` sudah ada.
+```env
+DB_HOST=127.0.0.1
+```
 
-### 4. Jalankan aplikasi
+## Akses Aplikasi
 
-Jika memakai XAMPP:
-- letakkan project di `htdocs`
-- akses `http://localhost/Dashboard/public`
+Jika memakai built-in web service dari installer:
+- aplikasi bind ke `0.0.0.0:80`
+- akses via IP server atau domain yang mengarah ke server
 
 Default login:
 - username: `admin`
@@ -118,7 +195,7 @@ Project ini punya dua webhook:
 
 Test Discord dari halaman pengaturan sekarang menembak dua webhook sekaligus.
 
-Selain itu, user bisa mengatur event mana yang dikirim ke webhook mana:
+User juga bisa mengatur event mana yang dikirim ke webhook mana:
 - dashboard dibuka
 - generate tagihan
 - pembayaran lunas
@@ -138,7 +215,7 @@ Perintah dasar:
 - `/pelanggan`
 - `/health`
 
-Jalankan bot:
+Menjalankan manual:
 
 ```bash
 cd discord-bot
@@ -146,22 +223,16 @@ npm run register
 npm start
 ```
 
-Jika bot dijalankan sebagai service systemd, pastikan environment DB mengarah ke IPv4:
-
-```ini
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_NAME=dashboard
-DB_USER=root
-DB_PASS=
-```
+Catatan Linux:
+- jika service `menettech-bot` gagal start, cek `journalctl -u menettech-bot -f`
+- jika error mengarah ke `ECONNREFUSED ::1:3306`, ubah `.env` ke `DB_HOST=127.0.0.1`
 
 ## Scheduler / Cron
 
 Scheduler ada di:
 - [cron/scheduler.php](/D:/xampp/htdocs/Dashboard/cron/scheduler.php)
 
-Jalankan tiap menit:
+Jika tidak memakai `systemd timer`, bisa dijalankan manual:
 
 ```bash
 php /path/to/project/cron/scheduler.php
@@ -238,8 +309,8 @@ phpdbg -qrr vendor/bin/phpunit --coverage-text
 
 Lint PHP:
 
-```powershell
-Get-ChildItem app,public,tests,cron -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
+```bash
+find app public tests cron -name "*.php" -print0 | xargs -0 -n1 php -l
 ```
 
 Check syntax bot:
@@ -249,8 +320,17 @@ node --check discord-bot/src/index.js
 node --check discord-bot/src/db.js
 ```
 
+Service check di Ubuntu:
+
+```bash
+systemctl status menettech-app.service
+systemctl status menettech-cron.timer
+systemctl status menettech-bot.service
+```
+
 ## Known Notes
 
+- built-in PHP server di port 80 cocok untuk deploy cepat, tapi untuk production jangka panjang tetap lebih ideal memakai Nginx/Apache + PHP-FPM
 - MikroTik client sudah memakai RouterOS socket API, tapi tetap perlu diuji ke router produksi
 - Bot Discord belum menjalankan aksi mutasi data seperti generate tagihan atau tandai lunas
 - Export laporan PDF native belum ada, saat ini fokus ke CSV / operasional web
@@ -262,4 +342,5 @@ node --check discord-bot/src/db.js
 - [current_progress.md](/D:/xampp/htdocs/Dashboard/current_progress.md)
 - [blueprint.md](/D:/xampp/htdocs/Dashboard/blueprint.md)
 - [database.sql](/D:/xampp/htdocs/Dashboard/database.sql)
+- [database/database.sql](/D:/xampp/htdocs/Dashboard/database/database.sql)
 - [whatsapp-api.md](/D:/xampp/htdocs/Dashboard/whatsapp-api.md)
