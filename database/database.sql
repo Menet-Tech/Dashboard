@@ -421,10 +421,11 @@ INSERT INTO `pengaturan` (`key`, `value`, `description`) VALUES
 ('mikrotik_status_last_check', '', 'Status cache MikroTik terakhir');
 
 INSERT INTO `paket` (`nama_paket`, `harga`, `profile_mikrotik`, `profile_limit_mikrotik`) VALUES
-('Home 10Mbps', 150000.00, '10M-basic', '10M-limit'),
-('Home 20Mbps', 250000.00, '20M-standard', '20M-limit'),
-('Gamer 50Mbps', 450000.00, '50M-gamer', '50M-limit'),
-('Bisnis 100Mbps', 950000.00, '100M-business', '100M-limit');
+('Pelajar 15Mbps', 99000.00, '15-basic', '10M-limit'),
+('Personal 20Mbps', 150000.00, '20M-standard', '20M-limit'),
+('Sosmed 30Mbps', 200000.00, '30M-gamer', '30M-limit'),
+('Family 50Mbps', 250000.00, '50M-business', '50M-limit');
+('Gamers 100Mbps', 350000.00, '100M-business', '100M-limit');
 
 INSERT INTO `template_wa` (`nama`, `isi_pesan`, `trigger_event`) VALUES
 ('Pembayaran Lunas', 
