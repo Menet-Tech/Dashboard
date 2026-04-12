@@ -424,7 +424,7 @@ INSERT INTO `paket` (`nama_paket`, `harga`, `profile_mikrotik`, `profile_limit_m
 ('Pelajar 15Mbps', 99000.00, '15-basic', '10M-limit'),
 ('Personal 20Mbps', 150000.00, '20M-standard', '20M-limit'),
 ('Sosmed 30Mbps', 200000.00, '30M-gamer', '30M-limit'),
-('Family 50Mbps', 250000.00, '50M-business', '50M-limit');
+('Family 50Mbps', 250000.00, '50M-business', '50M-limit'),
 ('Gamers 100Mbps', 350000.00, '100M-business', '100M-limit');
 
 INSERT INTO `template_wa` (`nama`, `isi_pesan`, `trigger_event`) VALUES
@@ -437,17 +437,6 @@ INSERT INTO `template_wa` (`nama`, `isi_pesan`, `trigger_event`) VALUES
 ('Reminder 7 Hari', 
 'Halo {nama},\n\nMengingatkan bahwa tagihan internet Anda sebesar Rp {harga} akan jatuh tempo dalam 7 hari ({tgl_jatuh_tempo}). Mohon siapkan pembayaran.\n\nTerima kasih.\n- {nama_isp}', 
 'reminder_7hari');
-
-INSERT INTO `pelanggan` (`id_paket`, `nama`, `user_pppoe`, `pass_pppoe`, `no_wa`, `sn_ont`, `latitude`, `longitude`, `alamat`, `tgl_jatuh_tempo`, `status`) VALUES
-(1, 'Budi Santoso', 'budi_pppoe', 'pass123', '6281234567890', 'SN123456', -6.2087634, 106.8455990, 'Jl. Sudirman No. 10, Jakarta', DATE_ADD(CURDATE(), INTERVAL 10 DAY), 'active'),
-(2, 'Siti Aminah', 'siti_pppoe', 'pass456', '6289876543210', 'SN789012', -6.2293867, 106.8243265, 'Jl. Thamrin No. 25, Jakarta', DATE_ADD(CURDATE(), INTERVAL 5 DAY), 'active'),
-(3, 'Agus Prasetyo', 'agus_pppoe', 'pass789', '6281112223334', 'SN345678', -7.2574719, 112.7520883, 'Jl. Ahmad Yani No. 5, Surabaya', DATE_SUB(CURDATE(), INTERVAL 7 DAY), 'limit');
-
-INSERT INTO `tagihan` (`id_pelanggan`, `periode`, `tgl_tagihan`, `harga`, `status`) VALUES
-(1, DATE_FORMAT(CURDATE(), '%Y-%m-01'), NOW(), 150000.00, 'belum_bayar'),
-(2, DATE_FORMAT(CURDATE(), '%Y-%m-01'), NOW(), 250000.00, 'menunggu_wa'),
-(3, DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01'), DATE_SUB(NOW(), INTERVAL 1 MONTH), 450000.00, 'lunas'),
-(3, DATE_FORMAT(CURDATE(), '%Y-%m-01'), NOW(), 450000.00, 'belum_bayar');
 
 COMMIT;
 
