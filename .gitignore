@@ -7,6 +7,13 @@
 /coverage/
 /storage/backups/*.sql
 /public/uploads/payment-proofs/*
+/frontend/node_modules/
+/frontend/dist/
+/frontend/tsconfig.tsbuildinfo
+/backend/storage/*.db
+/backend/storage/*.sqlite
+/backend/**/*.go.[0-9]*
+/.vite/
 /*.log
 /storage/*.log
 Thumbs.db

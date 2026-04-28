@@ -1,0 +1,21 @@
+[Unit]
+Description=Menet-Tech Go Worker
+After=network.target menettech-go-api.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/menettech-go/backend
+EnvironmentFile=/opt/menettech-go/backend/.env
+ExecStart=/opt/menettech-go/backend/menettech-go worker
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/menettech-go/storage
+
+[Install]
+WantedBy=multi-user.target
