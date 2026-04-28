@@ -1,0 +1,2 @@
+a7e37a624cc0e98f215c65c96dedecd6ce23fa207253b78a89b13767c6974e84  menettech-go
+630f43c72e5744b19bd1188aaf10e0a0cfad67e73d0d3bbb1e917efb53f8acbe  frontend-dist.tar.gz
