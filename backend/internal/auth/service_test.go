@@ -23,7 +23,7 @@ func TestServiceBootstrapAndLogin(t *testing.T) {
 		t.Fatalf("bootstrap: %v", err)
 	}
 
-	user, session, err := service.Login(context.Background(), "admin", "password", "admin|127.0.0.1")
+	user, session, err := service.Login(context.Background(), "admin", "password", "admin|127.0.0.1", "127.0.0.1")
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestServiceLoginRejectsWrongPassword(t *testing.T) {
 		t.Fatalf("bootstrap: %v", err)
 	}
 
-	_, _, err := service.Login(context.Background(), "admin", "wrong", "admin|127.0.0.1")
+	_, _, err := service.Login(context.Background(), "admin", "wrong", "admin|127.0.0.1", "127.0.0.1")
 	if !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected invalid credentials error, got %v", err)
 	}
@@ -76,9 +76,9 @@ func TestServiceLoginRateLimit(t *testing.T) {
 	}
 
 	identifier := "admin|127.0.0.1"
-	_, _, _ = service.Login(context.Background(), "admin", "wrong", identifier)
-	_, _, _ = service.Login(context.Background(), "admin", "wrong", identifier)
-	_, _, err := service.Login(context.Background(), "admin", "password", identifier)
+	_, _, _ = service.Login(context.Background(), "admin", "wrong", identifier, "127.0.0.1")
+	_, _, _ = service.Login(context.Background(), "admin", "wrong", identifier, "127.0.0.1")
+	_, _, err := service.Login(context.Background(), "admin", "password", identifier, "127.0.0.1")
 	if !errors.Is(err, ErrTooManyAttempts) {
 		t.Fatalf("expected too many attempts error, got %v", err)
 	}

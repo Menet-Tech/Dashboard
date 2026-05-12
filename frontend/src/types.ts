@@ -3,6 +3,8 @@ export type User = {
   username: string;
   role: string;
   is_active?: boolean;
+  last_login_at?: string;
+  last_login_ip?: string;
 };
 
 export type ManagedUserItem = {
@@ -10,6 +12,8 @@ export type ManagedUserItem = {
   username: string;
   role: string;
   is_active: boolean;
+  last_login_at?: string;
+  last_login_ip?: string;
 };
 
 export type PackageItem = {
@@ -78,8 +82,23 @@ export type SettingsPayload = Record<string, string>;
 export type AuditLogItem = {
   id: number;
   user_id?: number;
+  username?: string;
   pelanggan_id?: number;
   action: string;
   message: string;
+  ip_address?: string;
   created_at: string;
+};
+
+export type RevenueItem = {
+  period: string;
+  total_billed: number;
+  total_paid: number;
+};
+
+export type AgingReport = {
+  current: number;
+  days_1_30: number;
+  days_31_60: number;
+  over_60: number;
 };

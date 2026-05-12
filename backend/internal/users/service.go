@@ -13,10 +13,12 @@ import (
 var ErrUserNotFound = errors.New("user not found")
 
 type User struct {
-	ID       int64  `json:"id"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
-	IsActive bool   `json:"is_active"`
+	ID          int64   `json:"id"`
+	Username    string  `json:"username"`
+	Role        string  `json:"role"`
+	IsActive    bool    `json:"is_active"`
+	LastLoginAt *string `json:"last_login_at"`
+	LastLoginIP *string `json:"last_login_ip"`
 }
 
 type CreateInput struct {
@@ -88,7 +90,7 @@ func normalizeRole(role string) string {
 
 func (r Repository) List(ctx context.Context) ([]User, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT id, username, role, is_active
+		SELECT id, username, role, is_active, last_login_at, last_login_ip
 		FROM users
 		ORDER BY id ASC
 	`)
@@ -101,7 +103,7 @@ func (r Repository) List(ctx context.Context) ([]User, error) {
 	for rows.Next() {
 		var item User
 		var isActive int
-		if err := rows.Scan(&item.ID, &item.Username, &item.Role, &isActive); err != nil {
+		if err := rows.Scan(&item.ID, &item.Username, &item.Role, &isActive, &item.LastLoginAt, &item.LastLoginIP); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
 		item.IsActive = isActive == 1
@@ -169,14 +171,14 @@ func (r Repository) UpdatePassword(ctx context.Context, id int64, passwordHash s
 
 func (r Repository) FindByID(ctx context.Context, id int64) (User, error) {
 	row := r.DB.QueryRowContext(ctx, `
-		SELECT id, username, role, is_active
+		SELECT id, username, role, is_active, last_login_at, last_login_ip
 		FROM users
 		WHERE id = ?
 		LIMIT 1
 	`, id)
 	var item User
 	var isActive int
-	if err := row.Scan(&item.ID, &item.Username, &item.Role, &isActive); err != nil {
+	if err := row.Scan(&item.ID, &item.Username, &item.Role, &isActive, &item.LastLoginAt, &item.LastLoginIP); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return User{}, ErrUserNotFound
 		}

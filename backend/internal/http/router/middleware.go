@@ -2,6 +2,7 @@ package router
 
 import (
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -95,9 +96,51 @@ func auditMiddleware(auditService audit.Service) func(http.Handler) http.Handler
 				return
 			}
 
+			// extract client IP
+			clientIP := r.RemoteAddr
+			if host, _, err := net.SplitHostPort(clientIP); err == nil {
+				clientIP = host
+			}
+			if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+				clientIP = strings.Split(fwd, ",")[0]
+			}
+
 			action := r.Method + " " + r.URL.Path
 			message := "status=" + http.StatusText(recorder.status)
-			_ = auditService.Record(r.Context(), &user.ID, nil, action, message)
+			_ = auditService.RecordWithIP(r.Context(), &user.ID, nil, action, message, strings.TrimSpace(clientIP))
 		})
 	}
+}
+
+func requireRole(roles ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user, ok := auth.UserFromContext(r.Context())
+			if !ok {
+				handler.WriteUnauthorized(w)
+				return
+			}
+
+			hasRole := false
+			for _, role := range roles {
+				if user.Role == role {
+					hasRole = true
+					break
+				}
+			}
+
+			if !hasRole {
+				writeJSONError(w, http.StatusForbidden, "akses ditolak: role tidak sesuai")
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	w.Write([]byte(`{"error":"` + message + `"}`))
 }

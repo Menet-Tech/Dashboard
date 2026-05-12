@@ -31,8 +31,13 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	remoteAddr := strings.TrimSpace(r.RemoteAddr)
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		remoteAddr = host
+	}
+
 	identifier := loginIdentifier(r, request.Username)
-	user, session, err := h.Service.Login(r.Context(), request.Username, request.Password, identifier)
+	user, session, err := h.Service.Login(r.Context(), request.Username, request.Password, identifier, remoteAddr)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			writeError(w, http.StatusUnauthorized, "username atau password tidak valid")

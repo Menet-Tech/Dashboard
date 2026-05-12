@@ -166,3 +166,76 @@ func TestVerifyBackup_WithRealDB(t *testing.T) {
 		t.Fatalf("expected valid backup result, got %+v", result)
 	}
 }
+
+func TestSimulateRestore_WithRealDB(t *testing.T) {
+	dbDir := t.TempDir()
+	dbPath := filepath.Join(dbDir, "database.db")
+	backupDir := filepath.Join(dbDir, "backups")
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	// Create tables that SimulateRestore expects to count
+	queries := []string{
+		"CREATE TABLE users (id INTEGER PRIMARY KEY)",
+		"CREATE TABLE pelanggan (id INTEGER PRIMARY KEY)",
+		"CREATE TABLE tagihan (id INTEGER PRIMARY KEY)",
+		"INSERT INTO users VALUES (1)",
+		"INSERT INTO pelanggan VALUES (1)",
+		"INSERT INTO pelanggan VALUES (2)",
+	}
+	for _, q := range queries {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatalf("setup table: %v", err)
+		}
+	}
+
+	svc := backup.NewService(db, backupDir)
+	filename, err := svc.CreateBackup(context.Background())
+	if err != nil {
+		t.Fatalf("create backup: %v", err)
+	}
+
+	res, err := svc.SimulateRestore(context.Background(), filename)
+	if err != nil {
+		t.Fatalf("simulate restore: %v", err)
+	}
+	if !res.Valid {
+		t.Errorf("expected valid restore simulation")
+	}
+	if res.TotalUsers != 1 {
+		t.Errorf("expected 1 user, got %d", res.TotalUsers)
+	}
+	if res.TotalPelanggan != 2 {
+		t.Errorf("expected 2 pelanggan, got %d", res.TotalPelanggan)
+	}
+}
+
+func TestApplyRestore_WithRealDB(t *testing.T) {
+	dbDir := t.TempDir()
+	dbPath := filepath.Join(dbDir, "database.db")
+	backupDir := filepath.Join(dbDir, "backups")
+
+	// Create a dummy live db
+	_ = os.WriteFile(dbPath, []byte("live db"), 0644)
+	
+	svc := backup.NewService(nil, backupDir)
+	
+	// Create a dummy staging db
+	stagingPath := filepath.Join(dbDir, "staging.db")
+	_ = os.WriteFile(stagingPath, []byte("staging db"), 0644)
+	
+	err := svc.ApplyRestore(context.Background())
+	if err != nil {
+		t.Fatalf("apply restore failed: %v", err)
+	}
+	
+	// Check if live db was replaced
+	content, _ := os.ReadFile(dbPath)
+	if string(content) != "staging db" {
+		t.Errorf("expected live db to be replaced by staging db")
+	}
+}

@@ -15,6 +15,7 @@ type Config struct {
 	HTTPAddr               string
 	SQLitePath             string
 	StoragePath            string
+	FrontendDistPath       string
 	SessionCookieName      string
 	SessionCookieSecure    bool
 	SessionTTL             time.Duration
@@ -31,6 +32,7 @@ func Load() Config {
 		HTTPAddr:               envOrDefault("HTTP_ADDR", ":8080"),
 		SQLitePath:             cleanSQLitePath(envOrDefault("SQLITE_PATH", filepath.Join("storage", "dashboard.db"))),
 		StoragePath:            cleanSQLitePath(envOrDefault("STORAGE_PATH", "storage")),
+		FrontendDistPath:       envOrDefault("FRONTEND_DIST_PATH", filepath.Join("..", "frontend", "dist")),
 		SessionCookieName:      envOrDefault("SESSION_COOKIE_NAME", "menettech_session"),
 		SessionCookieSecure:    envBoolOrDefault("SESSION_COOKIE_SECURE", envOrDefault("APP_ENV", "development") == "production"),
 		SessionTTL:             time.Duration(envIntOrDefault("SESSION_TTL_HOURS", 24)) * time.Hour,

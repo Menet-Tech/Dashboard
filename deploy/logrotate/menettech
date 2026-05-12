@@ -1,0 +1,14 @@
+/var/log/menettech/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 0640 goapp goapp
+    sharedscripts
+    postrotate
+        systemctl reload menettech-api > /dev/null 2>/dev/null || true
+        systemctl reload menettech-worker > /dev/null 2>/dev/null || true
+    endscript
+}

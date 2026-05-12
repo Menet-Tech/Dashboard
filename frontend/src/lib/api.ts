@@ -6,6 +6,8 @@ import type {
   PackageItem,
   TemplateItem,
   User,
+  RevenueItem,
+  AgingReport,
 } from "../types";
 
 let csrfToken = "";
@@ -108,8 +110,19 @@ export function fetchHealth() {
   return request<HealthPayload>("/health");
 }
 
-export function fetchSummary() {
-  return request<SummaryPayload>("/api/v1/dashboard/summary");
+export async function fetchSummary(): Promise<SummaryPayload> {
+  const res = await request<SummaryPayload>("/api/v1/dashboard/summary");
+  return res;
+}
+
+export async function fetchRevenue(): Promise<{ data: RevenueItem[] }> {
+  const res = await request<{ data: RevenueItem[] }>("/api/v1/reports/revenue");
+  return res;
+}
+
+export async function fetchAging(): Promise<{ data: AgingReport }> {
+  const res = await request<{ data: AgingReport }>("/api/v1/reports/aging");
+  return res;
 }
 
 export function login(username: string, password: string) {
@@ -286,6 +299,29 @@ export function verifyBackup(filename: string) {
       method: "POST",
     },
   );
+}
+
+export type RestoreSimulationResult = {
+  valid: boolean;
+  message: string;
+  total_users: number;
+  total_pelanggan: number;
+  total_tagihan: number;
+};
+
+export function simulateRestore(filename: string) {
+  return request<{ message: string; data: RestoreSimulationResult }>(
+    `/api/v1/backups/${encodeURIComponent(filename)}/restore`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export function applyRestore() {
+  return request<{ message: string }>("/api/v1/backups/staging/apply", {
+    method: "POST",
+  });
 }
 
 export function getBackupDownloadUrl(filename: string) {

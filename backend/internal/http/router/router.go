@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -19,6 +21,7 @@ import (
 	"menettech/dashboard/backend/internal/http/handler"
 	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/packages"
+	"menettech/dashboard/backend/internal/reports"
 	"menettech/dashboard/backend/internal/settings"
 	"menettech/dashboard/backend/internal/templates"
 	"menettech/dashboard/backend/internal/users"
@@ -56,6 +59,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	})
 
 	discordService := notifications.NewDiscordService(settingsService)
+	reportsHandler := handler.NewReportsHandler(reports.Service{DB: db})
 
 	billHandler := handler.NewBillHandler(billing.Service{
 		Repository: billing.Repository{DB: db},
@@ -84,39 +88,70 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 			protected.Use(authMiddleware(authService))
 			protected.Use(csrfMiddleware(authService.SessionCookieName))
 			protected.Use(auditMiddleware(auditService))
+			
 			protected.Get("/auth/me", authHandler.Me)
 			protected.Post("/auth/logout", authHandler.Logout)
-			protected.Get("/audit-logs", auditHandler.List)
-			protected.Get("/dashboard/summary", dashboardHandler.Summary)
-			protected.Get("/packages", packageHandler.List)
-			protected.Post("/packages", packageHandler.Create)
-			protected.Put("/packages/{id}", packageHandler.Update)
-			protected.Delete("/packages/{id}", packageHandler.Delete)
-			protected.Get("/users", userHandler.List)
-			protected.Post("/users", userHandler.Create)
-			protected.Put("/users/{id}", userHandler.Update)
-			protected.Post("/users/{id}/reset-password", userHandler.ResetPassword)
-			protected.Get("/customers", customerHandler.List)
-			protected.Post("/customers", customerHandler.Create)
-			protected.Put("/customers/{id}", customerHandler.Update)
-			protected.Patch("/customers/{id}/status", customerHandler.UpdateStatus)
-			protected.Get("/bills", billHandler.List)
-			protected.Post("/bills/generate", billHandler.Generate)
-			protected.Post("/bills/{id}/pay", billHandler.Pay)
-			protected.Get("/bills/{id}/invoice", billHandler.Invoice)
-			protected.Get("/bills/{id}/notifications", notificationHandler.ListByBill)
-			protected.Post("/bills/{id}/proof", billHandler.UploadProof)
-			protected.Get("/templates", templateHandler.List)
-			protected.Post("/templates", templateHandler.Create)
-			protected.Put("/templates/{id}", templateHandler.Update)
-			protected.Delete("/templates/{id}", templateHandler.Delete)
-			protected.Get("/settings", settingsHandler.Get)
-			protected.Put("/settings", settingsHandler.Update)
-			protected.Post("/backups", backupHandler.Create)
-			protected.Get("/backups", backupHandler.List)
-			protected.Post("/backups/{filename}/verify", backupHandler.Verify)
-			protected.Get("/backups/{filename}/download", backupHandler.Download)
+
+			// Admin only
+			protected.Group(func(admin chi.Router) {
+				admin.Use(requireRole("admin"))
+				admin.Get("/audit-logs", auditHandler.List)
+				admin.Post("/packages", packageHandler.Create)
+				admin.Put("/packages/{id}", packageHandler.Update)
+				admin.Delete("/packages/{id}", packageHandler.Delete)
+				admin.Get("/users", userHandler.List)
+				admin.Post("/users", userHandler.Create)
+				admin.Put("/users/{id}", userHandler.Update)
+				admin.Post("/users/{id}/reset-password", userHandler.ResetPassword)
+				admin.Post("/templates", templateHandler.Create)
+				admin.Put("/templates/{id}", templateHandler.Update)
+				admin.Delete("/templates/{id}", templateHandler.Delete)
+				admin.Get("/settings", settingsHandler.Get)
+				admin.Put("/settings", settingsHandler.Update)
+				admin.Post("/backups", backupHandler.Create)
+				admin.Get("/backups", backupHandler.List)
+				admin.Post("/backups/{filename}/verify", backupHandler.Verify)
+				admin.Get("/backups/{filename}/download", backupHandler.Download)
+				admin.Post("/backups/{filename}/restore", backupHandler.SimulateRestore)
+				admin.Post("/backups/staging/apply", backupHandler.ApplyRestore)
+			})
+
+			// Admin + Petugas
+			protected.Group(func(staff chi.Router) {
+				staff.Use(requireRole("admin", "petugas"))
+				staff.Post("/customers", customerHandler.Create)
+				staff.Put("/customers/{id}", customerHandler.Update)
+				staff.Patch("/customers/{id}/status", customerHandler.UpdateStatus)
+				staff.Post("/bills/generate", billHandler.Generate)
+				staff.Post("/bills/{id}/pay", billHandler.Pay)
+				staff.Post("/bills/{id}/proof", billHandler.UploadProof)
+			})
+
+			// All logged in users (Admin, Petugas, Viewer)
+			protected.Group(func(all chi.Router) {
+				all.Use(requireRole("admin", "petugas", "viewer"))
+				all.Get("/dashboard/summary", dashboardHandler.Summary)
+				all.Get("/packages", packageHandler.List)
+				all.Get("/customers", customerHandler.List)
+				all.Get("/bills", billHandler.List)
+				all.Get("/bills/{id}/invoice", billHandler.Invoice)
+				all.Get("/bills/{id}/notifications", notificationHandler.ListByBill)
+				all.Get("/templates", templateHandler.List)
+				all.Get("/reports/revenue", reportsHandler.Revenue)
+				all.Get("/reports/aging", reportsHandler.Aging)
+			})
 		})
+	})
+
+	// Serve static files from frontend/dist
+	fs := http.FileServer(http.Dir(cfg.FrontendDistPath))
+	r.Get("/*", func(w http.ResponseWriter, req *http.Request) {
+		path := strings.TrimPrefix(req.URL.Path, "/")
+		if _, err := os.Stat(filepath.Join(cfg.FrontendDistPath, path)); os.IsNotExist(err) {
+			http.ServeFile(w, req, filepath.Join(cfg.FrontendDistPath, "index.html"))
+			return
+		}
+		fs.ServeHTTP(w, req)
 	})
 
 	return r

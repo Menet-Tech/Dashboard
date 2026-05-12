@@ -13,6 +13,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type DiscordAlerter interface {
+	IsEventEnabled(ctx context.Context, event string) bool
+	SendAlert(ctx context.Context, message string) error
+}
+
 const placeholderHash = "BOOTSTRAP_PENDING"
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
@@ -51,6 +56,7 @@ type Service struct {
 	LoginWindow            time.Duration
 	BootstrapAdminUsername string
 	BootstrapAdminPassword string
+	Discord                DiscordAlerter
 }
 
 func (s Service) Bootstrap(ctx context.Context) error {
@@ -92,7 +98,7 @@ func (s Service) Bootstrap(ctx context.Context) error {
 	return s.Repository.UpdateUserPasswordHash(ctx, user.ID, string(hash))
 }
 
-func (s Service) Login(ctx context.Context, username, password, identifier string) (User, Session, error) {
+func (s Service) Login(ctx context.Context, username, password, identifier, ip string) (User, Session, error) {
 	maxAttempts := s.LoginMaxAttempts
 	if maxAttempts <= 0 {
 		maxAttempts = 5
@@ -108,6 +114,9 @@ func (s Service) Login(ctx context.Context, username, password, identifier strin
 			return User{}, Session{}, err
 		}
 		if failures >= maxAttempts {
+			if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_security") {
+				_ = s.Discord.SendAlert(ctx, fmt.Sprintf("🚨 **Brute Force Terdeteksi**: Identifier `%s` — %d percobaan login gagal", identifier, failures))
+			}
 			return User{}, Session{}, ErrTooManyAttempts
 		}
 	}
@@ -147,6 +156,7 @@ func (s Service) Login(ctx context.Context, username, password, identifier strin
 	}
 
 	_ = s.Repository.RecordLoginAttempt(ctx, identifier, true)
+	_ = s.Repository.UpdateLastLogin(ctx, user.ID, ip)
 
 	return user.User, session, nil
 }
@@ -233,6 +243,18 @@ func (r Repository) UpdateUserPasswordHash(ctx context.Context, userID int64, pa
 		return fmt.Errorf("update user password hash: %w", err)
 	}
 
+	return nil
+}
+
+func (r Repository) UpdateLastLogin(ctx context.Context, userID int64, ip string) error {
+	_, err := r.DB.ExecContext(ctx, `
+		UPDATE users
+		SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ?
+		WHERE id = ?
+	`, ip, userID)
+	if err != nil {
+		return fmt.Errorf("update last login: %w", err)
+	}
 	return nil
 }
 
