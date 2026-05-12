@@ -19,6 +19,8 @@ import {
   fetchAuditLogs,
   fetchSettings,
   fetchSummary,
+  fetchRevenue,
+  fetchAging,
   fetchTemplates,
   fetchUsers,
   generateBills,
@@ -35,8 +37,11 @@ import {
   updateUser,
   uploadBillProof,
   verifyBackup,
+  simulateRestore,
+  applyRestore,
   type HealthPayload,
   type SummaryPayload,
+  type RestoreSimulationResult,
 } from "./lib/api";
 import type {
   AuditLogItem,
@@ -47,7 +52,23 @@ import type {
   PackageItem,
   TemplateItem,
   User,
+  RevenueItem,
+  AgingReport,
 } from "./types";
+
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Bar, Pie } from "react-chartjs-2";
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
 type ViewKey =
   | "dashboard"
@@ -146,6 +167,8 @@ const defaultManagedUserForm = (): ManagedUserFormState => ({
 export default function App() {
   const [health, setHealth] = useState<HealthPayload | null>(null);
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
+  const [revenue, setRevenue] = useState<RevenueItem[]>([]);
+  const [aging, setAging] = useState<AgingReport | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<ViewKey>("dashboard");
   const [booting, setBooting] = useState(true);
@@ -158,6 +181,7 @@ export default function App() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
   const [backups, setBackups] = useState<Array<{ filename: string; size: number; mod_time: string }>>([]);
+  const [restoreSimulation, setRestoreSimulation] = useState<{ filename: string; result: RestoreSimulationResult } | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [managedUsers, setManagedUsers] = useState<ManagedUserItem[]>([]);
   const [packageForm, setPackageForm] = useState<PackageFormState>(defaultPackageForm);
@@ -220,27 +244,46 @@ export default function App() {
 
     async function loadProtectedData() {
       try {
-        const [summaryPayload, packagesPayload, customersPayload, billsPayload, templatesPayload, settingsPayload, auditPayload, usersPayload] =
-          await Promise.all([
-            fetchSummary(),
-            fetchPackages(),
-            fetchCustomers(),
-            fetchBills(),
-            fetchTemplates(),
-            fetchSettings(),
-            isAdmin ? fetchAuditLogs(50) : Promise.resolve({ data: [] as AuditLogItem[] }),
-            isAdmin ? fetchUsers() : Promise.resolve({ data: [] as ManagedUserItem[] }),
-          ]);
+        const [
+          summaryPayload,
+          packagesPayload,
+          customersPayload,
+          billsPayload,
+          templatesPayload,
+          settingsPayload,
+          auditPayload,
+          usersPayload,
+          revenuePayload,
+          agingPayload,
+        ] = await Promise.all([
+          fetchSummary(),
+          fetchPackages(),
+          fetchCustomers(),
+          fetchBills(),
+          fetchTemplates(),
+          isAdmin ? fetchSettings() : Promise.resolve({ data: {} }),
+          isAdmin ? fetchAuditLogs(50) : Promise.resolve({ data: [] as AuditLogItem[] }),
+          isAdmin ? fetchUsers() : Promise.resolve({ data: [] as ManagedUserItem[] }),
+          isAdmin ? fetchRevenue().catch(() => ({ data: [] as RevenueItem[] })) : Promise.resolve({ data: [] as RevenueItem[] }),
+          isAdmin ? fetchAging().catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+        ]);
 
         if (!cancelled) {
-          setSummary(summaryPayload);
-          setPackages(packagesPayload.data);
-          setCustomers(customersPayload.data);
-          setBills(billsPayload.data);
-          setTemplates(templatesPayload.data);
-          setSettingsForm(settingsPayload.data);
-          setAuditLogs(auditPayload.data);
-          setManagedUsers(usersPayload.data);
+          startTransition(() => {
+            setSummary(summaryPayload);
+            setPackages(packagesPayload.data);
+            setCustomers(customersPayload.data);
+            setBills(billsPayload.data);
+            setTemplates(templatesPayload.data);
+            if (isAdmin) {
+              setSettingsForm(settingsPayload.data as Record<string, string>);
+              setAuditLogs(auditPayload.data);
+              setManagedUsers(usersPayload.data);
+              setRevenue(revenuePayload.data);
+              setAging(agingPayload.data);
+            }
+            setError(null);
+          });
         }
       } catch (caughtError) {
         if (!cancelled) {
@@ -266,7 +309,7 @@ export default function App() {
   const appTone = statusTone(health?.status);
 
   async function reloadProtectedData() {
-    const [summaryPayload, packagesPayload, customersPayload, billsPayload, templatesPayload, settingsPayload, auditPayload, usersPayload] =
+    const [summaryPayload, packagesPayload, customersPayload, billsPayload, templatesPayload, settingsPayload, auditPayload, usersPayload, revenuePayload, agingPayload] =
       await Promise.all([
         fetchSummary(),
         fetchPackages(),
@@ -276,6 +319,8 @@ export default function App() {
         fetchSettings(),
         user?.role === "admin" ? fetchAuditLogs(50) : Promise.resolve({ data: [] as AuditLogItem[] }),
         user?.role === "admin" ? fetchUsers() : Promise.resolve({ data: [] as ManagedUserItem[] }),
+        user?.role === "admin" ? fetchRevenue().catch(() => ({ data: [] as RevenueItem[] })) : Promise.resolve({ data: [] as RevenueItem[] }),
+        user?.role === "admin" ? fetchAging().catch(() => ({ data: null })) : Promise.resolve({ data: null }),
       ]);
 
     setSummary(summaryPayload);
@@ -286,6 +331,10 @@ export default function App() {
     setSettingsForm(settingsPayload.data);
     setAuditLogs(auditPayload.data);
     setManagedUsers(usersPayload.data);
+    if (user?.role === "admin") {
+      setRevenue(revenuePayload.data);
+      setAging(agingPayload.data);
+    }
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -505,6 +554,33 @@ export default function App() {
     });
   }
 
+  async function handleSimulateRestore(filename: string) {
+    await withFeedback(async () => {
+      const response = await simulateRestore(filename);
+      if (response.data.valid) {
+        setRestoreSimulation({ filename, result: response.data });
+      } else {
+        setMessage(`Simulasi gagal: ${response.data.message}`);
+      }
+    });
+  }
+
+  async function handleApplyRestore() {
+    if (!restoreSimulation) return;
+    const confirmed = window.confirm(`Apakah Anda yakin ingin menerapkan backup ${restoreSimulation.filename}? PERHATIAN: Ini akan menimpa database live dan me-restart sistem.`);
+    if (!confirmed) return;
+
+    await withFeedback(async () => {
+      const response = await applyRestore();
+      setMessage(response.message);
+      setRestoreSimulation(null);
+      // Backend will exit(0), causing a restart. Let's wait a bit and refresh the page.
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+    });
+  }
+
   async function handleToggleNotifications(billId: number) {
     if (expandedBillId === billId) {
       setExpandedBillId(null);
@@ -637,7 +713,12 @@ export default function App() {
 
       <nav className="tabbar">
         {navItems
-          .filter((item) => (item.key === "audit" || item.key === "users" ? user.role === "admin" : true))
+          .filter((item) => {
+            if (["audit", "users", "settings", "packages", "templates"].includes(item.key)) {
+              return user.role === "admin";
+            }
+            return true;
+          })
           .map((item) => (
           <button
             key={item.key}
@@ -701,17 +782,79 @@ export default function App() {
               </dl>
             </article>
 
-            <article className="surface">
-              <div className="section-heading">
-                <h2>Current Scope</h2>
-              </div>
-              <ul className="step-list">
-                <li>Computed status tagihan `jatuh_tempo` dan `menunggak`</li>
-                <li>Invoice print view backend</li>
-                <li>Upload bukti bayar</li>
-                <li>Template WA dan worker automation foundation</li>
-              </ul>
-            </article>
+            {user?.role === "admin" && (
+              <article className="surface" style={{ gridColumn: "1 / -1" }}>
+                <div className="section-heading">
+                  <h2>Laporan Tagihan</h2>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
+                  <div>
+                    <h3>Pendapatan Bulanan</h3>
+                    {revenue.length > 0 ? (
+                      <Bar
+                        data={{
+                          labels: [...revenue].reverse().map((r) => r.period),
+                          datasets: [
+                            {
+                              label: "Total Tagihan",
+                              data: [...revenue].reverse().map((r) => r.total_billed),
+                              backgroundColor: "rgba(99, 102, 241, 0.5)",
+                              borderColor: "rgba(99, 102, 241, 1)",
+                              borderWidth: 1,
+                            },
+                            {
+                              label: "Total Lunas",
+                              data: [...revenue].reverse().map((r) => r.total_paid),
+                              backgroundColor: "rgba(34, 197, 94, 0.5)",
+                              borderColor: "rgba(34, 197, 94, 1)",
+                              borderWidth: 1,
+                            },
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          plugins: { legend: { position: "bottom" } },
+                        }}
+                      />
+                    ) : (
+                      <p className="muted">Belum ada data pendapatan.</p>
+                    )}
+                  </div>
+                  <div>
+                    <h3>Aging Piutang (Belum Bayar)</h3>
+                    {aging && (aging.current > 0 || aging.days_1_30 > 0 || aging.days_31_60 > 0 || aging.over_60 > 0) ? (
+                      <div style={{ maxWidth: "300px", margin: "0 auto" }}>
+                        <Pie
+                          data={{
+                            labels: ["Current", "1-30 Hari", "31-60 Hari", ">60 Hari"],
+                            datasets: [
+                              {
+                                data: [aging.current, aging.days_1_30, aging.days_31_60, aging.over_60],
+                                backgroundColor: [
+                                  "rgba(59, 130, 246, 0.7)",
+                                  "rgba(234, 179, 8, 0.7)",
+                                  "rgba(249, 115, 22, 0.7)",
+                                  "rgba(239, 68, 68, 0.7)",
+                                ],
+                                borderWidth: 1,
+                              },
+                            ],
+                          }}
+                          options={{
+                            responsive: true,
+                            plugins: { legend: { position: "bottom" } },
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <p className="muted" style={{ textAlign: "center", paddingTop: "2rem" }}>
+                        Tidak ada tunggakan berjalan.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </article>
+            )}
           </section>
         </>
       ) : null}
@@ -817,8 +960,9 @@ export default function App() {
 
       {view === "customers" ? (
         <section className="grid feature-grid">
-          <article className="surface">
-            <div className="section-heading">
+          {user?.role !== "viewer" && (
+            <article className="surface">
+              <div className="section-heading">
               <h2>{editingCustomerId ? "Edit Pelanggan" : "Tambah Pelanggan"}</h2>
             </div>
             <form className="form-grid" onSubmit={handleCustomerSubmit}>
@@ -955,6 +1099,7 @@ export default function App() {
               </div>
             </form>
           </article>
+          )}
 
           <article className="surface">
             <div className="section-heading">
@@ -996,12 +1141,13 @@ export default function App() {
                       </td>
                       <td>{customer.whatsapp || "-"}</td>
                       <td>
-                        <button
-                          type="button"
-                          className="ghost-button"
-                          onClick={() => {
-                            setEditingCustomerId(customer.id);
-                            setCustomerForm({
+                        {user?.role !== "viewer" && (
+                          <button
+                            type="button"
+                            className="ghost-button"
+                            onClick={() => {
+                              setEditingCustomerId(customer.id);
+                              setCustomerForm({
                               name: customer.name,
                               package_id: customer.package_id,
                               user_pppoe: customer.user_pppoe,
@@ -1016,6 +1162,7 @@ export default function App() {
                         >
                           Edit
                         </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1028,30 +1175,32 @@ export default function App() {
 
       {view === "bills" ? (
         <section className="grid feature-grid">
-          <article className="surface">
-            <div className="section-heading">
-              <h2>Generate Tagihan</h2>
-            </div>
-            <form className="form-grid" onSubmit={handleGenerateBills}>
-              <label>
-                <span>Periode (YYYY-MM)</span>
-                <input
-                  value={billPeriod}
-                  onChange={(event) => setBillPeriod(event.target.value)}
-                  placeholder="2026-04"
-                />
-              </label>
-              <div className="button-row">
-                <button className="primary-button" disabled={submitting}>
-                  Generate Sekarang
-                </button>
+          {user?.role !== "viewer" && (
+            <article className="surface">
+              <div className="section-heading">
+                <h2>Generate Tagihan</h2>
               </div>
-            </form>
-            <p className="muted top-gap">
-              Generate hanya akan membuat tagihan untuk pelanggan `active` dan `limit`
-              yang belum punya tagihan di periode tersebut.
-            </p>
-          </article>
+              <form className="form-grid" onSubmit={handleGenerateBills}>
+                <label>
+                  <span>Periode (YYYY-MM)</span>
+                  <input
+                    value={billPeriod}
+                    onChange={(event) => setBillPeriod(event.target.value)}
+                    placeholder="2026-04"
+                  />
+                </label>
+                <div className="button-row">
+                  <button className="primary-button" disabled={submitting}>
+                    Generate Sekarang
+                  </button>
+                </div>
+              </form>
+              <p className="muted top-gap">
+                Generate hanya akan membuat tagihan untuk pelanggan `active` dan `limit`
+                yang belum punya tagihan di periode tersebut.
+              </p>
+            </article>
+          )}
 
           <article className="surface">
             <div className="section-heading">
@@ -1105,7 +1254,7 @@ export default function App() {
                             >
                               Invoice
                             </button>
-                            {bill.status === "belum_bayar" ? (
+                            {user?.role !== "viewer" && bill.status === "belum_bayar" ? (
                               <button
                                 type="button"
                                 className="ghost-button"
@@ -1121,23 +1270,27 @@ export default function App() {
                             >
                               Log WA
                             </button>
-                            <input
-                              type="file"
-                              accept=".jpg,.jpeg,.png,.pdf,.webp"
-                              onChange={(event) =>
-                                setProofFiles((current) => ({
-                                  ...current,
-                                  [bill.id]: event.target.files?.[0] ?? null,
-                                }))
-                              }
-                            />
-                            <button
-                              type="button"
-                              className="secondary-button"
-                              onClick={() => void handleUploadProof(bill.id)}
-                            >
-                              Upload Bukti
-                            </button>
+                            {user?.role !== "viewer" && (
+                              <>
+                                <input
+                                  type="file"
+                                  accept=".jpg,.jpeg,.png,.pdf,.webp"
+                                  onChange={(event) =>
+                                    setProofFiles((current) => ({
+                                      ...current,
+                                      [bill.id]: event.target.files?.[0] ?? null,
+                                    }))
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  className="secondary-button"
+                                  onClick={() => void handleUploadProof(bill.id)}
+                                >
+                                  Upload Bukti
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1467,6 +1620,13 @@ export default function App() {
                           >
                             Verify
                           </button>
+                          <button
+                            type="button"
+                            className="ghost-button"
+                            onClick={() => void handleSimulateRestore(b.filename)}
+                          >
+                            Simulasi Restore
+                          </button>
                           <a className="ghost-button" href={getBackupDownloadUrl(b.filename)} download>
                             Download
                           </a>
@@ -1477,6 +1637,26 @@ export default function App() {
                 </tbody>
               </table>
             </div>
+            {restoreSimulation && (
+              <div className="top-gap" style={{ padding: "1rem", border: "1px solid var(--border)", borderRadius: "var(--radius)", backgroundColor: "var(--surface)" }}>
+                <h3>Simulasi Restore: {restoreSimulation.filename}</h3>
+                <p>Status: {restoreSimulation.result.valid ? <span style={{ color: "var(--success)" }}>Valid</span> : "Invalid"}</p>
+                <p>Pesan: {restoreSimulation.result.message}</p>
+                <ul>
+                  <li>Total Users: {restoreSimulation.result.total_users}</li>
+                  <li>Total Pelanggan: {restoreSimulation.result.total_pelanggan}</li>
+                  <li>Total Tagihan: {restoreSimulation.result.total_tagihan}</li>
+                </ul>
+                <div className="button-row top-gap">
+                  <button type="button" className="danger-button" onClick={() => void handleApplyRestore()}>
+                    Apply to Live (Restart)
+                  </button>
+                  <button type="button" className="ghost-button" onClick={() => setRestoreSimulation(null)}>
+                    Batal
+                  </button>
+                </div>
+              </div>
+            )}
           </article>
 
           <article className="surface">
@@ -1715,7 +1895,8 @@ export default function App() {
                 <thead>
                   <tr>
                     <th>Waktu</th>
-                    <th>User ID</th>
+                    <th>User</th>
+                    <th>IP</th>
                     <th>Aksi</th>
                     <th>Detail</th>
                   </tr>
@@ -1723,7 +1904,7 @@ export default function App() {
                 <tbody>
                   {auditLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={4}>
+                      <td colSpan={5}>
                         <span className="muted">Belum ada audit log.</span>
                       </td>
                     </tr>
@@ -1731,7 +1912,8 @@ export default function App() {
                     auditLogs.map((log) => (
                       <tr key={log.id}>
                         <td>{formatDateTime(log.created_at)}</td>
-                        <td>{log.user_id ?? "-"}</td>
+                        <td>{log.username ?? (log.user_id ? `#${log.user_id}` : "-")}</td>
+                        <td><span className="muted" style={{fontSize:'0.85em'}}>{log.ip_address || "-"}</span></td>
                         <td>{log.action}</td>
                         <td>{log.message || "-"}</td>
                       </tr>
@@ -1805,6 +1987,7 @@ export default function App() {
                     <th>Username</th>
                     <th>Role</th>
                     <th>Status</th>
+                    <th>Terakhir Login</th>
                     <th>Aksi</th>
                   </tr>
                 </thead>
@@ -1835,6 +2018,16 @@ export default function App() {
                           <option value="1">Aktif</option>
                           <option value="0">Nonaktif</option>
                         </select>
+                      </td>
+                      <td>
+                        {item.last_login_at ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.85em' }}>
+                            <span>{new Date(item.last_login_at).toLocaleString('id-ID')}</span>
+                            <span className="muted">{item.last_login_ip || '-'}</span>
+                          </div>
+                        ) : (
+                          <span className="muted">Belum pernah</span>
+                        )}
                       </td>
                       <td>
                         <button

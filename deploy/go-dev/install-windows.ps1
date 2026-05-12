@@ -32,11 +32,12 @@ param(
 $ErrorActionPreference = "Stop"
 $VerbosePreference = "SilentlyContinue"
 
+$repoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
 $script:Config = @{
-    RepoRoot          = (Get-Location).Path
-    OutputDir         = Join-Path (Get-Location) "output\windows"
-    BackendDir        = Join-Path (Get-Location) "backend"
-    FrontendDir       = Join-Path (Get-Location) "frontend"
+    RepoRoot          = $repoRoot
+    OutputDir         = Join-Path $repoRoot "output\windows"
+    BackendDir        = Join-Path $repoRoot "backend"
+    FrontendDir       = Join-Path $repoRoot "frontend"
     GoMinVersion      = "1.26"
     NodeMinVersion    = "18"
     EnvFileName       = ".env"

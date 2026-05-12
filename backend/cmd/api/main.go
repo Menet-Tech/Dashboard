@@ -52,6 +52,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	settingsService := settings.Service{Repository: settings.Repository{DB: db}}
+	discordService := notifications.NewDiscordService(settingsService)
+
 	authService := auth.Service{
 		Repository: auth.Repository{
 			DB: db,
@@ -63,6 +66,7 @@ func main() {
 		LoginWindow:            time.Duration(cfg.LoginWindowMinutes) * time.Minute,
 		BootstrapAdminUsername: cfg.BootstrapAdminUsername,
 		BootstrapAdminPassword: cfg.BootstrapAdminPassword,
+		Discord:                discordService,
 	}
 
 	if err := authService.Bootstrap(context.Background()); err != nil {

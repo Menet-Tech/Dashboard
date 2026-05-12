@@ -49,6 +49,9 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 
 	if err := s.RunOnce(ctx); err != nil {
 		s.Logger.Error("worker run failed", "error", err)
+		if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
+			_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Worker Run Error**: %v", err))
+		}
 	}
 
 	ticker := time.NewTicker(interval)
@@ -71,6 +74,9 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 			}
 			if err := s.RunOnce(ctx); err != nil {
 				s.Logger.Error("worker run failed", "error", err)
+				if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
+					_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Worker Run Error**: %v", err))
+				}
 			}
 		}
 	}
@@ -153,6 +159,9 @@ func (s Service) runScheduledBackup(ctx context.Context, now time.Time) error {
 
 	filename, err := s.Backup.CreateBackup(ctx)
 	if err != nil {
+		if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
+			_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Auto Backup Gagal**: %v", err))
+		}
 		return err
 	}
 

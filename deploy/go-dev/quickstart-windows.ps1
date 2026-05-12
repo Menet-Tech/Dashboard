@@ -48,12 +48,13 @@ $ErrorActionPreference = "Stop"
 # Configuration
 # ===============================================================================
 
-$backendPath = Join-Path -Path (Get-Location).Path -ChildPath "backend"
-$frontendPath = Join-Path -Path (Get-Location).Path -ChildPath "frontend"
-$storagePath = Join-Path -Path (Get-Location).Path -ChildPath "storage"
+$repoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
+$backendPath = Join-Path -Path $repoRoot -ChildPath "backend"
+$frontendPath = Join-Path -Path $repoRoot -ChildPath "frontend"
+$storagePath = Join-Path -Path $repoRoot -ChildPath "storage"
 
 $script:Config = @{
-    RepoRoot      = (Get-Location).Path
+    RepoRoot      = $repoRoot
     BackendDir    = $backendPath
     FrontendDir   = $frontendPath
     EnvFile       = "$backendPath\.env"
