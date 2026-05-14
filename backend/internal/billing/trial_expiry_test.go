@@ -57,7 +57,7 @@ func TestProcessTrialExpiryGeneratesBillsForExpiredTrials(t *testing.T) {
 		t.Fatalf("insert package: %v", err)
 	}
 
-	now := time.Now().UTC()
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 
 	// Create a trial-expired customer
 	expiredDate := now.AddDate(0, 0, -4).Format(time.RFC3339)
@@ -104,8 +104,8 @@ func TestProcessTrialExpiryGeneratesBillsForExpiredTrials(t *testing.T) {
 
 	select {
 	case payload := <-mockWA.payloads:
-		if payload.TriggerKey != "trial_expired" {
-			t.Fatalf("expected trial_expired trigger, got %q", payload.TriggerKey)
+		if payload.TriggerKey != "jatuh_tempo" {
+			t.Fatalf("expected jatuh_tempo trigger, got %q", payload.TriggerKey)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected 1 whatsapp payload, got none")
@@ -138,7 +138,7 @@ func TestProcessTrialExpiryIgnoresNonTrialCustomers(t *testing.T) {
 		t.Fatalf("insert customer: %v", err)
 	}
 
-	now := time.Now().UTC()
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 
 	// Process trial expiry
 	err = service.ProcessTrialExpiry(context.Background(), now)
@@ -175,7 +175,7 @@ func TestProcessTrialExpiryIgnoresActiveTrials(t *testing.T) {
 		t.Fatalf("insert package: %v", err)
 	}
 
-	now := time.Now().UTC()
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 
 	// Create an active trial customer (trial not expired)
 	_, err = db.Exec(`
@@ -234,7 +234,7 @@ func TestProcessTrialExpiryMultipleCustomers(t *testing.T) {
 		t.Fatalf("insert package: %v", err)
 	}
 
-	now := time.Now().UTC()
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 	expiredDate := now.AddDate(0, 0, -4).Format(time.RFC3339)
 
 	// Create multiple trial-expired customers
@@ -293,7 +293,7 @@ func TestProcessTrialExpiryDoesNotDuplicateExistingBill(t *testing.T) {
 		t.Fatalf("insert package: %v", err)
 	}
 
-	now := time.Now().UTC()
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 	expiredDate := now.AddDate(0, 0, -4).Format(time.RFC3339)
 	_, err = db.Exec(`
 		INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status, is_trial, trial_started_at, trial_days, nomor_wa)
@@ -332,6 +332,87 @@ func TestProcessTrialExpiryDoesNotDuplicateExistingBill(t *testing.T) {
 	}
 	if isTrial != 0 {
 		t.Fatal("expected trial to be ended even when bill already exists")
+	}
+}
+
+func TestProcessTrialExpirySkipsNotificationBeforeReminderWindow(t *testing.T) {
+	db := trialTestDB(t)
+	settingsService := settings.Service{Repository: settings.Repository{DB: db}}
+	customersService := customers.Service{Repository: customers.Repository{DB: db}}
+	mockWA := &mockTrialWhatsAppSender{payloads: make(chan notifications.BillMessagePayload, 1)}
+
+	service := Service{
+		Repository: Repository{DB: db},
+		Settings:   settingsService,
+		Customers:  customersService,
+		WhatsApp:   mockWA,
+	}
+
+	_, err := db.Exec(`INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Test Paket', 20, 100000)`)
+	if err != nil {
+		t.Fatalf("insert package: %v", err)
+	}
+
+	now := time.Date(2026, 5, 4, 10, 0, 0, 0, time.UTC)
+	expiredDate := now.AddDate(0, 0, -4).Format(time.RFC3339)
+	_, err = db.Exec(`
+		INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status, is_trial, trial_started_at, trial_days, nomor_wa)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, 1, "Trial Early", 1, 10, "active", 1, expiredDate, 3, "6281234567890")
+	if err != nil {
+		t.Fatalf("insert customer: %v", err)
+	}
+
+	if err := service.ProcessTrialExpiry(context.Background(), now); err != nil {
+		t.Fatalf("process trial expiry: %v", err)
+	}
+
+	select {
+	case payload := <-mockWA.payloads:
+		t.Fatalf("expected no whatsapp notification before reminder window, got %q", payload.TriggerKey)
+	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+func TestProcessTrialExpiryUsesReminderTriggerInsideReminderWindow(t *testing.T) {
+	db := trialTestDB(t)
+	settingsService := settings.Service{Repository: settings.Repository{DB: db}}
+	customersService := customers.Service{Repository: customers.Repository{DB: db}}
+	mockWA := &mockTrialWhatsAppSender{payloads: make(chan notifications.BillMessagePayload, 1)}
+
+	service := Service{
+		Repository: Repository{DB: db},
+		Settings:   settingsService,
+		Customers:  customersService,
+		WhatsApp:   mockWA,
+	}
+
+	_, err := db.Exec(`INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Test Paket', 20, 100000)`)
+	if err != nil {
+		t.Fatalf("insert package: %v", err)
+	}
+
+	now := time.Date(2026, 5, 6, 10, 0, 0, 0, time.UTC)
+	expiredDate := now.AddDate(0, 0, -4).Format(time.RFC3339)
+	_, err = db.Exec(`
+		INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status, is_trial, trial_started_at, trial_days, nomor_wa)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, 1, "Trial Reminder", 1, 8, "active", 1, expiredDate, 3, "6281234567890")
+	if err != nil {
+		t.Fatalf("insert customer: %v", err)
+	}
+
+	if err := service.ProcessTrialExpiry(context.Background(), now); err != nil {
+		t.Fatalf("process trial expiry: %v", err)
+	}
+
+	select {
+	case payload := <-mockWA.payloads:
+		if payload.TriggerKey != "reminder_custom" {
+			t.Fatalf("expected reminder_custom trigger, got %q", payload.TriggerKey)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected reminder_custom notification, got none")
 	}
 }
 

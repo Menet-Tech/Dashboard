@@ -65,11 +65,12 @@ type AutomationMessage struct {
 }
 
 type AutomationOptions struct {
-	Now          time.Time
-	ReminderDays int
-	LimitDays    int
-	SendWhatsApp func(context.Context, AutomationMessage) error
-	SendDiscord  func(context.Context, string) error
+	Now            time.Time
+	ReminderDays   int
+	LimitDays      int
+	TrialGraceDays int
+	SendWhatsApp   func(context.Context, AutomationMessage) error
+	SendDiscord    func(context.Context, string) error
 }
 
 type Repository struct {
@@ -81,11 +82,12 @@ type WhatsAppSender interface {
 }
 
 type Service struct {
-	Repository Repository
-	Settings   settings.Service
-	Customers  customers.Service
-	WhatsApp   WhatsAppSender
-	Discord    notifications.DiscordSender
+	Repository    Repository
+	Settings      settings.Service
+	Customers     customers.Service
+	WhatsApp      WhatsAppSender
+	Discord       notifications.DiscordSender
+	Notifications notifications.NotificationLogRepository
 }
 
 func (s Service) List(ctx context.Context) ([]Bill, error) {
@@ -193,6 +195,9 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 	if options.Now.IsZero() {
 		options.Now = time.Now()
 	}
+	if options.TrialGraceDays <= 0 {
+		options.TrialGraceDays = 7
+	}
 
 	candidates, err := s.Repository.AutomationCandidates(ctx)
 	if err != nil {
@@ -203,6 +208,10 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		dueDate, err := time.Parse("2006-01-02", item.DueDate)
 		if err != nil {
 			return fmt.Errorf("parse due date for automation: %w", err)
+		}
+		effectiveDueDate := dueDate
+		if adjustedDueDate, ok := trialGraceDueDate(item.TrialStartedAt, item.TrialDays, dueDate, options.TrialGraceDays); ok {
+			effectiveDueDate = adjustedDueDate
 		}
 
 		if sameDate(dueDate, options.Now.AddDate(0, 0, options.ReminderDays)) {
@@ -225,7 +234,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 			}
 		}
 
-		if overdueDays(dueDate, options.Now) >= options.LimitDays {
+		if overdueDays(effectiveDueDate, options.Now) >= options.LimitDays {
 			if err := s.Repository.UpdateCustomerStatus(ctx, item.CustomerID, "limit"); err != nil {
 				return err
 			}
@@ -263,6 +272,10 @@ func (s Service) ProcessTrialExpiry(ctx context.Context, now time.Time) error {
 	if err != nil {
 		return err
 	}
+	reminderDays, err := s.getReminderDays(ctx)
+	if err != nil {
+		return err
+	}
 
 	for _, customer := range expiredTrials {
 		bill, created, err := s.Repository.EnsureBillForCustomer(ctx, customer.ID, period, menunggakDays, now)
@@ -283,12 +296,13 @@ func (s Service) ProcessTrialExpiry(ctx context.Context, now time.Time) error {
 			continue
 		}
 
-		if s.WhatsApp != nil {
+		triggerKey, shouldNotify := trialExpiryTrigger(customer, bill, reminderDays)
+		if s.WhatsApp != nil && shouldNotify {
 			go func(cust customers.Customer, generatedBill Bill) {
 				bgCtx := context.Background()
 				_ = s.WhatsApp.SendTemplate(bgCtx, notifications.BillMessagePayload{
 					BillID:      generatedBill.ID,
-					TriggerKey:  "trial_expired",
+					TriggerKey:  triggerKey,
 					PhoneNumber: cust.WhatsApp,
 					MessageData: map[string]string{
 						"nama":              cust.Name,
@@ -323,6 +337,13 @@ func (s Service) getMenunggakDays(ctx context.Context) (int, error) {
 	return s.Settings.GetInt(ctx, settings.KeyMenunggakDays)
 }
 
+func (s Service) getReminderDays(ctx context.Context) (int, error) {
+	if s.Settings.Repository.DB == nil {
+		return 3, nil
+	}
+	return s.Settings.GetInt(ctx, settings.KeyReminderDays)
+}
+
 type billCandidate struct {
 	CustomerID    int64
 	CustomerName  string
@@ -337,6 +358,8 @@ type billCandidate struct {
 type automationCandidate struct {
 	Bill
 	CustomerStatus string
+	TrialStartedAt *string
+	TrialDays      int
 }
 
 func (r Repository) List(ctx context.Context, menunggakDays int, now time.Time) ([]Bill, error) {
@@ -679,7 +702,7 @@ func (r Repository) AutomationCandidates(ctx context.Context) ([]automationCandi
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT t.id, t.pelanggan_id, c.nama, COALESCE(c.nomor_wa, ''), t.paket_id, p.nama, p.kecepatan_mbps,
 		       t.periode, t.invoice_number, t.nominal, t.jatuh_tempo, t.status, t.paid_at,
-		       COALESCE(t.payment_method, ''), t.proof_path, c.status
+		       COALESCE(t.payment_method, ''), t.proof_path, c.status, COALESCE(c.trial_started_at, ''), COALESCE(c.trial_days, 0)
 		FROM tagihan t
 		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
 		INNER JOIN paket p ON p.id = t.paket_id
@@ -696,6 +719,7 @@ func (r Repository) AutomationCandidates(ctx context.Context) ([]automationCandi
 		var item automationCandidate
 		var paidAt sql.NullString
 		var proofPath sql.NullString
+		var trialStartedAt string
 		if err := rows.Scan(
 			&item.ID,
 			&item.CustomerID,
@@ -713,6 +737,8 @@ func (r Repository) AutomationCandidates(ctx context.Context) ([]automationCandi
 			&item.PaymentMethod,
 			&proofPath,
 			&item.CustomerStatus,
+			&trialStartedAt,
+			&item.TrialDays,
 		); err != nil {
 			return nil, fmt.Errorf("scan automation candidate: %w", err)
 		}
@@ -721,6 +747,9 @@ func (r Repository) AutomationCandidates(ctx context.Context) ([]automationCandi
 		}
 		if proofPath.Valid {
 			item.ProofPath = &proofPath.String
+		}
+		if strings.TrimSpace(trialStartedAt) != "" {
+			item.TrialStartedAt = &trialStartedAt
 		}
 		items = append(items, item)
 	}
@@ -1022,6 +1051,50 @@ func sendAutomationMessage(ctx context.Context, options AutomationOptions, item 
 			"kecepatan_paket":   strconv.Itoa(item.PackageSpeed),
 		},
 	})
+}
+
+func trialExpiryTrigger(customer customers.Customer, bill Bill, reminderDays int) (string, bool) {
+	trialEndedAt, ok := resolveTrialEndedAt(customer.TrialStartedAt, customer.TrialDays)
+	if !ok {
+		return "trial_expired", true
+	}
+	dueDate, err := time.Parse("2006-01-02", bill.DueDate)
+	if err != nil {
+		return "trial_expired", true
+	}
+	reminderDate := dateOnly(dueDate).AddDate(0, 0, -reminderDays)
+	if trialEndedAt.Before(reminderDate) {
+		return "", false
+	}
+	if dateOnly(trialEndedAt).Before(dateOnly(dueDate)) {
+		return "reminder_custom", true
+	}
+	return "jatuh_tempo", true
+}
+
+func resolveTrialEndedAt(trialStartedAt *string, trialDays int) (time.Time, bool) {
+	if trialStartedAt == nil || strings.TrimSpace(*trialStartedAt) == "" || trialDays <= 0 {
+		return time.Time{}, false
+	}
+	startedAt, err := time.Parse(time.RFC3339, *trialStartedAt)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return startedAt.AddDate(0, 0, trialDays), true
+}
+
+func trialGraceDueDate(trialStartedAt *string, trialDays int, dueDate time.Time, graceDays int) (time.Time, bool) {
+	trialEndedAt, ok := resolveTrialEndedAt(trialStartedAt, trialDays)
+	if !ok {
+		return time.Time{}, false
+	}
+	if !trialEndedAt.After(dueDate) {
+		return time.Time{}, false
+	}
+	if graceDays <= 0 {
+		graceDays = 7
+	}
+	return dateOnly(trialEndedAt).AddDate(0, 0, graceDays), true
 }
 
 func formatDateLabel(raw string) string {

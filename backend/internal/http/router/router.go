@@ -66,11 +66,12 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	}
 
 	billHandler := handler.NewBillHandler(billing.Service{
-		Repository: billing.Repository{DB: db},
-		Settings:   settingsService,
-		Customers:  customersService,
-		WhatsApp:   whatsAppService,
-		Discord:    discordService,
+		Repository:    billing.Repository{DB: db},
+		Settings:      settingsService,
+		Customers:     customersService,
+		WhatsApp:      whatsAppService,
+		Discord:       discordService,
+		Notifications: notifications.NotificationLogRepository{DB: db},
 	}, cfg.AppName, cfg.StoragePath)
 	templateHandler := handler.NewTemplateHandler(templateService)
 	settingsHandler := handler.NewSettingsHandler(settingsService)
@@ -93,7 +94,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 			protected.Use(authMiddleware(authService))
 			protected.Use(csrfMiddleware(authService.SessionCookieName))
 			protected.Use(auditMiddleware(auditService))
-			
+
 			protected.Get("/auth/me", authHandler.Me)
 			protected.Post("/auth/logout", authHandler.Logout)
 

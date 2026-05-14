@@ -1358,3 +1358,45 @@ Iterasi ini melanjutkan flow trial ke sisi operator di frontend React.
 
 5. **Verifikasi**
    - `npm run build` di frontend akan dijalankan setelah perubahan UI selesai.
+
+### Turn 27: Trial -> Tertagih Lifecycle + Grace Jatuh Tempo
+
+Iterasi ini menyelaraskan flow trial pelanggan dengan lifecycle billing yang lebih realistis.
+
+1. **Trial habis tidak selalu langsung kirim notif**
+   - saat trial habis, sistem sekarang tetap membuat tagihan otomatis untuk pelanggan itu.
+   - notifikasi WA hanya dikirim jika trial selesai sudah masuk window reminder atau sudah menyentuh/lewat jatuh tempo.
+   - jika trial selesai masih jauh sebelum reminder, sistem tidak mengirim notif dulu.
+
+2. **Trigger notif trial kini situasional**
+   - sebelum window reminder: tidak kirim notif
+   - saat sudah masuk window reminder: kirim `reminder_custom`
+   - saat trial selesai di hari jatuh tempo / setelah jatuh tempo: kirim `jatuh_tempo`
+
+3. **Grace 7 hari untuk kasus trial selesai setelah due date**
+   - automation sekarang mengenal `trial_overdue_grace_days` default `7`.
+   - jika trial selesai setelah due date invoice, sistem menunda hitungan jatuh tempo/limit memakai due date efektif baru berbasis akhir trial + grace.
+
+4. **Worker billing trial dibenahi**
+   - `billing.Service` di mode worker sekarang benar-benar membawa sender WA/Discord dan repo notification log.
+   - ini memastikan flow trial expiry dari worker bisa jalan sesuai desain operasional.
+
+5. **Frontend daftar pelanggan diubah dari kolom Trial menjadi role lifecycle**
+   - kolom trial terpisah dihapus dari daftar pelanggan.
+   - sekarang pelanggan ditampilkan sebagai role:
+     - `Trial Aktif`
+     - `Tertagih`
+     - `Jatuh Tempo`
+     - `Menunggak`
+     - `Lunas`
+   - filter pelanggan juga berubah dari filter trial menjadi filter role billing.
+
+6. **Test tambahan**
+   - trial expired setelah due date -> trigger `jatuh_tempo`
+   - trial expired sebelum reminder -> tidak kirim notif
+   - trial expired dalam window reminder -> kirim `reminder_custom`
+   - helper due date grace trial ikut diuji
+
+7. **Verifikasi**
+   - `go test ./...` di backend lolos
+   - `npm run build` di frontend lolos

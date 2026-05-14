@@ -54,3 +54,18 @@ func TestComputeDisplayStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestTrialGraceDueDate(t *testing.T) {
+	trialStartedAt := "2026-05-08T10:00:00Z"
+	dueDate := time.Date(2026, 5, 8, 0, 0, 0, 0, time.UTC)
+
+	graceDate, ok := trialGraceDueDate(&trialStartedAt, 3, dueDate, 7)
+	if !ok {
+		t.Fatal("expected trial grace due date to be active when trial ends after due date")
+	}
+
+	expected := time.Date(2026, 5, 18, 0, 0, 0, 0, time.UTC)
+	if !graceDate.Equal(expected) {
+		t.Fatalf("expected grace date %s, got %s", expected.Format(time.RFC3339), graceDate.Format(time.RFC3339))
+	}
+}

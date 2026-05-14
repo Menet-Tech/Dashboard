@@ -13,6 +13,7 @@ const (
 	KeyReminderDays          = "billing_reminder_days"
 	KeyLimitDays             = "billing_limit_days"
 	KeyMenunggakDays         = "billing_menunggak_days"
+	KeyTrialGraceDays        = "trial_overdue_grace_days"
 	KeyBillingAutoEnabled    = "billing_auto_generate_enabled"
 	KeyBillingGenerateDay    = "billing_generate_day"
 	KeyBillingGenerateTime   = "billing_generate_time"
@@ -40,6 +41,7 @@ var defaults = map[string]string{
 	KeyReminderDays:          "3",
 	KeyLimitDays:             "5",
 	KeyMenunggakDays:         "30",
+	KeyTrialGraceDays:        "7",
 	KeyBillingAutoEnabled:    "1",
 	KeyBillingGenerateDay:    "1",
 	KeyBillingGenerateTime:   "00:05",
