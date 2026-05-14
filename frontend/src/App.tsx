@@ -1,4 +1,4 @@
-import { FormEvent, startTransition, useEffect, useMemo, useState, Fragment } from "react";
+import { FormEvent, ReactNode, startTransition, useEffect, useMemo, useState, Fragment } from "react";
 import { StatusPill } from "./components/StatusPill";
 import {
   ApiError,
@@ -113,23 +113,44 @@ type ManagedUserFormState = {
   role: string;
 };
 
+type ConfirmDialogState = {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  tone?: "danger" | "primary";
+  onConfirm: () => Promise<void> | void;
+};
+
+type PasswordResetState = {
+  user: ManagedUserItem;
+  password: string;
+};
+
+type FieldErrors = Record<string, string>;
+
+type ToastItem = {
+  id: number;
+  tone: "success" | "error" | "warning";
+  message: string;
+};
+
 const summaryCards = [
-  { key: "total_pelanggan", label: "Total Pelanggan" },
-  { key: "total_active", label: "Status Active" },
-  { key: "total_limit", label: "Status Limit" },
-  { key: "total_tagihan_belum_bayar", label: "Tagihan Belum Bayar" },
+  { key: "total_pelanggan", label: "Total Pelanggan", note: "Basis pelanggan yang tercatat di database operasional." },
+  { key: "total_active", label: "Status Active", note: "Layanan normal yang bisa dipantau tanpa tindakan isolir." },
+  { key: "total_limit", label: "Status Limit", note: "Pelanggan yang perlu follow-up karena pembatasan layanan." },
+  { key: "total_tagihan_belum_bayar", label: "Tagihan Belum Bayar", note: "Piutang berjalan yang masih perlu ditagih." },
 ] as const;
 
-const navItems: Array<{ key: ViewKey; label: string }> = [
-  { key: "dashboard", label: "Dashboard" },
-  { key: "packages", label: "Master Paket" },
-  { key: "customers", label: "Pelanggan" },
-  { key: "bills", label: "Tagihan" },
-  { key: "templates", label: "Template WA" },
-  { key: "monitoring", label: "Monitoring" },
-  { key: "audit", label: "Audit Log" },
-  { key: "users", label: "Users" },
-  { key: "settings", label: "Pengaturan" },
+const navItems: Array<{ key: ViewKey; label: string; caption: string }> = [
+  { key: "dashboard", label: "Dashboard", caption: "ringkasan bisnis dan status sistem" },
+  { key: "packages", label: "Master Paket", caption: "katalog produk internet" },
+  { key: "customers", label: "Pelanggan", caption: "data layanan dan jatuh tempo" },
+  { key: "bills", label: "Tagihan", caption: "invoice, pembayaran, bukti bayar" },
+  { key: "templates", label: "Template WA", caption: "notifikasi dan automation copy" },
+  { key: "monitoring", label: "Monitoring", caption: "health, backup, scheduler" },
+  { key: "audit", label: "Audit Log", caption: "jejak operasional dan keamanan" },
+  { key: "users", label: "Users", caption: "akun admin dan operator" },
+  { key: "settings", label: "Pengaturan", caption: "billing rules dan integrasi" },
 ];
 
 const defaultPackageForm = (): PackageFormState => ({
@@ -196,6 +217,21 @@ export default function App() {
   const [proofFiles, setProofFiles] = useState<Record<number, File | null>>({});
   const [notificationLogs, setNotificationLogs] = useState<Record<number, NotificationLog[]>>({});
   const [expandedBillId, setExpandedBillId] = useState<number | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [passwordResetState, setPasswordResetState] = useState<PasswordResetState | null>(null);
+  const [loginErrors, setLoginErrors] = useState<FieldErrors>({});
+  const [packageErrors, setPackageErrors] = useState<FieldErrors>({});
+  const [customerErrors, setCustomerErrors] = useState<FieldErrors>({});
+  const [templateErrors, setTemplateErrors] = useState<FieldErrors>({});
+  const [managedUserErrors, setManagedUserErrors] = useState<FieldErrors>({});
+  const [settingsErrors, setSettingsErrors] = useState<FieldErrors>({});
+  const [billErrors, setBillErrors] = useState<FieldErrors>({});
+  const [passwordResetErrors, setPasswordResetErrors] = useState<FieldErrors>({});
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [loadFailure, setLoadFailure] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -243,6 +279,7 @@ export default function App() {
     let cancelled = false;
 
     async function loadProtectedData() {
+      setPageLoading(true);
       try {
         const [
           summaryPayload,
@@ -282,12 +319,16 @@ export default function App() {
               setRevenue(revenuePayload.data);
               setAging(agingPayload.data);
             }
-            setError(null);
+            setLoadFailure(null);
           });
         }
       } catch (caughtError) {
         if (!cancelled) {
-          setError(toErrorMessage(caughtError));
+          setLoadFailure(toErrorMessage(caughtError));
+        }
+      } finally {
+        if (!cancelled) {
+          setPageLoading(false);
         }
       }
     }
@@ -302,48 +343,135 @@ export default function App() {
     () => packages.map((pkg) => ({ value: pkg.id, label: `${pkg.name} - ${pkg.speed_mbps} Mbps` })),
     [packages],
   );
+  const visibleNavItems = useMemo(
+    () =>
+      navItems.filter((item) => {
+        if (["audit", "users", "settings", "packages", "templates"].includes(item.key)) {
+          return user?.role === "admin";
+        }
+        return true;
+      }),
+    [user?.role],
+  );
 
   const databaseTone = statusTone(health?.services.database);
   const workerTone = statusTone(health?.services.worker);
   const backupTone = statusTone(health?.services.backup);
+  const schedulerTone = statusTone(
+    health?.scheduler.billing_last_error
+      ? "error"
+      : health?.scheduler.billing_auto_enabled
+        ? "ok"
+        : "unknown",
+  );
   const appTone = statusTone(health?.status);
 
-  async function reloadProtectedData() {
-    const [summaryPayload, packagesPayload, customersPayload, billsPayload, templatesPayload, settingsPayload, auditPayload, usersPayload, revenuePayload, agingPayload] =
-      await Promise.all([
-        fetchSummary(),
-        fetchPackages(),
-        fetchCustomers(),
-        fetchBills(),
-        fetchTemplates(),
-        fetchSettings(),
-        user?.role === "admin" ? fetchAuditLogs(50) : Promise.resolve({ data: [] as AuditLogItem[] }),
-        user?.role === "admin" ? fetchUsers() : Promise.resolve({ data: [] as ManagedUserItem[] }),
-        user?.role === "admin" ? fetchRevenue().catch(() => ({ data: [] as RevenueItem[] })) : Promise.resolve({ data: [] as RevenueItem[] }),
-        user?.role === "admin" ? fetchAging().catch(() => ({ data: null })) : Promise.resolve({ data: null }),
-      ]);
-
-    setSummary(summaryPayload);
-    setPackages(packagesPayload.data);
-    setCustomers(customersPayload.data);
-    setBills(billsPayload.data);
-    setTemplates(templatesPayload.data);
-    setSettingsForm(settingsPayload.data);
-    setAuditLogs(auditPayload.data);
-    setManagedUsers(usersPayload.data);
-    if (user?.role === "admin") {
-      setRevenue(revenuePayload.data);
-      setAging(agingPayload.data);
+  useEffect(() => {
+    if (!message) {
+      return;
     }
+    pushToast("success", message);
+    setMessage(null);
+  }, [message]);
+
+  useEffect(() => {
+    if (!error) {
+      return;
+    }
+    pushToast("error", error);
+    setError(null);
+  }, [error]);
+
+  async function reloadProtectedData() {
+    setPageLoading(true);
+    try {
+      const [summaryPayload, packagesPayload, customersPayload, billsPayload, templatesPayload, settingsPayload, auditPayload, usersPayload, revenuePayload, agingPayload] =
+        await Promise.all([
+          fetchSummary(),
+          fetchPackages(),
+          fetchCustomers(),
+          fetchBills(),
+          fetchTemplates(),
+          fetchSettings(),
+          user?.role === "admin" ? fetchAuditLogs(50) : Promise.resolve({ data: [] as AuditLogItem[] }),
+          user?.role === "admin" ? fetchUsers() : Promise.resolve({ data: [] as ManagedUserItem[] }),
+          user?.role === "admin" ? fetchRevenue().catch(() => ({ data: [] as RevenueItem[] })) : Promise.resolve({ data: [] as RevenueItem[] }),
+          user?.role === "admin" ? fetchAging().catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+        ]);
+
+      setSummary(summaryPayload);
+      setPackages(packagesPayload.data);
+      setCustomers(customersPayload.data);
+      setBills(billsPayload.data);
+      setTemplates(templatesPayload.data);
+      setSettingsForm(settingsPayload.data);
+      setAuditLogs(auditPayload.data);
+      setManagedUsers(usersPayload.data);
+      if (user?.role === "admin") {
+        setRevenue(revenuePayload.data);
+        setAging(agingPayload.data);
+      }
+      setLoadFailure(null);
+    } catch (caughtError) {
+      setLoadFailure(toErrorMessage(caughtError));
+      throw caughtError;
+    } finally {
+      setPageLoading(false);
+    }
+  }
+
+  function pushToast(tone: ToastItem["tone"], toastMessage: string) {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setToasts((current) => [...current, { id, tone, message: toastMessage }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((item) => item.id !== id));
+    }, 4200);
+  }
+
+  function isBusy(actionKey: string) {
+    return submitting && busyAction === actionKey;
+  }
+
+  function switchView(nextView: ViewKey) {
+    startTransition(() => setView(nextView));
+    setNavOpen(false);
+    if (nextView === "monitoring") {
+      void refreshMonitoringData();
+    }
+    if (nextView === "audit") {
+      void withFeedback(async () => {
+        const payload = await fetchAuditLogs(100);
+        setAuditLogs(payload.data);
+      });
+    }
+  }
+
+  function askForConfirmation(config: ConfirmDialogState) {
+    setConfirmDialog(config);
+  }
+
+  async function confirmAndRun() {
+    if (!confirmDialog) {
+      return;
+    }
+    const action = confirmDialog.onConfirm;
+    setConfirmDialog(null);
+    await action();
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const nextErrors = validateLogin(loginForm);
+    setLoginErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
     await withFeedback(async () => {
       const response = await login(loginForm.username, loginForm.password);
+      setLoginErrors({});
       setUser(response.user);
       setMessage("Login berhasil. Fondasi admin panel Go sekarang sudah aktif.");
-    });
+    }, "login");
   }
 
   async function handleLogout() {
@@ -359,11 +487,16 @@ export default function App() {
       setManagedUsers([]);
       startTransition(() => setView("dashboard"));
       setMessage("Sesi berhasil ditutup.");
-    });
+    }, "logout");
   }
 
   async function handlePackageSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const nextErrors = validatePackage(packageForm);
+    setPackageErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
     await withFeedback(async () => {
       if (editingPackageId) {
         await updatePackage(editingPackageId, packageForm);
@@ -372,26 +505,40 @@ export default function App() {
         await createPackage(packageForm);
         setMessage("Paket baru berhasil ditambahkan.");
       }
+      setPackageErrors({});
       setPackageForm(defaultPackageForm());
       setEditingPackageId(null);
       await reloadProtectedData();
-    });
+    }, "save-package");
   }
 
   async function handlePackageDelete(id: number) {
-    await withFeedback(async () => {
-      await deletePackage(id);
-      if (editingPackageId === id) {
-        setPackageForm(defaultPackageForm());
-        setEditingPackageId(null);
-      }
-      setMessage("Paket berhasil dihapus.");
-      await reloadProtectedData();
+    askForConfirmation({
+      title: "Hapus paket internet",
+      body: "Paket akan dihapus dari daftar master. Pastikan tidak ada pelanggan aktif yang masih bergantung pada paket ini.",
+      confirmLabel: "Ya, hapus paket",
+      tone: "danger",
+      onConfirm: async () => {
+        await withFeedback(async () => {
+          await deletePackage(id);
+          if (editingPackageId === id) {
+            setPackageForm(defaultPackageForm());
+            setEditingPackageId(null);
+          }
+          setMessage("Paket berhasil dihapus.");
+          await reloadProtectedData();
+        }, "delete-package");
+      },
     });
   }
 
   async function handleCustomerSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const nextErrors = validateCustomer(customerForm);
+    setCustomerErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
     await withFeedback(async () => {
       if (editingCustomerId) {
         await updateCustomer(editingCustomerId, customerForm);
@@ -400,10 +547,11 @@ export default function App() {
         await createCustomer(customerForm);
         setMessage("Pelanggan baru berhasil ditambahkan.");
       }
+      setCustomerErrors({});
       setCustomerForm(defaultCustomerForm());
       setEditingCustomerId(null);
       await reloadProtectedData();
-    });
+    }, "save-customer");
   }
 
   async function handleStatusChange(id: number, status: CustomerItem["status"]) {
@@ -416,20 +564,42 @@ export default function App() {
 
   async function handleGenerateBills(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await withFeedback(async () => {
-      const response = await generateBills(billPeriod);
-      setMessage(
-        `Generate tagihan periode ${response.data.period} selesai. ${response.data.generated} tagihan baru dibuat.`,
-      );
-      await reloadProtectedData();
+    const nextErrors = validateBillPeriod(billPeriod);
+    setBillErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+    askForConfirmation({
+      title: "Generate tagihan bulanan",
+      body: `Sistem akan membuat tagihan untuk periode ${billPeriod} hanya untuk pelanggan aktif/limit yang belum memiliki invoice pada periode tersebut.`,
+      confirmLabel: "Generate sekarang",
+      tone: "primary",
+      onConfirm: async () => {
+        await withFeedback(async () => {
+          const response = await generateBills(billPeriod);
+          setBillErrors({});
+          setMessage(
+            `Generate tagihan periode ${response.data.period} selesai. ${response.data.generated} tagihan baru dibuat.`,
+          );
+          await reloadProtectedData();
+        }, "generate-bills");
+      },
     });
   }
 
   async function handleMarkBillPaid(id: number) {
-    await withFeedback(async () => {
-      await markBillPaid(id, "transfer");
-      setMessage("Tagihan berhasil ditandai lunas.");
-      await reloadProtectedData();
+    askForConfirmation({
+      title: "Tandai tagihan lunas",
+      body: "Apakah Anda yakin? Tindakan ini akan mencatat pembayaran, memicu notifikasi lunas, dan tidak dirancang untuk dibatalkan dari UI operator.",
+      confirmLabel: "Ya, tandai lunas",
+      tone: "danger",
+      onConfirm: async () => {
+        await withFeedback(async () => {
+          await markBillPaid(id, "transfer");
+          setMessage("Tagihan berhasil ditandai lunas.");
+          await reloadProtectedData();
+        }, "mark-paid");
+      },
     });
   }
 
@@ -445,11 +615,16 @@ export default function App() {
       setProofFiles((current) => ({ ...current, [id]: null }));
       setMessage("Bukti bayar berhasil diunggah.");
       await reloadProtectedData();
-    });
+    }, "upload-proof");
   }
 
   async function handleTemplateSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const nextErrors = validateTemplate(templateForm);
+    setTemplateErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
     await withFeedback(async () => {
       if (editingTemplateId) {
         await updateTemplate(editingTemplateId, templateForm);
@@ -458,32 +633,47 @@ export default function App() {
         await createTemplate(templateForm);
         setMessage("Template baru berhasil ditambahkan.");
       }
+      setTemplateErrors({});
       setTemplateForm(defaultTemplateForm());
       setEditingTemplateId(null);
       await reloadProtectedData();
-    });
+    }, "save-template");
   }
 
   async function handleTemplateDelete(id: number) {
-    await withFeedback(async () => {
-      await deleteTemplate(id);
-      if (editingTemplateId === id) {
-        setTemplateForm(defaultTemplateForm());
-        setEditingTemplateId(null);
-      }
-      setMessage("Template berhasil dihapus.");
-      await reloadProtectedData();
+    askForConfirmation({
+      title: "Hapus template WhatsApp",
+      body: "Template yang dihapus tidak lagi tersedia untuk trigger notifikasi. Pastikan template ini memang tidak dibutuhkan di automation.",
+      confirmLabel: "Ya, hapus template",
+      tone: "danger",
+      onConfirm: async () => {
+        await withFeedback(async () => {
+          await deleteTemplate(id);
+          if (editingTemplateId === id) {
+            setTemplateForm(defaultTemplateForm());
+            setEditingTemplateId(null);
+          }
+          setMessage("Template berhasil dihapus.");
+          await reloadProtectedData();
+        }, "delete-template");
+      },
     });
   }
 
   async function handleManagedUserSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const nextErrors = validateManagedUser(managedUserForm);
+    setManagedUserErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
     await withFeedback(async () => {
       await createUser(managedUserForm);
+      setManagedUserErrors({});
       setManagedUserForm(defaultManagedUserForm());
       setMessage("User baru berhasil ditambahkan.");
       await reloadProtectedData();
-    });
+    }, "save-user");
   }
 
   async function handleManagedUserUpdate(item: ManagedUserItem, patch: Partial<ManagedUserItem>) {
@@ -498,25 +688,24 @@ export default function App() {
   }
 
   async function handleResetUserPassword(item: ManagedUserItem) {
-    const password = window.prompt(`Masukkan password baru untuk ${item.username} (minimal 8 karakter):`, "");
-    if (!password) {
-      return;
-    }
-
-    await withFeedback(async () => {
-      await resetUserPassword(item.id, password);
-      setMessage(`Password untuk ${item.username} berhasil direset.`);
-    });
+    setPasswordResetErrors({});
+    setPasswordResetState({ user: item, password: "" });
   }
 
   async function handleSettingsSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const nextErrors = validateSettings(settingsForm);
+    setSettingsErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
     await withFeedback(async () => {
       await updateSettings(settingsForm);
+      setSettingsErrors({});
       setMessage("Pengaturan berhasil disimpan.");
       await reloadProtectedData();
       await refreshHealth();
-    });
+    }, "save-settings");
   }
 
   async function handleCreateBackup() {
@@ -524,7 +713,7 @@ export default function App() {
       const res = await createBackup();
       setMessage(`Backup berhasil dibuat: ${res.data.filename}`);
       await refreshMonitoringData();
-    });
+    }, "create-backup");
   }
 
   async function refreshHealth() {
@@ -533,14 +722,23 @@ export default function App() {
   }
 
   async function refreshMonitoringData() {
-    const [healthPayload, backupsPayload, auditPayload] = await Promise.all([
-      fetchHealth(),
-      fetchBackups(),
-      user?.role === "admin" ? fetchAuditLogs(25) : Promise.resolve({ data: [] as AuditLogItem[] }),
-    ]);
-    setHealth(healthPayload);
-    setBackups(backupsPayload.data ?? []);
-    setAuditLogs(auditPayload.data ?? []);
+    setPageLoading(true);
+    try {
+      const [healthPayload, backupsPayload, auditPayload] = await Promise.all([
+        fetchHealth(),
+        fetchBackups(),
+        user?.role === "admin" ? fetchAuditLogs(25) : Promise.resolve({ data: [] as AuditLogItem[] }),
+      ]);
+      setHealth(healthPayload);
+      setBackups(backupsPayload.data ?? []);
+      setAuditLogs(auditPayload.data ?? []);
+      setLoadFailure(null);
+    } catch (caughtError) {
+      setLoadFailure(toErrorMessage(caughtError));
+      throw caughtError;
+    } finally {
+      setPageLoading(false);
+    }
   }
 
   async function handleVerifyBackup(filename: string) {
@@ -567,17 +765,41 @@ export default function App() {
 
   async function handleApplyRestore() {
     if (!restoreSimulation) return;
-    const confirmed = window.confirm(`Apakah Anda yakin ingin menerapkan backup ${restoreSimulation.filename}? PERHATIAN: Ini akan menimpa database live dan me-restart sistem.`);
-    if (!confirmed) return;
+    askForConfirmation({
+      title: "Terapkan backup ke sistem live",
+      body: `Backup ${restoreSimulation.filename} akan menimpa database aktif dan menyebabkan service restart. Jalankan hanya saat maintenance window sudah disetujui.`,
+      confirmLabel: "Terapkan restore",
+      tone: "danger",
+      onConfirm: async () => {
+        await withFeedback(async () => {
+          const response = await applyRestore();
+          setMessage(response.message);
+          setRestoreSimulation(null);
+          setTimeout(() => {
+            window.location.reload();
+          }, 3000);
+        });
+      },
+    });
+  }
 
+  async function handlePasswordResetSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!passwordResetState) {
+      return;
+    }
+    const nextErrors = validatePasswordReset(passwordResetState.password);
+    setPasswordResetErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
+    const target = passwordResetState.user;
     await withFeedback(async () => {
-      const response = await applyRestore();
-      setMessage(response.message);
-      setRestoreSimulation(null);
-      // Backend will exit(0), causing a restart. Let's wait a bit and refresh the page.
-      setTimeout(() => {
-        window.location.reload();
-      }, 3000);
+      await resetUserPassword(target.id, passwordResetState.password.trim());
+      setPasswordResetErrors({});
+      setPasswordResetState(null);
+      setMessage(`Password untuk ${target.username} berhasil direset.`);
     });
   }
 
@@ -599,8 +821,9 @@ export default function App() {
     }
   }
 
-  async function withFeedback(action: () => Promise<void>) {
+  async function withFeedback(action: () => Promise<void>, actionKey?: string) {
     setSubmitting(true);
+    setBusyAction(actionKey ?? null);
     setMessage(null);
     setError(null);
     try {
@@ -609,6 +832,7 @@ export default function App() {
       setError(toErrorMessage(caughtError));
     } finally {
       setSubmitting(false);
+      setBusyAction(null);
     }
   }
 
@@ -662,28 +886,30 @@ export default function App() {
             <label>
               <span>Username</span>
               <input
+                className={inputClassName(loginErrors.username)}
                 value={loginForm.username}
                 onChange={(event) =>
                   setLoginForm((current) => ({ ...current, username: event.target.value }))
                 }
               />
+              {renderInlineError(loginErrors.username)}
             </label>
             <label>
               <span>Password</span>
               <input
+                className={inputClassName(loginErrors.password)}
                 type="password"
                 value={loginForm.password}
                 onChange={(event) =>
                   setLoginForm((current) => ({ ...current, password: event.target.value }))
                 }
               />
+              {renderInlineError(loginErrors.password)}
             </label>
             <button className="primary-button" disabled={submitting}>
-              {submitting ? "Masuk..." : "Masuk"}
+              {isBusy("login") ? "Masuk..." : "Masuk"}
             </button>
           </form>
-          {error ? <p className="feedback error-text">{error}</p> : null}
-          {message ? <p className="feedback success-text">{message}</p> : null}
         </section>
       </main>
     );
@@ -691,69 +917,143 @@ export default function App() {
 
   return (
     <main className="page-shell app-shell">
-      <section className="topbar">
-        <div>
+      <aside className={`app-sidebar ${navOpen ? "is-open" : ""}`} aria-label="Navigasi utama">
+        <div className="sidebar-brand">
           <p className="eyebrow">go-dev rewrite</p>
           <h1>Menet-Tech Dashboard</h1>
-          <p className="hero-copy">
-            Rewrite sekarang sudah masuk ke alur billing yang lebih lengkap: status tagihan,
-            invoice, bukti bayar, template WA, dan fondasi worker automasi.
-          </p>
+          <p className="hero-copy">Backend Go, worker billing, dan panel operasional baru untuk tim ISP.</p>
         </div>
-        <div className="topbar-actions">
+        <nav className="sidebar-nav">
+          {visibleNavItems.map((item) => (
+            <button
+              key={item.key}
+              className={item.key === view ? "tab-button active" : "tab-button"}
+              onClick={() => switchView(item.key)}
+              type="button"
+              aria-label={`Buka menu ${item.label}`}
+            >
+              <span className="nav-label">{item.label}</span>
+              <span className="nav-caption">{item.caption}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
           <div className="user-chip">
             <strong>{user.username}</strong>
             <span>{user.role}</span>
           </div>
           <button className="secondary-button" onClick={() => void handleLogout()} disabled={submitting}>
-            Logout
+            {isBusy("logout") ? "Keluar..." : "Logout"}
           </button>
         </div>
-      </section>
+      </aside>
 
-      <nav className="tabbar">
-        {navItems
-          .filter((item) => {
-            if (["audit", "users", "settings", "packages", "templates"].includes(item.key)) {
-              return user.role === "admin";
-            }
-            return true;
-          })
-          .map((item) => (
-          <button
-            key={item.key}
-            className={item.key === view ? "tab-button active" : "tab-button"}
-            onClick={() => {
-              startTransition(() => setView(item.key));
-              if (item.key === "monitoring") {
-                void refreshMonitoringData();
-              }
-              if (item.key === "audit") {
-                void withFeedback(async () => {
-                  const payload = await fetchAuditLogs(100);
-                  setAuditLogs(payload.data);
-                });
-              }
-            }}
-            type="button"
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      {navOpen ? (
+        <button type="button" className="sidebar-backdrop" onClick={() => setNavOpen(false)} aria-label="Tutup navigasi" />
+      ) : null}
 
-      {error ? <p className="feedback error-text">{error}</p> : null}
-      {message ? <p className="feedback success-text">{message}</p> : null}
+      <div className="main-panel">
+        <section className="topbar">
+          <div>
+            <button
+              type="button"
+              className="ghost-button mobile-nav-toggle"
+              onClick={() => setNavOpen((current) => !current)}
+              aria-label={navOpen ? "Tutup menu navigasi" : "Buka menu navigasi"}
+              aria-expanded={navOpen}
+            >
+              {navOpen ? "Tutup Menu" : "Buka Menu"}
+            </button>
+            <p className="eyebrow">go-dev rewrite</p>
+            <h1>Menet-Tech Dashboard</h1>
+            <p className="hero-copy">
+              Rewrite sekarang sudah masuk ke alur billing yang lebih lengkap: status tagihan,
+              invoice, bukti bayar, template WA, dan fondasi worker automasi.
+            </p>
+            <div className="topbar-status-strip">
+              <StatusPill label={health?.status ?? "checking"} tone={appTone} />
+              <StatusPill label={`worker ${health?.services.worker ?? "unknown"}`} tone={workerTone} />
+              <StatusPill label={`backup ${health?.services.backup ?? "unknown"}`} tone={backupTone} />
+            </div>
+          </div>
+          <div className="topbar-actions">
+            <div className="user-chip compact-user-chip">
+              <strong>{user.username}</strong>
+              <span>{user.role}</span>
+            </div>
+            <button className="secondary-button" onClick={() => void handleLogout()} disabled={submitting}>
+              {isBusy("logout") ? "Keluar..." : "Logout"}
+            </button>
+          </div>
+        </section>
+
+        {loadFailure ? (
+          <section className="surface retry-panel">
+            <div>
+              <p className="eyebrow">load failure</p>
+              <h2>Data panel belum berhasil dimuat penuh</h2>
+              <p className="hero-copy">{loadFailure}</p>
+            </div>
+            <div className="button-row">
+              <button type="button" className="primary-button" onClick={() => void withFeedback(reloadProtectedData, "retry-load")} disabled={submitting}>
+                {isBusy("retry-load") ? "Memuat ulang..." : "Coba Muat Ulang"}
+              </button>
+            </div>
+          </section>
+        ) : null}
 
       {view === "dashboard" ? (
         <>
           <section className="grid stats-grid">
-            {summaryCards.map((card) => (
-              <article key={card.key} className="stat-card">
-                <span>{card.label}</span>
-                <strong>{summary?.[card.key] ?? 0}</strong>
-              </article>
-            ))}
+            {pageLoading ? (
+              <>
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </>
+            ) : (
+              summaryCards.map((card) => (
+                <article key={card.key} className="stat-card">
+                  <span>{card.label}</span>
+                  <strong>{summary?.[card.key] ?? 0}</strong>
+                  <p className="stat-note">{card.note}</p>
+                </article>
+              ))
+            )}
+          </section>
+
+          <section className="grid quick-actions-grid">
+            <article className="surface action-card">
+              <div>
+                <p className="eyebrow">Aksi Cepat</p>
+                <h2>Operasional Hari Ini</h2>
+                <p className="muted">Lihat kesehatan sistem, generate tagihan, dan pantau tunggakan dari satu area.</p>
+              </div>
+              <div className="button-row">
+                <button type="button" className="primary-button" onClick={() => switchView("bills")}>
+                  Buka Tagihan
+                </button>
+                <button type="button" className="ghost-button" onClick={() => switchView("monitoring")}>
+                  Buka Monitoring
+                </button>
+              </div>
+            </article>
+            <article className="surface action-card">
+              <div>
+                <p className="eyebrow">Scheduler</p>
+                <h2>Run Berikutnya</h2>
+                <p className="muted">
+                  {health?.scheduler.billing_next_run
+                    ? `Auto billing berikutnya dijadwalkan pada ${formatDateTime(health.scheduler.billing_next_run)}.`
+                    : "Jadwal billing otomatis belum tercatat."}
+                </p>
+              </div>
+              <StatusPill
+                label={health?.scheduler.billing_last_error ? "attention" : "scheduled"}
+                tone={health?.scheduler.billing_last_error ? "gold" : "green"}
+              />
+            </article>
           </section>
 
           <section className="grid detail-grid">
@@ -869,15 +1169,18 @@ export default function App() {
               <label>
                 <span>Nama Paket</span>
                 <input
+                  className={inputClassName(packageErrors.name)}
                   value={packageForm.name}
                   onChange={(event) =>
                     setPackageForm((current) => ({ ...current, name: event.target.value }))
                   }
                 />
+                {renderInlineError(packageErrors.name)}
               </label>
               <label>
                 <span>Kecepatan (Mbps)</span>
                 <input
+                  className={inputClassName(packageErrors.speed_mbps)}
                   type="number"
                   min={1}
                   value={packageForm.speed_mbps}
@@ -888,10 +1191,12 @@ export default function App() {
                     }))
                   }
                 />
+                {renderInlineError(packageErrors.speed_mbps)}
               </label>
               <label>
                 <span>Harga</span>
                 <input
+                  className={inputClassName(packageErrors.price)}
                   type="number"
                   min={0}
                   value={packageForm.price}
@@ -902,6 +1207,7 @@ export default function App() {
                     }))
                   }
                 />
+                {renderInlineError(packageErrors.price)}
               </label>
               <label>
                 <span>Deskripsi</span>
@@ -918,7 +1224,7 @@ export default function App() {
               </label>
               <div className="button-row">
                 <button className="primary-button" disabled={submitting}>
-                  {editingPackageId ? "Update Paket" : "Simpan Paket"}
+                  {isBusy("save-package") ? "Menyimpan..." : editingPackageId ? "Update Paket" : "Simpan Paket"}
                 </button>
                 {editingPackageId ? (
                   <button
@@ -969,15 +1275,18 @@ export default function App() {
               <label>
                 <span>Nama</span>
                 <input
+                  className={inputClassName(customerErrors.name)}
                   value={customerForm.name}
                   onChange={(event) =>
                     setCustomerForm((current) => ({ ...current, name: event.target.value }))
                   }
                 />
+                {renderInlineError(customerErrors.name)}
               </label>
               <label>
                 <span>Paket</span>
                 <select
+                  className={inputClassName(customerErrors.package_id)}
                   value={customerForm.package_id}
                   onChange={(event) =>
                     setCustomerForm((current) => ({
@@ -993,10 +1302,12 @@ export default function App() {
                     </option>
                   ))}
                 </select>
+                {renderInlineError(customerErrors.package_id)}
               </label>
               <label>
                 <span>User PPPoE</span>
                 <input
+                  className={inputClassName(customerErrors.user_pppoe)}
                   value={customerForm.user_pppoe}
                   onChange={(event) =>
                     setCustomerForm((current) => ({
@@ -1005,10 +1316,12 @@ export default function App() {
                     }))
                   }
                 />
+                {renderInlineError(customerErrors.user_pppoe)}
               </label>
               <label>
                 <span>Password PPPoE</span>
                 <input
+                  className={inputClassName(customerErrors.password_pppoe)}
                   value={customerForm.password_pppoe}
                   onChange={(event) =>
                     setCustomerForm((current) => ({
@@ -1017,6 +1330,7 @@ export default function App() {
                     }))
                   }
                 />
+                {renderInlineError(customerErrors.password_pppoe)}
               </label>
               <label>
                 <span>Nomor WhatsApp</span>
@@ -1042,6 +1356,7 @@ export default function App() {
               <label>
                 <span>Tanggal Jatuh Tempo Bulanan</span>
                 <input
+                  className={inputClassName(customerErrors.due_day)}
                   type="number"
                   min={1}
                   max={31}
@@ -1053,6 +1368,7 @@ export default function App() {
                     }))
                   }
                 />
+                {renderInlineError(customerErrors.due_day)}
               </label>
               <label>
                 <span>Status</span>
@@ -1082,7 +1398,7 @@ export default function App() {
               </label>
               <div className="button-row">
                 <button className="primary-button" disabled={submitting}>
-                  {editingCustomerId ? "Update Pelanggan" : "Simpan Pelanggan"}
+                  {isBusy("save-customer") ? "Menyimpan..." : editingCustomerId ? "Update Pelanggan" : "Simpan Pelanggan"}
                 </button>
                 {editingCustomerId ? (
                   <button
@@ -1119,7 +1435,13 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {customers.map((customer) => (
+                  {customers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6}>
+                        <span className="muted">Belum ada pelanggan terdaftar.</span>
+                      </td>
+                    </tr>
+                  ) : customers.map((customer) => (
                     <tr key={customer.id}>
                       <td>{customer.name}</td>
                       <td>{customer.package_name ?? "-"}</td>
@@ -1184,14 +1506,16 @@ export default function App() {
                 <label>
                   <span>Periode (YYYY-MM)</span>
                   <input
+                    className={inputClassName(billErrors.period)}
                     value={billPeriod}
                     onChange={(event) => setBillPeriod(event.target.value)}
                     placeholder="2026-04"
                   />
+                  {renderInlineError(billErrors.period)}
                 </label>
                 <div className="button-row">
                   <button className="primary-button" disabled={submitting}>
-                    Generate Sekarang
+                    {isBusy("generate-bills") ? "Menghasilkan..." : "Generate Sekarang"}
                   </button>
                 </div>
               </form>
@@ -1222,7 +1546,13 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {bills.map((bill) => (
+                  {bills.length === 0 ? (
+                    <tr>
+                      <td colSpan={8}>
+                        <span className="muted">Belum ada tagihan untuk ditampilkan pada database ini.</span>
+                      </td>
+                    </tr>
+                  ) : bills.map((bill) => (
                     <Fragment key={bill.id}>
                       <tr>
                         <td>{bill.invoice_number}</td>
@@ -1287,7 +1617,7 @@ export default function App() {
                                   className="secondary-button"
                                   onClick={() => void handleUploadProof(bill.id)}
                                 >
-                                  Upload Bukti
+                                  {isBusy("upload-proof") ? "Mengunggah..." : "Upload Bukti"}
                                 </button>
                               </>
                             )}
@@ -1348,15 +1678,18 @@ export default function App() {
               <label>
                 <span>Nama Template</span>
                 <input
+                  className={inputClassName(templateErrors.name)}
                   value={templateForm.name}
                   onChange={(event) =>
                     setTemplateForm((current) => ({ ...current, name: event.target.value }))
                   }
                 />
+                {renderInlineError(templateErrors.name)}
               </label>
               <label>
                 <span>Trigger Key</span>
                 <input
+                  className={inputClassName(templateErrors.trigger_key)}
                   value={templateForm.trigger_key}
                   onChange={(event) =>
                     setTemplateForm((current) => ({
@@ -1366,16 +1699,19 @@ export default function App() {
                   }
                   placeholder="contoh: reminder_custom"
                 />
+                {renderInlineError(templateErrors.trigger_key)}
               </label>
               <label className="full-width">
                 <span>Isi Template</span>
                 <textarea
+                  className={inputClassName(templateErrors.content)}
                   rows={8}
                   value={templateForm.content}
                   onChange={(event) =>
                     setTemplateForm((current) => ({ ...current, content: event.target.value }))
                   }
                 />
+                {renderInlineError(templateErrors.content)}
               </label>
               <label>
                 <span>Status</span>
@@ -1394,7 +1730,7 @@ export default function App() {
               </label>
               <div className="button-row">
                 <button className="primary-button" disabled={submitting}>
-                  {editingTemplateId ? "Update Template" : "Simpan Template"}
+                  {isBusy("save-template") ? "Menyimpan..." : editingTemplateId ? "Update Template" : "Simpan Template"}
                 </button>
                 {editingTemplateId ? (
                   <button
@@ -1433,7 +1769,13 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {templates.map((item) => (
+                  {templates.length === 0 ? (
+                    <tr>
+                      <td colSpan={5}>
+                        <span className="muted">Belum ada template WhatsApp yang tersimpan.</span>
+                      </td>
+                    </tr>
+                  ) : templates.map((item) => (
                     <tr key={item.id}>
                       <td>{item.name}</td>
                       <td>{item.trigger_key}</td>
@@ -1489,7 +1831,7 @@ export default function App() {
                   disabled={submitting}
                   onClick={() => void withFeedback(refreshMonitoringData)}
                 >
-                  Refresh Status
+                  {submitting && !busyAction ? "Memproses..." : "Refresh Status"}
                 </button>
               </div>
             </div>
@@ -1508,6 +1850,14 @@ export default function App() {
                 <span>Backup Otomatis</span>
                 <strong>{health?.services.backup ?? "unknown"}</strong>
                 <StatusPill label={health?.services.backup ?? "unknown"} tone={backupTone} />
+              </article>
+              <article className="monitor-card">
+                <span>Scheduler Billing</span>
+                <strong>{health?.scheduler.billing_auto_enabled ? "aktif" : "nonaktif"}</strong>
+                <StatusPill
+                  label={health?.scheduler.billing_last_error ? "error" : health?.scheduler.billing_auto_enabled ? "scheduled" : "disabled"}
+                  tone={schedulerTone}
+                />
               </article>
               <article className="monitor-card">
                 <span>Integrasi</span>
@@ -1550,6 +1900,14 @@ export default function App() {
                   <dt>Last Health Check</dt>
                   <dd>{formatDateTime(health?.timestamp)}</dd>
                 </div>
+                <div>
+                  <dt>Last Cycle</dt>
+                  <dd>{formatDateTime(health?.worker.last_cycle_at)}</dd>
+                </div>
+                <div>
+                  <dt>Cycle Error</dt>
+                  <dd>{health?.worker.last_cycle_error || "Tidak ada"}</dd>
+                </div>
               </dl>
             </article>
 
@@ -1578,20 +1936,86 @@ export default function App() {
             </article>
           </section>
 
+          <section className="grid detail-grid">
+            <article className="surface">
+              <div className="section-heading">
+                <h2>Scheduler Billing</h2>
+              </div>
+              <dl className="meta-list">
+                <div>
+                  <dt>Status</dt>
+                  <dd>{health?.scheduler.billing_auto_enabled ? "Aktif" : "Nonaktif"}</dd>
+                </div>
+                <div>
+                  <dt>Jadwal Generate</dt>
+                  <dd>
+                    Tanggal {health?.scheduler.billing_generate_day ?? 1} pukul {health?.scheduler.billing_generate_time ?? "00:05"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Next Run</dt>
+                  <dd>{formatDateTime(health?.scheduler.billing_next_run)}</dd>
+                </div>
+                <div>
+                  <dt>Last Attempt</dt>
+                  <dd>{formatDateTime(health?.scheduler.billing_last_attempt_at)}</dd>
+                </div>
+                <div>
+                  <dt>Last Success</dt>
+                  <dd>
+                    {health?.scheduler.billing_last_success_period
+                      ? `${health.scheduler.billing_last_success_period} (${formatDateTime(health.scheduler.billing_last_run_at)})`
+                      : "Belum ada"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Tagihan Dibuat Terakhir</dt>
+                  <dd>{health?.scheduler.billing_last_generated_count ?? 0}</dd>
+                </div>
+                <div>
+                  <dt>Retry Policy</dt>
+                  <dd>
+                    {health?.scheduler.billing_retry_attempts ?? 0} percobaan / backoff {health?.scheduler.billing_retry_backoff_seconds ?? 0} detik
+                  </dd>
+                </div>
+                <div>
+                  <dt>Last Error</dt>
+                  <dd>{health?.scheduler.billing_last_error || "Tidak ada"}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article className="surface">
+              <div className="section-heading">
+                <h2>Database Integrity</h2>
+              </div>
+              <dl className="meta-list">
+                <div>
+                  <dt>Quick Check</dt>
+                  <dd>{health?.database.quick_check.status ?? "unknown"}</dd>
+                </div>
+                <div>
+                  <dt>Pesan</dt>
+                  <dd>{health?.database.quick_check.message ?? "-"}</dd>
+                </div>
+              </dl>
+            </article>
+          </section>
+
           <article className="surface">
             <div className="section-heading">
               <h2>Backup Database</h2>
               <StatusPill label={`${backups.length} backup tersedia`} tone="slate" />
             </div>
             <div className="button-row" style={{ marginBottom: "1rem" }}>
-              <button
-                type="button"
-                className="primary-button"
-                disabled={submitting}
-                onClick={() => void handleCreateBackup()}
-              >
-                Backup Sekarang
-              </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={submitting}
+                  onClick={() => void handleCreateBackup()}
+                >
+                {isBusy("create-backup") ? "Membuat backup..." : "Backup Sekarang"}
+                </button>
             </div>
             <div className="table-shell">
               <table>
@@ -1782,12 +2206,66 @@ export default function App() {
                 />
               </label>
               <label>
+                <span>Auto Generate Tagihan</span>
+                <select
+                  value={settingsForm["billing_auto_generate_enabled"] ?? "1"}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_auto_generate_enabled: e.target.value })}
+                >
+                  <option value="1">Aktif</option>
+                  <option value="0">Nonaktif</option>
+                </select>
+              </label>
+              <label>
+                <span>Tanggal Generate Bulanan</span>
+                <input
+                  className={inputClassName(settingsErrors.billing_generate_day)}
+                  type="number"
+                  min="1"
+                  max="28"
+                  value={settingsForm["billing_generate_day"] ?? "1"}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_generate_day: e.target.value })}
+                />
+                {renderInlineError(settingsErrors.billing_generate_day)}
+              </label>
+              <label>
+                <span>Jam Generate Bulanan</span>
+                <input
+                  className={inputClassName(settingsErrors.billing_generate_time)}
+                  type="time"
+                  value={settingsForm["billing_generate_time"] ?? "00:05"}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_generate_time: e.target.value })}
+                />
+                {renderInlineError(settingsErrors.billing_generate_time)}
+              </label>
+              <label>
+                <span>Retry Generate</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={settingsForm["billing_generate_retry_attempts"] ?? "3"}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_generate_retry_attempts: e.target.value })}
+                />
+              </label>
+              <label>
+                <span>Backoff Retry (Detik)</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="60"
+                  value={settingsForm["billing_generate_retry_backoff_seconds"] ?? "2"}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_generate_retry_backoff_seconds: e.target.value })}
+                />
+              </label>
+              <label>
                 <span>Worker Interval (Detik)</span>
                 <input
+                  className={inputClassName(settingsErrors.worker_interval_seconds)}
                   type="number"
                   value={settingsForm["worker_interval_seconds"] ?? "60"}
                   onChange={(e) => setSettingsForm({ ...settingsForm, worker_interval_seconds: e.target.value })}
                 />
+                {renderInlineError(settingsErrors.worker_interval_seconds)}
               </label>
               <label>
                 <span>Auto Backup</span>
@@ -1857,7 +2335,7 @@ export default function App() {
 
               <div className="form-actions">
                 <button type="submit" className="primary-button" disabled={submitting}>
-                  Simpan Pengaturan
+                  {isBusy("save-settings") ? "Menyimpan..." : "Simpan Pengaturan"}
                 </button>
               </div>
             </form>
@@ -1936,21 +2414,25 @@ export default function App() {
               <label>
                 <span>Username</span>
                 <input
+                  className={inputClassName(managedUserErrors.username)}
                   value={managedUserForm.username}
                   onChange={(event) =>
                     setManagedUserForm((current) => ({ ...current, username: event.target.value }))
                   }
                 />
+                {renderInlineError(managedUserErrors.username)}
               </label>
               <label>
                 <span>Password Awal</span>
                 <input
+                  className={inputClassName(managedUserErrors.password)}
                   type="password"
                   value={managedUserForm.password}
                   onChange={(event) =>
                     setManagedUserForm((current) => ({ ...current, password: event.target.value }))
                   }
                 />
+                {renderInlineError(managedUserErrors.password)}
               </label>
               <label>
                 <span>Role</span>
@@ -1966,7 +2448,7 @@ export default function App() {
               </label>
               <div className="button-row">
                 <button className="primary-button" disabled={submitting}>
-                  Simpan User
+                  {isBusy("save-user") ? "Menyimpan..." : "Simpan User"}
                 </button>
               </div>
             </form>
@@ -1992,7 +2474,13 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {managedUsers.map((item) => (
+                  {managedUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5}>
+                        <span className="muted">Belum ada user tim tambahan.</span>
+                      </td>
+                    </tr>
+                  ) : managedUsers.map((item) => (
                     <tr key={item.id}>
                       <td>{item.username}</td>
                       <td>
@@ -2046,6 +2534,77 @@ export default function App() {
           </article>
         </section>
       ) : null}
+      </div>
+
+      {confirmDialog ? (
+        <ModalShell
+          title={confirmDialog.title}
+          onClose={() => setConfirmDialog(null)}
+          actions={
+            <>
+              <button type="button" className="secondary-button" onClick={() => setConfirmDialog(null)}>
+                Batal
+              </button>
+              <button
+                type="button"
+                className={confirmDialog.tone === "danger" ? "ghost-button danger-button" : "primary-button"}
+                onClick={() => void confirmAndRun()}
+                disabled={submitting}
+              >
+                {confirmDialog.confirmLabel}
+              </button>
+            </>
+          }
+        >
+          <p className="muted">{confirmDialog.body}</p>
+        </ModalShell>
+      ) : null}
+
+      {passwordResetState ? (
+        <ModalShell
+          title={`Reset password ${passwordResetState.user.username}`}
+          onClose={() => setPasswordResetState(null)}
+          actions={
+            <>
+              <button type="button" className="secondary-button" onClick={() => setPasswordResetState(null)}>
+                Batal
+              </button>
+              <button type="submit" form="password-reset-form" className="primary-button" disabled={submitting}>
+                Simpan Password Baru
+              </button>
+            </>
+          }
+        >
+          <form id="password-reset-form" className="form-grid single-column-grid" onSubmit={handlePasswordResetSubmit}>
+            <label>
+              <span>Password Baru</span>
+              <input
+                type="password"
+                minLength={8}
+                className={inputClassName(passwordResetErrors.password)}
+                autoFocus
+                value={passwordResetState.password}
+                onChange={(event) =>
+                  setPasswordResetState((current) =>
+                    current ? { ...current, password: event.target.value } : current,
+                  )
+                }
+              />
+              {renderInlineError(passwordResetErrors.password)}
+            </label>
+            <p className="muted">Minimal 8 karakter. Password lama akan langsung digantikan setelah disimpan.</p>
+          </form>
+        </ModalShell>
+      ) : null}
+
+      <div className="toast-stack" aria-live="polite" aria-atomic="true">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast-item toast-${toast.tone}`}>
+            <strong>{toast.tone === "success" ? "Berhasil" : toast.tone === "warning" ? "Perhatian" : "Error"}</strong>
+            <span>{toast.message}</span>
+          </div>
+        ))}
+      </div>
     </main>
   );
 }
@@ -2068,7 +2627,13 @@ function DataPackageTable(props: {
           </tr>
         </thead>
         <tbody>
-          {props.packages.map((pkg) => (
+          {props.packages.length === 0 ? (
+            <tr>
+              <td colSpan={5}>
+                <span className="muted">Belum ada master paket. Tambahkan paket pertama untuk mulai operasional.</span>
+              </td>
+            </tr>
+          ) : props.packages.map((pkg) => (
             <tr key={pkg.id}>
               <td>{pkg.name}</td>
               <td>{pkg.speed_mbps} Mbps</td>
@@ -2096,6 +2661,43 @@ function DataPackageTable(props: {
   );
 }
 
+function SkeletonCard() {
+  return (
+    <article className="stat-card skeleton-card" aria-hidden="true">
+      <span className="skeleton-line skeleton-line-short" />
+      <strong className="skeleton-line skeleton-line-large" />
+    </article>
+  );
+}
+
+function ModalShell(props: {
+  title: string;
+  children: ReactNode;
+  actions: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={props.onClose}>
+      <section
+        className="modal-card surface"
+        role="dialog"
+        aria-modal="true"
+        aria-label={props.title}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="section-heading">
+          <h2>{props.title}</h2>
+          <button type="button" className="ghost-button" onClick={props.onClose} aria-label="Tutup dialog">
+            Tutup
+          </button>
+        </div>
+        <div className="modal-body">{props.children}</div>
+        <div className="modal-actions">{props.actions}</div>
+      </section>
+    </div>
+  );
+}
+
 function displayStatusLabel(status: BillItem["display_status"]) {
   switch (status) {
     case "lunas":
@@ -2107,6 +2709,87 @@ function displayStatusLabel(status: BillItem["display_status"]) {
     default:
       return "belum bayar";
   }
+}
+
+function inputClassName(error?: string) {
+  return error ? "input-invalid" : undefined;
+}
+
+function renderInlineError(error?: string) {
+  if (!error) {
+    return null;
+  }
+  return <span className="field-error">{error}</span>;
+}
+
+function validateLogin(form: { username: string; password: string }): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!form.username.trim()) errors.username = "Username wajib diisi.";
+  if (!form.password.trim()) errors.password = "Password wajib diisi.";
+  return errors;
+}
+
+function validatePackage(form: PackageFormState): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!form.name.trim()) errors.name = "Nama paket wajib diisi.";
+  if (form.speed_mbps <= 0) errors.speed_mbps = "Kecepatan harus lebih dari 0 Mbps.";
+  if (form.price <= 0) errors.price = "Harga harus lebih dari 0.";
+  return errors;
+}
+
+function validateCustomer(form: CustomerFormState): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!form.name.trim()) errors.name = "Nama pelanggan wajib diisi.";
+  if (!form.package_id) errors.package_id = "Pilih paket pelanggan.";
+  if (!form.user_pppoe.trim()) errors.user_pppoe = "Username PPPoE wajib diisi.";
+  if (!form.password_pppoe.trim()) errors.password_pppoe = "Password PPPoE wajib diisi.";
+  if (form.due_day < 1 || form.due_day > 28) errors.due_day = "Jatuh tempo bulanan harus antara 1-28.";
+  return errors;
+}
+
+function validateTemplate(form: TemplateFormState): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!form.name.trim()) errors.name = "Nama template wajib diisi.";
+  if (!form.trigger_key.trim()) errors.trigger_key = "Trigger key wajib diisi.";
+  if (!form.content.trim()) errors.content = "Isi template wajib diisi.";
+  return errors;
+}
+
+function validateManagedUser(form: ManagedUserFormState): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!form.username.trim()) errors.username = "Username user wajib diisi.";
+  if (form.password.trim().length < 8) errors.password = "Password awal minimal 8 karakter.";
+  return errors;
+}
+
+function validateSettings(form: Record<string, string>): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!/^\d+$/.test(form["billing_generate_day"] ?? "1")) {
+    errors.billing_generate_day = "Tanggal generate harus berupa angka.";
+  }
+  if (!/^\d{2}:\d{2}$/.test(form["billing_generate_time"] ?? "00:05")) {
+    errors.billing_generate_time = "Jam generate harus format HH:MM.";
+  }
+  if (!/^\d+$/.test(form["worker_interval_seconds"] ?? "60")) {
+    errors.worker_interval_seconds = "Interval worker harus berupa angka.";
+  }
+  return errors;
+}
+
+function validateBillPeriod(period: string): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!/^\d{4}-\d{2}$/.test(period.trim())) {
+    errors.period = "Periode harus memakai format YYYY-MM.";
+  }
+  return errors;
+}
+
+function validatePasswordReset(password: string): FieldErrors {
+  const errors: FieldErrors = {};
+  if (password.trim().length < 8) {
+    errors.password = "Password baru minimal 8 karakter.";
+  }
+  return errors;
 }
 
 function displayStatusTone(status: BillItem["display_status"]) {

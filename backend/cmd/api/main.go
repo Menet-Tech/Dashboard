@@ -185,9 +185,11 @@ func newLogger(environment string) *slog.Logger {
 		level = slog.LevelDebug
 	}
 
-	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: level,
-	}))
+	options := &slog.HandlerOptions{Level: level}
+	if environment == "production" {
+		return slog.New(slog.NewJSONHandler(os.Stdout, options))
+	}
+	return slog.New(slog.NewTextHandler(os.Stdout, options))
 }
 
 func closeQuietly(db *sql.DB, logger *slog.Logger) {
