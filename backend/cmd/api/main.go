@@ -125,15 +125,17 @@ func runWorker(cfg config.Config, logger *slog.Logger, db *sql.DB) {
 	templateService := templates.Service{Repository: templates.Repository{DB: db}}
 	customersService := customers.Service{Repository: customers.Repository{DB: db}}
 	billingService := billing.Service{
-		Repository: billing.Repository{DB: db},
-		Settings:   settingsService,
-		Customers:  customersService,
+		Repository:    billing.Repository{DB: db},
+		Settings:      settingsService,
+		Customers:     customersService,
+		Notifications: notifications.NotificationLogRepository{DB: db},
 	}
 	whatsAppService := notifications.WhatsAppService{
 		Settings:  settingsService,
 		Templates: templateService,
 		Logs:      notifications.NotificationLogRepository{DB: db},
 	}
+	billingService.WhatsApp = whatsAppService
 
 	intervalSeconds, err := settingsService.GetInt(context.Background(), settings.KeyWorkerIntervalSecs)
 	if err != nil {
@@ -142,6 +144,7 @@ func runWorker(cfg config.Config, logger *slog.Logger, db *sql.DB) {
 	}
 
 	discordService := notifications.NewDiscordService(settingsService)
+	billingService.Discord = discordService
 	backupDir := filepath.Join(cfg.StoragePath, "backups")
 	backupService := backup.NewService(db, backupDir)
 

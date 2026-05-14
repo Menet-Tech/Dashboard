@@ -113,11 +113,17 @@ func (s Service) RunOnce(ctx context.Context) error {
 		_ = s.Settings.Set(ctx, "worker_last_cycle_error", err.Error())
 		return err
 	}
+	trialGraceDays, err := s.Settings.GetInt(ctx, settings.KeyTrialGraceDays)
+	if err != nil {
+		_ = s.Settings.Set(ctx, "worker_last_cycle_error", err.Error())
+		return err
+	}
 
 	if err := s.Billing.ProcessAutomation(ctx, billing.AutomationOptions{
-		Now:          now,
-		ReminderDays: reminderDays,
-		LimitDays:    limitDays,
+		Now:            now,
+		ReminderDays:   reminderDays,
+		LimitDays:      limitDays,
+		TrialGraceDays: trialGraceDays,
 		SendWhatsApp: func(ctx context.Context, payload billing.AutomationMessage) error {
 			return s.WhatsApp.SendTemplate(ctx, notifications.BillMessagePayload{
 				BillID:      payload.BillID,

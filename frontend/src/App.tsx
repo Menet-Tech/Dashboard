@@ -134,7 +134,7 @@ type ToastItem = {
   message: string;
 };
 
-type CustomerTrialFilter = "all" | "active" | "completed" | "none";
+type CustomerLifecycleFilter = "all" | "trial" | "tertagih" | "jatuh_tempo" | "menunggak" | "lunas";
 
 const summaryCards = [
   { key: "total_pelanggan", label: "Total Pelanggan", note: "Basis pelanggan yang tercatat di database operasional." },
@@ -220,7 +220,7 @@ export default function App() {
   const [notificationLogs, setNotificationLogs] = useState<Record<number, NotificationLog[]>>({});
   const [expandedBillId, setExpandedBillId] = useState<number | null>(null);
   const [navOpen, setNavOpen] = useState(false);
-  const [customerTrialFilter, setCustomerTrialFilter] = useState<CustomerTrialFilter>(() => readCustomerTrialFilter());
+  const [customerLifecycleFilter, setCustomerLifecycleFilter] = useState<CustomerLifecycleFilter>(() => readCustomerLifecycleFilter());
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [passwordResetState, setPasswordResetState] = useState<PasswordResetState | null>(null);
   const [loginErrors, setLoginErrors] = useState<FieldErrors>({});
@@ -356,22 +356,32 @@ export default function App() {
       }),
     [user?.role],
   );
+  const customerLifecycleMap = useMemo(
+    () => buildCustomerLifecycleMap(customers, bills, settingsForm),
+    [bills, customers, settingsForm],
+  );
   const filteredCustomers = useMemo(
     () =>
       customers.filter((customer) => {
-        const trialState = getCustomerTrialState(customer);
-        if (customerTrialFilter === "active") {
-          return trialState === "active";
+        const lifecycle = customerLifecycleMap[customer.id]?.key ?? "lunas";
+        if (customerLifecycleFilter === "trial") {
+          return lifecycle === "trial";
         }
-        if (customerTrialFilter === "completed") {
-          return trialState === "completed";
+        if (customerLifecycleFilter === "tertagih") {
+          return lifecycle === "tertagih";
         }
-        if (customerTrialFilter === "none") {
-          return trialState === "none";
+        if (customerLifecycleFilter === "jatuh_tempo") {
+          return lifecycle === "jatuh_tempo";
+        }
+        if (customerLifecycleFilter === "menunggak") {
+          return lifecycle === "menunggak";
+        }
+        if (customerLifecycleFilter === "lunas") {
+          return lifecycle === "lunas";
         }
         return true;
       }),
-    [customerTrialFilter, customers],
+    [customerLifecycleFilter, customerLifecycleMap, customers],
   );
 
   const databaseTone = statusTone(health?.services.database);
@@ -403,8 +413,8 @@ export default function App() {
   }, [error]);
 
   useEffect(() => {
-    window.localStorage.setItem("customers.trialFilter", customerTrialFilter);
-  }, [customerTrialFilter]);
+    window.localStorage.setItem("customers.lifecycleFilter", customerLifecycleFilter);
+  }, [customerLifecycleFilter]);
 
   async function reloadProtectedData() {
     setPageLoading(true);
@@ -1445,20 +1455,22 @@ export default function App() {
             <div className="section-heading">
               <div>
                 <h2>Daftar Pelanggan</h2>
-                <p className="section-copy">Pantau trial aktif, trial selesai, dan pelanggan reguler tanpa buka detail satu per satu.</p>
+                <p className="section-copy">Pantau role pelanggan dari trial aktif sampai tertagih, jatuh tempo, dan menunggak dalam satu daftar.</p>
               </div>
               <div className="section-heading-actions">
                 <label className="toolbar-field">
-                  <span>Filter Trial</span>
+                  <span>Filter Role</span>
                   <select
-                    value={customerTrialFilter}
-                    onChange={(event) => setCustomerTrialFilter(event.target.value as CustomerTrialFilter)}
-                    aria-label="Filter status trial pelanggan"
+                    value={customerLifecycleFilter}
+                    onChange={(event) => setCustomerLifecycleFilter(event.target.value as CustomerLifecycleFilter)}
+                    aria-label="Filter role billing pelanggan"
                   >
                     <option value="all">Semua</option>
-                    <option value="active">Trial Aktif</option>
-                    <option value="completed">Trial Selesai</option>
-                    <option value="none">Non-Trial</option>
+                    <option value="trial">Trial Aktif</option>
+                    <option value="tertagih">Tertagih</option>
+                    <option value="jatuh_tempo">Jatuh Tempo</option>
+                    <option value="menunggak">Menunggak</option>
+                    <option value="lunas">Lunas</option>
                   </select>
                 </label>
                 <StatusPill label={`${filteredCustomers.length} item`} tone="slate" />
@@ -1471,8 +1483,8 @@ export default function App() {
                     <th>Nama</th>
                     <th>Paket</th>
                     <th>Jatuh Tempo</th>
-                    <th>Trial</th>
-                    <th>Status</th>
+                    <th>Role</th>
+                    <th>Layanan</th>
                     <th>WA</th>
                     <th>Aksi</th>
                   </tr>
@@ -1484,7 +1496,7 @@ export default function App() {
                         <span className="muted">
                           {customers.length === 0
                             ? "Belum ada pelanggan terdaftar."
-                            : "Tidak ada pelanggan yang cocok dengan filter trial saat ini."}
+                            : "Tidak ada pelanggan yang cocok dengan filter role saat ini."}
                         </span>
                       </td>
                     </tr>
@@ -1496,11 +1508,11 @@ export default function App() {
                       <td>
                         <div className="meta-stack">
                           <StatusPill
-                            label={trialStatusLabel(customer)}
-                            tone={trialStatusTone(customer)}
+                            label={customerLifecycleMap[customer.id]?.label ?? "Lunas"}
+                            tone={customerLifecycleMap[customer.id]?.tone ?? "green"}
                           />
                           <span className="muted">
-                            {trialDateCopy(customer)}
+                            {customerLifecycleMap[customer.id]?.note ?? "Tidak ada tagihan aktif."}
                           </span>
                         </div>
                       </td>
@@ -2850,61 +2862,158 @@ function validatePasswordReset(password: string): FieldErrors {
   return errors;
 }
 
-function readCustomerTrialFilter(): CustomerTrialFilter {
+function readCustomerLifecycleFilter(): CustomerLifecycleFilter {
   if (typeof window === "undefined") {
     return "all";
   }
-  const stored = window.localStorage.getItem("customers.trialFilter");
-  if (stored === "active" || stored === "completed" || stored === "none" || stored === "all") {
+  const stored = window.localStorage.getItem("customers.lifecycleFilter");
+  if (stored === "trial" || stored === "tertagih" || stored === "jatuh_tempo" || stored === "menunggak" || stored === "lunas" || stored === "all") {
     return stored;
   }
   return "all";
 }
 
-function getCustomerTrialState(customer: CustomerItem): "active" | "completed" | "none" {
-  if (customer.is_trial) {
-    return "active";
+function buildCustomerLifecycleMap(
+  customers: CustomerItem[],
+  bills: BillItem[],
+  settingsForm: Record<string, string>,
+) {
+  const reminderDays = parseInt(settingsForm["billing_reminder_days"] ?? "3", 10) || 3;
+  const menunggakDays = parseInt(settingsForm["billing_menunggak_days"] ?? "30", 10) || 30;
+  const trialGraceDays = parseInt(settingsForm["trial_overdue_grace_days"] ?? "7", 10) || 7;
+  const now = new Date();
+  const billsByCustomer = new Map<number, BillItem[]>();
+
+  for (const bill of bills) {
+    const current = billsByCustomer.get(bill.customer_id) ?? [];
+    current.push(bill);
+    billsByCustomer.set(bill.customer_id, current);
   }
-  if (customer.trial_started_at || customer.trial_days) {
-    return "completed";
-  }
-  return "none";
+
+  return Object.fromEntries(
+    customers.map((customer) => {
+      const trialEndsAt = resolveTrialEndsAt(customer);
+      if (customer.is_trial) {
+        return [customer.id, {
+          key: "trial",
+          label: "Trial Aktif",
+          tone: "gold" as const,
+          note: trialEndsAt
+            ? `Free trial sampai ${formatDateId(trialEndsAt)} (${customer.trial_days ?? 3} hari).`
+            : `Free trial ${customer.trial_days ?? 3} hari sedang berjalan.`,
+        }];
+      }
+
+      const unpaidBills = (billsByCustomer.get(customer.id) ?? []).filter((bill) => bill.status !== "lunas");
+      if (unpaidBills.length === 0) {
+        return [customer.id, {
+          key: "lunas",
+          label: "Lunas",
+          tone: "green" as const,
+          note: "Tidak ada tagihan aktif. Layanan berada pada kondisi aman.",
+        }];
+      }
+
+      const mostSevere = unpaidBills
+        .map((bill) => customerLifecycleFromBill(customer, bill, now, reminderDays, trialGraceDays, menunggakDays))
+        .sort((left, right) => lifecycleRank(right.key) - lifecycleRank(left.key))[0];
+
+      return [customer.id, mostSevere];
+    }),
+  ) as Record<number, { key: CustomerLifecycleFilter; label: string; tone: "green" | "gold" | "red" | "slate"; note: string }>;
 }
 
-function trialStatusLabel(customer: CustomerItem) {
-  switch (getCustomerTrialState(customer)) {
-    case "active":
-      return "Trial Aktif";
-    case "completed":
-      return "Trial Selesai";
-    default:
-      return "Non-Trial";
+function customerLifecycleFromBill(
+  customer: CustomerItem,
+  bill: BillItem,
+  now: Date,
+  reminderDays: number,
+  trialGraceDays: number,
+  menunggakDays: number,
+) {
+  const dueDate = parseBillDate(bill.due_date);
+  if (!dueDate) {
+    return {
+      key: "tertagih" as const,
+      label: "Tertagih",
+      tone: "slate" as const,
+      note: `Invoice ${bill.invoice_number} aktif dan menunggu pembayaran.`,
+    };
   }
-}
 
-function trialStatusTone(customer: CustomerItem): "green" | "gold" | "slate" {
-  switch (getCustomerTrialState(customer)) {
-    case "active":
-      return "gold";
-    case "completed":
-      return "green";
-    default:
-      return "slate";
-  }
-}
-
-function trialDateCopy(customer: CustomerItem) {
   const trialEndsAt = resolveTrialEndsAt(customer);
-  if (getCustomerTrialState(customer) === "none") {
-    return "Pelanggan reguler.";
+  let effectiveDueDate = new Date(dueDate);
+  if (trialEndsAt && trialEndsAt.getTime() > dueDate.getTime()) {
+    effectiveDueDate = addDays(startOfDay(trialEndsAt), trialGraceDays);
   }
-  if (trialEndsAt) {
-    return `Berakhir ${formatDateId(trialEndsAt)}${customer.trial_days ? ` (${customer.trial_days} hari)` : ""}`;
+
+  if (bill.status === "lunas") {
+    return {
+      key: "lunas" as const,
+      label: "Lunas",
+      tone: "green" as const,
+      note: `Invoice ${bill.invoice_number} sudah lunas.`,
+    };
   }
-  if (customer.trial_days) {
-    return `Durasi trial ${customer.trial_days} hari.`;
+
+  const overdue = daysDiff(startOfDay(now), startOfDay(effectiveDueDate));
+  if (overdue > menunggakDays) {
+    return {
+      key: "menunggak" as const,
+      label: "Menunggak",
+      tone: "red" as const,
+      note: `Invoice ${bill.invoice_number} sudah lewat ${overdue} hari dari role jatuh tempo efektif.`,
+    };
   }
-  return "Riwayat trial tersedia.";
+  if (overdue > 0) {
+    return {
+      key: "jatuh_tempo" as const,
+      label: "Jatuh Tempo",
+      tone: "gold" as const,
+      note: `Invoice ${bill.invoice_number} aktif. Role jatuh tempo sejak ${formatDateId(effectiveDueDate)}.`,
+    };
+  }
+
+  const reminderDate = addDays(startOfDay(dueDate), -reminderDays);
+  if (trialEndsAt && trialEndsAt.getTime() > dueDate.getTime()) {
+    return {
+      key: "tertagih" as const,
+      label: "Tertagih",
+      tone: "slate" as const,
+      note: `Trial selesai, notif sudah dikirim. Role jatuh tempo mulai ${formatDateId(effectiveDueDate)}.`,
+    };
+  }
+  if (now.getTime() >= reminderDate.getTime()) {
+    return {
+      key: "tertagih" as const,
+      label: "Tertagih",
+      tone: "slate" as const,
+      note: `Invoice ${bill.invoice_number} aktif. Window reminder dimulai ${formatDateId(reminderDate)}.`,
+    };
+  }
+  return {
+    key: "tertagih" as const,
+    label: "Tertagih",
+    tone: "slate" as const,
+    note: `Invoice ${bill.invoice_number} aktif. Menunggu window reminder berikutnya.`,
+  };
+}
+
+function lifecycleRank(key: CustomerLifecycleFilter) {
+  switch (key) {
+    case "menunggak":
+      return 5;
+    case "jatuh_tempo":
+      return 4;
+    case "tertagih":
+      return 3;
+    case "trial":
+      return 2;
+    case "lunas":
+      return 1;
+    default:
+      return 0;
+  }
 }
 
 function resolveTrialEndsAt(customer: CustomerItem) {
@@ -2915,9 +3024,29 @@ function resolveTrialEndsAt(customer: CustomerItem) {
   if (Number.isNaN(startedAt.getTime())) {
     return null;
   }
-  const endsAt = new Date(startedAt);
-  endsAt.setDate(endsAt.getDate() + customer.trial_days);
-  return endsAt;
+  return addDays(startedAt, customer.trial_days);
+}
+
+function parseBillDate(value: string) {
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
+function startOfDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function addDays(value: Date, days: number) {
+  const next = new Date(value);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function daysDiff(current: Date, previous: Date) {
+  return Math.floor((current.getTime() - previous.getTime()) / 86400000);
 }
 
 function formatDateId(value: Date) {
