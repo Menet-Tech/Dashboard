@@ -13,6 +13,11 @@ const (
 	KeyReminderDays          = "billing_reminder_days"
 	KeyLimitDays             = "billing_limit_days"
 	KeyMenunggakDays         = "billing_menunggak_days"
+	KeyBillingAutoEnabled    = "billing_auto_generate_enabled"
+	KeyBillingGenerateDay    = "billing_generate_day"
+	KeyBillingGenerateTime   = "billing_generate_time"
+	KeyBillingRetryAttempts  = "billing_generate_retry_attempts"
+	KeyBillingRetryBackoff   = "billing_generate_retry_backoff_seconds"
 	KeyWAGatewayURL          = "wa_gateway_url"
 	KeyWAAPIKey              = "wa_api_key"
 	KeyWAAccountID           = "wa_account_id"
@@ -35,6 +40,11 @@ var defaults = map[string]string{
 	KeyReminderDays:          "3",
 	KeyLimitDays:             "5",
 	KeyMenunggakDays:         "30",
+	KeyBillingAutoEnabled:    "1",
+	KeyBillingGenerateDay:    "1",
+	KeyBillingGenerateTime:   "00:05",
+	KeyBillingRetryAttempts:  "3",
+	KeyBillingRetryBackoff:   "2",
 	KeyWAGatewayURL:          "",
 	KeyWAAPIKey:              "",
 	KeyWAAccountID:           "default",

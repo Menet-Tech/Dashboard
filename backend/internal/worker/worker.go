@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -86,27 +87,29 @@ func (s Service) RunOnce(ctx context.Context) error {
 	now := time.Now()
 
 	_ = s.Settings.Set(ctx, "worker_last_heartbeat", now.UTC().Format(time.RFC3339))
+	_ = s.Settings.Set(ctx, "worker_last_cycle_at", now.UTC().Format(time.RFC3339))
 
 	if err := s.runScheduledBackup(ctx, now); err != nil {
 		s.Logger.Error("auto backup failed", "error", err)
 	}
 
-	period := now.Format("2006-01")
-
-	if _, err := s.Billing.Generate(ctx, period); err != nil {
-		return fmt.Errorf("worker generate current period bills: %w", err)
+	if err := s.runScheduledBilling(ctx, now); err != nil {
+		_ = s.Settings.Set(ctx, "worker_last_cycle_error", err.Error())
+		return err
 	}
 
 	reminderDays, err := s.Settings.GetInt(ctx, settings.KeyReminderDays)
 	if err != nil {
+		_ = s.Settings.Set(ctx, "worker_last_cycle_error", err.Error())
 		return err
 	}
 	limitDays, err := s.Settings.GetInt(ctx, settings.KeyLimitDays)
 	if err != nil {
+		_ = s.Settings.Set(ctx, "worker_last_cycle_error", err.Error())
 		return err
 	}
 
-	return s.Billing.ProcessAutomation(ctx, billing.AutomationOptions{
+	if err := s.Billing.ProcessAutomation(ctx, billing.AutomationOptions{
 		Now:          now,
 		ReminderDays: reminderDays,
 		LimitDays:    limitDays,
@@ -124,7 +127,13 @@ func (s Service) RunOnce(ctx context.Context) error {
 			}
 			return s.Discord.SendAlert(ctx, message)
 		},
-	})
+	}); err != nil {
+		_ = s.Settings.Set(ctx, "worker_last_cycle_error", err.Error())
+		return err
+	}
+
+	_ = s.Settings.Set(ctx, "worker_last_cycle_error", "")
+	return nil
 }
 
 func (s Service) runScheduledBackup(ctx context.Context, now time.Time) error {
@@ -176,6 +185,82 @@ func (s Service) runScheduledBackup(ctx context.Context, now time.Time) error {
 	return nil
 }
 
+func (s Service) runScheduledBilling(ctx context.Context, now time.Time) error {
+	autoEnabled, _ := s.Settings.GetString(ctx, settings.KeyBillingAutoEnabled)
+	if strings.TrimSpace(autoEnabled) == "0" {
+		_ = s.Settings.Set(ctx, "worker_billing_next_run", "")
+		return nil
+	}
+
+	generateDay, _ := s.Settings.GetInt(ctx, settings.KeyBillingGenerateDay)
+	scheduledTime, _ := s.Settings.GetString(ctx, settings.KeyBillingGenerateTime)
+	retryAttempts, _ := s.Settings.GetInt(ctx, settings.KeyBillingRetryAttempts)
+	retryBackoffSeconds, _ := s.Settings.GetInt(ctx, settings.KeyBillingRetryBackoff)
+
+	if generateDay < 1 {
+		generateDay = 1
+	}
+	if generateDay > 28 {
+		generateDay = 28
+	}
+	if retryAttempts <= 0 {
+		retryAttempts = 1
+	}
+	if retryBackoffSeconds < 0 {
+		retryBackoffSeconds = 0
+	}
+	if strings.TrimSpace(scheduledTime) == "" {
+		scheduledTime = "00:05"
+	}
+
+	nextRun := nextBillingRun(now, generateDay, scheduledTime)
+	_ = s.Settings.Set(ctx, "worker_billing_next_run", nextRun.UTC().Format(time.RFC3339))
+
+	if !shouldRunBillingNow(now, generateDay, scheduledTime) {
+		return nil
+	}
+
+	period := now.Format("2006-01")
+	lastSuccessPeriod, _ := s.Settings.GetString(ctx, "worker_billing_last_success_period")
+	if lastSuccessPeriod == period {
+		return nil
+	}
+
+	var lastErr error
+	for attempt := 1; attempt <= retryAttempts; attempt++ {
+		_ = s.Settings.Set(ctx, "worker_billing_last_attempt_at", time.Now().UTC().Format(time.RFC3339))
+		_ = s.Settings.Set(ctx, "worker_billing_last_period", period)
+		_ = s.Settings.Set(ctx, "worker_billing_retry_count", strconv.Itoa(attempt))
+
+		result, err := s.Billing.Generate(ctx, period)
+		if err == nil {
+			_ = s.Settings.Set(ctx, "worker_billing_last_run_at", time.Now().UTC().Format(time.RFC3339))
+			_ = s.Settings.Set(ctx, "worker_billing_last_generated_count", strconv.Itoa(result.Generated))
+			_ = s.Settings.Set(ctx, "worker_billing_last_error", "")
+			_ = s.Settings.Set(ctx, "worker_billing_last_success_period", period)
+			_ = s.Settings.Set(ctx, "worker_billing_retry_count", "0")
+			s.Logger.Info("scheduled billing completed", "period", period, "generated", result.Generated, "attempt", attempt)
+			return nil
+		}
+
+		lastErr = err
+		_ = s.Settings.Set(ctx, "worker_billing_last_error", err.Error())
+		s.Logger.Error("scheduled billing failed", "period", period, "attempt", attempt, "error", err)
+
+		if attempt >= retryAttempts {
+			break
+		}
+		if err := waitRetryBackoff(ctx, time.Duration(retryBackoffSeconds)*time.Second); err != nil {
+			return fmt.Errorf("scheduled billing retry interrupted: %w", err)
+		}
+	}
+
+	if lastErr != nil {
+		return fmt.Errorf("worker generate scheduled bills for %s: %w", period, lastErr)
+	}
+	return nil
+}
+
 func shouldRunBackupNow(now time.Time, scheduledTime string) bool {
 	parts := strings.Split(strings.TrimSpace(scheduledTime), ":")
 	if len(parts) != 2 {
@@ -192,6 +277,79 @@ func shouldRunBackupNow(now time.Time, scheduledTime string) bool {
 	}
 
 	return now.Hour() == hour && now.Minute() >= minute
+}
+
+func shouldRunBillingNow(now time.Time, day int, scheduledTime string) bool {
+	hour, minute := parseScheduleTime(scheduledTime, 0, 5)
+	if now.Day() < day {
+		return false
+	}
+	if now.Day() > day {
+		return true
+	}
+	if now.Hour() > hour {
+		return true
+	}
+	if now.Hour() == hour && now.Minute() >= minute {
+		return true
+	}
+	return false
+}
+
+func nextBillingRun(now time.Time, day int, scheduledTime string) time.Time {
+	hour, minute := parseScheduleTime(scheduledTime, 0, 5)
+	location := now.Location()
+	currentCandidate := time.Date(now.Year(), now.Month(), clampDay(day, now.Year(), now.Month()), hour, minute, 0, 0, location)
+	if now.Before(currentCandidate) {
+		return currentCandidate
+	}
+
+	nextMonth := now.AddDate(0, 1, 0)
+	return time.Date(nextMonth.Year(), nextMonth.Month(), clampDay(day, nextMonth.Year(), nextMonth.Month()), hour, minute, 0, 0, location)
+}
+
+func parseScheduleTime(value string, fallbackHour, fallbackMinute int) (int, int) {
+	parts := strings.Split(strings.TrimSpace(value), ":")
+	if len(parts) != 2 {
+		return fallbackHour, fallbackMinute
+	}
+	hour, err := strconv.Atoi(parts[0])
+	if err != nil || hour < 0 || hour > 23 {
+		hour = fallbackHour
+	}
+	minute, err := strconv.Atoi(parts[1])
+	if err != nil || minute < 0 || minute > 59 {
+		minute = fallbackMinute
+	}
+	return hour, minute
+}
+
+func clampDay(day, year int, month time.Month) int {
+	if day < 1 {
+		day = 1
+	}
+	last := time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	if day > last {
+		return last
+	}
+	return day
+}
+
+func waitRetryBackoff(ctx context.Context, duration time.Duration) error {
+	if duration <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return context.Canceled
+		}
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func workerOwner() string {

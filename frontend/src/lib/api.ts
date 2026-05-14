@@ -34,9 +34,32 @@ export type HealthPayload = {
     worker: string;
     backup: string;
   };
+  database: {
+    quick_check: {
+      status: string;
+      message: string;
+    };
+  };
   worker: {
     last_heartbeat: string;
+    last_cycle_at: string;
+    last_cycle_error: string;
     interval_seconds: number;
+  };
+  scheduler: {
+    billing_auto_enabled: boolean;
+    billing_generate_day: number;
+    billing_generate_time: string;
+    billing_retry_attempts: number;
+    billing_retry_backoff_seconds: number;
+    billing_last_attempt_at: string;
+    billing_last_run_at: string;
+    billing_last_period: string;
+    billing_last_success_period: string;
+    billing_last_generated_count: number;
+    billing_last_error: string;
+    billing_retry_count: number;
+    billing_next_run: string;
   };
   backup: {
     enabled: boolean;

@@ -32,6 +32,11 @@ func TestHealthHandler(t *testing.T) {
 		if services["backup"] != "idle" {
 			t.Errorf("expected backup idle by default, got %v", services["backup"])
 		}
+		database := res["database"].(map[string]any)
+		quickCheck := database["quick_check"].(map[string]any)
+		if quickCheck["status"] != "ok" {
+			t.Errorf("expected quick check ok, got %v", quickCheck["status"])
+		}
 		integrations := res["integrations"].(map[string]any)
 		if integrations["mikrotik_configured"] != false {
 			t.Errorf("expected mikrotik_configured false by default, got %v", integrations["mikrotik_configured"])
@@ -42,6 +47,10 @@ func TestHealthHandler(t *testing.T) {
 		_ = svc.Set(t.Context(), "worker_last_heartbeat", time.Now().UTC().Format(time.RFC3339))
 		_ = svc.Set(t.Context(), settings.KeyBackupAutoEnabled, "1")
 		_ = svc.Set(t.Context(), "worker_last_backup_date", time.Now().UTC().Format("2006-01-02"))
+		_ = svc.Set(t.Context(), settings.KeyBillingAutoEnabled, "1")
+		_ = svc.Set(t.Context(), settings.KeyBillingGenerateDay, "1")
+		_ = svc.Set(t.Context(), settings.KeyBillingGenerateTime, "00:05")
+		_ = svc.Set(t.Context(), "worker_billing_next_run", time.Now().UTC().Add(time.Hour).Format(time.RFC3339))
 
 		req := httptest.NewRequest(http.MethodGet, "/health", nil)
 		w := httptest.NewRecorder()
@@ -56,6 +65,11 @@ func TestHealthHandler(t *testing.T) {
 		}
 		if services["backup"] != "ok" {
 			t.Errorf("expected backup ok, got %v", services["backup"])
+		}
+
+		scheduler := res["scheduler"].(map[string]any)
+		if scheduler["billing_auto_enabled"] != true {
+			t.Errorf("expected billing automation enabled, got %v", scheduler["billing_auto_enabled"])
 		}
 	})
 

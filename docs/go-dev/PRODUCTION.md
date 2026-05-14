@@ -13,7 +13,8 @@ Referensi pendukung:
 - frontend React dibuild menjadi static assets
 - SQLite sebagai database file
 - `systemd` untuk API dan worker
-- reverse proxy: Nginx
+- binary Go menyajikan API sekaligus file statis frontend secara langsung
+- tanpa Nginx
 
 ## Struktur Direktori yang Disarankan
 
@@ -22,11 +23,11 @@ Referensi pendukung:
   /backend
     menettech-go
     .env
-  /frontend-dist
   /storage
     dashboard.db
     /uploads
     /backups
+  /frontend-dist
 ```
 
 ## Environment Minimal
@@ -35,9 +36,10 @@ Gunakan [backend/.env.example](/D:/xampp/htdocs/Dashboard/backend/.env.example) 
 
 Poin penting:
 - `APP_ENV=production`
-- `HTTP_ADDR=127.0.0.1:8080`
+- `HTTP_ADDR=:8080`
 - `SQLITE_PATH=/opt/menettech-go/storage/dashboard.db`
 - `STORAGE_PATH=/opt/menettech-go/storage`
+- `FRONTEND_DIST_PATH=/opt/menettech-go/frontend-dist`
 - `SESSION_COOKIE_SECURE=true`
 - ganti `BOOTSTRAP_ADMIN_PASSWORD`
 
@@ -58,7 +60,7 @@ npm ci
 npm run build
 ```
 
-Lalu taruh hasil `frontend/dist` ke direktori static yang akan diserve oleh Nginx.
+Lalu taruh hasil `frontend/dist` ke direktori static yang akan diserve langsung oleh binary Go lewat `FRONTEND_DIST_PATH`.
 
 ### Build + package sekali jalan
 
@@ -92,6 +94,18 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now menettech-go-api
 sudo systemctl enable --now menettech-go-worker
 ```
+
+## Direct HTTP Serving
+
+Binary Go saat ini melayani:
+- endpoint API
+- endpoint health (`/livez`, `/readyz`, `/health`)
+- file statis hasil build React
+
+Artinya tidak perlu layer web server tambahan untuk kebutuhan dasar production kecil/menengah. Untuk environment internet publik tetap disarankan:
+- aktifkan firewall Ubuntu (`ufw`)
+- batasi port yang terbuka
+- gunakan TLS terminator eksternal bila ada kebutuhan HTTPS penuh sebelum fitur native TLS di binary diaktifkan
 
 ## Health Checks
 
@@ -160,16 +174,18 @@ Checklist backup yang sehat:
 2. Ganti password bootstrap admin
 3. Pastikan folder storage writable oleh service user
 4. Pastikan `SESSION_COOKIE_SECURE=true`
-5. Jalankan `go test ./...`
-6. Jalankan `npm run build`
-7. Cek `/livez`, `/readyz`, `/health`
-8. Login sebagai admin
-9. Buat backup dan verify
-10. Jalankan worker dan cek heartbeat
-11. Uji login petugas
-12. Uji generate tagihan dan pelunasan satu skenario penuh
-13. Jalankan `./deploy/go-dev/smoke.sh`
-14. Pastikan `/health` tidak memiliki alert kritikal (database/worker error)
+5. Pastikan `FRONTEND_DIST_PATH` menunjuk ke hasil build React yang benar
+6. Jalankan `go test ./...`
+7. Jalankan `npm run build`
+8. Cek `/livez`, `/readyz`, `/health`
+9. Login sebagai admin
+10. Buat backup dan verify
+11. Jalankan worker dan cek heartbeat
+12. Verifikasi `Scheduler Billing` pada tab Monitoring menampilkan `next run`, `last attempt`, dan tidak ada `last error`
+13. Uji login petugas
+14. Uji generate tagihan dan pelunasan satu skenario penuh
+15. Jalankan `./deploy/go-dev/smoke.sh`
+16. Pastikan `/health` tidak memiliki alert kritikal (database/worker error/generate billing gagal)
 
 ## Incident Runbook Ringkas
 

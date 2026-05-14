@@ -1097,3 +1097,193 @@ Pada iterasi ini, fokusnya adalah menyelesaikan semua langkah otomatis yang masi
 4. **Dokumentasi root/handoff dirapikan**
    - root [README.md](/D:/xampp/htdocs/Dashboard/README.md) sekarang menjelaskan repo sebagai rewrite `go-dev`
    - [HANDOFF_GO_DEV.md](/D:/xampp/htdocs/Dashboard/HANDOFF_GO_DEV.md) diperbarui agar sesuai struktur baru dan gap aktual
+
+### Turn 20: Automated Billing Observability + Direct-Serve Production Sync
+
+Fokus iterasi ini adalah menutup gap P0 di worker billing otomatis dan membuat status scheduler benar-benar terlihat dari monitoring.
+
+1. **Scheduler generate tagihan bulanan dibuat eksplisit**
+   - worker tidak lagi selalu mencoba generate tagihan di setiap siklus.
+   - sekarang ada konfigurasi baru di settings:
+     - `billing_auto_generate_enabled`
+     - `billing_generate_day`
+     - `billing_generate_time`
+     - `billing_generate_retry_attempts`
+     - `billing_generate_retry_backoff_seconds`
+   - worker sekarang:
+     - menghitung apakah sudah waktunya generate bulanan
+     - mencatat `next run`
+     - menyimpan metadata attempt/success/error
+     - menjalankan retry bertingkat jika generate gagal
+   - file utama:
+     - [backend/internal/worker/worker.go](/D:/xampp/htdocs/Dashboard/backend/internal/worker/worker.go)
+     - [backend/internal/settings/service.go](/D:/xampp/htdocs/Dashboard/backend/internal/settings/service.go)
+
+2. **Health payload diperkaya untuk operasional**
+   - `/health` sekarang menampilkan:
+     - `database.quick_check`
+     - `worker.last_cycle_at`
+     - `worker.last_cycle_error`
+     - blok `scheduler` lengkap untuk billing otomatis
+   - alert health sekarang akan menandai:
+     - worker cycle terakhir gagal
+     - generate tagihan otomatis terakhir gagal
+     - hasil quick check database error
+   - file utama:
+     - [backend/internal/http/handler/health.go](/D:/xampp/htdocs/Dashboard/backend/internal/http/handler/health.go)
+
+3. **Monitoring & settings frontend ikut tersambung**
+   - tab Monitoring sekarang menampilkan:
+     - kartu `Scheduler Billing`
+     - detail `next run`, `last attempt`, `last success`, `retry policy`, `last error`
+     - panel `Database Integrity`
+   - tab Pengaturan sekarang punya kontrol untuk billing otomatis bulanan.
+   - file utama:
+     - [frontend/src/lib/api.ts](/D:/xampp/htdocs/Dashboard/frontend/src/lib/api.ts)
+     - [frontend/src/App.tsx](/D:/xampp/htdocs/Dashboard/frontend/src/App.tsx)
+
+4. **Logging production dirapikan**
+   - logger Go sekarang memakai JSON handler saat `APP_ENV=production`.
+   - ini membuat output `journalctl` / collector lebih mudah diparse otomatis.
+   - file:
+     - [backend/cmd/api/main.go](/D:/xampp/htdocs/Dashboard/backend/cmd/api/main.go)
+
+5. **Dokumentasi Ubuntu tanpa Nginx disinkronkan**
+   - production guide sekarang menegaskan bahwa binary Go menyajikan API + static frontend langsung.
+   - instruksi Nginx yang lama sudah dibuang dari dokumen ini.
+   - file:
+     - [docs/go-dev/PRODUCTION.md](/D:/xampp/htdocs/Dashboard/docs/go-dev/PRODUCTION.md)
+
+6. **Test coverage area baru ditambah**
+   - worker scheduler helper sekarang punya test untuk:
+     - catch-up billing
+     - next run calculation
+   - health handler test sekarang mengecek:
+     - `database.quick_check`
+     - `scheduler.billing_auto_enabled`
+   - file:
+     - [backend/internal/worker/worker_test.go](/D:/xampp/htdocs/Dashboard/backend/internal/worker/worker_test.go)
+     - [backend/internal/http/handler/health_test.go](/D:/xampp/htdocs/Dashboard/backend/internal/http/handler/health_test.go)
+
+### Turn 21: Sidebar Navigation + Confirmation Modal UX Pass
+
+Fokus iterasi ini adalah menaikkan UX operator tanpa mengubah arsitektur API.
+
+1. **Navigasi desktop diubah ke sidebar**
+   - layout utama React sekarang memakai sidebar vertikal di desktop.
+   - pada mobile, sidebar berubah menjadi drawer overlay yang dibuka lewat tombol hamburger.
+   - helper `switchView()` juga sekarang menutup drawer mobile otomatis setelah pindah halaman.
+   - file:
+     - [frontend/src/App.tsx](/D:/xampp/htdocs/Dashboard/frontend/src/App.tsx)
+     - [frontend/src/styles.css](/D:/xampp/htdocs/Dashboard/frontend/src/styles.css)
+
+2. **Aksi sensitif sekarang memakai modal konfirmasi**
+   - menggantikan aksi langsung / `window.confirm` untuk:
+     - hapus paket
+     - generate tagihan
+     - tandai lunas
+     - hapus template WA
+     - apply restore backup
+   - modal reusable baru `ModalShell` ditambahkan di frontend agar pola konfirmasi konsisten.
+
+3. **Reset password user tidak lagi memakai `window.prompt`**
+   - sekarang ada dialog khusus dengan input password baru.
+   - validasi minimum 8 karakter dilakukan di frontend sebelum request dikirim.
+
+4. **Build verification tetap sehat**
+   - `cd frontend && npm run build` lolos
+   - `cd backend && go test ./...` lolos
+
+### Turn 22: Toast Feedback + Inline Validation Pass
+
+Fokus iterasi ini adalah merapikan UX feedback operator tanpa mengubah kontrak backend.
+
+1. **Toast notification terstandar**
+   - state `message/error` sekarang dikonversi menjadi toast stack non-blocking.
+   - toast muncul di kanan atas desktop dan pindah ke bawah pada mobile.
+   - ini menggantikan feedback banner lama yang statis di dalam halaman.
+
+2. **Inline validation ditambahkan ke form utama**
+   - validasi frontend sekarang aktif untuk:
+     - login
+     - paket
+     - pelanggan
+     - generate tagihan
+     - template WA
+     - tambah user tim
+     - sebagian field settings worker/billing
+     - reset password user
+   - field yang bermasalah sekarang diberi highlight merah + pesan error inline.
+
+3. **Empty states tabel dibuat lebih jelas**
+   - tabel paket, pelanggan, tagihan, template, dan users sekarang punya empty state yang lebih informatif dibanding tabel kosong.
+
+4. **File utama yang disentuh**
+   - [frontend/src/App.tsx](/D:/xampp/htdocs/Dashboard/frontend/src/App.tsx)
+   - [frontend/src/styles.css](/D:/xampp/htdocs/Dashboard/frontend/src/styles.css)
+
+5. **Verifikasi**
+   - `cd frontend && npm run build` lolos
+   - `cd backend && go test ./...` lolos
+
+### Turn 23: Final UI/UX Polish Pass (Loading + Retry + Quick Actions)
+
+Iterasi ini difokuskan untuk membuat panel terasa lebih dekat ke kualitas production, bukan sekadar CRUD yang berfungsi.
+
+1. **Loading state yang lebih terasa**
+   - state `pageLoading` ditambahkan untuk memisahkan booting awal dari refresh data sesudah login.
+   - dashboard sekarang menampilkan skeleton card saat data utama sedang dimuat ulang.
+
+2. **Retry panel untuk fetch failure**
+   - jika data panel gagal dimuat, UI sekarang menampilkan panel retry yang persisten di bagian atas.
+   - operator tidak lagi hanya mengandalkan toast; sekarang ada jalur pemulihan yang jelas lewat tombol `Coba Muat Ulang`.
+
+3. **Busy state pada aksi utama**
+   - state `busyAction` ditambahkan agar tombol aksi menampilkan label kerja yang sesuai, misalnya:
+     - login
+     - logout
+     - simpan paket
+     - simpan pelanggan
+     - generate tagihan
+     - upload bukti
+     - simpan template
+     - simpan user
+     - simpan pengaturan
+     - backup sekarang
+
+4. **Dashboard diberi action cards**
+   - dashboard sekarang punya area aksi cepat untuk pindah ke tagihan/monitoring.
+   - ringkasan jadwal scheduler billing juga ikut ditampilkan agar operator lebih cepat tahu kapan billing otomatis berikutnya berjalan.
+
+5. **File yang diperbarui**
+   - [frontend/src/App.tsx](/D:/xampp/htdocs/Dashboard/frontend/src/App.tsx)
+   - [frontend/src/styles.css](/D:/xampp/htdocs/Dashboard/frontend/src/styles.css)
+
+6. **Verifikasi**
+   - `cd frontend && npm run build` lolos
+   - `cd backend && go test ./...` lolos
+
+### Turn 24: Premium Visual System Pass
+
+Iterasi ini adalah pass visual yang lebih ambisius untuk membuat panel terasa lebih premium dan intentional.
+
+1. **Visual system diperkuat**
+   - background sekarang memakai layered gradient yang lebih atmosferik.
+   - token warna dasar diperkenalkan langsung di CSS (`--ink-*`, `--surface-*`, `--shadow-*`, `--brand-*`) agar styling lebih konsisten.
+
+2. **Sidebar diberi karakter premium**
+   - sidebar sekarang memakai panel gelap/glass dengan hierarki teks yang lebih tegas.
+   - setiap menu punya `label + caption`, jadi navigasi tidak terasa seperti daftar tombol polos.
+
+3. **Dashboard terasa lebih seperti command center**
+   - topbar sekarang punya status strip.
+   - stat cards diberi accent line dan note operasional.
+   - action cards tetap dipertahankan sebagai area tindakan cepat.
+
+4. **Komponen permukaan dan tabel dipoles**
+   - surface, card, monitor card, tombol, dan tabel sekarang punya depth/contrast yang lebih kuat.
+   - spacing dan shadow dirapikan agar keseluruhan UI terasa lebih matang.
+
+5. **Verifikasi final**
+   - `npm run build` di frontend akhirnya lolos setelah diverifikasi di luar sandbox karena `esbuild` membutuhkan spawn helper process
+   - `go test ./...` di backend tetap lolos

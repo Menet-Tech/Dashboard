@@ -3,8 +3,10 @@ package handler
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,18 +48,48 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lastHeartbeatStr, _ := h.Settings.GetString(ctx, "worker_last_heartbeat")
+	lastCycleAt, _ := h.Settings.GetString(ctx, "worker_last_cycle_at")
+	lastCycleError, _ := h.Settings.GetString(ctx, "worker_last_cycle_error")
 	intervalSecs, _ := h.Settings.GetInt(ctx, settings.KeyWorkerIntervalSecs)
 	backupEnabledValue, _ := h.Settings.GetString(ctx, settings.KeyBackupAutoEnabled)
 	backupTime, _ := h.Settings.GetString(ctx, settings.KeyBackupAutoTime)
 	backupRetention, _ := h.Settings.GetInt(ctx, settings.KeyBackupRetentionCount)
 	lastBackupDate, _ := h.Settings.GetString(ctx, "worker_last_backup_date")
 	lastBackupFilename, _ := h.Settings.GetString(ctx, "worker_last_backup_filename")
+	billingAutoEnabledValue, _ := h.Settings.GetString(ctx, settings.KeyBillingAutoEnabled)
+	billingDay, _ := h.Settings.GetInt(ctx, settings.KeyBillingGenerateDay)
+	billingTime, _ := h.Settings.GetString(ctx, settings.KeyBillingGenerateTime)
+	billingRetryAttempts, _ := h.Settings.GetInt(ctx, settings.KeyBillingRetryAttempts)
+	billingRetryBackoff, _ := h.Settings.GetInt(ctx, settings.KeyBillingRetryBackoff)
+	billingLastAttemptAt, _ := h.Settings.GetString(ctx, "worker_billing_last_attempt_at")
+	billingLastRunAt, _ := h.Settings.GetString(ctx, "worker_billing_last_run_at")
+	billingLastPeriod, _ := h.Settings.GetString(ctx, "worker_billing_last_period")
+	billingLastSuccessPeriod, _ := h.Settings.GetString(ctx, "worker_billing_last_success_period")
+	billingLastGeneratedCount, _ := h.Settings.GetString(ctx, "worker_billing_last_generated_count")
+	billingLastError, _ := h.Settings.GetString(ctx, "worker_billing_last_error")
+	billingRetryCount, _ := h.Settings.GetString(ctx, "worker_billing_retry_count")
+	billingNextRun, _ := h.Settings.GetString(ctx, "worker_billing_next_run")
 	waGatewayURL, _ := h.Settings.GetString(ctx, settings.KeyWAGatewayURL)
 	waAPIKey, _ := h.Settings.GetString(ctx, settings.KeyWAAPIKey)
 	discordWebhookURL, _ := h.Settings.GetString(ctx, settings.KeyDiscordWebhookURL)
 	mikrotikHost, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
 	mikrotikUser, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
 	mikrotikPass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
+	billingAutoEnabled := strings.TrimSpace(billingAutoEnabledValue) != "0"
+
+	dbQuickCheck := "unknown"
+	dbQuickCheckMessage := "belum diperiksa"
+	if check, err := h.quickCheckDatabase(ctx); err != nil {
+		status = "degraded"
+		databaseStatus = "error"
+		dbQuickCheck = "error"
+		dbQuickCheckMessage = err.Error()
+		alerts = append(alerts, "database quick check gagal")
+		h.Logger.Warn("database quick check failed", "error", err)
+	} else {
+		dbQuickCheck = check
+		dbQuickCheckMessage = "integrity ok"
+	}
 
 	if lastHeartbeatStr != "" {
 		if lastRun, err := time.Parse(time.RFC3339, lastHeartbeatStr); err == nil {
@@ -71,6 +103,11 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		workerStatus = "unknown"
 		alerts = append(alerts, "worker heartbeat belum tercatat")
+	}
+	if strings.TrimSpace(lastCycleError) != "" {
+		workerStatus = "error"
+		status = "degraded"
+		alerts = append(alerts, "worker cycle terakhir gagal")
 	}
 
 	backupEnabled := strings.TrimSpace(backupEnabledValue) != "0"
@@ -97,6 +134,10 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	if !mikrotikConfigured {
 		alerts = append(alerts, "konfigurasi MikroTik belum lengkap")
 	}
+	if billingAutoEnabled && strings.TrimSpace(billingLastError) != "" {
+		status = "degraded"
+		alerts = append(alerts, "generate tagihan otomatis terakhir gagal")
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status": status,
@@ -109,9 +150,32 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 			"worker":   workerStatus,
 			"backup":   backupStatus,
 		},
+		"database": map[string]any{
+			"quick_check": map[string]string{
+				"status":  dbQuickCheck,
+				"message": dbQuickCheckMessage,
+			},
+		},
 		"worker": map[string]any{
 			"last_heartbeat":   lastHeartbeatStr,
+			"last_cycle_at":    lastCycleAt,
+			"last_cycle_error": lastCycleError,
 			"interval_seconds": intervalSecs,
+		},
+		"scheduler": map[string]any{
+			"billing_auto_enabled":          billingAutoEnabled,
+			"billing_generate_day":          billingDay,
+			"billing_generate_time":         billingTime,
+			"billing_retry_attempts":        billingRetryAttempts,
+			"billing_retry_backoff_seconds": billingRetryBackoff,
+			"billing_last_attempt_at":       billingLastAttemptAt,
+			"billing_last_run_at":           billingLastRunAt,
+			"billing_last_period":           billingLastPeriod,
+			"billing_last_success_period":   billingLastSuccessPeriod,
+			"billing_last_generated_count":  atoiDefault(billingLastGeneratedCount, 0),
+			"billing_last_error":            billingLastError,
+			"billing_retry_count":           atoiDefault(billingRetryCount, 0),
+			"billing_next_run":              billingNextRun,
 		},
 		"backup": map[string]any{
 			"enabled":         backupEnabled,
@@ -128,6 +192,18 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 		"alerts":    alerts,
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
+}
+
+func (h HealthHandler) quickCheckDatabase(ctx context.Context) (string, error) {
+	row := h.DB.QueryRowContext(ctx, `PRAGMA quick_check;`)
+	var result string
+	if err := row.Scan(&result); err != nil {
+		return "error", fmt.Errorf("quick check scan: %w", err)
+	}
+	if strings.EqualFold(strings.TrimSpace(result), "ok") {
+		return "ok", nil
+	}
+	return "error", fmt.Errorf("quick check result: %s", result)
 }
 
 func contextWithTimeout(r *http.Request, timeout time.Duration) (context.Context, context.CancelFunc) {
@@ -159,4 +235,12 @@ func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 		"message":   "ready",
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
+}
+
+func atoiDefault(value string, fallback int) int {
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
