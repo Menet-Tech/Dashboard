@@ -134,6 +134,8 @@ type ToastItem = {
   message: string;
 };
 
+type CustomerTrialFilter = "all" | "active" | "completed" | "none";
+
 const summaryCards = [
   { key: "total_pelanggan", label: "Total Pelanggan", note: "Basis pelanggan yang tercatat di database operasional." },
   { key: "total_active", label: "Status Active", note: "Layanan normal yang bisa dipantau tanpa tindakan isolir." },
@@ -218,6 +220,7 @@ export default function App() {
   const [notificationLogs, setNotificationLogs] = useState<Record<number, NotificationLog[]>>({});
   const [expandedBillId, setExpandedBillId] = useState<number | null>(null);
   const [navOpen, setNavOpen] = useState(false);
+  const [customerTrialFilter, setCustomerTrialFilter] = useState<CustomerTrialFilter>(() => readCustomerTrialFilter());
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [passwordResetState, setPasswordResetState] = useState<PasswordResetState | null>(null);
   const [loginErrors, setLoginErrors] = useState<FieldErrors>({});
@@ -353,6 +356,23 @@ export default function App() {
       }),
     [user?.role],
   );
+  const filteredCustomers = useMemo(
+    () =>
+      customers.filter((customer) => {
+        const trialState = getCustomerTrialState(customer);
+        if (customerTrialFilter === "active") {
+          return trialState === "active";
+        }
+        if (customerTrialFilter === "completed") {
+          return trialState === "completed";
+        }
+        if (customerTrialFilter === "none") {
+          return trialState === "none";
+        }
+        return true;
+      }),
+    [customerTrialFilter, customers],
+  );
 
   const databaseTone = statusTone(health?.services.database);
   const workerTone = statusTone(health?.services.worker);
@@ -381,6 +401,10 @@ export default function App() {
     pushToast("error", error);
     setError(null);
   }, [error]);
+
+  useEffect(() => {
+    window.localStorage.setItem("customers.trialFilter", customerTrialFilter);
+  }, [customerTrialFilter]);
 
   async function reloadProtectedData() {
     setPageLoading(true);
@@ -1419,8 +1443,26 @@ export default function App() {
 
           <article className="surface">
             <div className="section-heading">
-              <h2>Daftar Pelanggan</h2>
-              <StatusPill label={`${customers.length} item`} tone="slate" />
+              <div>
+                <h2>Daftar Pelanggan</h2>
+                <p className="section-copy">Pantau trial aktif, trial selesai, dan pelanggan reguler tanpa buka detail satu per satu.</p>
+              </div>
+              <div className="section-heading-actions">
+                <label className="toolbar-field">
+                  <span>Filter Trial</span>
+                  <select
+                    value={customerTrialFilter}
+                    onChange={(event) => setCustomerTrialFilter(event.target.value as CustomerTrialFilter)}
+                    aria-label="Filter status trial pelanggan"
+                  >
+                    <option value="all">Semua</option>
+                    <option value="active">Trial Aktif</option>
+                    <option value="completed">Trial Selesai</option>
+                    <option value="none">Non-Trial</option>
+                  </select>
+                </label>
+                <StatusPill label={`${filteredCustomers.length} item`} tone="slate" />
+              </div>
             </div>
             <div className="table-shell">
               <table>
@@ -1429,23 +1471,39 @@ export default function App() {
                     <th>Nama</th>
                     <th>Paket</th>
                     <th>Jatuh Tempo</th>
+                    <th>Trial</th>
                     <th>Status</th>
                     <th>WA</th>
                     <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {customers.length === 0 ? (
+                  {filteredCustomers.length === 0 ? (
                     <tr>
-                      <td colSpan={6}>
-                        <span className="muted">Belum ada pelanggan terdaftar.</span>
+                      <td colSpan={7}>
+                        <span className="muted">
+                          {customers.length === 0
+                            ? "Belum ada pelanggan terdaftar."
+                            : "Tidak ada pelanggan yang cocok dengan filter trial saat ini."}
+                        </span>
                       </td>
                     </tr>
-                  ) : customers.map((customer) => (
+                  ) : filteredCustomers.map((customer) => (
                     <tr key={customer.id}>
                       <td>{customer.name}</td>
                       <td>{customer.package_name ?? "-"}</td>
                       <td>Tanggal {customer.due_day}</td>
+                      <td>
+                        <div className="meta-stack">
+                          <StatusPill
+                            label={trialStatusLabel(customer)}
+                            tone={trialStatusTone(customer)}
+                          />
+                          <span className="muted">
+                            {trialDateCopy(customer)}
+                          </span>
+                        </div>
+                      </td>
                       <td>
                         <select
                           value={customer.status}
@@ -2790,6 +2848,84 @@ function validatePasswordReset(password: string): FieldErrors {
     errors.password = "Password baru minimal 8 karakter.";
   }
   return errors;
+}
+
+function readCustomerTrialFilter(): CustomerTrialFilter {
+  if (typeof window === "undefined") {
+    return "all";
+  }
+  const stored = window.localStorage.getItem("customers.trialFilter");
+  if (stored === "active" || stored === "completed" || stored === "none" || stored === "all") {
+    return stored;
+  }
+  return "all";
+}
+
+function getCustomerTrialState(customer: CustomerItem): "active" | "completed" | "none" {
+  if (customer.is_trial) {
+    return "active";
+  }
+  if (customer.trial_started_at || customer.trial_days) {
+    return "completed";
+  }
+  return "none";
+}
+
+function trialStatusLabel(customer: CustomerItem) {
+  switch (getCustomerTrialState(customer)) {
+    case "active":
+      return "Trial Aktif";
+    case "completed":
+      return "Trial Selesai";
+    default:
+      return "Non-Trial";
+  }
+}
+
+function trialStatusTone(customer: CustomerItem): "green" | "gold" | "slate" {
+  switch (getCustomerTrialState(customer)) {
+    case "active":
+      return "gold";
+    case "completed":
+      return "green";
+    default:
+      return "slate";
+  }
+}
+
+function trialDateCopy(customer: CustomerItem) {
+  const trialEndsAt = resolveTrialEndsAt(customer);
+  if (getCustomerTrialState(customer) === "none") {
+    return "Pelanggan reguler.";
+  }
+  if (trialEndsAt) {
+    return `Berakhir ${formatDateId(trialEndsAt)}${customer.trial_days ? ` (${customer.trial_days} hari)` : ""}`;
+  }
+  if (customer.trial_days) {
+    return `Durasi trial ${customer.trial_days} hari.`;
+  }
+  return "Riwayat trial tersedia.";
+}
+
+function resolveTrialEndsAt(customer: CustomerItem) {
+  if (!customer.trial_started_at || !customer.trial_days) {
+    return null;
+  }
+  const startedAt = new Date(customer.trial_started_at);
+  if (Number.isNaN(startedAt.getTime())) {
+    return null;
+  }
+  const endsAt = new Date(startedAt);
+  endsAt.setDate(endsAt.getDate() + customer.trial_days);
+  return endsAt;
+}
+
+function formatDateId(value: Date) {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(value);
 }
 
 function displayStatusTone(status: BillItem["display_status"]) {

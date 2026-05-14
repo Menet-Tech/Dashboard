@@ -517,6 +517,35 @@ th {
   gap: 8px;
 }
 
+.section-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.toolbar-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.toolbar-field span {
+  color: #6b7c94;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.meta-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .stack-actions {
   display: flex;
   flex-direction: column;
@@ -680,6 +709,15 @@ th {
 }
 
 @media (max-width: 920px) {
+  .section-heading-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .toolbar-field {
+    min-width: min(220px, 100%);
+  }
+
   .hero,
   .stats-grid,
   .quick-actions-grid,

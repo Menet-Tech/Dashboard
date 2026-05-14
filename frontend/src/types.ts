@@ -38,6 +38,9 @@ export type CustomerItem = {
   due_day: number;
   status: "active" | "limit" | "inactive";
   address: string;
+  is_trial?: boolean;
+  trial_started_at?: string;
+  trial_days?: number;
 };
 
 export type BillItem = {

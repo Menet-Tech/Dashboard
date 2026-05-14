@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/settings"
 )
@@ -82,6 +83,7 @@ type WhatsAppSender interface {
 type Service struct {
 	Repository Repository
 	Settings   settings.Service
+	Customers  customers.Service
 	WhatsApp   WhatsAppSender
 	Discord    notifications.DiscordSender
 }
@@ -240,6 +242,80 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 	return nil
 }
 
+// ProcessTrialExpiry handles trial period expiry for customers
+func (s Service) ProcessTrialExpiry(ctx context.Context, now time.Time) error {
+	if s.Customers.Repository.DB == nil {
+		return nil
+	}
+
+	// Get all trial-expired customers
+	expiredTrials, err := s.Customers.ListTrialExpired(ctx)
+	if err != nil {
+		return fmt.Errorf("list trial expired customers: %w", err)
+	}
+
+	if len(expiredTrials) == 0 {
+		return nil
+	}
+
+	period := now.Format("2006-01")
+	menunggakDays, err := s.getMenunggakDays(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, customer := range expiredTrials {
+		bill, created, err := s.Repository.EnsureBillForCustomer(ctx, customer.ID, period, menunggakDays, now)
+		if err != nil {
+			if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
+				_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Trial Expiry Generate Failed**: Gagal generate tagihan untuk **%s** (ID:%d): %v", customer.Name, customer.ID, err))
+			}
+			continue
+		}
+		if bill.ID == 0 {
+			continue
+		}
+
+		if err := s.Customers.EndTrial(ctx, customer.ID); err != nil {
+			if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
+				_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Trial Expiry End Failed**: Gagal end trial untuk **%s** (ID:%d): %v", customer.Name, customer.ID, err))
+			}
+			continue
+		}
+
+		if s.WhatsApp != nil {
+			go func(cust customers.Customer, generatedBill Bill) {
+				bgCtx := context.Background()
+				_ = s.WhatsApp.SendTemplate(bgCtx, notifications.BillMessagePayload{
+					BillID:      generatedBill.ID,
+					TriggerKey:  "trial_expired",
+					PhoneNumber: cust.WhatsApp,
+					MessageData: map[string]string{
+						"nama":              cust.Name,
+						"periode":           generatedBill.Period,
+						"jatuh_tempo":       formatDateLabel(generatedBill.DueDate),
+						"invoice_number":    generatedBill.InvoiceNumber,
+						"nominal":           formatIDRCurrency(generatedBill.Amount),
+						"paket":             generatedBill.PackageName,
+						"kecepatan_paket":   strconv.Itoa(generatedBill.PackageSpeed),
+						"status_pembayaran": "belum_bayar",
+					},
+				})
+			}(customer, bill)
+		}
+
+		if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
+			action := "mengaktifkan tagihan trial yang sudah ada"
+			if created {
+				action = "membuat tagihan otomatis"
+			}
+			_ = s.Discord.SendAlert(ctx, fmt.Sprintf("✅ **Trial Period Expired**: Pelanggan **%s** (ID:%d) trial berakhir. Sistem berhasil %s untuk periode **%s**", customer.Name, customer.ID, action, period))
+		}
+	}
+
+	return nil
+}
+
 func (s Service) getMenunggakDays(ctx context.Context) (int, error) {
 	if s.Settings.Repository.DB == nil {
 		return 30, nil
@@ -248,13 +324,14 @@ func (s Service) getMenunggakDays(ctx context.Context) (int, error) {
 }
 
 type billCandidate struct {
-	CustomerID   int64
-	CustomerName string
-	PackageID    int64
-	PackageName  string
-	PackageSpeed int
-	PackagePrice int
-	DueDay       int
+	CustomerID    int64
+	CustomerName  string
+	CustomerPhone string
+	PackageID     int64
+	PackageName   string
+	PackageSpeed  int
+	PackagePrice  int
+	DueDay        int
 }
 
 type automationCandidate struct {
@@ -401,6 +478,84 @@ func (r Repository) Generate(ctx context.Context, period string) (int, error) {
 	}
 
 	return generated, nil
+}
+
+func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64, period string, menunggakDays int, now time.Time) (Bill, bool, error) {
+	if existing, err := r.FindByCustomerAndPeriod(ctx, customerID, period, menunggakDays, now); err == nil {
+		return existing, false, nil
+	} else if !errors.Is(err, ErrBillNotFound) {
+		return Bill{}, false, err
+	}
+
+	periodTime, err := time.Parse("2006-01", period)
+	if err != nil {
+		return Bill{}, false, fmt.Errorf("parse period: %w", err)
+	}
+
+	candidate, found, err := r.findCandidateForCustomer(ctx, customerID, period)
+	if err != nil {
+		return Bill{}, false, err
+	}
+	if !found {
+		return Bill{}, false, nil
+	}
+
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return Bill{}, false, fmt.Errorf("begin single bill generation tx: %w", err)
+	}
+
+	dueDate := resolveDueDate(periodTime, candidate.DueDay)
+	serial, err := billSerial(ctx, tx, candidate.CustomerID)
+	if err != nil {
+		_ = tx.Rollback()
+		return Bill{}, false, err
+	}
+
+	invoiceNumber := fmt.Sprintf(
+		"%s/%d/%d/%03d",
+		dueDate.Format("02-01-2006"),
+		candidate.CustomerID,
+		candidate.PackageSpeed,
+		serial,
+	)
+
+	result, err := tx.ExecContext(ctx, `
+		INSERT INTO tagihan (
+			pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status, updated_at
+		)
+		VALUES (?, ?, ?, ?, ?, ?, 'belum_bayar', CURRENT_TIMESTAMP)
+	`, candidate.CustomerID, candidate.PackageID, period, invoiceNumber, candidate.PackagePrice, dueDate.Format("2006-01-02"))
+	if err != nil {
+		_ = tx.Rollback()
+		return Bill{}, false, fmt.Errorf("insert single generated bill: %w", err)
+	}
+
+	billID, err := result.LastInsertId()
+	if err != nil {
+		_ = tx.Rollback()
+		return Bill{}, false, fmt.Errorf("single generated bill id: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Bill{}, false, fmt.Errorf("commit single generated bill: %w", err)
+	}
+
+	return Bill{
+		ID:            billID,
+		CustomerID:    candidate.CustomerID,
+		CustomerName:  candidate.CustomerName,
+		CustomerPhone: candidate.CustomerPhone,
+		PackageID:     candidate.PackageID,
+		PackageName:   candidate.PackageName,
+		PackageSpeed:  candidate.PackageSpeed,
+		Period:        period,
+		InvoiceNumber: invoiceNumber,
+		Amount:        candidate.PackagePrice,
+		DueDate:       dueDate.Format("2006-01-02"),
+		Status:        "belum_bayar",
+		DisplayStatus: computeDisplayStatus("belum_bayar", dueDate.Format("2006-01-02"), menunggakDays, now),
+	}, true, nil
 }
 
 func (r Repository) MarkPaid(ctx context.Context, billID int64, method string, userID int64) error {
@@ -587,10 +742,11 @@ func (r Repository) UpdateCustomerStatus(ctx context.Context, customerID int64, 
 
 func (r Repository) findCandidates(ctx context.Context, period string) ([]billCandidate, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT c.id, c.nama, p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo
+		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		WHERE c.status IN ('active', 'limit')
+		  AND COALESCE(c.is_trial, 0) = 0
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM tagihan t
@@ -610,6 +766,7 @@ func (r Repository) findCandidates(ctx context.Context, period string) ([]billCa
 		if err := rows.Scan(
 			&item.CustomerID,
 			&item.CustomerName,
+			&item.CustomerPhone,
 			&item.PackageID,
 			&item.PackageName,
 			&item.PackageSpeed,
@@ -622,6 +779,66 @@ func (r Repository) findCandidates(ctx context.Context, period string) ([]billCa
 	}
 
 	return items, rows.Err()
+}
+
+func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int64, period string) (billCandidate, bool, error) {
+	row := r.DB.QueryRowContext(ctx, `
+		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo
+		FROM pelanggan c
+		INNER JOIN paket p ON p.id = c.paket_id
+		WHERE c.id = ?
+		  AND c.status IN ('active', 'limit')
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM tagihan t
+			WHERE t.pelanggan_id = c.id
+			  AND t.periode = ?
+		  )
+		LIMIT 1
+	`, customerID, period)
+
+	var item billCandidate
+	if err := row.Scan(
+		&item.CustomerID,
+		&item.CustomerName,
+		&item.CustomerPhone,
+		&item.PackageID,
+		&item.PackageName,
+		&item.PackageSpeed,
+		&item.PackagePrice,
+		&item.DueDay,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return billCandidate{}, false, nil
+		}
+		return billCandidate{}, false, fmt.Errorf("find customer billing candidate: %w", err)
+	}
+
+	return item, true, nil
+}
+
+func (r Repository) FindByCustomerAndPeriod(ctx context.Context, customerID int64, period string, menunggakDays int, now time.Time) (Bill, error) {
+	row := r.DB.QueryRowContext(ctx, `
+		SELECT t.id, t.pelanggan_id, c.nama, COALESCE(c.nomor_wa, ''), t.paket_id, p.nama, p.kecepatan_mbps,
+		       t.periode, t.invoice_number, t.nominal, t.jatuh_tempo, t.status, t.paid_at,
+		       COALESCE(t.payment_method, ''), t.proof_path
+		FROM tagihan t
+		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
+		INNER JOIN paket p ON p.id = t.paket_id
+		WHERE t.pelanggan_id = ?
+		  AND t.periode = ?
+		LIMIT 1
+	`, customerID, period)
+
+	item, err := scanBill(row, menunggakDays, now)
+	if err != nil {
+		if strings.Contains(err.Error(), "no rows") {
+			return Bill{}, ErrBillNotFound
+		}
+		return Bill{}, fmt.Errorf("find bill by customer and period: %w", err)
+	}
+
+	return item, nil
 }
 
 func (r Repository) paymentHistory(ctx context.Context, billID int64) ([]PaymentHistory, error) {

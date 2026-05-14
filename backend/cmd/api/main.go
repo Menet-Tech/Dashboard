@@ -21,6 +21,7 @@ import (
 	"menettech/dashboard/backend/internal/backup"
 	"menettech/dashboard/backend/internal/billing"
 	"menettech/dashboard/backend/internal/config"
+	"menettech/dashboard/backend/internal/customers"
 	apphttp "menettech/dashboard/backend/internal/http/router"
 	"menettech/dashboard/backend/internal/importer"
 	"menettech/dashboard/backend/internal/notifications"
@@ -122,9 +123,11 @@ func runAPI(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth
 func runWorker(cfg config.Config, logger *slog.Logger, db *sql.DB) {
 	settingsService := settings.Service{Repository: settings.Repository{DB: db}}
 	templateService := templates.Service{Repository: templates.Repository{DB: db}}
+	customersService := customers.Service{Repository: customers.Repository{DB: db}}
 	billingService := billing.Service{
 		Repository: billing.Repository{DB: db},
 		Settings:   settingsService,
+		Customers:  customersService,
 	}
 	whatsAppService := notifications.WhatsAppService{
 		Settings:  settingsService,

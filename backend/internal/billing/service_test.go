@@ -29,6 +29,32 @@ func TestServiceGenerateCreatesBillsForEligibleCustomers(t *testing.T) {
 	}
 }
 
+func TestServiceGenerateSkipsTrialCustomers(t *testing.T) {
+	db := billingTestDB(t)
+	service := Service{Repository: Repository{DB: db}}
+
+	mustBillingExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status, is_trial, trial_started_at, trial_days) VALUES (1, 'Trial User', 1, 8, 'active', 1, '2026-04-01T00:00:00Z', 3)`)
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status, is_trial, trial_started_at, trial_days) VALUES (2, 'Regular User', 1, 8, 'active', 0, NULL, 3)`)
+
+	result, err := service.Generate(context.Background(), "2026-04")
+	if err != nil {
+		t.Fatalf("generate bills: %v", err)
+	}
+
+	if result.Generated != 1 {
+		t.Fatalf("expected only non-trial customer to be billed, got %d", result.Generated)
+	}
+
+	var billedTrialCount int
+	if err := db.QueryRow(`SELECT COUNT(1) FROM tagihan WHERE pelanggan_id = 1`).Scan(&billedTrialCount); err != nil {
+		t.Fatalf("count trial bills: %v", err)
+	}
+	if billedTrialCount != 0 {
+		t.Fatalf("expected trial customer to be skipped by regular generator, got %d bills", billedTrialCount)
+	}
+}
+
 type mockWhatsAppSender struct {
 	payloads chan notifications.BillMessagePayload
 }

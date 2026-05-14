@@ -61,9 +61,14 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	discordService := notifications.NewDiscordService(settingsService)
 	reportsHandler := handler.NewReportsHandler(reports.Service{DB: db})
 
+	customersService := customers.Service{
+		Repository: customers.Repository{DB: db},
+	}
+
 	billHandler := handler.NewBillHandler(billing.Service{
 		Repository: billing.Repository{DB: db},
 		Settings:   settingsService,
+		Customers:  customersService,
 		WhatsApp:   whatsAppService,
 		Discord:    discordService,
 	}, cfg.AppName, cfg.StoragePath)
