@@ -1287,3 +1287,74 @@ Iterasi ini adalah pass visual yang lebih ambisius untuk membuat panel terasa le
 5. **Verifikasi final**
    - `npm run build` di frontend akhirnya lolos setelah diverifikasi di luar sandbox karena `esbuild` membutuhkan spawn helper process
    - `go test ./...` di backend tetap lolos
+
+### Turn 25: Trial 3 Hari -> Auto Generate Tagihan + WA
+
+Iterasi ini menyelesaikan flow bisnis trial pelanggan baru di backend.
+
+1. **Pelanggan baru otomatis masuk mode trial**
+   - field trial yang sudah ditambahkan user (`is_trial`, `trial_started_at`, `trial_days`) tetap dipakai.
+   - create customer sekarang tetap menginisialisasi trial default 3 hari.
+
+2. **Generator tagihan massal sekarang mengecualikan pelanggan trial**
+   - pelanggan yang masih `is_trial = 1` tidak akan ikut `Generate()` reguler.
+   - ini memastikan pelanggan trial baru hanya ditagih setelah masa trial selesai.
+
+3. **Worker trial expiry dibuat idempotent per pelanggan**
+   - `ProcessTrialExpiry()` tidak lagi memanggil generator massal untuk seluruh periode.
+   - sekarang worker memastikan bill hanya untuk pelanggan trial yang expired:
+     - cek apakah bill periode berjalan sudah ada
+     - kalau belum ada, generate bill khusus pelanggan itu
+     - setelah itu trial diakhiri
+     - notifikasi WA trigger `trial_expired` dikirim otomatis
+   - jika worker restart di tengah proses, flow tetap aman dan tidak bikin tagihan duplikat.
+
+4. **Repository billing ditambah helper spesifik**
+   - `EnsureBillForCustomer(...)`
+   - `FindByCustomerAndPeriod(...)`
+   - helper candidate per customer
+   - ini dipakai khusus untuk trial expiry flow.
+
+5. **Migration trial disempurnakan**
+   - migration [backend/internal/platform/migrate/sql/0007_trial_period.sql](/D:/xampp/htdocs/Dashboard/backend/internal/platform/migrate/sql/0007_trial_period.sql)
+     sekarang juga menambahkan template WA bawaan `trial_expired`.
+
+6. **Test trial flow ditambah**
+   - generate reguler skip customer trial
+   - trial expired membuat tagihan + end trial
+   - trial expired tidak menduplikasi bill yang sudah ada
+   - trigger WA `trial_expired` ikut diverifikasi
+
+7. **Verifikasi**
+   - `go test ./internal/billing ./internal/customers` lolos
+   - `go test ./...` di backend lolos
+
+### Turn 26: UX Trial Pelanggan di Frontend
+
+Iterasi ini melanjutkan flow trial ke sisi operator di frontend React.
+
+1. **Tanggal trial berakhir tampil di daftar pelanggan**
+   - daftar pelanggan sekarang menghitung dan menampilkan tanggal selesai trial dari `trial_started_at + trial_days`.
+   - jika pelanggan bukan trial, UI menampilkan keterangan bahwa pelanggan reguler.
+
+2. **Badge trial lebih jelas**
+   - status trial sekarang memakai badge:
+     - `Trial Aktif`
+     - `Trial Selesai`
+     - `Non-Trial`
+   - ini membantu operator membedakan pelanggan baru, pelanggan yang trial-nya selesai, dan pelanggan reguler.
+
+3. **Filter pelanggan trial**
+   - ditambahkan filter frontend pada daftar pelanggan:
+     - semua
+     - trial aktif
+     - trial selesai
+     - non-trial
+   - preferensi filter disimpan di `localStorage` supaya tetap konsisten saat halaman dibuka ulang.
+
+4. **Polish tampilan**
+   - section heading pelanggan sekarang punya toolbar filter yang lebih rapi.
+   - kolom trial memakai stack badge + tanggal selesai agar informasi tetap padat tapi mudah dibaca.
+
+5. **Verifikasi**
+   - `npm run build` di frontend akan dijalankan setelah perubahan UI selesai.

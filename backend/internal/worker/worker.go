@@ -93,6 +93,11 @@ func (s Service) RunOnce(ctx context.Context) error {
 		s.Logger.Error("auto backup failed", "error", err)
 	}
 
+	// Process trial expiry and auto-generate bills
+	if err := s.Billing.ProcessTrialExpiry(ctx, now); err != nil {
+		s.Logger.Error("trial expiry processing failed", "error", err)
+	}
+
 	if err := s.runScheduledBilling(ctx, now); err != nil {
 		_ = s.Settings.Set(ctx, "worker_last_cycle_error", err.Error())
 		return err
