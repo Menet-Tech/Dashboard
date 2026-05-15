@@ -1,4 +1,6 @@
-:root {
+@import "tailwindcss";
+
+
   color-scheme: light;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   line-height: 1.5;

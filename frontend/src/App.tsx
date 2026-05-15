@@ -54,6 +54,7 @@ import type {
   User,
   RevenueItem,
   AgingReport,
+  ViewKey,
 } from "./types";
 
 import {
@@ -66,52 +67,46 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import { Bar, Pie } from "react-chartjs-2";
+
+import { formatCurrency, formatDateTime, currentPeriod, toErrorMessage } from "./utils/format";
+import { statusTone, displayStatusLabel, displayStatusTone, integrationSummary } from "./utils/status";
+import {
+  validateLogin,
+  validatePackage,
+  validateCustomer,
+  validateTemplate,
+  validateManagedUser,
+  validateSettings,
+  validateBillPeriod,
+  validatePasswordReset,
+  type FieldErrors,
+} from "./utils/validation";
+import {
+  buildCustomerLifecycleMap,
+  readCustomerLifecycleFilter,
+  type CustomerLifecycleKey,
+} from "./lib/lifecycle";
+import { Modal } from "./components/ui/Modal";
+import { SkeletonCard } from "./components/ui/SkeletonCard";
+import { ToastStack, type ToastItem } from "./components/ui/Toast";
+import { inputClassName, renderInlineError } from "./components/ui";
+import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { PackagesPage, defaultPackageForm, type PackageFormState } from "./features/packages/PackagesPage";
+import { CustomersPage, defaultCustomerForm, type CustomerFormState } from "./features/customers/CustomersPage";
+import { BillsPage } from "./features/bills/BillsPage";
+import { TemplatesPage, defaultTemplateForm, type TemplateFormState } from "./features/templates/TemplatesPage";
+import { MonitoringPage, type BackupItem } from "./features/monitoring/MonitoringPage";
+import { SettingsPage } from "./features/settings/SettingsPage";
+import { AuditLogsPage } from "./features/audit/AuditLogsPage";
+import { UsersPage, defaultManagedUserForm, type ManagedUserFormState } from "./features/users/UsersPage";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
-type ViewKey =
-  | "dashboard"
-  | "packages"
-  | "customers"
-  | "bills"
-  | "templates"
-  | "monitoring"
-  | "audit"
-  | "users"
-  | "settings";
 
-type PackageFormState = {
-  name: string;
-  speed_mbps: number;
-  price: number;
-  description: string;
-};
 
-type CustomerFormState = {
-  name: string;
-  package_id: number;
-  user_pppoe: string;
-  password_pppoe: string;
-  whatsapp: string;
-  sn_ont: string;
-  due_day: number;
-  status: CustomerItem["status"];
-  address: string;
-};
 
-type TemplateFormState = {
-  name: string;
-  trigger_key: string;
-  content: string;
-  is_active: boolean;
-};
 
-type ManagedUserFormState = {
-  username: string;
-  password: string;
-  role: string;
-};
+
 
 type ConfirmDialogState = {
   title: string;
@@ -126,22 +121,10 @@ type PasswordResetState = {
   password: string;
 };
 
-type FieldErrors = Record<string, string>;
 
-type ToastItem = {
-  id: number;
-  tone: "success" | "error" | "warning";
-  message: string;
-};
+type CustomerLifecycleFilter = CustomerLifecycleKey;
 
-type CustomerLifecycleFilter = "all" | "trial" | "tertagih" | "jatuh_tempo" | "menunggak" | "lunas";
 
-const summaryCards = [
-  { key: "total_pelanggan", label: "Total Pelanggan", note: "Basis pelanggan yang tercatat di database operasional." },
-  { key: "total_active", label: "Status Active", note: "Layanan normal yang bisa dipantau tanpa tindakan isolir." },
-  { key: "total_limit", label: "Status Limit", note: "Pelanggan yang perlu follow-up karena pembatasan layanan." },
-  { key: "total_tagihan_belum_bayar", label: "Tagihan Belum Bayar", note: "Piutang berjalan yang masih perlu ditagih." },
-] as const;
 
 const navItems: Array<{ key: ViewKey; label: string; caption: string }> = [
   { key: "dashboard", label: "Dashboard", caption: "ringkasan bisnis dan status sistem" },
@@ -155,37 +138,12 @@ const navItems: Array<{ key: ViewKey; label: string; caption: string }> = [
   { key: "settings", label: "Pengaturan", caption: "billing rules dan integrasi" },
 ];
 
-const defaultPackageForm = (): PackageFormState => ({
-  name: "",
-  speed_mbps: 10,
-  price: 150000,
-  description: "",
-});
 
-const defaultCustomerForm = (): CustomerFormState => ({
-  name: "",
-  package_id: 0,
-  user_pppoe: "",
-  password_pppoe: "",
-  whatsapp: "",
-  sn_ont: "",
-  due_day: 8,
-  status: "active",
-  address: "",
-});
 
-const defaultTemplateForm = (): TemplateFormState => ({
-  name: "",
-  trigger_key: "",
-  content: "",
-  is_active: true,
-});
 
-const defaultManagedUserForm = (): ManagedUserFormState => ({
-  username: "",
-  password: "",
-  role: "petugas",
-});
+
+
+
 
 export default function App() {
   const [health, setHealth] = useState<HealthPayload | null>(null);
@@ -203,7 +161,7 @@ export default function App() {
   const [bills, setBills] = useState<BillItem[]>([]);
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
-  const [backups, setBackups] = useState<Array<{ filename: string; size: number; mod_time: string }>>([]);
+  const [backups, setBackups] = useState<BackupItem[]>([]);
   const [restoreSimulation, setRestoreSimulation] = useState<{ filename: string; result: RestoreSimulationResult } | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [managedUsers, setManagedUsers] = useState<ManagedUserItem[]>([]);
@@ -1037,1577 +995,200 @@ export default function App() {
         ) : null}
 
       {view === "dashboard" ? (
-        <>
-          <section className="grid stats-grid">
-            {pageLoading ? (
-              <>
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
-              </>
-            ) : (
-              summaryCards.map((card) => (
-                <article key={card.key} className="stat-card">
-                  <span>{card.label}</span>
-                  <strong>{summary?.[card.key] ?? 0}</strong>
-                  <p className="stat-note">{card.note}</p>
-                </article>
-              ))
-            )}
-          </section>
-
-          <section className="grid quick-actions-grid">
-            <article className="surface action-card">
-              <div>
-                <p className="eyebrow">Aksi Cepat</p>
-                <h2>Operasional Hari Ini</h2>
-                <p className="muted">Lihat kesehatan sistem, generate tagihan, dan pantau tunggakan dari satu area.</p>
-              </div>
-              <div className="button-row">
-                <button type="button" className="primary-button" onClick={() => switchView("bills")}>
-                  Buka Tagihan
-                </button>
-                <button type="button" className="ghost-button" onClick={() => switchView("monitoring")}>
-                  Buka Monitoring
-                </button>
-              </div>
-            </article>
-            <article className="surface action-card">
-              <div>
-                <p className="eyebrow">Scheduler</p>
-                <h2>Run Berikutnya</h2>
-                <p className="muted">
-                  {health?.scheduler.billing_next_run
-                    ? `Auto billing berikutnya dijadwalkan pada ${formatDateTime(health.scheduler.billing_next_run)}.`
-                    : "Jadwal billing otomatis belum tercatat."}
-                </p>
-              </div>
-              <StatusPill
-                label={health?.scheduler.billing_last_error ? "attention" : "scheduled"}
-                tone={health?.scheduler.billing_last_error ? "gold" : "green"}
-              />
-            </article>
-          </section>
-
-          <section className="grid detail-grid">
-            <article className="surface">
-              <div className="section-heading">
-                <h2>Service Snapshot</h2>
-                <StatusPill label={health?.status ?? "checking"} tone={appTone} />
-              </div>
-              <dl className="meta-list">
-                <div>
-                  <dt>App Name</dt>
-                  <dd>{health?.app.name ?? "-"}</dd>
-                </div>
-                <div>
-                  <dt>Environment</dt>
-                  <dd>{health?.app.environment ?? "-"}</dd>
-                </div>
-                <div>
-                  <dt>Last Health Check</dt>
-                  <dd>{health?.timestamp ?? "-"}</dd>
-                </div>
-                <div>
-                  <dt>Worker Heartbeat</dt>
-                  <dd>{formatDateTime(health?.worker.last_heartbeat)}</dd>
-                </div>
-              </dl>
-            </article>
-
-            {user?.role === "admin" && (
-              <article className="surface" style={{ gridColumn: "1 / -1" }}>
-                <div className="section-heading">
-                  <h2>Laporan Tagihan</h2>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
-                  <div>
-                    <h3>Pendapatan Bulanan</h3>
-                    {revenue.length > 0 ? (
-                      <Bar
-                        data={{
-                          labels: [...revenue].reverse().map((r) => r.period),
-                          datasets: [
-                            {
-                              label: "Total Tagihan",
-                              data: [...revenue].reverse().map((r) => r.total_billed),
-                              backgroundColor: "rgba(99, 102, 241, 0.5)",
-                              borderColor: "rgba(99, 102, 241, 1)",
-                              borderWidth: 1,
-                            },
-                            {
-                              label: "Total Lunas",
-                              data: [...revenue].reverse().map((r) => r.total_paid),
-                              backgroundColor: "rgba(34, 197, 94, 0.5)",
-                              borderColor: "rgba(34, 197, 94, 1)",
-                              borderWidth: 1,
-                            },
-                          ],
-                        }}
-                        options={{
-                          responsive: true,
-                          plugins: { legend: { position: "bottom" } },
-                        }}
-                      />
-                    ) : (
-                      <p className="muted">Belum ada data pendapatan.</p>
-                    )}
-                  </div>
-                  <div>
-                    <h3>Aging Piutang (Belum Bayar)</h3>
-                    {aging && (aging.current > 0 || aging.days_1_30 > 0 || aging.days_31_60 > 0 || aging.over_60 > 0) ? (
-                      <div style={{ maxWidth: "300px", margin: "0 auto" }}>
-                        <Pie
-                          data={{
-                            labels: ["Current", "1-30 Hari", "31-60 Hari", ">60 Hari"],
-                            datasets: [
-                              {
-                                data: [aging.current, aging.days_1_30, aging.days_31_60, aging.over_60],
-                                backgroundColor: [
-                                  "rgba(59, 130, 246, 0.7)",
-                                  "rgba(234, 179, 8, 0.7)",
-                                  "rgba(249, 115, 22, 0.7)",
-                                  "rgba(239, 68, 68, 0.7)",
-                                ],
-                                borderWidth: 1,
-                              },
-                            ],
-                          }}
-                          options={{
-                            responsive: true,
-                            plugins: { legend: { position: "bottom" } },
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <p className="muted" style={{ textAlign: "center", paddingTop: "2rem" }}>
-                        Tidak ada tunggakan berjalan.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </article>
-            )}
-          </section>
-        </>
+        <DashboardPage
+          pageLoading={pageLoading}
+          summary={summary}
+          health={health}
+          user={user}
+          revenue={revenue}
+          aging={aging}
+          appTone={appTone}
+          workerTone={workerTone}
+          backupTone={backupTone}
+          onSwitchView={switchView}
+        />
       ) : null}
 
       {view === "packages" ? (
-        <section className="grid feature-grid">
-          <article className="surface">
-            <div className="section-heading">
-              <h2>{editingPackageId ? "Edit Paket" : "Tambah Paket"}</h2>
-            </div>
-            <form className="form-grid" onSubmit={handlePackageSubmit}>
-              <label>
-                <span>Nama Paket</span>
-                <input
-                  className={inputClassName(packageErrors.name)}
-                  value={packageForm.name}
-                  onChange={(event) =>
-                    setPackageForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                />
-                {renderInlineError(packageErrors.name)}
-              </label>
-              <label>
-                <span>Kecepatan (Mbps)</span>
-                <input
-                  className={inputClassName(packageErrors.speed_mbps)}
-                  type="number"
-                  min={1}
-                  value={packageForm.speed_mbps}
-                  onChange={(event) =>
-                    setPackageForm((current) => ({
-                      ...current,
-                      speed_mbps: Number(event.target.value),
-                    }))
-                  }
-                />
-                {renderInlineError(packageErrors.speed_mbps)}
-              </label>
-              <label>
-                <span>Harga</span>
-                <input
-                  className={inputClassName(packageErrors.price)}
-                  type="number"
-                  min={0}
-                  value={packageForm.price}
-                  onChange={(event) =>
-                    setPackageForm((current) => ({
-                      ...current,
-                      price: Number(event.target.value),
-                    }))
-                  }
-                />
-                {renderInlineError(packageErrors.price)}
-              </label>
-              <label>
-                <span>Deskripsi</span>
-                <textarea
-                  rows={4}
-                  value={packageForm.description}
-                  onChange={(event) =>
-                    setPackageForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <div className="button-row">
-                <button className="primary-button" disabled={submitting}>
-                  {isBusy("save-package") ? "Menyimpan..." : editingPackageId ? "Update Paket" : "Simpan Paket"}
-                </button>
-                {editingPackageId ? (
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => {
-                      setEditingPackageId(null);
-                      setPackageForm(defaultPackageForm());
-                    }}
-                  >
-                    Batal Edit
-                  </button>
-                ) : null}
-              </div>
-            </form>
-          </article>
-
-          <article className="surface">
-            <div className="section-heading">
-              <h2>Daftar Paket</h2>
-              <StatusPill label={`${packages.length} item`} tone="slate" />
-            </div>
-            <DataPackageTable
-              packages={packages}
-              onEdit={(pkg) => {
-                setEditingPackageId(pkg.id);
-                setPackageForm({
-                  name: pkg.name,
-                  speed_mbps: pkg.speed_mbps,
-                  price: pkg.price,
-                  description: pkg.description,
-                });
-              }}
-              onDelete={(id) => void handlePackageDelete(id)}
-            />
-          </article>
-        </section>
+        <PackagesPage
+          packages={packages}
+          packageForm={packageForm}
+          packageErrors={packageErrors}
+          editingPackageId={editingPackageId}
+          submitting={submitting}
+          busyAction={busyAction}
+          onFormChange={setPackageForm}
+          onSubmit={handlePackageSubmit}
+          onEdit={(pkg) => {
+            setEditingPackageId(pkg.id);
+            setPackageForm({
+              name: pkg.name,
+              speed_mbps: pkg.speed_mbps,
+              price: pkg.price,
+              description: pkg.description,
+            });
+          }}
+          onCancelEdit={() => {
+            setEditingPackageId(null);
+            setPackageForm(defaultPackageForm());
+          }}
+          onDelete={(id) => void handlePackageDelete(id)}
+        />
       ) : null}
 
       {view === "customers" ? (
-        <section className="grid feature-grid">
-          {user?.role !== "viewer" && (
-            <article className="surface">
-              <div className="section-heading">
-              <h2>{editingCustomerId ? "Edit Pelanggan" : "Tambah Pelanggan"}</h2>
-            </div>
-            <form className="form-grid" onSubmit={handleCustomerSubmit}>
-              <label>
-                <span>Nama</span>
-                <input
-                  className={inputClassName(customerErrors.name)}
-                  value={customerForm.name}
-                  onChange={(event) =>
-                    setCustomerForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                />
-                {renderInlineError(customerErrors.name)}
-              </label>
-              <label>
-                <span>Paket</span>
-                <select
-                  className={inputClassName(customerErrors.package_id)}
-                  value={customerForm.package_id}
-                  onChange={(event) =>
-                    setCustomerForm((current) => ({
-                      ...current,
-                      package_id: Number(event.target.value),
-                    }))
-                  }
-                >
-                  <option value={0}>Pilih paket</option>
-                  {packageOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                {renderInlineError(customerErrors.package_id)}
-              </label>
-              <label>
-                <span>User PPPoE</span>
-                <input
-                  className={inputClassName(customerErrors.user_pppoe)}
-                  value={customerForm.user_pppoe}
-                  onChange={(event) =>
-                    setCustomerForm((current) => ({
-                      ...current,
-                      user_pppoe: event.target.value,
-                    }))
-                  }
-                />
-                {renderInlineError(customerErrors.user_pppoe)}
-              </label>
-              <label>
-                <span>Password PPPoE</span>
-                <input
-                  className={inputClassName(customerErrors.password_pppoe)}
-                  value={customerForm.password_pppoe}
-                  onChange={(event) =>
-                    setCustomerForm((current) => ({
-                      ...current,
-                      password_pppoe: event.target.value,
-                    }))
-                  }
-                />
-                {renderInlineError(customerErrors.password_pppoe)}
-              </label>
-              <label>
-                <span>Nomor WhatsApp</span>
-                <input
-                  value={customerForm.whatsapp}
-                  onChange={(event) =>
-                    setCustomerForm((current) => ({
-                      ...current,
-                      whatsapp: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                <span>SN ONT</span>
-                <input
-                  value={customerForm.sn_ont}
-                  onChange={(event) =>
-                    setCustomerForm((current) => ({ ...current, sn_ont: event.target.value }))
-                  }
-                />
-              </label>
-              <label>
-                <span>Tanggal Jatuh Tempo Bulanan</span>
-                <input
-                  className={inputClassName(customerErrors.due_day)}
-                  type="number"
-                  min={1}
-                  max={31}
-                  value={customerForm.due_day}
-                  onChange={(event) =>
-                    setCustomerForm((current) => ({
-                      ...current,
-                      due_day: Number(event.target.value),
-                    }))
-                  }
-                />
-                {renderInlineError(customerErrors.due_day)}
-              </label>
-              <label>
-                <span>Status</span>
-                <select
-                  value={customerForm.status}
-                  onChange={(event) =>
-                    setCustomerForm((current) => ({
-                      ...current,
-                      status: event.target.value as CustomerItem["status"],
-                    }))
-                  }
-                >
-                  <option value="active">Active</option>
-                  <option value="limit">Limit</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </label>
-              <label className="full-width">
-                <span>Alamat</span>
-                <textarea
-                  rows={4}
-                  value={customerForm.address}
-                  onChange={(event) =>
-                    setCustomerForm((current) => ({ ...current, address: event.target.value }))
-                  }
-                />
-              </label>
-              <div className="button-row">
-                <button className="primary-button" disabled={submitting}>
-                  {isBusy("save-customer") ? "Menyimpan..." : editingCustomerId ? "Update Pelanggan" : "Simpan Pelanggan"}
-                </button>
-                {editingCustomerId ? (
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => {
-                      setEditingCustomerId(null);
-                      setCustomerForm(defaultCustomerForm());
-                    }}
-                  >
-                    Batal Edit
-                  </button>
-                ) : null}
-              </div>
-            </form>
-          </article>
-          )}
-
-          <article className="surface">
-            <div className="section-heading">
-              <div>
-                <h2>Daftar Pelanggan</h2>
-                <p className="section-copy">Pantau role pelanggan dari trial aktif sampai tertagih, jatuh tempo, dan menunggak dalam satu daftar.</p>
-              </div>
-              <div className="section-heading-actions">
-                <label className="toolbar-field">
-                  <span>Filter Role</span>
-                  <select
-                    value={customerLifecycleFilter}
-                    onChange={(event) => setCustomerLifecycleFilter(event.target.value as CustomerLifecycleFilter)}
-                    aria-label="Filter role billing pelanggan"
-                  >
-                    <option value="all">Semua</option>
-                    <option value="trial">Trial Aktif</option>
-                    <option value="tertagih">Tertagih</option>
-                    <option value="jatuh_tempo">Jatuh Tempo</option>
-                    <option value="menunggak">Menunggak</option>
-                    <option value="lunas">Lunas</option>
-                  </select>
-                </label>
-                <StatusPill label={`${filteredCustomers.length} item`} tone="slate" />
-              </div>
-            </div>
-            <div className="table-shell">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nama</th>
-                    <th>Paket</th>
-                    <th>Jatuh Tempo</th>
-                    <th>Role</th>
-                    <th>Layanan</th>
-                    <th>WA</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCustomers.length === 0 ? (
-                    <tr>
-                      <td colSpan={7}>
-                        <span className="muted">
-                          {customers.length === 0
-                            ? "Belum ada pelanggan terdaftar."
-                            : "Tidak ada pelanggan yang cocok dengan filter role saat ini."}
-                        </span>
-                      </td>
-                    </tr>
-                  ) : filteredCustomers.map((customer) => (
-                    <tr key={customer.id}>
-                      <td>{customer.name}</td>
-                      <td>{customer.package_name ?? "-"}</td>
-                      <td>Tanggal {customer.due_day}</td>
-                      <td>
-                        <div className="meta-stack">
-                          <StatusPill
-                            label={customerLifecycleMap[customer.id]?.label ?? "Lunas"}
-                            tone={customerLifecycleMap[customer.id]?.tone ?? "green"}
-                          />
-                          <span className="muted">
-                            {customerLifecycleMap[customer.id]?.note ?? "Tidak ada tagihan aktif."}
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <select
-                          value={customer.status}
-                          onChange={(event) =>
-                            void handleStatusChange(
-                              customer.id,
-                              event.target.value as CustomerItem["status"],
-                            )
-                          }
-                        >
-                          <option value="active">Active</option>
-                          <option value="limit">Limit</option>
-                          <option value="inactive">Inactive</option>
-                        </select>
-                      </td>
-                      <td>{customer.whatsapp || "-"}</td>
-                      <td>
-                        {user?.role !== "viewer" && (
-                          <button
-                            type="button"
-                            className="ghost-button"
-                            onClick={() => {
-                              setEditingCustomerId(customer.id);
-                              setCustomerForm({
-                              name: customer.name,
-                              package_id: customer.package_id,
-                              user_pppoe: customer.user_pppoe,
-                              password_pppoe: customer.password_pppoe,
-                              whatsapp: customer.whatsapp,
-                              sn_ont: customer.sn_ont,
-                              due_day: customer.due_day,
-                              status: customer.status,
-                              address: customer.address,
-                            });
-                          }}
-                        >
-                          Edit
-                        </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </article>
-        </section>
+        <CustomersPage
+          user={user}
+          packages={packages}
+          customers={customers}
+          filteredCustomers={filteredCustomers}
+          customerForm={customerForm}
+          customerErrors={customerErrors}
+          editingCustomerId={editingCustomerId}
+          customerLifecycleFilter={customerLifecycleFilter}
+          customerLifecycleMap={customerLifecycleMap}
+          submitting={submitting}
+          busyAction={busyAction}
+          onFormChange={setCustomerForm}
+          onFilterChange={(filter) => setCustomerLifecycleFilter(filter as CustomerLifecycleFilter)}
+          onSubmit={handleCustomerSubmit}
+          onStatusChange={(id, status) => void handleStatusChange(id, status)}
+          onEdit={(customer) => {
+            setEditingCustomerId(customer.id);
+            setCustomerForm({
+              name: customer.name,
+              package_id: customer.package_id,
+              user_pppoe: customer.user_pppoe,
+              password_pppoe: customer.password_pppoe,
+              whatsapp: customer.whatsapp,
+              sn_ont: customer.sn_ont,
+              due_day: customer.due_day,
+              status: customer.status,
+              address: customer.address,
+            });
+          }}
+          onCancelEdit={() => {
+            setEditingCustomerId(null);
+            setCustomerForm(defaultCustomerForm());
+          }}
+        />
       ) : null}
 
       {view === "bills" ? (
-        <section className="grid feature-grid">
-          {user?.role !== "viewer" && (
-            <article className="surface">
-              <div className="section-heading">
-                <h2>Generate Tagihan</h2>
-              </div>
-              <form className="form-grid" onSubmit={handleGenerateBills}>
-                <label>
-                  <span>Periode (YYYY-MM)</span>
-                  <input
-                    className={inputClassName(billErrors.period)}
-                    value={billPeriod}
-                    onChange={(event) => setBillPeriod(event.target.value)}
-                    placeholder="2026-04"
-                  />
-                  {renderInlineError(billErrors.period)}
-                </label>
-                <div className="button-row">
-                  <button className="primary-button" disabled={submitting}>
-                    {isBusy("generate-bills") ? "Menghasilkan..." : "Generate Sekarang"}
-                  </button>
-                </div>
-              </form>
-              <p className="muted top-gap">
-                Generate hanya akan membuat tagihan untuk pelanggan `active` dan `limit`
-                yang belum punya tagihan di periode tersebut.
-              </p>
-            </article>
-          )}
-
-          <article className="surface">
-            <div className="section-heading">
-              <h2>Daftar Tagihan</h2>
-              <StatusPill label={`${bills.length} item`} tone="slate" />
-            </div>
-            <div className="table-shell">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Invoice</th>
-                    <th>Pelanggan</th>
-                    <th>Periode</th>
-                    <th>Jatuh Tempo</th>
-                    <th>Nominal</th>
-                    <th>Status</th>
-                    <th>Bukti</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bills.length === 0 ? (
-                    <tr>
-                      <td colSpan={8}>
-                        <span className="muted">Belum ada tagihan untuk ditampilkan pada database ini.</span>
-                      </td>
-                    </tr>
-                  ) : bills.map((bill) => (
-                    <Fragment key={bill.id}>
-                      <tr>
-                        <td>{bill.invoice_number}</td>
-                        <td>{bill.customer_name}</td>
-                        <td>{bill.period}</td>
-                        <td>{bill.due_date}</td>
-                        <td>{formatCurrency(bill.amount)}</td>
-                        <td>
-                          <StatusPill
-                            label={displayStatusLabel(bill.display_status)}
-                            tone={displayStatusTone(bill.display_status)}
-                          />
-                        </td>
-                        <td>
-                          {bill.proof_path ? (
-                            <a href={bill.proof_path} target="_blank" rel="noreferrer">
-                              Lihat bukti
-                            </a>
-                          ) : (
-                            <span className="muted">Belum ada</span>
-                          )}
-                        </td>
-                        <td>
-                          <div className="stack-actions">
-                            <button
-                              type="button"
-                              className="ghost-button"
-                              onClick={() => window.open(`/api/v1/bills/${bill.id}/invoice`, "_blank")}
-                            >
-                              Invoice
-                            </button>
-                            {user?.role !== "viewer" && bill.status === "belum_bayar" ? (
-                              <button
-                                type="button"
-                                className="ghost-button"
-                                onClick={() => void handleMarkBillPaid(bill.id)}
-                              >
-                                Tandai Lunas
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              className="ghost-button"
-                              onClick={() => void handleToggleNotifications(bill.id)}
-                            >
-                              Log WA
-                            </button>
-                            {user?.role !== "viewer" && (
-                              <>
-                                <input
-                                  type="file"
-                                  accept=".jpg,.jpeg,.png,.pdf,.webp"
-                                  onChange={(event) =>
-                                    setProofFiles((current) => ({
-                                      ...current,
-                                      [bill.id]: event.target.files?.[0] ?? null,
-                                    }))
-                                  }
-                                />
-                                <button
-                                  type="button"
-                                  className="secondary-button"
-                                  onClick={() => void handleUploadProof(bill.id)}
-                                >
-                                  {isBusy("upload-proof") ? "Mengunggah..." : "Upload Bukti"}
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                      {expandedBillId === bill.id && (
-                        <tr className="expanded-row">
-                          <td colSpan={8}>
-                            <div className="expanded-content p-4">
-                              <h4>Riwayat Notifikasi</h4>
-                              {notificationLogs[bill.id]?.length ? (
-                                <table className="compact-table mt-2" style={{width: '100%'}}>
-                                  <thead>
-                                    <tr>
-                                      <th style={{textAlign: 'left'}}>Waktu</th>
-                                      <th style={{textAlign: 'left'}}>Tujuan</th>
-                                      <th style={{textAlign: 'left'}}>Trigger</th>
-                                      <th style={{textAlign: 'left'}}>Status</th>
-                                      <th style={{textAlign: 'left'}}>Response</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {notificationLogs[bill.id].map((log) => (
-                                      <tr key={log.id}>
-                                        <td>{new Date(log.created_at).toLocaleString()}</td>
-                                        <td>{log.sent_to}</td>
-                                        <td>{log.trigger_key}</td>
-                                        <td><StatusPill label={log.status} tone={log.status === "sent" ? "green" : "slate"} /></td>
-                                        <td>{log.response_message}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              ) : (
-                                <p className="muted mt-2">Belum ada riwayat notifikasi WhatsApp.</p>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </article>
-        </section>
+        <BillsPage
+          user={user}
+          bills={bills}
+          billPeriod={billPeriod}
+          billErrors={billErrors}
+          submitting={submitting}
+          busyAction={busyAction}
+          expandedBillId={expandedBillId}
+          notificationLogs={notificationLogs}
+          proofFiles={proofFiles}
+          onBillPeriodChange={setBillPeriod}
+          onGenerateBills={handleGenerateBills}
+          onMarkBillPaid={(id) => void handleMarkBillPaid(id)}
+          onToggleNotifications={(id) => void handleToggleNotifications(id)}
+          onProofFileChange={(id, file) =>
+            setProofFiles((current) => ({
+              ...current,
+              [id]: file,
+            }))
+          }
+          onUploadProof={(id) => void handleUploadProof(id)}
+        />
       ) : null}
 
       {view === "templates" ? (
-        <section className="grid feature-grid">
-          <article className="surface">
-            <div className="section-heading">
-              <h2>{editingTemplateId ? "Edit Template" : "Tambah Template"}</h2>
-            </div>
-            <form className="form-grid" onSubmit={handleTemplateSubmit}>
-              <label>
-                <span>Nama Template</span>
-                <input
-                  className={inputClassName(templateErrors.name)}
-                  value={templateForm.name}
-                  onChange={(event) =>
-                    setTemplateForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                />
-                {renderInlineError(templateErrors.name)}
-              </label>
-              <label>
-                <span>Trigger Key</span>
-                <input
-                  className={inputClassName(templateErrors.trigger_key)}
-                  value={templateForm.trigger_key}
-                  onChange={(event) =>
-                    setTemplateForm((current) => ({
-                      ...current,
-                      trigger_key: event.target.value,
-                    }))
-                  }
-                  placeholder="contoh: reminder_custom"
-                />
-                {renderInlineError(templateErrors.trigger_key)}
-              </label>
-              <label className="full-width">
-                <span>Isi Template</span>
-                <textarea
-                  className={inputClassName(templateErrors.content)}
-                  rows={8}
-                  value={templateForm.content}
-                  onChange={(event) =>
-                    setTemplateForm((current) => ({ ...current, content: event.target.value }))
-                  }
-                />
-                {renderInlineError(templateErrors.content)}
-              </label>
-              <label>
-                <span>Status</span>
-                <select
-                  value={templateForm.is_active ? "1" : "0"}
-                  onChange={(event) =>
-                    setTemplateForm((current) => ({
-                      ...current,
-                      is_active: event.target.value === "1",
-                    }))
-                  }
-                >
-                  <option value="1">Active</option>
-                  <option value="0">Inactive</option>
-                </select>
-              </label>
-              <div className="button-row">
-                <button className="primary-button" disabled={submitting}>
-                  {isBusy("save-template") ? "Menyimpan..." : editingTemplateId ? "Update Template" : "Simpan Template"}
-                </button>
-                {editingTemplateId ? (
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => {
-                      setEditingTemplateId(null);
-                      setTemplateForm(defaultTemplateForm());
-                    }}
-                  >
-                    Batal Edit
-                  </button>
-                ) : null}
-              </div>
-            </form>
-            <p className="muted top-gap">
-              Placeholder dasar yang didukung: `{"{nama}"}`, `{"{periode}"}`, `{"{jatuh_tempo}"}`,
-              `{"{invoice_number}"}`, `{"{nominal}"}`, `{"{hari_limit}"}`.
-            </p>
-          </article>
-
-          <article className="surface">
-            <div className="section-heading">
-              <h2>Daftar Template</h2>
-              <StatusPill label={`${templates.length} item`} tone="slate" />
-            </div>
-            <div className="table-shell">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nama</th>
-                    <th>Trigger</th>
-                    <th>Status</th>
-                    <th>Isi</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {templates.length === 0 ? (
-                    <tr>
-                      <td colSpan={5}>
-                        <span className="muted">Belum ada template WhatsApp yang tersimpan.</span>
-                      </td>
-                    </tr>
-                  ) : templates.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.name}</td>
-                      <td>{item.trigger_key}</td>
-                      <td>
-                        <StatusPill label={item.is_active ? "active" : "inactive"} tone={item.is_active ? "green" : "slate"} />
-                      </td>
-                      <td>{item.content}</td>
-                      <td>
-                        <div className="table-actions">
-                          <button
-                            type="button"
-                            className="ghost-button"
-                            onClick={() => {
-                              setEditingTemplateId(item.id);
-                              setTemplateForm({
-                                name: item.name,
-                                trigger_key: item.trigger_key,
-                                content: item.content,
-                                is_active: item.is_active,
-                              });
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="ghost-button danger-button"
-                            onClick={() => void handleTemplateDelete(item.id)}
-                          >
-                            Hapus
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </article>
-        </section>
+        <TemplatesPage
+          templates={templates}
+          templateForm={templateForm}
+          templateErrors={templateErrors}
+          editingTemplateId={editingTemplateId}
+          submitting={submitting}
+          busyAction={busyAction}
+          onFormChange={setTemplateForm}
+          onSubmit={handleTemplateSubmit}
+          onEdit={(item) => {
+            setEditingTemplateId(item.id);
+            setTemplateForm({
+              name: item.name,
+              trigger_key: item.trigger_key,
+              content: item.content,
+              is_active: item.is_active,
+            });
+          }}
+          onCancelEdit={() => {
+            setEditingTemplateId(null);
+            setTemplateForm(defaultTemplateForm());
+          }}
+          onDelete={(id) => void handleTemplateDelete(id)}
+        />
       ) : null}
 
       {view === "monitoring" ? (
-        <section className="grid">
-          <article className="surface">
-            <div className="section-heading">
-              <h2>Monitoring Sistem</h2>
-              <div className="table-actions">
-                <StatusPill label={health?.status ?? "checking"} tone={appTone} />
-                <button
-                  type="button"
-                  className="ghost-button"
-                  disabled={submitting}
-                  onClick={() => void withFeedback(refreshMonitoringData)}
-                >
-                  {submitting && !busyAction ? "Memproses..." : "Refresh Status"}
-                </button>
-              </div>
-            </div>
-            <div className="monitor-grid">
-              <article className="monitor-card">
-                <span>Database</span>
-                <strong>{health?.services.database ?? "unknown"}</strong>
-                <StatusPill label={health?.services.database ?? "unknown"} tone={databaseTone} />
-              </article>
-              <article className="monitor-card">
-                <span>Worker</span>
-                <strong>{health?.services.worker ?? "unknown"}</strong>
-                <StatusPill label={health?.services.worker ?? "unknown"} tone={workerTone} />
-              </article>
-              <article className="monitor-card">
-                <span>Backup Otomatis</span>
-                <strong>{health?.services.backup ?? "unknown"}</strong>
-                <StatusPill label={health?.services.backup ?? "unknown"} tone={backupTone} />
-              </article>
-              <article className="monitor-card">
-                <span>Scheduler Billing</span>
-                <strong>{health?.scheduler.billing_auto_enabled ? "aktif" : "nonaktif"}</strong>
-                <StatusPill
-                  label={health?.scheduler.billing_last_error ? "error" : health?.scheduler.billing_auto_enabled ? "scheduled" : "disabled"}
-                  tone={schedulerTone}
-                />
-              </article>
-              <article className="monitor-card">
-                <span>Integrasi</span>
-                <strong>{integrationSummary(health)}</strong>
-                <StatusPill
-                  label={
-                    health?.integrations.whatsapp_configured ||
-                    health?.integrations.discord_configured ||
-                    health?.integrations.mikrotik_configured
-                      ? "configured"
-                      : "pending"
-                  }
-                  tone={
-                    health?.integrations.whatsapp_configured ||
-                    health?.integrations.discord_configured ||
-                    health?.integrations.mikrotik_configured
-                      ? "green"
-                      : "gold"
-                  }
-                />
-              </article>
-            </div>
-          </article>
-
-          <section className="grid detail-grid">
-            <article className="surface">
-              <div className="section-heading">
-                <h2>Worker Detail</h2>
-              </div>
-              <dl className="meta-list">
-                <div>
-                  <dt>Last Heartbeat</dt>
-                  <dd>{formatDateTime(health?.worker.last_heartbeat)}</dd>
-                </div>
-                <div>
-                  <dt>Worker Interval</dt>
-                  <dd>{health?.worker.interval_seconds ?? 0} detik</dd>
-                </div>
-                <div>
-                  <dt>Last Health Check</dt>
-                  <dd>{formatDateTime(health?.timestamp)}</dd>
-                </div>
-                <div>
-                  <dt>Last Cycle</dt>
-                  <dd>{formatDateTime(health?.worker.last_cycle_at)}</dd>
-                </div>
-                <div>
-                  <dt>Cycle Error</dt>
-                  <dd>{health?.worker.last_cycle_error || "Tidak ada"}</dd>
-                </div>
-              </dl>
-            </article>
-
-            <article className="surface">
-              <div className="section-heading">
-                <h2>Backup Policy</h2>
-              </div>
-              <dl className="meta-list">
-                <div>
-                  <dt>Status</dt>
-                  <dd>{health?.backup.enabled ? "Aktif" : "Nonaktif"}</dd>
-                </div>
-                <div>
-                  <dt>Jadwal Harian</dt>
-                  <dd>{health?.backup.scheduled_time ?? "-"}</dd>
-                </div>
-                <div>
-                  <dt>Retensi</dt>
-                  <dd>{health?.backup.retention_count ?? 0} file</dd>
-                </div>
-                <div>
-                  <dt>Backup Terakhir</dt>
-                  <dd>{health?.backup.last_filename ? `${health.backup.last_filename} (${health.backup.last_run_date})` : "Belum ada"}</dd>
-                </div>
-              </dl>
-            </article>
-          </section>
-
-          <section className="grid detail-grid">
-            <article className="surface">
-              <div className="section-heading">
-                <h2>Scheduler Billing</h2>
-              </div>
-              <dl className="meta-list">
-                <div>
-                  <dt>Status</dt>
-                  <dd>{health?.scheduler.billing_auto_enabled ? "Aktif" : "Nonaktif"}</dd>
-                </div>
-                <div>
-                  <dt>Jadwal Generate</dt>
-                  <dd>
-                    Tanggal {health?.scheduler.billing_generate_day ?? 1} pukul {health?.scheduler.billing_generate_time ?? "00:05"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Next Run</dt>
-                  <dd>{formatDateTime(health?.scheduler.billing_next_run)}</dd>
-                </div>
-                <div>
-                  <dt>Last Attempt</dt>
-                  <dd>{formatDateTime(health?.scheduler.billing_last_attempt_at)}</dd>
-                </div>
-                <div>
-                  <dt>Last Success</dt>
-                  <dd>
-                    {health?.scheduler.billing_last_success_period
-                      ? `${health.scheduler.billing_last_success_period} (${formatDateTime(health.scheduler.billing_last_run_at)})`
-                      : "Belum ada"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Tagihan Dibuat Terakhir</dt>
-                  <dd>{health?.scheduler.billing_last_generated_count ?? 0}</dd>
-                </div>
-                <div>
-                  <dt>Retry Policy</dt>
-                  <dd>
-                    {health?.scheduler.billing_retry_attempts ?? 0} percobaan / backoff {health?.scheduler.billing_retry_backoff_seconds ?? 0} detik
-                  </dd>
-                </div>
-                <div>
-                  <dt>Last Error</dt>
-                  <dd>{health?.scheduler.billing_last_error || "Tidak ada"}</dd>
-                </div>
-              </dl>
-            </article>
-
-            <article className="surface">
-              <div className="section-heading">
-                <h2>Database Integrity</h2>
-              </div>
-              <dl className="meta-list">
-                <div>
-                  <dt>Quick Check</dt>
-                  <dd>{health?.database.quick_check.status ?? "unknown"}</dd>
-                </div>
-                <div>
-                  <dt>Pesan</dt>
-                  <dd>{health?.database.quick_check.message ?? "-"}</dd>
-                </div>
-              </dl>
-            </article>
-          </section>
-
-          <article className="surface">
-            <div className="section-heading">
-              <h2>Backup Database</h2>
-              <StatusPill label={`${backups.length} backup tersedia`} tone="slate" />
-            </div>
-            <div className="button-row" style={{ marginBottom: "1rem" }}>
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={submitting}
-                  onClick={() => void handleCreateBackup()}
-                >
-                {isBusy("create-backup") ? "Membuat backup..." : "Backup Sekarang"}
-                </button>
-            </div>
-            <div className="table-shell">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Filename</th>
-                    <th>Ukuran</th>
-                    <th>Waktu</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {backups.length === 0 ? (
-                    <tr><td colSpan={4}><span className="muted">Belum ada backup.</span></td></tr>
-                  ) : backups.map((b) => (
-                    <tr key={b.filename}>
-                      <td>{b.filename}</td>
-                      <td>{(b.size / 1024).toFixed(1)} KB</td>
-                      <td>{formatDateTime(b.mod_time)}</td>
-                      <td>
-                        <div className="table-actions">
-                          <button
-                            type="button"
-                            className="ghost-button"
-                            onClick={() => void handleVerifyBackup(b.filename)}
-                          >
-                            Verify
-                          </button>
-                          <button
-                            type="button"
-                            className="ghost-button"
-                            onClick={() => void handleSimulateRestore(b.filename)}
-                          >
-                            Simulasi Restore
-                          </button>
-                          <a className="ghost-button" href={getBackupDownloadUrl(b.filename)} download>
-                            Download
-                          </a>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {restoreSimulation && (
-              <div className="top-gap" style={{ padding: "1rem", border: "1px solid var(--border)", borderRadius: "var(--radius)", backgroundColor: "var(--surface)" }}>
-                <h3>Simulasi Restore: {restoreSimulation.filename}</h3>
-                <p>Status: {restoreSimulation.result.valid ? <span style={{ color: "var(--success)" }}>Valid</span> : "Invalid"}</p>
-                <p>Pesan: {restoreSimulation.result.message}</p>
-                <ul>
-                  <li>Total Users: {restoreSimulation.result.total_users}</li>
-                  <li>Total Pelanggan: {restoreSimulation.result.total_pelanggan}</li>
-                  <li>Total Tagihan: {restoreSimulation.result.total_tagihan}</li>
-                </ul>
-                <div className="button-row top-gap">
-                  <button type="button" className="danger-button" onClick={() => void handleApplyRestore()}>
-                    Apply to Live (Restart)
-                  </button>
-                  <button type="button" className="ghost-button" onClick={() => setRestoreSimulation(null)}>
-                    Batal
-                  </button>
-                </div>
-              </div>
-            )}
-          </article>
-
-          <article className="surface">
-            <div className="section-heading">
-              <h2>Alert Operasional</h2>
-              <StatusPill label={`${health?.alerts?.length ?? 0} alert`} tone={health?.alerts?.length ? "gold" : "green"} />
-            </div>
-            {!health?.alerts?.length ? (
-              <p className="muted">Tidak ada alert operasional dari health check saat ini.</p>
-            ) : (
-              <ul className="simple-list">
-                {health.alerts.map((alert, idx) => (
-                  <li key={`${idx}-${alert}`}>{alert}</li>
-                ))}
-              </ul>
-            )}
-          </article>
-        </section>
+        <MonitoringPage
+          health={health}
+          backups={backups}
+          restoreSimulation={restoreSimulation}
+          submitting={submitting}
+          busyAction={busyAction}
+          appTone={appTone}
+          databaseTone={databaseTone}
+          workerTone={workerTone}
+          backupTone={backupTone}
+          schedulerTone={schedulerTone}
+          onRefresh={() => void withFeedback(refreshMonitoringData)}
+          onCreateBackup={() => void handleCreateBackup()}
+          onVerifyBackup={(filename) => void handleVerifyBackup(filename)}
+          onSimulateRestore={(filename) => void handleSimulateRestore(filename)}
+          onApplyRestore={() => void handleApplyRestore()}
+          onCancelRestore={() => setRestoreSimulation(null)}
+        />
       ) : null}
 
       {view === "settings" ? (
-        <section className="grid">
-          <article className="surface">
-            <div className="section-heading">
-              <h2>Pengaturan Sistem</h2>
-              <p>Konfigurasi WhatsApp, Discord, billing rule, worker, dan kebijakan backup.</p>
-            </div>
-            <form className="form-grid" onSubmit={handleSettingsSubmit}>
-              <div className="form-group-title"><h4>WhatsApp Gateway</h4></div>
-
-              <label>
-                <span>Gateway URL</span>
-                <input
-                  type="text"
-                  value={settingsForm["wa_gateway_url"] ?? ""}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, wa_gateway_url: e.target.value })}
-                  placeholder="https://api.gateway.com/v1/messages"
-                />
-              </label>
-              <label>
-                <span>API Key</span>
-                <input
-                  type="text"
-                  value={settingsForm["wa_api_key"] ?? ""}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, wa_api_key: e.target.value })}
-                />
-              </label>
-              <label>
-                <span>Account ID / Device ID</span>
-                <input
-                  type="text"
-                  value={settingsForm["wa_account_id"] ?? ""}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, wa_account_id: e.target.value })}
-                />
-              </label>
-
-              <div className="form-group-title" style={{ marginTop: "1rem" }}><h4>Discord Notifications</h4></div>
-
-              <label className="full-width">
-                <span>Webhook URL</span>
-                <input
-                  type="text"
-                  value={settingsForm["discord_webhook_url"] ?? ""}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, discord_webhook_url: e.target.value })}
-                  placeholder="https://discord.com/api/webhooks/..."
-                />
-              </label>
-              <label>
-                <span>Notif Pembayaran Lunas</span>
-                <select
-                  value={settingsForm["discord_notify_payment"] ?? "1"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, discord_notify_payment: e.target.value })}
-                >
-                  <option value="1">Aktif</option>
-                  <option value="0">Nonaktif</option>
-                </select>
-              </label>
-              <label>
-                <span>Notif Generate Tagihan</span>
-                <select
-                  value={settingsForm["discord_notify_generate"] ?? "1"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, discord_notify_generate: e.target.value })}
-                >
-                  <option value="1">Aktif</option>
-                  <option value="0">Nonaktif</option>
-                </select>
-              </label>
-              <label>
-                <span>Notif Worker (Reminder / Limit / Backup)</span>
-                <select
-                  value={settingsForm["discord_notify_worker"] ?? "1"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, discord_notify_worker: e.target.value })}
-                >
-                  <option value="1">Aktif</option>
-                  <option value="0">Nonaktif</option>
-                </select>
-              </label>
-
-              <div className="form-group-title" style={{ marginTop: "1rem" }}><h4>Billing Rules & Worker</h4></div>
-
-              <label>
-                <span>Reminder Days (Hari sebelum jatuh tempo)</span>
-                <input
-                  type="number"
-                  value={settingsForm["billing_reminder_days"] ?? "3"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_reminder_days: e.target.value })}
-                />
-              </label>
-              <label>
-                <span>Limit Days (Batas bayar sebelum isolir)</span>
-                <input
-                  type="number"
-                  value={settingsForm["billing_limit_days"] ?? "5"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_limit_days: e.target.value })}
-                />
-              </label>
-              <label>
-                <span>Menunggak Days (Hari untuk status menunggak)</span>
-                <input
-                  type="number"
-                  value={settingsForm["billing_menunggak_days"] ?? "30"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_menunggak_days: e.target.value })}
-                />
-              </label>
-              <label>
-                <span>Auto Generate Tagihan</span>
-                <select
-                  value={settingsForm["billing_auto_generate_enabled"] ?? "1"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_auto_generate_enabled: e.target.value })}
-                >
-                  <option value="1">Aktif</option>
-                  <option value="0">Nonaktif</option>
-                </select>
-              </label>
-              <label>
-                <span>Tanggal Generate Bulanan</span>
-                <input
-                  className={inputClassName(settingsErrors.billing_generate_day)}
-                  type="number"
-                  min="1"
-                  max="28"
-                  value={settingsForm["billing_generate_day"] ?? "1"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_generate_day: e.target.value })}
-                />
-                {renderInlineError(settingsErrors.billing_generate_day)}
-              </label>
-              <label>
-                <span>Jam Generate Bulanan</span>
-                <input
-                  className={inputClassName(settingsErrors.billing_generate_time)}
-                  type="time"
-                  value={settingsForm["billing_generate_time"] ?? "00:05"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_generate_time: e.target.value })}
-                />
-                {renderInlineError(settingsErrors.billing_generate_time)}
-              </label>
-              <label>
-                <span>Retry Generate</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={settingsForm["billing_generate_retry_attempts"] ?? "3"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_generate_retry_attempts: e.target.value })}
-                />
-              </label>
-              <label>
-                <span>Backoff Retry (Detik)</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="60"
-                  value={settingsForm["billing_generate_retry_backoff_seconds"] ?? "2"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, billing_generate_retry_backoff_seconds: e.target.value })}
-                />
-              </label>
-              <label>
-                <span>Worker Interval (Detik)</span>
-                <input
-                  className={inputClassName(settingsErrors.worker_interval_seconds)}
-                  type="number"
-                  value={settingsForm["worker_interval_seconds"] ?? "60"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, worker_interval_seconds: e.target.value })}
-                />
-                {renderInlineError(settingsErrors.worker_interval_seconds)}
-              </label>
-              <label>
-                <span>Auto Backup</span>
-                <select
-                  value={settingsForm["backup_auto_enabled"] ?? "1"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, backup_auto_enabled: e.target.value })}
-                >
-                  <option value="1">Aktif</option>
-                  <option value="0">Nonaktif</option>
-                </select>
-              </label>
-              <label>
-                <span>Jadwal Backup Harian</span>
-                <input
-                  type="time"
-                  value={settingsForm["backup_auto_time"] ?? "02:00"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, backup_auto_time: e.target.value })}
-                />
-              </label>
-              <label>
-                <span>Retensi Backup</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={settingsForm["backup_retention_count"] ?? "7"}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, backup_retention_count: e.target.value })}
-                />
-              </label>
-
-              <div className="form-group-title" style={{ marginTop: "1rem" }}><h4>MikroTik</h4></div>
-              <label>
-                <span>Host Router</span>
-                <input
-                  type="text"
-                  value={settingsForm["mikrotik_host"] ?? ""}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, mikrotik_host: e.target.value })}
-                  placeholder="192.168.88.1"
-                />
-              </label>
-              <label>
-                <span>Username Router</span>
-                <input
-                  type="text"
-                  value={settingsForm["mikrotik_user"] ?? ""}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, mikrotik_user: e.target.value })}
-                  placeholder="admin"
-                />
-              </label>
-              <label>
-                <span>Password Router</span>
-                <input
-                  type="password"
-                  value={settingsForm["mikrotik_pass"] ?? ""}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, mikrotik_pass: e.target.value })}
-                  placeholder="••••••••"
-                />
-              </label>
-              <label>
-                <span>Username PPPoE Test</span>
-                <input
-                  type="text"
-                  value={settingsForm["mikrotik_test_username"] ?? ""}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, mikrotik_test_username: e.target.value })}
-                  placeholder="test-user"
-                />
-              </label>
-
-              <div className="form-actions">
-                <button type="submit" className="primary-button" disabled={submitting}>
-                  {isBusy("save-settings") ? "Menyimpan..." : "Simpan Pengaturan"}
-                </button>
-              </div>
-            </form>
-            <p className="muted top-gap">
-              Operasional backup manual dan histori file sekarang dipindahkan ke tab Monitoring agar tim bisa cek status sistem tanpa membuka form konfigurasi.
-            </p>
-          </article>
-        </section>
+        <SettingsPage
+          settingsForm={settingsForm}
+          settingsErrors={settingsErrors}
+          submitting={submitting}
+          busyAction={busyAction}
+          onFormChange={setSettingsForm}
+          onSubmit={handleSettingsSubmit}
+        />
       ) : null}
 
       {view === "audit" ? (
-        <section className="grid">
-          <article className="surface">
-            <div className="section-heading">
-              <h2>Audit Log Operasional</h2>
-              <div className="table-actions">
-                <StatusPill label={`${auditLogs.length} event`} tone="slate" />
-                <button
-                  type="button"
-                  className="ghost-button"
-                  disabled={submitting}
-                  onClick={() =>
-                    void withFeedback(async () => {
-                      const payload = await fetchAuditLogs(100);
-                      setAuditLogs(payload.data);
-                    })
-                  }
-                >
-                  Refresh Audit
-                </button>
-              </div>
-            </div>
-            <div className="table-shell">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Waktu</th>
-                    <th>User</th>
-                    <th>IP</th>
-                    <th>Aksi</th>
-                    <th>Detail</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan={5}>
-                        <span className="muted">Belum ada audit log.</span>
-                      </td>
-                    </tr>
-                  ) : (
-                    auditLogs.map((log) => (
-                      <tr key={log.id}>
-                        <td>{formatDateTime(log.created_at)}</td>
-                        <td>{log.username ?? (log.user_id ? `#${log.user_id}` : "-")}</td>
-                        <td><span className="muted" style={{fontSize:'0.85em'}}>{log.ip_address || "-"}</span></td>
-                        <td>{log.action}</td>
-                        <td>{log.message || "-"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </article>
-        </section>
+        <AuditLogsPage
+          auditLogs={auditLogs}
+          submitting={submitting}
+          onRefresh={() =>
+            void withFeedback(async () => {
+              const payload = await fetchAuditLogs(100);
+              setAuditLogs(payload.data);
+            })
+          }
+        />
       ) : null}
 
       {view === "users" ? (
-        <section className="grid feature-grid">
-          <article className="surface">
-            <div className="section-heading">
-              <h2>Tambah User Tim</h2>
-            </div>
-            <form className="form-grid" onSubmit={handleManagedUserSubmit}>
-              <label>
-                <span>Username</span>
-                <input
-                  className={inputClassName(managedUserErrors.username)}
-                  value={managedUserForm.username}
-                  onChange={(event) =>
-                    setManagedUserForm((current) => ({ ...current, username: event.target.value }))
-                  }
-                />
-                {renderInlineError(managedUserErrors.username)}
-              </label>
-              <label>
-                <span>Password Awal</span>
-                <input
-                  className={inputClassName(managedUserErrors.password)}
-                  type="password"
-                  value={managedUserForm.password}
-                  onChange={(event) =>
-                    setManagedUserForm((current) => ({ ...current, password: event.target.value }))
-                  }
-                />
-                {renderInlineError(managedUserErrors.password)}
-              </label>
-              <label>
-                <span>Role</span>
-                <select
-                  value={managedUserForm.role}
-                  onChange={(event) =>
-                    setManagedUserForm((current) => ({ ...current, role: event.target.value }))
-                  }
-                >
-                  <option value="petugas">Petugas</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </label>
-              <div className="button-row">
-                <button className="primary-button" disabled={submitting}>
-                  {isBusy("save-user") ? "Menyimpan..." : "Simpan User"}
-                </button>
-              </div>
-            </form>
-            <p className="muted top-gap">
-              Gunakan akun `petugas` untuk operasional harian dan sisakan `admin` hanya untuk konfigurasi dan audit.
-            </p>
-          </article>
-
-          <article className="surface">
-            <div className="section-heading">
-              <h2>Daftar User</h2>
-              <StatusPill label={`${managedUsers.length} user`} tone="slate" />
-            </div>
-            <div className="table-shell">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Username</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Terakhir Login</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {managedUsers.length === 0 ? (
-                    <tr>
-                      <td colSpan={5}>
-                        <span className="muted">Belum ada user tim tambahan.</span>
-                      </td>
-                    </tr>
-                  ) : managedUsers.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.username}</td>
-                      <td>
-                        <select
-                          value={item.role}
-                          onChange={(event) =>
-                            void handleManagedUserUpdate(item, { role: event.target.value })
-                          }
-                        >
-                          <option value="petugas">Petugas</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                      </td>
-                      <td>
-                        <select
-                          value={item.is_active ? "1" : "0"}
-                          onChange={(event) =>
-                            void handleManagedUserUpdate(item, {
-                              is_active: event.target.value === "1",
-                            })
-                          }
-                        >
-                          <option value="1">Aktif</option>
-                          <option value="0">Nonaktif</option>
-                        </select>
-                      </td>
-                      <td>
-                        {item.last_login_at ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.85em' }}>
-                            <span>{new Date(item.last_login_at).toLocaleString('id-ID')}</span>
-                            <span className="muted">{item.last_login_ip || '-'}</span>
-                          </div>
-                        ) : (
-                          <span className="muted">Belum pernah</span>
-                        )}
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="ghost-button"
-                          onClick={() => void handleResetUserPassword(item)}
-                        >
-                          Reset Password
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </article>
-        </section>
+        <UsersPage
+          managedUsers={managedUsers}
+          managedUserForm={managedUserForm}
+          managedUserErrors={managedUserErrors}
+          submitting={submitting}
+          busyAction={busyAction}
+          onFormChange={setManagedUserForm}
+          onSubmit={handleManagedUserSubmit}
+          onUpdateRole={(item, role) => void handleManagedUserUpdate(item, { role })}
+          onUpdateStatus={(item, isActive) => void handleManagedUserUpdate(item, { is_active: isActive })}
+          onResetPassword={(item) => void handleResetUserPassword(item)}
+        />
       ) : null}
       </div>
 
       {confirmDialog ? (
-        <ModalShell
+        <Modal
           title={confirmDialog.title}
           onClose={() => setConfirmDialog(null)}
           actions={
@@ -2627,11 +1208,11 @@ export default function App() {
           }
         >
           <p className="muted">{confirmDialog.body}</p>
-        </ModalShell>
+        </Modal>
       ) : null}
 
       {passwordResetState ? (
-        <ModalShell
+        <Modal
           title={`Reset password ${passwordResetState.user.username}`}
           onClose={() => setPasswordResetState(null)}
           actions={
@@ -2664,482 +1245,13 @@ export default function App() {
             </label>
             <p className="muted">Minimal 8 karakter. Password lama akan langsung digantikan setelah disimpan.</p>
           </form>
-        </ModalShell>
+        </Modal>
       ) : null}
 
-      <div className="toast-stack" aria-live="polite" aria-atomic="true">
-        {toasts.map((toast) => (
-          <div key={toast.id} className={`toast-item toast-${toast.tone}`}>
-            <strong>{toast.tone === "success" ? "Berhasil" : toast.tone === "warning" ? "Perhatian" : "Error"}</strong>
-            <span>{toast.message}</span>
-          </div>
-        ))}
-      </div>
+      <ToastStack toasts={toasts} />
     </main>
   );
 }
 
-function DataPackageTable(props: {
-  packages: PackageItem[];
-  onEdit: (item: PackageItem) => void;
-  onDelete: (id: number) => void;
-}) {
-  return (
-    <div className="table-shell">
-      <table>
-        <thead>
-          <tr>
-            <th>Nama</th>
-            <th>Speed</th>
-            <th>Harga</th>
-            <th>Pelanggan</th>
-            <th>Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {props.packages.length === 0 ? (
-            <tr>
-              <td colSpan={5}>
-                <span className="muted">Belum ada master paket. Tambahkan paket pertama untuk mulai operasional.</span>
-              </td>
-            </tr>
-          ) : props.packages.map((pkg) => (
-            <tr key={pkg.id}>
-              <td>{pkg.name}</td>
-              <td>{pkg.speed_mbps} Mbps</td>
-              <td>{formatCurrency(pkg.price)}</td>
-              <td>{pkg.customer_count}</td>
-              <td>
-                <div className="table-actions">
-                  <button type="button" className="ghost-button" onClick={() => props.onEdit(pkg)}>
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button danger-button"
-                    onClick={() => props.onDelete(pkg.id)}
-                  >
-                    Hapus
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
-function SkeletonCard() {
-  return (
-    <article className="stat-card skeleton-card" aria-hidden="true">
-      <span className="skeleton-line skeleton-line-short" />
-      <strong className="skeleton-line skeleton-line-large" />
-    </article>
-  );
-}
 
-function ModalShell(props: {
-  title: string;
-  children: ReactNode;
-  actions: ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <div className="modal-backdrop" role="presentation" onClick={props.onClose}>
-      <section
-        className="modal-card surface"
-        role="dialog"
-        aria-modal="true"
-        aria-label={props.title}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="section-heading">
-          <h2>{props.title}</h2>
-          <button type="button" className="ghost-button" onClick={props.onClose} aria-label="Tutup dialog">
-            Tutup
-          </button>
-        </div>
-        <div className="modal-body">{props.children}</div>
-        <div className="modal-actions">{props.actions}</div>
-      </section>
-    </div>
-  );
-}
-
-function displayStatusLabel(status: BillItem["display_status"]) {
-  switch (status) {
-    case "lunas":
-      return "lunas";
-    case "menunggak":
-      return "menunggak";
-    case "jatuh_tempo":
-      return "jatuh tempo";
-    default:
-      return "belum bayar";
-  }
-}
-
-function inputClassName(error?: string) {
-  return error ? "input-invalid" : undefined;
-}
-
-function renderInlineError(error?: string) {
-  if (!error) {
-    return null;
-  }
-  return <span className="field-error">{error}</span>;
-}
-
-function validateLogin(form: { username: string; password: string }): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!form.username.trim()) errors.username = "Username wajib diisi.";
-  if (!form.password.trim()) errors.password = "Password wajib diisi.";
-  return errors;
-}
-
-function validatePackage(form: PackageFormState): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!form.name.trim()) errors.name = "Nama paket wajib diisi.";
-  if (form.speed_mbps <= 0) errors.speed_mbps = "Kecepatan harus lebih dari 0 Mbps.";
-  if (form.price <= 0) errors.price = "Harga harus lebih dari 0.";
-  return errors;
-}
-
-function validateCustomer(form: CustomerFormState): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!form.name.trim()) errors.name = "Nama pelanggan wajib diisi.";
-  if (!form.package_id) errors.package_id = "Pilih paket pelanggan.";
-  if (!form.user_pppoe.trim()) errors.user_pppoe = "Username PPPoE wajib diisi.";
-  if (!form.password_pppoe.trim()) errors.password_pppoe = "Password PPPoE wajib diisi.";
-  if (form.due_day < 1 || form.due_day > 28) errors.due_day = "Jatuh tempo bulanan harus antara 1-28.";
-  return errors;
-}
-
-function validateTemplate(form: TemplateFormState): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!form.name.trim()) errors.name = "Nama template wajib diisi.";
-  if (!form.trigger_key.trim()) errors.trigger_key = "Trigger key wajib diisi.";
-  if (!form.content.trim()) errors.content = "Isi template wajib diisi.";
-  return errors;
-}
-
-function validateManagedUser(form: ManagedUserFormState): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!form.username.trim()) errors.username = "Username user wajib diisi.";
-  if (form.password.trim().length < 8) errors.password = "Password awal minimal 8 karakter.";
-  return errors;
-}
-
-function validateSettings(form: Record<string, string>): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!/^\d+$/.test(form["billing_generate_day"] ?? "1")) {
-    errors.billing_generate_day = "Tanggal generate harus berupa angka.";
-  }
-  if (!/^\d{2}:\d{2}$/.test(form["billing_generate_time"] ?? "00:05")) {
-    errors.billing_generate_time = "Jam generate harus format HH:MM.";
-  }
-  if (!/^\d+$/.test(form["worker_interval_seconds"] ?? "60")) {
-    errors.worker_interval_seconds = "Interval worker harus berupa angka.";
-  }
-  return errors;
-}
-
-function validateBillPeriod(period: string): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!/^\d{4}-\d{2}$/.test(period.trim())) {
-    errors.period = "Periode harus memakai format YYYY-MM.";
-  }
-  return errors;
-}
-
-function validatePasswordReset(password: string): FieldErrors {
-  const errors: FieldErrors = {};
-  if (password.trim().length < 8) {
-    errors.password = "Password baru minimal 8 karakter.";
-  }
-  return errors;
-}
-
-function readCustomerLifecycleFilter(): CustomerLifecycleFilter {
-  if (typeof window === "undefined") {
-    return "all";
-  }
-  const stored = window.localStorage.getItem("customers.lifecycleFilter");
-  if (stored === "trial" || stored === "tertagih" || stored === "jatuh_tempo" || stored === "menunggak" || stored === "lunas" || stored === "all") {
-    return stored;
-  }
-  return "all";
-}
-
-function buildCustomerLifecycleMap(
-  customers: CustomerItem[],
-  bills: BillItem[],
-  settingsForm: Record<string, string>,
-) {
-  const reminderDays = parseInt(settingsForm["billing_reminder_days"] ?? "3", 10) || 3;
-  const menunggakDays = parseInt(settingsForm["billing_menunggak_days"] ?? "30", 10) || 30;
-  const trialGraceDays = parseInt(settingsForm["trial_overdue_grace_days"] ?? "7", 10) || 7;
-  const now = new Date();
-  const billsByCustomer = new Map<number, BillItem[]>();
-
-  for (const bill of bills) {
-    const current = billsByCustomer.get(bill.customer_id) ?? [];
-    current.push(bill);
-    billsByCustomer.set(bill.customer_id, current);
-  }
-
-  return Object.fromEntries(
-    customers.map((customer) => {
-      const trialEndsAt = resolveTrialEndsAt(customer);
-      if (customer.is_trial) {
-        return [customer.id, {
-          key: "trial",
-          label: "Trial Aktif",
-          tone: "gold" as const,
-          note: trialEndsAt
-            ? `Free trial sampai ${formatDateId(trialEndsAt)} (${customer.trial_days ?? 3} hari).`
-            : `Free trial ${customer.trial_days ?? 3} hari sedang berjalan.`,
-        }];
-      }
-
-      const unpaidBills = (billsByCustomer.get(customer.id) ?? []).filter((bill) => bill.status !== "lunas");
-      if (unpaidBills.length === 0) {
-        return [customer.id, {
-          key: "lunas",
-          label: "Lunas",
-          tone: "green" as const,
-          note: "Tidak ada tagihan aktif. Layanan berada pada kondisi aman.",
-        }];
-      }
-
-      const mostSevere = unpaidBills
-        .map((bill) => customerLifecycleFromBill(customer, bill, now, reminderDays, trialGraceDays, menunggakDays))
-        .sort((left, right) => lifecycleRank(right.key) - lifecycleRank(left.key))[0];
-
-      return [customer.id, mostSevere];
-    }),
-  ) as Record<number, { key: CustomerLifecycleFilter; label: string; tone: "green" | "gold" | "red" | "slate"; note: string }>;
-}
-
-function customerLifecycleFromBill(
-  customer: CustomerItem,
-  bill: BillItem,
-  now: Date,
-  reminderDays: number,
-  trialGraceDays: number,
-  menunggakDays: number,
-) {
-  const dueDate = parseBillDate(bill.due_date);
-  if (!dueDate) {
-    return {
-      key: "tertagih" as const,
-      label: "Tertagih",
-      tone: "slate" as const,
-      note: `Invoice ${bill.invoice_number} aktif dan menunggu pembayaran.`,
-    };
-  }
-
-  const trialEndsAt = resolveTrialEndsAt(customer);
-  let effectiveDueDate = new Date(dueDate);
-  if (trialEndsAt && trialEndsAt.getTime() > dueDate.getTime()) {
-    effectiveDueDate = addDays(startOfDay(trialEndsAt), trialGraceDays);
-  }
-
-  if (bill.status === "lunas") {
-    return {
-      key: "lunas" as const,
-      label: "Lunas",
-      tone: "green" as const,
-      note: `Invoice ${bill.invoice_number} sudah lunas.`,
-    };
-  }
-
-  const overdue = daysDiff(startOfDay(now), startOfDay(effectiveDueDate));
-  if (overdue > menunggakDays) {
-    return {
-      key: "menunggak" as const,
-      label: "Menunggak",
-      tone: "red" as const,
-      note: `Invoice ${bill.invoice_number} sudah lewat ${overdue} hari dari role jatuh tempo efektif.`,
-    };
-  }
-  if (overdue > 0) {
-    return {
-      key: "jatuh_tempo" as const,
-      label: "Jatuh Tempo",
-      tone: "gold" as const,
-      note: `Invoice ${bill.invoice_number} aktif. Role jatuh tempo sejak ${formatDateId(effectiveDueDate)}.`,
-    };
-  }
-
-  const reminderDate = addDays(startOfDay(dueDate), -reminderDays);
-  if (trialEndsAt && trialEndsAt.getTime() > dueDate.getTime()) {
-    return {
-      key: "tertagih" as const,
-      label: "Tertagih",
-      tone: "slate" as const,
-      note: `Trial selesai, notif sudah dikirim. Role jatuh tempo mulai ${formatDateId(effectiveDueDate)}.`,
-    };
-  }
-  if (now.getTime() >= reminderDate.getTime()) {
-    return {
-      key: "tertagih" as const,
-      label: "Tertagih",
-      tone: "slate" as const,
-      note: `Invoice ${bill.invoice_number} aktif. Window reminder dimulai ${formatDateId(reminderDate)}.`,
-    };
-  }
-  return {
-    key: "tertagih" as const,
-    label: "Tertagih",
-    tone: "slate" as const,
-    note: `Invoice ${bill.invoice_number} aktif. Menunggu window reminder berikutnya.`,
-  };
-}
-
-function lifecycleRank(key: CustomerLifecycleFilter) {
-  switch (key) {
-    case "menunggak":
-      return 5;
-    case "jatuh_tempo":
-      return 4;
-    case "tertagih":
-      return 3;
-    case "trial":
-      return 2;
-    case "lunas":
-      return 1;
-    default:
-      return 0;
-  }
-}
-
-function resolveTrialEndsAt(customer: CustomerItem) {
-  if (!customer.trial_started_at || !customer.trial_days) {
-    return null;
-  }
-  const startedAt = new Date(customer.trial_started_at);
-  if (Number.isNaN(startedAt.getTime())) {
-    return null;
-  }
-  return addDays(startedAt, customer.trial_days);
-}
-
-function parseBillDate(value: string) {
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return parsed;
-}
-
-function startOfDay(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-}
-
-function addDays(value: Date, days: number) {
-  const next = new Date(value);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function daysDiff(current: Date, previous: Date) {
-  return Math.floor((current.getTime() - previous.getTime()) / 86400000);
-}
-
-function formatDateId(value: Date) {
-  return new Intl.DateTimeFormat("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(value);
-}
-
-function displayStatusTone(status: BillItem["display_status"]) {
-  switch (status) {
-    case "lunas":
-      return "green" as const;
-    case "menunggak":
-      return "red" as const;
-    case "jatuh_tempo":
-      return "gold" as const;
-    default:
-      return "slate" as const;
-  }
-}
-
-function statusTone(status?: string) {
-  switch (status) {
-    case "ok":
-      return "green" as const;
-    case "error":
-    case "disabled":
-      return "red" as const;
-    case "degraded":
-    case "idle":
-    case "pending":
-      return "gold" as const;
-    default:
-      return "slate" as const;
-  }
-}
-
-function formatDateTime(value?: string) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString("id-ID");
-}
-
-function integrationSummary(health: HealthPayload | null) {
-  if (!health) {
-    return "Belum diperiksa";
-  }
-
-  const items: string[] = [];
-  if (health.integrations.whatsapp_configured) {
-    items.push("WA siap");
-  }
-  if (health.integrations.discord_configured) {
-    items.push("Discord siap");
-  }
-  if (health.integrations.mikrotik_configured) {
-    items.push("MikroTik siap");
-  }
-
-  return items.length > 0 ? items.join(" • ") : "Belum dikonfigurasi";
-}
-
-function toErrorMessage(caughtError: unknown) {
-  if (caughtError instanceof ApiError) {
-    return caughtError.message;
-  }
-
-  if (caughtError instanceof Error) {
-    return caughtError.message;
-  }
-
-  return "Unknown error";
-}
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-function currentPeriod() {
-  const now = new Date();
-  const month = `${now.getMonth() + 1}`.padStart(2, "0");
-  return `${now.getFullYear()}-${month}`;
-}

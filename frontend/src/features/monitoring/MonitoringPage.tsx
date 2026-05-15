@@ -1,0 +1,371 @@
+import { StatusPill } from "../../components/ui";
+import { formatDateTime } from "../../utils/format";
+import { integrationSummary } from "../../utils/status";
+import { getBackupDownloadUrl, type HealthPayload, type RestoreSimulationResult } from "../../lib/api";
+
+export type BackupItem = {
+  filename: string;
+  size: number;
+  mod_time: string;
+};
+
+type MonitoringPageProps = {
+  health: HealthPayload | null;
+  backups: BackupItem[];
+  restoreSimulation: { filename: string; result: RestoreSimulationResult } | null;
+  submitting: boolean;
+  busyAction: string | null;
+  appTone: "green" | "gold" | "red" | "slate";
+  databaseTone: "green" | "gold" | "red" | "slate";
+  workerTone: "green" | "gold" | "red" | "slate";
+  backupTone: "green" | "gold" | "red" | "slate";
+  schedulerTone: "green" | "gold" | "red" | "slate";
+  onRefresh: () => void;
+  onCreateBackup: () => void;
+  onVerifyBackup: (filename: string) => void;
+  onSimulateRestore: (filename: string) => void;
+  onApplyRestore: () => void;
+  onCancelRestore: () => void;
+};
+
+export function MonitoringPage({
+  health,
+  backups,
+  restoreSimulation,
+  submitting,
+  busyAction,
+  appTone,
+  databaseTone,
+  workerTone,
+  backupTone,
+  schedulerTone,
+  onRefresh,
+  onCreateBackup,
+  onVerifyBackup,
+  onSimulateRestore,
+  onApplyRestore,
+  onCancelRestore,
+}: MonitoringPageProps) {
+  const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
+
+  return (
+    <section className="grid">
+      <article className="surface">
+        <div className="section-heading">
+          <h2>Monitoring Sistem</h2>
+          <div className="table-actions">
+            <StatusPill label={health?.status ?? "checking"} tone={appTone} />
+            <button
+              type="button"
+              className="ghost-button"
+              disabled={submitting}
+              onClick={onRefresh}
+            >
+              {submitting && !busyAction ? "Memproses..." : "Refresh Status"}
+            </button>
+          </div>
+        </div>
+        <div className="monitor-grid">
+          <article className="monitor-card">
+            <span>Database</span>
+            <strong>{health?.services.database ?? "unknown"}</strong>
+            <StatusPill label={health?.services.database ?? "unknown"} tone={databaseTone} />
+          </article>
+          <article className="monitor-card">
+            <span>Worker</span>
+            <strong>{health?.services.worker ?? "unknown"}</strong>
+            <StatusPill label={health?.services.worker ?? "unknown"} tone={workerTone} />
+          </article>
+          <article className="monitor-card">
+            <span>Backup Otomatis</span>
+            <strong>{health?.services.backup ?? "unknown"}</strong>
+            <StatusPill label={health?.services.backup ?? "unknown"} tone={backupTone} />
+          </article>
+          <article className="monitor-card">
+            <span>Scheduler Billing</span>
+            <strong>{health?.scheduler.billing_auto_enabled ? "aktif" : "nonaktif"}</strong>
+            <StatusPill
+              label={
+                health?.scheduler.billing_last_error
+                  ? "error"
+                  : health?.scheduler.billing_auto_enabled
+                    ? "scheduled"
+                    : "disabled"
+              }
+              tone={schedulerTone}
+            />
+          </article>
+          <article className="monitor-card">
+            <span>Integrasi</span>
+            <strong>{integrationSummary(health)}</strong>
+            <StatusPill
+              label={
+                health?.integrations.whatsapp_configured ||
+                health?.integrations.discord_configured ||
+                health?.integrations.mikrotik_configured
+                  ? "configured"
+                  : "pending"
+              }
+              tone={
+                health?.integrations.whatsapp_configured ||
+                health?.integrations.discord_configured ||
+                health?.integrations.mikrotik_configured
+                  ? "green"
+                  : "gold"
+              }
+            />
+          </article>
+        </div>
+      </article>
+
+      <section className="grid detail-grid">
+        <article className="surface">
+          <div className="section-heading">
+            <h2>Worker Detail</h2>
+          </div>
+          <dl className="meta-list">
+            <div>
+              <dt>Last Heartbeat</dt>
+              <dd>{formatDateTime(health?.worker.last_heartbeat)}</dd>
+            </div>
+            <div>
+              <dt>Worker Interval</dt>
+              <dd>{health?.worker.interval_seconds ?? 0} detik</dd>
+            </div>
+            <div>
+              <dt>Last Health Check</dt>
+              <dd>{formatDateTime(health?.timestamp)}</dd>
+            </div>
+            <div>
+              <dt>Last Cycle</dt>
+              <dd>{formatDateTime(health?.worker.last_cycle_at)}</dd>
+            </div>
+            <div>
+              <dt>Cycle Error</dt>
+              <dd>{health?.worker.last_cycle_error || "Tidak ada"}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article className="surface">
+          <div className="section-heading">
+            <h2>Backup Policy</h2>
+          </div>
+          <dl className="meta-list">
+            <div>
+              <dt>Status</dt>
+              <dd>{health?.backup.enabled ? "Aktif" : "Nonaktif"}</dd>
+            </div>
+            <div>
+              <dt>Jadwal Harian</dt>
+              <dd>{health?.backup.scheduled_time ?? "-"}</dd>
+            </div>
+            <div>
+              <dt>Retensi</dt>
+              <dd>{health?.backup.retention_count ?? 0} file</dd>
+            </div>
+            <div>
+              <dt>Backup Terakhir</dt>
+              <dd>
+                {health?.backup.last_filename
+                  ? `${health.backup.last_filename} (${health.backup.last_run_date})`
+                  : "Belum ada"}
+              </dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <section className="grid detail-grid">
+        <article className="surface">
+          <div className="section-heading">
+            <h2>Scheduler Billing</h2>
+          </div>
+          <dl className="meta-list">
+            <div>
+              <dt>Status</dt>
+              <dd>{health?.scheduler.billing_auto_enabled ? "Aktif" : "Nonaktif"}</dd>
+            </div>
+            <div>
+              <dt>Jadwal Generate</dt>
+              <dd>
+                Tanggal {health?.scheduler.billing_generate_day ?? 1} pukul{" "}
+                {health?.scheduler.billing_generate_time ?? "00:05"}
+              </dd>
+            </div>
+            <div>
+              <dt>Next Run</dt>
+              <dd>{formatDateTime(health?.scheduler.billing_next_run)}</dd>
+            </div>
+            <div>
+              <dt>Last Attempt</dt>
+              <dd>{formatDateTime(health?.scheduler.billing_last_attempt_at)}</dd>
+            </div>
+            <div>
+              <dt>Last Success</dt>
+              <dd>
+                {health?.scheduler.billing_last_success_period
+                  ? `${health.scheduler.billing_last_success_period} (${formatDateTime(
+                      health.scheduler.billing_last_run_at,
+                    )})`
+                  : "Belum ada"}
+              </dd>
+            </div>
+            <div>
+              <dt>Tagihan Dibuat Terakhir</dt>
+              <dd>{health?.scheduler.billing_last_generated_count ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Retry Policy</dt>
+              <dd>
+                {health?.scheduler.billing_retry_attempts ?? 0} percobaan / backoff{" "}
+                {health?.scheduler.billing_retry_backoff_seconds ?? 0} detik
+              </dd>
+            </div>
+            <div>
+              <dt>Last Error</dt>
+              <dd>{health?.scheduler.billing_last_error || "Tidak ada"}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article className="surface">
+          <div className="section-heading">
+            <h2>Database Integrity</h2>
+          </div>
+          <dl className="meta-list">
+            <div>
+              <dt>Quick Check</dt>
+              <dd>{health?.database.quick_check.status ?? "unknown"}</dd>
+            </div>
+            <div>
+              <dt>Pesan</dt>
+              <dd>{health?.database.quick_check.message ?? "-"}</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <article className="surface">
+        <div className="section-heading">
+          <h2>Backup Database</h2>
+          <StatusPill label={`${backups.length} backup tersedia`} tone="slate" />
+        </div>
+        <div className="button-row" style={{ marginBottom: "1rem" }}>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={submitting}
+            onClick={onCreateBackup}
+          >
+            {isBusy("create-backup") ? "Membuat backup..." : "Backup Sekarang"}
+          </button>
+        </div>
+        <div className="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Ukuran</th>
+                <th>Waktu</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {backups.length === 0 ? (
+                <tr>
+                  <td colSpan={4}>
+                    <span className="muted">Belum ada backup.</span>
+                  </td>
+                </tr>
+              ) : (
+                backups.map((b) => (
+                  <tr key={b.filename}>
+                    <td>{b.filename}</td>
+                    <td>{(b.size / 1024).toFixed(1)} KB</td>
+                    <td>{formatDateTime(b.mod_time)}</td>
+                    <td>
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          onClick={() => onVerifyBackup(b.filename)}
+                        >
+                          Verify
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          onClick={() => onSimulateRestore(b.filename)}
+                        >
+                          Simulasi Restore
+                        </button>
+                        <a className="ghost-button" href={getBackupDownloadUrl(b.filename)} download>
+                          Download
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {restoreSimulation && (
+          <div
+            className="top-gap"
+            style={{
+              padding: "1rem",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              backgroundColor: "var(--surface)",
+            }}
+          >
+            <h3>Simulasi Restore: {restoreSimulation.filename}</h3>
+            <p>
+              Status:{" "}
+              {restoreSimulation.result.valid ? (
+                <span style={{ color: "var(--success)" }}>Valid</span>
+              ) : (
+                "Invalid"
+              )}
+            </p>
+            <p>Pesan: {restoreSimulation.result.message}</p>
+            <ul>
+              <li>Total Users: {restoreSimulation.result.total_users}</li>
+              <li>Total Pelanggan: {restoreSimulation.result.total_pelanggan}</li>
+              <li>Total Tagihan: {restoreSimulation.result.total_tagihan}</li>
+            </ul>
+            <div className="button-row top-gap">
+              <button type="button" className="danger-button" onClick={onApplyRestore}>
+                Apply to Live (Restart)
+              </button>
+              <button type="button" className="ghost-button" onClick={onCancelRestore}>
+                Batal
+              </button>
+            </div>
+          </div>
+        )}
+      </article>
+
+      <article className="surface">
+        <div className="section-heading">
+          <h2>Alert Operasional</h2>
+          <StatusPill
+            label={`${health?.alerts?.length ?? 0} alert`}
+            tone={health?.alerts?.length ? "gold" : "green"}
+          />
+        </div>
+        {!health?.alerts?.length ? (
+          <p className="muted">Tidak ada alert operasional dari health check saat ini.</p>
+        ) : (
+          <ul className="simple-list">
+            {health.alerts.map((alert, idx) => (
+              <li key={`${idx}-${alert}`}>{alert}</li>
+            ))}
+          </ul>
+        )}
+      </article>
+    </section>
+  );
+}
