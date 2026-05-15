@@ -1,0 +1,160 @@
+import type { FormEvent } from "react";
+import { formatCurrency } from "../../utils/format";
+import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
+import type { PackageItem } from "../../types";
+import type { FieldErrors } from "../../utils/validation";
+
+export type PackageFormState = {
+  name: string;
+  speed_mbps: number;
+  price: number;
+  description: string;
+};
+
+export const defaultPackageForm = (): PackageFormState => ({
+  name: "",
+  speed_mbps: 10,
+  price: 150000,
+  description: "",
+});
+
+type PackagesPageProps = {
+  packages: PackageItem[];
+  packageForm: PackageFormState;
+  packageErrors: FieldErrors;
+  editingPackageId: number | null;
+  submitting: boolean;
+  busyAction: string | null;
+  onFormChange: (updater: (current: PackageFormState) => PackageFormState) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onEdit: (pkg: PackageItem) => void;
+  onCancelEdit: () => void;
+  onDelete: (id: number) => void;
+};
+
+export function PackagesPage({
+  packages,
+  packageForm,
+  packageErrors,
+  editingPackageId,
+  submitting,
+  busyAction,
+  onFormChange,
+  onSubmit,
+  onEdit,
+  onCancelEdit,
+  onDelete,
+}: PackagesPageProps) {
+  const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
+
+  return (
+    <section className="grid feature-grid">
+      <article className="surface">
+        <div className="section-heading">
+          <h2>{editingPackageId ? "Edit Paket" : "Tambah Paket"}</h2>
+        </div>
+        <form className="form-grid" onSubmit={onSubmit}>
+          <label>
+            <span>Nama Paket</span>
+            <input
+              className={inputClassName(packageErrors.name)}
+              value={packageForm.name}
+              onChange={(e) => onFormChange((curr) => ({ ...curr, name: e.target.value }))}
+            />
+            {renderInlineError(packageErrors.name)}
+          </label>
+          <label>
+            <span>Kecepatan (Mbps)</span>
+            <input
+              className={inputClassName(packageErrors.speed_mbps)}
+              type="number"
+              min={1}
+              value={packageForm.speed_mbps}
+              onChange={(e) =>
+                onFormChange((curr) => ({ ...curr, speed_mbps: Number(e.target.value) }))
+              }
+            />
+            {renderInlineError(packageErrors.speed_mbps)}
+          </label>
+          <label>
+            <span>Harga</span>
+            <input
+              className={inputClassName(packageErrors.price)}
+              type="number"
+              min={0}
+              value={packageForm.price}
+              onChange={(e) => onFormChange((curr) => ({ ...curr, price: Number(e.target.value) }))}
+            />
+            {renderInlineError(packageErrors.price)}
+          </label>
+          <label>
+            <span>Deskripsi</span>
+            <textarea
+              rows={4}
+              value={packageForm.description}
+              onChange={(e) => onFormChange((curr) => ({ ...curr, description: e.target.value }))}
+            />
+          </label>
+          <div className="button-row">
+            <button className="primary-button" disabled={submitting}>
+              {isBusy("save-package") ? "Menyimpan..." : editingPackageId ? "Update Paket" : "Simpan Paket"}
+            </button>
+            {editingPackageId ? (
+              <button type="button" className="secondary-button" onClick={onCancelEdit}>
+                Batal Edit
+              </button>
+            ) : null}
+          </div>
+        </form>
+      </article>
+
+      <article className="surface">
+        <div className="section-heading">
+          <h2>Daftar Paket</h2>
+          <StatusPill label={`${packages.length} item`} tone="slate" />
+        </div>
+        <div className="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>Nama</th>
+                <th>Speed</th>
+                <th>Harga</th>
+                <th>Pelanggan</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {packages.length === 0 ? (
+                <EmptyTableRow message="Belum ada master paket. Tambahkan paket pertama untuk mulai operasional." />
+              ) : (
+                packages.map((pkg) => (
+                  <tr key={pkg.id}>
+                    <td>{pkg.name}</td>
+                    <td>{pkg.speed_mbps} Mbps</td>
+                    <td>{formatCurrency(pkg.price)}</td>
+                    <td>{pkg.customer_count}</td>
+                    <td>
+                      <div className="table-actions">
+                        <button type="button" className="ghost-button" onClick={() => onEdit(pkg)}>
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-button danger-button"
+                          onClick={() => onDelete(pkg.id)}
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+  );
+}

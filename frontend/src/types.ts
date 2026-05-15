@@ -105,3 +105,14 @@ export type AgingReport = {
   days_31_60: number;
   over_60: number;
 };
+
+export type ViewKey =
+  | "dashboard"
+  | "packages"
+  | "customers"
+  | "bills"
+  | "templates"
+  | "monitoring"
+  | "audit"
+  | "users"
+  | "settings";
