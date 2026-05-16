@@ -118,11 +118,11 @@ export function DashboardPage({
         </article>
 
         {user?.role === "admin" && (
-          <article className="surface" style={{ gridColumn: "1 / -1" }}>
+          <article className="surface col-span-full">
             <div className="section-heading">
               <h2>Laporan Tagihan</h2>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
+            <div className="grid grid-cols-2 gap-8">
               <div>
                 <h3>Pendapatan Bulanan</h3>
                 {revenue.length > 0 ? (
@@ -158,7 +158,7 @@ export function DashboardPage({
               <div>
                 <h3>Aging Piutang (Belum Bayar)</h3>
                 {aging && (aging.current > 0 || aging.days_1_30 > 0 || aging.days_31_60 > 0 || aging.over_60 > 0) ? (
-                  <div style={{ maxWidth: "300px", margin: "0 auto" }}>
+                  <div className="max-w-xs mx-auto">
                     <Pie
                       data={{
                         labels: ["Current", "1-30 Hari", "31-60 Hari", ">60 Hari"],
@@ -182,7 +182,7 @@ export function DashboardPage({
                     />
                   </div>
                 ) : (
-                  <p className="muted" style={{ textAlign: "center", paddingTop: "2rem" }}>
+                  <p className="muted text-center pt-8">
                     Tidak ada tunggakan berjalan.
                   </p>
                 )}

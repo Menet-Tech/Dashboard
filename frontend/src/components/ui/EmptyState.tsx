@@ -17,7 +17,7 @@ export function EmptyTableRow({ message, colSpan = 5 }: EmptyStateProps) {
 /** Standalone empty state for non-table contexts. */
 export function EmptyState({ message }: { message: string }) {
   return (
-    <p className="muted" style={{ textAlign: "center", padding: "2rem 0" }}>
+    <p className="muted text-center py-8">
       {message}
     </p>
   );

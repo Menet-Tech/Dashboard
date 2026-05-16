@@ -50,7 +50,7 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
                     <td>{formatDateTime(log.created_at)}</td>
                     <td>{log.username ?? (log.user_id ? `#${log.user_id}` : "-")}</td>
                     <td>
-                      <span className="muted" style={{ fontSize: "0.85em" }}>
+                      <span className="muted text-sm">
                         {log.ip_address || "-"}
                       </span>
                     </td>

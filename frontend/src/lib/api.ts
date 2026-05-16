@@ -8,6 +8,8 @@ import type {
   User,
   RevenueItem,
   AgingReport,
+  NotificationLog,
+  SettingsState,
 } from "../types";
 
 let csrfToken = "";
@@ -274,18 +276,18 @@ export function deleteTemplate(id: number) {
 }
 
 export function fetchSettings() {
-  return request<{ data: Record<string, string> }>("/api/v1/settings");
+  return request<{ data: SettingsState }>("/api/v1/settings");
 }
 
-export function updateSettings(payload: Record<string, string>) {
+export function updateSettings(settings: SettingsState) {
   return request<{ message: string }>("/api/v1/settings", {
     method: "PUT",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(settings),
   });
 }
 
 export function fetchBillNotifications(billId: number) {
-  return request<{ data: any[] }>(`/api/v1/bills/${billId}/notifications`);
+  return request<{ data: NotificationLog[] }>(`/api/v1/bills/${billId}/notifications`);
 }
 
 export type BackupInfo = {

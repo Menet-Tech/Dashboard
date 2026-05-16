@@ -1,13 +1,14 @@
 import type { FormEvent } from "react";
 import { inputClassName, renderInlineError } from "../../components/ui";
 import type { FieldErrors } from "../../utils/validation";
+import type { SettingsState } from "../../types";
 
 type SettingsPageProps = {
-  settingsForm: Record<string, string>;
+  settingsForm: SettingsState;
   settingsErrors: FieldErrors;
   submitting: boolean;
   busyAction: string | null;
-  onFormChange: (form: Record<string, string>) => void;
+  onFormChange: (form: SettingsState) => void;
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
 };
 
@@ -59,7 +60,7 @@ export function SettingsPage({
             />
           </label>
 
-          <div className="form-group-title" style={{ marginTop: "1rem" }}>
+          <div className="form-group-title mt-4">
             <h4>Discord Notifications</h4>
           </div>
 
@@ -111,7 +112,7 @@ export function SettingsPage({
             </select>
           </label>
 
-          <div className="form-group-title" style={{ marginTop: "1rem" }}>
+          <div className="form-group-title mt-4">
             <h4>Billing Rules & Worker</h4>
           </div>
 
@@ -252,7 +253,7 @@ export function SettingsPage({
             />
           </label>
 
-          <div className="form-group-title" style={{ marginTop: "1rem" }}>
+          <div className="form-group-title mt-4">
             <h4>MikroTik</h4>
           </div>
           <label>
