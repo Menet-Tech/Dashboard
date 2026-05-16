@@ -48,11 +48,11 @@ export function TemplatesPage({
 
   return (
     <section className="grid feature-grid">
-      <article className="surface">
-        <div className="section-heading">
-          <h2>{editingTemplateId ? "Edit Template" : "Tambah Template"}</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">{editingTemplateId ? "Edit Template" : "Tambah Template"}</h2>
         </div>
-        <form className="form-grid" onSubmit={onSubmit}>
+        <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onSubmit}>
           <label>
             <span>Nama Template</span>
             <input
@@ -119,38 +119,38 @@ export function TemplatesPage({
         </p>
       </article>
 
-      <article className="surface">
-        <div className="section-heading">
-          <h2>Daftar Template</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Daftar Template</h2>
           <StatusPill label={`${templates.length} item`} tone="slate" />
         </div>
-        <div className="table-shell">
-          <table>
-            <thead>
+        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
               <tr>
-                <th>Nama</th>
-                <th>Trigger</th>
-                <th>Status</th>
-                <th>Isi</th>
-                <th>Aksi</th>
+                <th className="px-6 py-4 font-medium">Nama</th>
+                <th className="px-6 py-4 font-medium">Trigger</th>
+                <th className="px-6 py-4 font-medium">Status</th>
+                <th className="px-6 py-4 font-medium">Isi</th>
+                <th className="px-6 py-4 font-medium">Aksi</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200">
               {templates.length === 0 ? (
                 <EmptyTableRow message="Belum ada template WhatsApp yang tersimpan." colSpan={5} />
               ) : (
                 templates.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.name}</td>
-                    <td>{item.trigger_key}</td>
-                    <td>
+                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 text-gray-700">{item.name}</td>
+                    <td className="px-6 py-4 text-gray-700">{item.trigger_key}</td>
+                    <td className="px-6 py-4 text-gray-700">
                       <StatusPill
                         label={item.is_active ? "active" : "inactive"}
                         tone={item.is_active ? "green" : "slate"}
                       />
                     </td>
-                    <td>{item.content}</td>
-                    <td>
+                    <td className="px-6 py-4 text-gray-700">{item.content}</td>
+                    <td className="px-6 py-4 text-gray-700">
                       <div className="table-actions">
                         <button type="button" className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" onClick={() => onEdit(item)}>
                           Edit

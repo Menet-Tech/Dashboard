@@ -258,7 +258,7 @@ export default function App() {
   if (booting) {
     return (
       <main className="page-shell centered-shell">
-        <div className="surface loading-state">Menyiapkan fondasi go-dev...</div>
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm loading-state">Menyiapkan fondasi go-dev...</div>
       </main>
     );
   }
@@ -266,7 +266,6 @@ export default function App() {
   if (!user) {
     return (
       <LoginPage
-        health={monitoringHook.state.health}
         loginForm={loginForm}
         loginErrors={loginErrors}
         submitting={feedback.submitting}
@@ -280,7 +279,7 @@ export default function App() {
   }
 
   return (
-    <main className="page-shell app-shell">
+    <main className="flex min-h-screen bg-slate-50 text-slate-900 max-w-[1600px] mx-auto">
       <Sidebar
         navOpen={navOpen}
         navItems={visibleNavItems}
@@ -293,10 +292,10 @@ export default function App() {
       />
 
       {navOpen ? (
-        <button type="button" className="sidebar-backdrop" onClick={() => setNavOpen(false)} aria-label="Tutup navigasi" />
+        <button type="button" className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 lg:hidden" onClick={() => setNavOpen(false)} aria-label="Tutup navigasi" />
       ) : null}
 
-      <div className="main-panel">
+      <div className="flex-1 flex flex-col min-w-0 px-4 py-6 md:px-8 lg:px-12 max-w-full overflow-x-hidden">
         <Topbar
           navOpen={navOpen}
           onToggleNav={() => setNavOpen((current) => !current)}
@@ -305,11 +304,11 @@ export default function App() {
         />
 
         {loadFailure ? (
-          <section className="surface retry-panel">
+          <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm retry-panel">
             <div>
-              <p className="eyebrow">load failure</p>
-              <h2>Data panel belum berhasil dimuat penuh</h2>
-              <p className="hero-copy">{loadFailure}</p>
+              <p className="text-xs font-bold tracking-wider text-indigo-500 uppercase mb-2">load failure</p>
+              <h2 className="text-lg font-bold text-slate-900">Data panel belum berhasil dimuat penuh</h2>
+              <p className="text-slate-500 max-w-2xl leading-relaxed">{loadFailure}</p>
             </div>
             <div className="button-row">
               <button type="button" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={() => void feedback.withFeedback(reloadProtectedData, "retry-load")} disabled={feedback.submitting}>
@@ -553,7 +552,7 @@ export default function App() {
             </>
           }
         >
-          <form id="password-reset-form" className="form-grid single-column-grid" onSubmit={usersHook.handlers.handlePasswordResetSubmit}>
+          <form id="password-reset-form" className="flex flex-col gap-5" onSubmit={usersHook.handlers.handlePasswordResetSubmit}>
             <label>
               <span>Password Baru</span>
               <input

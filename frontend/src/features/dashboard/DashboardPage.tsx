@@ -38,8 +38,14 @@ export function DashboardPage({
   onSwitchView,
 }: DashboardPageProps) {
   return (
-    <>
-      <section className="grid stats-grid">
+    <div className="space-y-6">
+      <div className="flex flex-wrap gap-2">
+        <StatusPill label={health?.status ?? "checking"} tone={appTone} />
+        <StatusPill label={`worker ${health?.services.worker ?? "unknown"}`} tone={workerTone} />
+        <StatusPill label={`backup ${health?.services.backup ?? "unknown"}`} tone={backupTone} />
+      </div>
+
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {pageLoading ? (
           <>
             <SkeletonCard />
@@ -49,20 +55,20 @@ export function DashboardPage({
           </>
         ) : (
           summaryCards.map((card) => (
-            <article key={card.key} className="stat-card">
-              <span>{card.label}</span>
-              <strong>{summary?.[card.key] ?? 0}</strong>
-              <p className="stat-note">{card.note}</p>
+            <article key={card.key} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+              <span className="text-sm font-semibold text-slate-500 mb-2">{card.label}</span>
+              <strong className="text-3xl font-bold text-slate-900">{summary?.[card.key] ?? 0}</strong>
+              <p className="text-xs text-slate-400 mt-4 leading-relaxed">{card.note}</p>
             </article>
           ))
         )}
       </section>
 
       <section className="grid quick-actions-grid">
-        <article className="surface action-card">
+        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm action-card">
           <div>
-            <p className="eyebrow">Aksi Cepat</p>
-            <h2>Operasional Hari Ini</h2>
+            <p className="text-xs font-bold tracking-wider text-indigo-500 uppercase mb-2">Aksi Cepat</p>
+            <h2 className="text-lg font-bold text-slate-900">Operasional Hari Ini</h2>
             <p className="muted">Lihat kesehatan sistem, generate tagihan, dan pantau tunggakan dari satu area.</p>
           </div>
           <div className="button-row">
@@ -74,10 +80,10 @@ export function DashboardPage({
             </button>
           </div>
         </article>
-        <article className="surface action-card">
+        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm action-card">
           <div>
-            <p className="eyebrow">Scheduler</p>
-            <h2>Run Berikutnya</h2>
+            <p className="text-xs font-bold tracking-wider text-indigo-500 uppercase mb-2">Scheduler</p>
+            <h2 className="text-lg font-bold text-slate-900">Run Berikutnya</h2>
             <p className="muted">
               {health?.scheduler.billing_next_run
                 ? `Auto billing berikutnya dijadwalkan pada ${formatDateTime(health.scheduler.billing_next_run)}.`
@@ -92,9 +98,9 @@ export function DashboardPage({
       </section>
 
       <section className="grid detail-grid">
-        <article className="surface">
-          <div className="section-heading">
-            <h2>Service Snapshot</h2>
+        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-slate-900">Service Snapshot</h2>
             <StatusPill label={health?.status ?? "checking"} tone={appTone} />
           </div>
           <dl className="meta-list">
@@ -118,13 +124,13 @@ export function DashboardPage({
         </article>
 
         {user?.role === "admin" && (
-          <article className="surface col-span-full">
-            <div className="section-heading">
-              <h2>Laporan Tagihan</h2>
+          <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm col-span-full">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-bold text-slate-900">Laporan Tagihan</h2>
             </div>
             <div className="grid grid-cols-2 gap-8">
               <div>
-                <h3>Pendapatan Bulanan</h3>
+                <h3 className="text-base font-semibold text-slate-800 mb-4">Pendapatan Bulanan</h3>
                 {revenue.length > 0 ? (
                   <Bar
                     data={{
@@ -156,7 +162,7 @@ export function DashboardPage({
                 )}
               </div>
               <div>
-                <h3>Aging Piutang (Belum Bayar)</h3>
+                <h3 className="text-base font-semibold text-slate-800 mb-4">Aging Piutang (Belum Bayar)</h3>
                 {aging && (aging.current > 0 || aging.days_1_30 > 0 || aging.days_31_60 > 0 || aging.over_60 > 0) ? (
                   <div className="max-w-xs mx-auto">
                     <Pie
@@ -191,6 +197,6 @@ export function DashboardPage({
           </article>
         )}
       </section>
-    </>
+    </div>
   );
 }

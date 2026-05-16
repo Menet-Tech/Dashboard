@@ -50,9 +50,9 @@ export function MonitoringPage({
 
   return (
     <section className="grid">
-      <article className="surface">
-        <div className="section-heading">
-          <h2>Monitoring Sistem</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Monitoring Sistem</h2>
           <div className="table-actions">
             <StatusPill label={health?.status ?? "checking"} tone={appTone} />
             <button
@@ -119,9 +119,9 @@ export function MonitoringPage({
       </article>
 
       <section className="grid detail-grid">
-        <article className="surface">
-          <div className="section-heading">
-            <h2>Worker Detail</h2>
+        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-slate-900">Worker Detail</h2>
           </div>
           <dl className="meta-list">
             <div>
@@ -147,9 +147,9 @@ export function MonitoringPage({
           </dl>
         </article>
 
-        <article className="surface">
-          <div className="section-heading">
-            <h2>Backup Policy</h2>
+        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-slate-900">Backup Policy</h2>
           </div>
           <dl className="meta-list">
             <div>
@@ -177,9 +177,9 @@ export function MonitoringPage({
       </section>
 
       <section className="grid detail-grid">
-        <article className="surface">
-          <div className="section-heading">
-            <h2>Scheduler Billing</h2>
+        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-slate-900">Scheduler Billing</h2>
           </div>
           <dl className="meta-list">
             <div>
@@ -229,9 +229,9 @@ export function MonitoringPage({
           </dl>
         </article>
 
-        <article className="surface">
-          <div className="section-heading">
-            <h2>Database Integrity</h2>
+        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-slate-900">Database Integrity</h2>
           </div>
           <dl className="meta-list">
             <div>
@@ -246,9 +246,9 @@ export function MonitoringPage({
         </article>
       </section>
 
-      <article className="surface">
-        <div className="section-heading">
-          <h2>Backup Database</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Backup Database</h2>
           <StatusPill label={`${backups.length} backup tersedia`} tone="slate" />
         </div>
         <div className="button-row mb-4">
@@ -261,30 +261,30 @@ export function MonitoringPage({
             {isBusy("create-backup") ? "Membuat backup..." : "Backup Sekarang"}
           </button>
         </div>
-        <div className="table-shell">
-          <table>
-            <thead>
+        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
               <tr>
-                <th>Filename</th>
-                <th>Ukuran</th>
-                <th>Waktu</th>
-                <th>Aksi</th>
+                <th className="px-6 py-4 font-medium">Filename</th>
+                <th className="px-6 py-4 font-medium">Ukuran</th>
+                <th className="px-6 py-4 font-medium">Waktu</th>
+                <th className="px-6 py-4 font-medium">Aksi</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200">
               {backups.length === 0 ? (
                 <tr>
-                  <td colSpan={4}>
+                  <td className="px-6 py-4 text-gray-700" colSpan={4}>
                     <span className="muted">Belum ada backup.</span>
                   </td>
                 </tr>
               ) : (
                 backups.map((b) => (
-                  <tr key={b.filename}>
-                    <td>{b.filename}</td>
-                    <td>{(b.size / 1024).toFixed(1)} KB</td>
-                    <td>{formatDateTime(b.mod_time)}</td>
-                    <td>
+                  <tr key={b.filename} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 text-gray-700">{b.filename}</td>
+                    <td className="px-6 py-4 text-gray-700">{(b.size / 1024).toFixed(1)} KB</td>
+                    <td className="px-6 py-4 text-gray-700">{formatDateTime(b.mod_time)}</td>
+                    <td className="px-6 py-4 text-gray-700">
                       <div className="table-actions">
                         <button
                           type="button"
@@ -313,7 +313,7 @@ export function MonitoringPage({
         </div>
         {restoreSimulation && (
           <div className="top-gap p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--surface)]">
-            <h3>Simulasi Restore: {restoreSimulation.filename}</h3>
+            <h3 className="text-base font-semibold text-slate-800 mb-4">Simulasi Restore: {restoreSimulation.filename}</h3>
             <p>
               Status:{" "}
               {restoreSimulation.result.valid ? (
@@ -340,9 +340,9 @@ export function MonitoringPage({
         )}
       </article>
 
-      <article className="surface">
-        <div className="section-heading">
-          <h2>Alert Operasional</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Alert Operasional</h2>
           <StatusPill
             label={`${health?.alerts?.length ?? 0} alert`}
             tone={health?.alerts?.length ? "gold" : "green"}

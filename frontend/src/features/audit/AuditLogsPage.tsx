@@ -11,9 +11,9 @@ type AuditLogsPageProps = {
 export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPageProps) {
   return (
     <section className="grid">
-      <article className="surface">
-        <div className="section-heading">
-          <h2>Audit Log Operasional</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Audit Log Operasional</h2>
           <div className="table-actions">
             <StatusPill label={`${auditLogs.length} event`} tone="slate" />
             <button
@@ -26,36 +26,36 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
             </button>
           </div>
         </div>
-        <div className="table-shell">
-          <table>
-            <thead>
+        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
               <tr>
-                <th>Waktu</th>
-                <th>User</th>
-                <th>IP</th>
-                <th>Aksi</th>
-                <th>Detail</th>
+                <th className="px-6 py-4 font-medium">Waktu</th>
+                <th className="px-6 py-4 font-medium">User</th>
+                <th className="px-6 py-4 font-medium">IP</th>
+                <th className="px-6 py-4 font-medium">Aksi</th>
+                <th className="px-6 py-4 font-medium">Detail</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200">
               {auditLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>
+                  <td className="px-6 py-4 text-gray-700" colSpan={5}>
                     <span className="muted">Belum ada audit log.</span>
                   </td>
                 </tr>
               ) : (
                 auditLogs.map((log) => (
-                  <tr key={log.id}>
-                    <td>{formatDateTime(log.created_at)}</td>
-                    <td>{log.username ?? (log.user_id ? `#${log.user_id}` : "-")}</td>
-                    <td>
+                  <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 text-gray-700">{formatDateTime(log.created_at)}</td>
+                    <td className="px-6 py-4 text-gray-700">{log.username ?? (log.user_id ? `#${log.user_id}` : "-")}</td>
+                    <td className="px-6 py-4 text-gray-700">
                       <span className="muted text-sm">
                         {log.ip_address || "-"}
                       </span>
                     </td>
-                    <td>{log.action}</td>
-                    <td>{log.message || "-"}</td>
+                    <td className="px-6 py-4 text-gray-700">{log.action}</td>
+                    <td className="px-6 py-4 text-gray-700">{log.message || "-"}</td>
                   </tr>
                 ))
               )}

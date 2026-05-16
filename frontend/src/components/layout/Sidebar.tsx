@@ -28,32 +28,39 @@ export function Sidebar({
   isBusy,
 }: SidebarProps) {
   return (
-    <aside className={`app-sidebar ${navOpen ? "is-open" : ""}`} aria-label="Navigasi utama">
-      <div className="sidebar-brand">
-        <p className="eyebrow">go-dev rewrite</p>
-        <h1>Menet-Tech Dashboard</h1>
-        <p className="hero-copy">Backend Go, worker billing, dan panel operasional baru untuk tim ISP.</p>
+    <aside className={`sticky top-6 w-72 bg-slate-900 text-slate-300 rounded-2xl flex flex-col shadow-xl shrink-0 h-[calc(100vh-3rem)] transition-transform z-40 ${navOpen ? "translate-x-0 fixed inset-y-4 left-4" : "hidden lg:flex"}`} aria-label="Navigasi utama">
+      <div className="p-6 border-b border-slate-800">
+        <p className="text-xs font-bold tracking-wider text-indigo-400 uppercase mb-2">go-dev rewrite</p>
+        <h1 className="text-xl font-bold text-white leading-tight">Menet-Tech<br/>Dashboard</h1>
       </div>
-      <nav className="sidebar-nav">
-        {navItems.map((item) => (
-          <button
-            key={item.key}
-            className={item.key === view ? "tab-button active" : "tab-button"}
-            onClick={() => switchView(item.key)}
-            type="button"
-            aria-label={`Buka menu ${item.label}`}
-          >
-            <span className="nav-label">{item.label}</span>
-            <span className="nav-caption">{item.caption}</span>
-          </button>
-        ))}
+      <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+        {navItems.map((item) => {
+          const isActive = item.key === view;
+          return (
+            <button
+              key={item.key}
+              className={`w-full text-left px-4 py-3 rounded-xl transition-colors flex flex-col ${isActive ? "bg-indigo-600 text-white shadow-md" : "hover:bg-slate-800 text-slate-300"}`}
+              onClick={() => switchView(item.key)}
+              type="button"
+              aria-label={`Buka menu ${item.label}`}
+            >
+              <span className="font-semibold text-sm">{item.label}</span>
+              <span className={`text-xs mt-0.5 ${isActive ? "text-indigo-200" : "text-slate-500"}`}>{item.caption}</span>
+            </button>
+          );
+        })}
       </nav>
-      <div className="sidebar-footer">
-        <div className="user-chip">
-          <strong>{user.username}</strong>
-          <span>{user.role}</span>
+      <div className="p-4 border-t border-slate-800">
+        <div className="flex items-center gap-3 mb-4 px-2">
+          <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-indigo-400 font-bold uppercase shrink-0">
+            {user.username.charAt(0)}
+          </div>
+          <div className="min-w-0">
+            <strong className="block text-sm font-semibold text-white truncate">{user.username}</strong>
+            <span className="block text-xs text-slate-400 truncate">{user.role}</span>
+          </div>
         </div>
-        <button className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={onLogout} disabled={submitting}>
+        <button className="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={onLogout} disabled={submitting}>
           {isBusy("logout") ? "Keluar..." : "Logout"}
         </button>
       </div>

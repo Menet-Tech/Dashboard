@@ -24,12 +24,12 @@ export function SettingsPage({
 
   return (
     <section className="grid">
-      <article className="surface">
-        <div className="section-heading">
-          <h2>Pengaturan Sistem</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Pengaturan Sistem</h2>
           <p>Konfigurasi WhatsApp, Discord, billing rule, worker, dan kebijakan backup.</p>
         </div>
-        <form className="form-grid" onSubmit={onSubmit}>
+        <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onSubmit}>
           <div className="form-group-title">
             <h4>WhatsApp Gateway</h4>
           </div>

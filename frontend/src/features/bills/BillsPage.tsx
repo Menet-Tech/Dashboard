@@ -45,11 +45,11 @@ export function BillsPage({
   return (
     <section className="grid feature-grid">
       {user?.role !== "viewer" && (
-        <article className="surface">
-          <div className="section-heading">
-            <h2>Generate Tagihan</h2>
+        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-slate-900">Generate Tagihan</h2>
           </div>
-          <form className="form-grid" onSubmit={onGenerateBills}>
+          <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onGenerateBills}>
             <label>
               <span>Periode (YYYY-MM)</span>
               <input
@@ -73,44 +73,44 @@ export function BillsPage({
         </article>
       )}
 
-      <article className="surface">
-        <div className="section-heading">
-          <h2>Daftar Tagihan</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Daftar Tagihan</h2>
           <StatusPill label={`${bills.length} item`} tone="slate" />
         </div>
-        <div className="table-shell">
-          <table>
-            <thead>
+        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
               <tr>
-                <th>Invoice</th>
-                <th>Pelanggan</th>
-                <th>Periode</th>
-                <th>Jatuh Tempo</th>
-                <th>Nominal</th>
-                <th>Status</th>
-                <th>Bukti</th>
-                <th>Aksi</th>
+                <th className="px-6 py-4 font-medium">Invoice</th>
+                <th className="px-6 py-4 font-medium">Pelanggan</th>
+                <th className="px-6 py-4 font-medium">Periode</th>
+                <th className="px-6 py-4 font-medium">Jatuh Tempo</th>
+                <th className="px-6 py-4 font-medium">Nominal</th>
+                <th className="px-6 py-4 font-medium">Status</th>
+                <th className="px-6 py-4 font-medium">Bukti</th>
+                <th className="px-6 py-4 font-medium">Aksi</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200">
               {bills.length === 0 ? (
                 <EmptyTableRow message="Belum ada tagihan untuk ditampilkan pada database ini." colSpan={8} />
               ) : (
                 bills.map((bill) => (
                   <Fragment key={bill.id}>
                     <tr>
-                      <td>{bill.invoice_number}</td>
-                      <td>{bill.customer_name}</td>
-                      <td>{bill.period}</td>
-                      <td>{bill.due_date}</td>
-                      <td>{formatCurrency(bill.amount)}</td>
-                      <td>
+                      <td className="px-6 py-4 text-gray-700">{bill.invoice_number}</td>
+                      <td className="px-6 py-4 text-gray-700">{bill.customer_name}</td>
+                      <td className="px-6 py-4 text-gray-700">{bill.period}</td>
+                      <td className="px-6 py-4 text-gray-700">{bill.due_date}</td>
+                      <td className="px-6 py-4 text-gray-700">{formatCurrency(bill.amount)}</td>
+                      <td className="px-6 py-4 text-gray-700">
                         <StatusPill
                           label={displayStatusLabel(bill.display_status)}
                           tone={displayStatusTone(bill.display_status)}
                         />
                       </td>
-                      <td>
+                      <td className="px-6 py-4 text-gray-700">
                         {bill.proof_path ? (
                           <a href={bill.proof_path} target="_blank" rel="noreferrer">
                             Lihat bukti
@@ -119,7 +119,7 @@ export function BillsPage({
                           <span className="muted">Belum ada</span>
                         )}
                       </td>
-                      <td>
+                      <td className="px-6 py-4 text-gray-700">
                         <div className="stack-actions">
                           <button
                             type="button"
@@ -165,12 +165,12 @@ export function BillsPage({
                     </tr>
                     {expandedBillId === bill.id && (
                       <tr className="expanded-row">
-                        <td colSpan={8}>
+                        <td className="px-6 py-4 text-gray-700" colSpan={8}>
                           <div className="expanded-content p-4">
                             <h4>Riwayat Notifikasi</h4>
                             {notificationLogs[bill.id]?.length ? (
                               <table className="compact-table mt-2 w-full">
-                                <thead>
+                                <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
                                   <tr>
                                     <th className="text-left">Waktu</th>
                                     <th className="text-left">Tujuan</th>
@@ -179,19 +179,19 @@ export function BillsPage({
                                     <th className="text-left">Response</th>
                                   </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="divide-y divide-gray-200">
                                   {notificationLogs[bill.id].map((log) => (
-                                    <tr key={log.id}>
-                                      <td>{new Date(log.created_at).toLocaleString()}</td>
-                                      <td>{log.sent_to}</td>
-                                      <td>{log.trigger_key}</td>
-                                      <td>
+                                    <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                                      <td className="px-6 py-4 text-gray-700">{new Date(log.created_at).toLocaleString()}</td>
+                                      <td className="px-6 py-4 text-gray-700">{log.sent_to}</td>
+                                      <td className="px-6 py-4 text-gray-700">{log.trigger_key}</td>
+                                      <td className="px-6 py-4 text-gray-700">
                                         <StatusPill
                                           label={log.status}
                                           tone={log.status === "sent" ? "green" : "slate"}
                                         />
                                       </td>
-                                      <td>{log.response_message}</td>
+                                      <td className="px-6 py-4 text-gray-700">{log.response_message}</td>
                                     </tr>
                                   ))}
                                 </tbody>
