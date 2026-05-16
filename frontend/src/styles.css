@@ -20,34 +20,24 @@
  */
 @import "tailwindcss";
 
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans antialiased min-w-[320px] m-0;
+  }
+}
+
 :root {
-  color-scheme: light;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #122033;
-  --ink-strong: #14213d;
-  --ink-soft: #52627b;
-  --surface-strong: rgba(255, 255, 255, 0.88);
-  --surface-soft: rgba(255, 255, 255, 0.72);
-  --border-soft: rgba(15, 23, 42, 0.08);
-  --shadow-soft: 0 20px 50px rgba(15, 23, 42, 0.08);
-  --shadow-strong: 0 30px 70px rgba(15, 23, 42, 0.16);
-  --brand-deep: #112441;
-  --brand-warm: #b7791f;
+  --ink-strong: #0f172a;
+  --ink-soft: #64748b;
+  --surface-strong: #ffffff;
+  --surface-soft: #f8fafc;
+  --border-soft: #e2e8f0;
+  --brand-deep: #4f46e5;
+  --brand-warm: #6366f1;
 }
 
 * {
   box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  min-width: 320px;
-  background:
-    radial-gradient(circle at top left, rgba(245, 158, 11, 0.34), transparent 24%),
-    radial-gradient(circle at top right, rgba(14, 165, 233, 0.16), transparent 24%),
-    linear-gradient(180deg, #f7f2e9 0%, #eef5ff 48%, #e3edf9 100%);
 }
 
 #root {
