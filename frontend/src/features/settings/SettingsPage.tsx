@@ -30,13 +30,14 @@ export function SettingsPage({
           <p>Konfigurasi WhatsApp, Discord, billing rule, worker, dan kebijakan backup.</p>
         </div>
         <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onSubmit}>
-          <div className="form-group-title">
-            <h4>WhatsApp Gateway</h4>
+          <div className="col-span-full border-b border-slate-100 pb-2 mt-4 first:mt-0">
+            <h4 className="text-sm font-bold text-indigo-600 uppercase tracking-wider">WhatsApp Gateway</h4>
           </div>
 
           <label>
             <span>Gateway URL</span>
             <input
+              className={inputClassName()}
               type="text"
               value={settingsForm["wa_gateway_url"] ?? ""}
               onChange={(e) => onFormChange({ ...settingsForm, wa_gateway_url: e.target.value })}
@@ -46,6 +47,7 @@ export function SettingsPage({
           <label>
             <span>API Key</span>
             <input
+              className={inputClassName()}
               type="text"
               value={settingsForm["wa_api_key"] ?? ""}
               onChange={(e) => onFormChange({ ...settingsForm, wa_api_key: e.target.value })}
@@ -54,19 +56,21 @@ export function SettingsPage({
           <label>
             <span>Account ID / Device ID</span>
             <input
+              className={inputClassName()}
               type="text"
               value={settingsForm["wa_account_id"] ?? ""}
               onChange={(e) => onFormChange({ ...settingsForm, wa_account_id: e.target.value })}
             />
           </label>
 
-          <div className="form-group-title mt-4">
-            <h4>Discord Notifications</h4>
+          <div className="col-span-full border-b border-slate-100 pb-2 mt-6">
+            <h4 className="text-sm font-bold text-indigo-600 uppercase tracking-wider">Discord Notifications</h4>
           </div>
 
           <label className="full-width">
             <span>Webhook URL</span>
             <input
+              className={inputClassName()}
               type="text"
               value={settingsForm["discord_webhook_url"] ?? ""}
               onChange={(e) =>
@@ -78,6 +82,7 @@ export function SettingsPage({
           <label>
             <span>Notif Pembayaran Lunas</span>
             <select
+              className={inputClassName()}
               value={settingsForm["discord_notify_payment"] ?? "1"}
               onChange={(e) =>
                 onFormChange({ ...settingsForm, discord_notify_payment: e.target.value })
@@ -90,6 +95,7 @@ export function SettingsPage({
           <label>
             <span>Notif Generate Tagihan</span>
             <select
+              className={inputClassName()}
               value={settingsForm["discord_notify_generate"] ?? "1"}
               onChange={(e) =>
                 onFormChange({ ...settingsForm, discord_notify_generate: e.target.value })
@@ -102,6 +108,7 @@ export function SettingsPage({
           <label>
             <span>Notif Worker (Reminder / Limit / Backup)</span>
             <select
+              className={inputClassName()}
               value={settingsForm["discord_notify_worker"] ?? "1"}
               onChange={(e) =>
                 onFormChange({ ...settingsForm, discord_notify_worker: e.target.value })
@@ -112,13 +119,14 @@ export function SettingsPage({
             </select>
           </label>
 
-          <div className="form-group-title mt-4">
-            <h4>Billing Rules & Worker</h4>
+          <div className="col-span-full border-b border-slate-100 pb-2 mt-6">
+            <h4 className="text-sm font-bold text-indigo-600 uppercase tracking-wider">Billing Rules & Worker</h4>
           </div>
 
           <label>
             <span>Reminder Days (Hari sebelum jatuh tempo)</span>
             <input
+              className={inputClassName()}
               type="number"
               value={settingsForm["billing_reminder_days"] ?? "3"}
               onChange={(e) =>
@@ -129,6 +137,7 @@ export function SettingsPage({
           <label>
             <span>Limit Days (Batas bayar sebelum isolir)</span>
             <input
+              className={inputClassName()}
               type="number"
               value={settingsForm["billing_limit_days"] ?? "5"}
               onChange={(e) => onFormChange({ ...settingsForm, billing_limit_days: e.target.value })}
@@ -137,6 +146,7 @@ export function SettingsPage({
           <label>
             <span>Menunggak Days (Hari untuk status menunggak)</span>
             <input
+              className={inputClassName()}
               type="number"
               value={settingsForm["billing_menunggak_days"] ?? "30"}
               onChange={(e) =>
@@ -147,6 +157,7 @@ export function SettingsPage({
           <label>
             <span>Auto Generate Tagihan</span>
             <select
+              className={inputClassName()}
               value={settingsForm["billing_auto_generate_enabled"] ?? "1"}
               onChange={(e) =>
                 onFormChange({ ...settingsForm, billing_auto_generate_enabled: e.target.value })
@@ -185,6 +196,7 @@ export function SettingsPage({
           <label>
             <span>Retry Generate</span>
             <input
+              className={inputClassName()}
               type="number"
               min="1"
               max="10"
@@ -197,6 +209,7 @@ export function SettingsPage({
           <label>
             <span>Backoff Retry (Detik)</span>
             <input
+              className={inputClassName()}
               type="number"
               min="0"
               max="60"
@@ -224,6 +237,7 @@ export function SettingsPage({
           <label>
             <span>Auto Backup</span>
             <select
+              className={inputClassName()}
               value={settingsForm["backup_auto_enabled"] ?? "1"}
               onChange={(e) =>
                 onFormChange({ ...settingsForm, backup_auto_enabled: e.target.value })
@@ -236,6 +250,7 @@ export function SettingsPage({
           <label>
             <span>Jadwal Backup Harian</span>
             <input
+              className={inputClassName()}
               type="time"
               value={settingsForm["backup_auto_time"] ?? "02:00"}
               onChange={(e) => onFormChange({ ...settingsForm, backup_auto_time: e.target.value })}
@@ -244,6 +259,7 @@ export function SettingsPage({
           <label>
             <span>Retensi Backup</span>
             <input
+              className={inputClassName()}
               type="number"
               min="1"
               value={settingsForm["backup_retention_count"] ?? "7"}
@@ -253,12 +269,13 @@ export function SettingsPage({
             />
           </label>
 
-          <div className="form-group-title mt-4">
-            <h4>MikroTik</h4>
+          <div className="col-span-full border-b border-slate-100 pb-2 mt-6">
+            <h4 className="text-sm font-bold text-indigo-600 uppercase tracking-wider">MikroTik</h4>
           </div>
           <label>
             <span>Host Router</span>
             <input
+              className={inputClassName()}
               type="text"
               value={settingsForm["mikrotik_host"] ?? ""}
               onChange={(e) => onFormChange({ ...settingsForm, mikrotik_host: e.target.value })}
@@ -268,6 +285,7 @@ export function SettingsPage({
           <label>
             <span>Username Router</span>
             <input
+              className={inputClassName()}
               type="text"
               value={settingsForm["mikrotik_user"] ?? ""}
               onChange={(e) => onFormChange({ ...settingsForm, mikrotik_user: e.target.value })}
@@ -277,6 +295,7 @@ export function SettingsPage({
           <label>
             <span>Password Router</span>
             <input
+              className={inputClassName()}
               type="password"
               value={settingsForm["mikrotik_pass"] ?? ""}
               onChange={(e) => onFormChange({ ...settingsForm, mikrotik_pass: e.target.value })}
@@ -286,6 +305,7 @@ export function SettingsPage({
           <label>
             <span>Username PPPoE Test</span>
             <input
+              className={inputClassName()}
               type="text"
               value={settingsForm["mikrotik_test_username"] ?? ""}
               onChange={(e) =>
@@ -295,7 +315,7 @@ export function SettingsPage({
             />
           </label>
 
-          <div className="form-actions">
+          <div className="flex gap-3 mt-8">
             <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
               {isBusy("save-settings") ? "Menyimpan..." : "Simpan Pengaturan"}
             </button>

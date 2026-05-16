@@ -64,46 +64,125 @@ export function DashboardPage({
         )}
       </section>
 
-      <section className="grid quick-actions-grid">
-        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm action-card">
-          <div>
-            <p className="text-xs font-bold tracking-wider text-indigo-500 uppercase mb-2">Aksi Cepat</p>
-            <h2 className="text-lg font-bold text-slate-900">Operasional Hari Ini</h2>
-            <p className="muted">Lihat kesehatan sistem, generate tagihan, dan pantau tunggakan dari satu area.</p>
+      {user?.role === "admin" && (
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <h3 className="text-base font-semibold text-slate-800 mb-4">Pendapatan Bulanan</h3>
+            {revenue.length > 0 ? (
+              <Bar
+                data={{
+                  labels: [...revenue].reverse().map((r) => r.period),
+                  datasets: [
+                    {
+                      label: "Total Tagihan",
+                      data: [...revenue].reverse().map((r) => r.total_billed),
+                      backgroundColor: "rgba(99, 102, 241, 0.5)",
+                      borderColor: "rgba(99, 102, 241, 1)",
+                      borderWidth: 1,
+                    },
+                    {
+                      label: "Total Lunas",
+                      data: [...revenue].reverse().map((r) => r.total_paid),
+                      backgroundColor: "rgba(34, 197, 94, 0.5)",
+                      borderColor: "rgba(34, 197, 94, 1)",
+                      borderWidth: 1,
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  plugins: { legend: { position: "bottom" } },
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-48 border-2 border-dashed border-slate-100 rounded-xl">
+                <p className="text-slate-400 text-sm">Belum ada data pendapatan.</p>
+              </div>
+            )}
+          </article>
+          <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <h3 className="text-base font-semibold text-slate-800 mb-4">Aging Piutang (Belum Bayar)</h3>
+            {aging && (aging.current > 0 || aging.days_1_30 > 0 || aging.days_31_60 > 0 || aging.over_60 > 0) ? (
+              <div className="max-w-xs mx-auto">
+                <Pie
+                  data={{
+                    labels: ["Current", "1-30 Hari", "31-60 Hari", ">60 Hari"],
+                    datasets: [
+                      {
+                        data: [aging.current, aging.days_1_30, aging.days_31_60, aging.over_60],
+                        backgroundColor: [
+                          "rgba(59, 130, 246, 0.7)",
+                          "rgba(234, 179, 8, 0.7)",
+                          "rgba(249, 115, 22, 0.7)",
+                          "rgba(239, 68, 68, 0.7)",
+                        ],
+                        borderWidth: 1,
+                      },
+                    ],
+                  }}
+                  options={{
+                    responsive: true,
+                    plugins: { legend: { position: "bottom" } },
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-48 border-2 border-dashed border-slate-100 rounded-xl">
+                <p className="text-slate-400 text-sm">Tidak ada tunggakan berjalan.</p>
+              </div>
+            )}
+          </article>
+        </section>
+      )}
+
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow hover:shadow-md transition-shadow flex items-start gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
           </div>
-          <div className="button-row">
-            <button type="button" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={() => onSwitchView("bills")}>
-              Buka Tagihan
-            </button>
-            <button type="button" className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" onClick={() => onSwitchView("monitoring")}>
-              Buka Monitoring
-            </button>
+          <div className="flex-1">
+            <p className="text-xs font-bold tracking-wider text-indigo-500 uppercase mb-1">Aksi Cepat</p>
+            <h2 className="text-lg font-bold text-slate-900 mb-2">Operasional Hari Ini</h2>
+            <p className="text-sm text-slate-500 mb-4">Lihat kesehatan sistem, generate tagihan, dan pantau tunggakan.</p>
+            <div className="flex gap-2">
+              <button type="button" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors" onClick={() => onSwitchView("bills")}>
+                Buka Tagihan
+              </button>
+              <button type="button" className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-2 px-4 rounded-lg transition-colors" onClick={() => onSwitchView("monitoring")}>
+                Buka Monitoring
+              </button>
+            </div>
           </div>
         </article>
-        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm action-card">
-          <div>
-            <p className="text-xs font-bold tracking-wider text-indigo-500 uppercase mb-2">Scheduler</p>
-            <h2 className="text-lg font-bold text-slate-900">Run Berikutnya</h2>
-            <p className="muted">
+        <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow hover:shadow-md transition-shadow flex items-start gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-bold tracking-wider text-amber-600 uppercase">Scheduler</p>
+              <StatusPill
+                label={health?.scheduler.billing_last_error ? "attention" : "scheduled"}
+                tone={health?.scheduler.billing_last_error ? "gold" : "green"}
+              />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900 mb-2">Run Berikutnya</h2>
+            <p className="text-sm text-slate-500">
               {health?.scheduler.billing_next_run
-                ? `Auto billing berikutnya dijadwalkan pada ${formatDateTime(health.scheduler.billing_next_run)}.`
+                ? `Auto billing dijadwalkan pada ${formatDateTime(health.scheduler.billing_next_run)}.`
                 : "Jadwal billing otomatis belum tercatat."}
             </p>
           </div>
-          <StatusPill
-            label={health?.scheduler.billing_last_error ? "attention" : "scheduled"}
-            tone={health?.scheduler.billing_last_error ? "gold" : "green"}
-          />
         </article>
       </section>
 
-      <section className="grid detail-grid">
+      <section className="grid grid-cols-1">
         <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-slate-900">Service Snapshot</h2>
             <StatusPill label={health?.status ?? "checking"} tone={appTone} />
           </div>
-          <dl className="meta-list">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <dt>App Name</dt>
               <dd>{health?.app.name ?? "-"}</dd>
@@ -123,79 +202,7 @@ export function DashboardPage({
           </dl>
         </article>
 
-        {user?.role === "admin" && (
-          <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm col-span-full">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-slate-900">Laporan Tagihan</h2>
-            </div>
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <h3 className="text-base font-semibold text-slate-800 mb-4">Pendapatan Bulanan</h3>
-                {revenue.length > 0 ? (
-                  <Bar
-                    data={{
-                      labels: [...revenue].reverse().map((r) => r.period),
-                      datasets: [
-                        {
-                          label: "Total Tagihan",
-                          data: [...revenue].reverse().map((r) => r.total_billed),
-                          backgroundColor: "rgba(99, 102, 241, 0.5)",
-                          borderColor: "rgba(99, 102, 241, 1)",
-                          borderWidth: 1,
-                        },
-                        {
-                          label: "Total Lunas",
-                          data: [...revenue].reverse().map((r) => r.total_paid),
-                          backgroundColor: "rgba(34, 197, 94, 0.5)",
-                          borderColor: "rgba(34, 197, 94, 1)",
-                          borderWidth: 1,
-                        },
-                      ],
-                    }}
-                    options={{
-                      responsive: true,
-                      plugins: { legend: { position: "bottom" } },
-                    }}
-                  />
-                ) : (
-                  <p className="muted">Belum ada data pendapatan.</p>
-                )}
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-slate-800 mb-4">Aging Piutang (Belum Bayar)</h3>
-                {aging && (aging.current > 0 || aging.days_1_30 > 0 || aging.days_31_60 > 0 || aging.over_60 > 0) ? (
-                  <div className="max-w-xs mx-auto">
-                    <Pie
-                      data={{
-                        labels: ["Current", "1-30 Hari", "31-60 Hari", ">60 Hari"],
-                        datasets: [
-                          {
-                            data: [aging.current, aging.days_1_30, aging.days_31_60, aging.over_60],
-                            backgroundColor: [
-                              "rgba(59, 130, 246, 0.7)",
-                              "rgba(234, 179, 8, 0.7)",
-                              "rgba(249, 115, 22, 0.7)",
-                              "rgba(239, 68, 68, 0.7)",
-                            ],
-                            borderWidth: 1,
-                          },
-                        ],
-                      }}
-                      options={{
-                        responsive: true,
-                        plugins: { legend: { position: "bottom" } },
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <p className="muted text-center pt-8">
-                    Tidak ada tunggakan berjalan.
-                  </p>
-                )}
-              </div>
-            </div>
-          </article>
-        )}
+
       </section>
     </div>
   );

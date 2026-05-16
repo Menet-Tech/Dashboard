@@ -50,6 +50,8 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { AuditLogsPage } from "./features/audit/AuditLogsPage";
 import { UsersPage } from "./features/users/UsersPage";
 import { LoginPage } from "./features/auth/LoginPage";
+import { TicketsPage } from "./features/tickets/TicketsPage";
+import { RegistrationPage } from "./features/registration/RegistrationPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { useAppFeedback } from "./hooks/useAppFeedback";
@@ -82,6 +84,8 @@ const navItems: NavItem[] = [
   { key: "audit", label: "Audit Log", caption: "Jejak aktivitas tim" },
   { key: "users", label: "Manajemen Tim", caption: "Akses login admin" },
   { key: "settings", label: "Pengaturan", caption: "Konfigurasi sistem" },
+  { key: "tickets", label: "Tiket Support", caption: "Bantuan & keluhan" },
+  { key: "registration", label: "Registrasi", caption: "Daftar mandiri" },
 ];
 
 export default function App() {
@@ -415,6 +419,9 @@ export default function App() {
             }))
           }
           onUploadProof={(id) => void billsHook.handlers.handleUploadProof(id)}
+          pushToast={feedback.pushToast}
+          pushSuccess={feedback.pushSuccess}
+          pushError={feedback.pushError}
         />
       ) : null}
 
@@ -463,6 +470,11 @@ export default function App() {
           onSimulateRestore={(filename) => void monitoringHook.handlers.handleSimulateRestore(filename)}
           onApplyRestore={() => void monitoringHook.handlers.handleApplyRestore()}
           onCancelRestore={monitoringHook.handlers.cancelRestore}
+          onCheckIntegrations={async () => {
+            await feedback.withFeedback(monitoringHook.handlers.refreshHealth, "check-integrations");
+          }}
+          pushSuccess={feedback.pushSuccess}
+          pushError={feedback.pushError}
         />
       ) : null}
 
@@ -504,6 +516,9 @@ export default function App() {
           onResetPassword={(item) => void usersHook.handlers.handleResetUserPassword(item)}
         />
       ) : null}
+
+      {view === "tickets" ? <TicketsPage /> : null}
+      {view === "registration" ? <RegistrationPage /> : null}
       </div>
 
       <ToastStack toasts={feedback.toasts} />

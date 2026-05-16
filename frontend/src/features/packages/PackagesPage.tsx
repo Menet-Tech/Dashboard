@@ -48,7 +48,7 @@ export function PackagesPage({
   const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
 
   return (
-    <section className="grid feature-grid">
+    <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-slate-900">{editingPackageId ? "Edit Paket" : "Tambah Paket"}</h2>
@@ -90,17 +90,18 @@ export function PackagesPage({
           <label>
             <span>Deskripsi</span>
             <textarea
+              className={inputClassName()}
               rows={4}
               value={packageForm.description}
               onChange={(e) => onFormChange((curr) => ({ ...curr, description: e.target.value }))}
             />
           </label>
-          <div className="button-row">
+          <div className="flex gap-3 mt-4">
             <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
               {isBusy("save-package") ? "Menyimpan..." : editingPackageId ? "Update Paket" : "Simpan Paket"}
             </button>
             {editingPackageId ? (
-              <button type="button" className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={onCancelEdit}>
+              <button type="button" className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={onCancelEdit}>
                 Batal Edit
               </button>
             ) : null}
@@ -135,13 +136,13 @@ export function PackagesPage({
                     <td className="px-6 py-4 text-gray-700">{formatCurrency(pkg.price)}</td>
                     <td className="px-6 py-4 text-gray-700">{pkg.customer_count}</td>
                     <td className="px-6 py-4 text-gray-700">
-                      <div className="table-actions">
-                        <button type="button" className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" onClick={() => onEdit(pkg)}>
+                      <div className="flex gap-2">
+                        <button type="button" className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={() => onEdit(pkg)}>
                           Edit
                         </button>
                         <button
                           type="button"
-                          className="text-red-600 hover:bg-red-50 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
+                          className="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors disabled:opacity-50"
                           onClick={() => onDelete(pkg.id)}
                         >
                           Hapus

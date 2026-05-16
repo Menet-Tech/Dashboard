@@ -43,7 +43,7 @@ export function UsersPage({
   const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
 
   return (
-    <section className="grid feature-grid">
+    <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-slate-900">Tambah User Tim</h2>
@@ -71,6 +71,7 @@ export function UsersPage({
           <label>
             <span>Role</span>
             <select
+              className={inputClassName()}
               value={managedUserForm.role}
               onChange={(e) => onFormChange((curr) => ({ ...curr, role: e.target.value }))}
             >
@@ -78,16 +79,18 @@ export function UsersPage({
               <option value="admin">Admin</option>
             </select>
           </label>
-          <div className="button-row">
+          <div className="flex gap-3 mt-4">
             <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
               {isBusy("save-user") ? "Menyimpan..." : "Simpan User"}
             </button>
           </div>
         </form>
-        <p className="muted top-gap">
-          Gunakan akun `petugas` untuk operasional harian dan sisakan `admin` hanya untuk konfigurasi
-          dan audit.
-        </p>
+        <div className="border-t border-slate-100 pt-6 mt-6">
+          <p className="text-xs text-slate-400 leading-relaxed flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            Gunakan akun <code className="bg-slate-50 px-1 rounded">petugas</code> untuk operasional harian dan sisakan <code className="bg-slate-50 px-1 rounded">admin</code> hanya untuk konfigurasi dan audit.
+          </p>
+        </div>
       </article>
 
       <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
@@ -115,6 +118,7 @@ export function UsersPage({
                     <td className="px-6 py-4 text-gray-700">{item.username}</td>
                     <td className="px-6 py-4 text-gray-700">
                       <select
+                        className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         value={item.role}
                         onChange={(e) => onUpdateRole(item, e.target.value)}
                       >
@@ -124,6 +128,7 @@ export function UsersPage({
                     </td>
                     <td className="px-6 py-4 text-gray-700">
                       <select
+                        className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         value={item.is_active ? "1" : "0"}
                         onChange={(e) => onUpdateStatus(item, e.target.value === "1")}
                       >
@@ -144,7 +149,7 @@ export function UsersPage({
                     <td className="px-6 py-4 text-gray-700">
                       <button
                         type="button"
-                        className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
+                        className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
                         onClick={() => onResetPassword(item)}
                       >
                         Reset Password

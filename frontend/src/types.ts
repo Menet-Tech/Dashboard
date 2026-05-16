@@ -140,4 +140,6 @@ export type ViewKey =
   | "monitoring"
   | "audit"
   | "users"
-  | "settings";
+  | "settings"
+  | "tickets"
+  | "registration";
