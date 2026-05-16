@@ -52,6 +52,7 @@ import { UsersPage } from "./features/users/UsersPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
+import { useAppFeedback } from "./hooks/useAppFeedback";
 
 import type { ConfirmDialogState } from "./hooks/types";
 import { useCustomers } from "./hooks/useCustomers";
@@ -93,12 +94,7 @@ export default function App() {
   const [aging, setAging] = useState<AgingReport | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   
-  const [submitting, setSubmitting] = useState(false);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const feedback = useAppFeedback();
   
   const [loginForm, setLoginForm] = useState({ username: "admin", password: "password" });
   const [loginErrors, setLoginErrors] = useState<FieldErrors>({});
@@ -107,40 +103,13 @@ export default function App() {
   const [pageLoading, setPageLoading] = useState(false);
   const [loadFailure, setLoadFailure] = useState<string | null>(null);
 
-  function pushToast(tone: ToastItem["tone"], toastMessage: string) {
-    const id = Date.now() + Math.floor(Math.random() * 1000);
-    setToasts((current) => [...current, { id, tone, message: toastMessage }]);
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((item) => item.id !== id));
-    }, 4200);
-  }
-
-  function pushSuccess(msg: string) { pushToast("success", msg); }
-  function pushError(msg: string) { pushToast("error", msg); }
-  function askForConfirmation(config: ConfirmDialogState) { setConfirmDialog(config); }
-
-  async function withFeedback(action: () => Promise<void>, actionKey?: string) {
-    setSubmitting(true);
-    setBusyAction(actionKey ?? null);
-    setMessage(null);
-    setError(null);
-    try {
-      await action();
-    } catch (caughtError) {
-      setError(toErrorMessage(caughtError));
-    } finally {
-      setSubmitting(false);
-      setBusyAction(null);
-    }
-  }
-
-  const monitoringHook = useMonitoring({ withFeedback, askForConfirmation, onSuccess: pushSuccess, userRole: user?.role, setAuditLogs });
-  const customersHook = useCustomers({ withFeedback, onSuccess: pushSuccess });
-  const billsHook = useBills({ withFeedback, askForConfirmation, onSuccess: pushSuccess, onError: pushError });
-  const packagesHook = usePackages({ withFeedback, askForConfirmation, onSuccess: pushSuccess });
-  const templatesHook = useTemplates({ withFeedback, askForConfirmation, onSuccess: pushSuccess });
-  const usersHook = useUsers({ withFeedback, onSuccess: pushSuccess });
-  const settingsHook = useSettings({ withFeedback, onSuccess: pushSuccess, refreshHealth: monitoringHook.handlers.refreshHealth });
+  const monitoringHook = useMonitoring({ withFeedback: feedback.withFeedback, askForConfirmation: feedback.askForConfirmation, onSuccess: feedback.pushSuccess, userRole: user?.role, setAuditLogs });
+  const customersHook = useCustomers({ withFeedback: feedback.withFeedback, onSuccess: feedback.pushSuccess });
+  const billsHook = useBills({ withFeedback: feedback.withFeedback, askForConfirmation: feedback.askForConfirmation, onSuccess: feedback.pushSuccess, onError: feedback.pushError });
+  const packagesHook = usePackages({ withFeedback: feedback.withFeedback, askForConfirmation: feedback.askForConfirmation, onSuccess: feedback.pushSuccess });
+  const templatesHook = useTemplates({ withFeedback: feedback.withFeedback, askForConfirmation: feedback.askForConfirmation, onSuccess: feedback.pushSuccess });
+  const usersHook = useUsers({ withFeedback: feedback.withFeedback, onSuccess: feedback.pushSuccess });
+  const settingsHook = useSettings({ withFeedback: feedback.withFeedback, onSuccess: feedback.pushSuccess, refreshHealth: monitoringHook.handlers.refreshHealth });
 
   useEffect(() => {
     let cancelled = false;
@@ -155,7 +124,7 @@ export default function App() {
           if (!cancelled && !(caughtError instanceof ApiError && caughtError.status === 401)) throw caughtError;
         }
       } catch (caughtError) {
-        if (!cancelled) setError(toErrorMessage(caughtError));
+        if (!cancelled) feedback.pushError(toErrorMessage(caughtError));
       } finally {
         if (!cancelled) setBooting(false);
       }
@@ -243,20 +212,6 @@ export default function App() {
   );
   const appTone = statusTone(monitoringHook.state.health?.status);
 
-  useEffect(() => {
-    if (!message) return;
-    pushToast("success", message);
-    setMessage(null);
-  }, [message]);
-
-  useEffect(() => {
-    if (!error) return;
-    pushToast("error", error);
-    setError(null);
-  }, [error]);
-
-  function isBusy(actionKey: string) { return submitting && busyAction === actionKey; }
-
   function switchView(nextView: ViewKey) {
     startTransition(() => setView(nextView));
     setNavOpen(false);
@@ -264,18 +219,11 @@ export default function App() {
       void monitoringHook.handlers.refreshMonitoringData();
     }
     if (nextView === "audit") {
-      void withFeedback(async () => {
+      void feedback.withFeedback(async () => {
         const payload = await fetchAuditLogs(100);
         setAuditLogs(payload.data);
       });
     }
-  }
-
-  async function confirmAndRun() {
-    if (!confirmDialog) return;
-    const action = confirmDialog.onConfirm;
-    setConfirmDialog(null);
-    await action();
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -283,16 +231,16 @@ export default function App() {
     const nextErrors = validateLogin(loginForm);
     setLoginErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    await withFeedback(async () => {
+    await feedback.withFeedback(async () => {
       const response = await login(loginForm.username, loginForm.password);
       setLoginErrors({});
       setUser(response.user);
-      setMessage("Login berhasil. Fondasi admin panel Go sekarang sudah aktif.");
+      feedback.pushSuccess("Login berhasil. Fondasi admin panel Go sekarang sudah aktif.");
     }, "login");
   }
 
   async function handleLogout() {
-    await withFeedback(async () => {
+    await feedback.withFeedback(async () => {
       await logout();
       setUser(null);
       setSummary(null);
@@ -303,7 +251,7 @@ export default function App() {
       setAuditLogs([]);
       usersHook.handlers.setManagedUsers([]);
       startTransition(() => setView("dashboard"));
-      setMessage("Sesi berhasil ditutup.");
+      feedback.pushSuccess("Sesi berhasil ditutup.");
     }, "logout");
   }
 
@@ -321,8 +269,8 @@ export default function App() {
         health={monitoringHook.state.health}
         loginForm={loginForm}
         loginErrors={loginErrors}
-        submitting={submitting}
-        isBusy={isBusy}
+        submitting={feedback.submitting}
+        isBusy={feedback.isBusy}
         onFormChange={(field, value) =>
           setLoginForm((current) => ({ ...current, [field]: value }))
         }
@@ -340,8 +288,8 @@ export default function App() {
         switchView={switchView}
         user={user}
         onLogout={() => void handleLogout()}
-        submitting={submitting}
-        isBusy={isBusy}
+        submitting={feedback.submitting}
+        isBusy={feedback.isBusy}
       />
 
       {navOpen ? (
@@ -364,8 +312,8 @@ export default function App() {
               <p className="hero-copy">{loadFailure}</p>
             </div>
             <div className="button-row">
-              <button type="button" className="primary-button" onClick={() => void withFeedback(reloadProtectedData, "retry-load")} disabled={submitting}>
-                {isBusy("retry-load") ? "Memuat ulang..." : "Coba Muat Ulang"}
+              <button type="button" className="primary-button" onClick={() => void feedback.withFeedback(reloadProtectedData, "retry-load")} disabled={feedback.submitting}>
+                {feedback.isBusy("retry-load") ? "Memuat ulang..." : "Coba Muat Ulang"}
               </button>
             </div>
           </section>
@@ -392,8 +340,8 @@ export default function App() {
           packageForm={packagesHook.state.packageForm}
           packageErrors={packagesHook.state.packageErrors}
           editingPackageId={packagesHook.state.editingPackageId}
-          submitting={submitting}
-          busyAction={busyAction}
+          submitting={feedback.submitting}
+          busyAction={feedback.busyAction}
           onFormChange={packagesHook.handlers.setPackageForm}
           onSubmit={packagesHook.handlers.handlePackageSubmit}
           onEdit={(pkg) => {
@@ -424,8 +372,8 @@ export default function App() {
           editingCustomerId={customersHook.state.editingCustomerId}
           customerLifecycleFilter={customersHook.state.customerLifecycleFilter}
           customerLifecycleMap={customerLifecycleMap}
-          submitting={submitting}
-          busyAction={busyAction}
+          submitting={feedback.submitting}
+          busyAction={feedback.busyAction}
           onFormChange={customersHook.handlers.setCustomerForm}
           onFilterChange={(filter) => customersHook.handlers.setCustomerLifecycleFilter(filter)}
           onSubmit={customersHook.handlers.handleCustomerSubmit}
@@ -457,8 +405,8 @@ export default function App() {
           bills={billsHook.state.bills}
           billPeriod={billsHook.state.billPeriod}
           billErrors={billsHook.state.billErrors}
-          submitting={submitting}
-          busyAction={busyAction}
+          submitting={feedback.submitting}
+          busyAction={feedback.busyAction}
           expandedBillId={billsHook.state.expandedBillId}
           notificationLogs={billsHook.state.notificationLogs}
           proofFiles={billsHook.state.proofFiles}
@@ -482,8 +430,8 @@ export default function App() {
           templateForm={templatesHook.state.templateForm}
           templateErrors={templatesHook.state.templateErrors}
           editingTemplateId={templatesHook.state.editingTemplateId}
-          submitting={submitting}
-          busyAction={busyAction}
+          submitting={feedback.submitting}
+          busyAction={feedback.busyAction}
           onFormChange={templatesHook.handlers.setTemplateForm}
           onSubmit={templatesHook.handlers.handleTemplateSubmit}
           onEdit={(item) => {
@@ -508,14 +456,14 @@ export default function App() {
           health={monitoringHook.state.health}
           backups={monitoringHook.state.backups}
           restoreSimulation={monitoringHook.state.restoreSimulation}
-          submitting={submitting}
-          busyAction={busyAction}
+          submitting={feedback.submitting}
+          busyAction={feedback.busyAction}
           appTone={appTone}
           databaseTone={databaseTone}
           workerTone={workerTone}
           backupTone={backupTone}
           schedulerTone={schedulerTone}
-          onRefresh={() => void withFeedback(monitoringHook.handlers.refreshMonitoringData)}
+          onRefresh={() => void feedback.withFeedback(monitoringHook.handlers.refreshMonitoringData)}
           onCreateBackup={() => void monitoringHook.handlers.handleCreateBackup()}
           onVerifyBackup={(filename) => void monitoringHook.handlers.handleVerifyBackup(filename)}
           onSimulateRestore={(filename) => void monitoringHook.handlers.handleSimulateRestore(filename)}
@@ -528,8 +476,8 @@ export default function App() {
         <SettingsPage
           settingsForm={settingsHook.state.settingsForm}
           settingsErrors={settingsHook.state.settingsErrors}
-          submitting={submitting}
-          busyAction={busyAction}
+          submitting={feedback.submitting}
+          busyAction={feedback.busyAction}
           onFormChange={settingsHook.handlers.setSettingsForm}
           onSubmit={settingsHook.handlers.handleSettingsSubmit}
         />
@@ -538,13 +486,13 @@ export default function App() {
       {view === "audit" ? (
         <AuditLogsPage
           auditLogs={auditLogs}
-          submitting={submitting}
-          onRefresh={() =>
-            void withFeedback(async () => {
+          submitting={feedback.submitting}
+          onRefresh={() => {
+            void feedback.withFeedback(async () => {
               const payload = await fetchAuditLogs(100);
               setAuditLogs(payload.data);
-            })
-          }
+            });
+          }}
         />
       ) : null}
 
@@ -553,8 +501,8 @@ export default function App() {
           managedUsers={usersHook.state.managedUsers}
           managedUserForm={usersHook.state.managedUserForm}
           managedUserErrors={usersHook.state.managedUserErrors}
-          submitting={submitting}
-          busyAction={busyAction}
+          submitting={feedback.submitting}
+          busyAction={feedback.busyAction}
           onFormChange={usersHook.handlers.setManagedUserForm}
           onSubmit={usersHook.handlers.handleManagedUserSubmit}
           onUpdateRole={(item, role) => void usersHook.handlers.handleManagedUserUpdate(item, { role })}
@@ -564,27 +512,29 @@ export default function App() {
       ) : null}
       </div>
 
-      {confirmDialog ? (
+      <ToastStack toasts={feedback.toasts} />
+
+      {feedback.confirmDialog ? (
         <Modal
-          title={confirmDialog.title}
-          onClose={() => setConfirmDialog(null)}
+          title={feedback.confirmDialog.title}
+          onClose={feedback.dismissConfirmDialog}
           actions={
             <>
-              <button type="button" className="secondary-button" onClick={() => setConfirmDialog(null)}>
+              <button type="button" className="secondary-button" onClick={feedback.dismissConfirmDialog}>
                 Batal
               </button>
               <button
                 type="button"
-                className={confirmDialog.tone === "danger" ? "ghost-button danger-button" : "primary-button"}
-                onClick={() => void confirmAndRun()}
-                disabled={submitting}
+                className={feedback.confirmDialog.tone === "danger" ? "ghost-button danger-button" : "primary-button"}
+                onClick={() => void feedback.confirmAndRun()}
+                disabled={feedback.submitting}
               >
-                {confirmDialog.confirmLabel}
+                {feedback.confirmDialog.confirmLabel}
               </button>
             </>
           }
         >
-          <p className="muted">{confirmDialog.body}</p>
+          <p className="muted">{feedback.confirmDialog.body}</p>
         </Modal>
       ) : null}
 
@@ -597,7 +547,7 @@ export default function App() {
               <button type="button" className="secondary-button" onClick={() => usersHook.handlers.setPasswordResetState(null)}>
                 Batal
               </button>
-              <button type="submit" form="password-reset-form" className="primary-button" disabled={submitting}>
+              <button type="submit" form="password-reset-form" className="primary-button" disabled={feedback.submitting}>
                 Simpan Password Baru
               </button>
             </>
@@ -625,7 +575,6 @@ export default function App() {
         </Modal>
       ) : null}
 
-      <ToastStack toasts={toasts} />
     </main>
   );
 }
