@@ -50,6 +50,8 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { AuditLogsPage } from "./features/audit/AuditLogsPage";
 import { UsersPage } from "./features/users/UsersPage";
 import { LoginPage } from "./features/auth/LoginPage";
+import { Sidebar } from "./components/layout/Sidebar";
+import { Topbar } from "./components/layout/Topbar";
 
 import type { ConfirmDialogState } from "./hooks/types";
 import { useCustomers } from "./hooks/useCustomers";
@@ -331,75 +333,28 @@ export default function App() {
 
   return (
     <main className="page-shell app-shell">
-      <aside className={`app-sidebar ${navOpen ? "is-open" : ""}`} aria-label="Navigasi utama">
-        <div className="sidebar-brand">
-          <p className="eyebrow">go-dev rewrite</p>
-          <h1>Menet-Tech Dashboard</h1>
-          <p className="hero-copy">Backend Go, worker billing, dan panel operasional baru untuk tim ISP.</p>
-        </div>
-        <nav className="sidebar-nav">
-          {visibleNavItems.map((item) => (
-            <button
-              key={item.key}
-              className={item.key === view ? "tab-button active" : "tab-button"}
-              onClick={() => switchView(item.key)}
-              type="button"
-              aria-label={`Buka menu ${item.label}`}
-            >
-              <span className="nav-label">{item.label}</span>
-              <span className="nav-caption">{item.caption}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-footer">
-          <div className="user-chip">
-            <strong>{user.username}</strong>
-            <span>{user.role}</span>
-          </div>
-          <button className="secondary-button" onClick={() => void handleLogout()} disabled={submitting}>
-            {isBusy("logout") ? "Keluar..." : "Logout"}
-          </button>
-        </div>
-      </aside>
+      <Sidebar
+        navOpen={navOpen}
+        navItems={visibleNavItems}
+        view={view}
+        switchView={switchView}
+        user={user}
+        onLogout={() => void handleLogout()}
+        submitting={submitting}
+        isBusy={isBusy}
+      />
 
       {navOpen ? (
         <button type="button" className="sidebar-backdrop" onClick={() => setNavOpen(false)} aria-label="Tutup navigasi" />
       ) : null}
 
       <div className="main-panel">
-        <section className="topbar">
-          <div>
-            <button
-              type="button"
-              className="ghost-button mobile-nav-toggle"
-              onClick={() => setNavOpen((current) => !current)}
-              aria-label={navOpen ? "Tutup menu navigasi" : "Buka menu navigasi"}
-              aria-expanded={navOpen}
-            >
-              {navOpen ? "Tutup Menu" : "Buka Menu"}
-            </button>
-            <p className="eyebrow">go-dev rewrite</p>
-            <h1>Menet-Tech Dashboard</h1>
-            <p className="hero-copy">
-              Rewrite sekarang sudah masuk ke alur billing yang lebih lengkap: status tagihan,
-              invoice, bukti bayar, template WA, dan fondasi worker automasi.
-            </p>
-            <div className="topbar-status-strip">
-              <StatusPill label={monitoringHook.state.health?.status ?? "checking"} tone={appTone} />
-              <StatusPill label={`worker ${monitoringHook.state.health?.services.worker ?? "unknown"}`} tone={workerTone} />
-              <StatusPill label={`backup ${monitoringHook.state.health?.services.backup ?? "unknown"}`} tone={backupTone} />
-            </div>
-          </div>
-          <div className="topbar-actions">
-            <div className="user-chip compact-user-chip">
-              <strong>{user.username}</strong>
-              <span>{user.role}</span>
-            </div>
-            <button className="secondary-button" onClick={() => void handleLogout()} disabled={submitting}>
-              {isBusy("logout") ? "Keluar..." : "Logout"}
-            </button>
-          </div>
-        </section>
+        <Topbar
+          navOpen={navOpen}
+          onToggleNav={() => setNavOpen((current) => !current)}
+          health={monitoringHook.state.health}
+          user={user}
+        />
 
         {loadFailure ? (
           <section className="surface retry-panel">
