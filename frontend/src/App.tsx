@@ -49,6 +49,7 @@ import { MonitoringPage } from "./features/monitoring/MonitoringPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { AuditLogsPage } from "./features/audit/AuditLogsPage";
 import { UsersPage } from "./features/users/UsersPage";
+import { LoginPage } from "./features/auth/LoginPage";
 
 import type { ConfirmDialogState } from "./hooks/types";
 import { useCustomers } from "./hooks/useCustomers";
@@ -314,72 +315,17 @@ export default function App() {
 
   if (!user) {
     return (
-      <main className="page-shell auth-shell">
-        <section className="hero">
-          <div>
-            <p className="eyebrow">go-dev rewrite</p>
-            <h1>Masuk ke Menet-Tech Dashboard</h1>
-            <p className="hero-copy">
-              Backend Go, frontend React, dan SQLite sekarang sudah mulai membentuk
-              admin panel baru. Login default bootstrap tetap `admin / password`
-              sampai nanti kita pindah ke user management penuh.
-            </p>
-          </div>
-          <div className="hero-panel">
-            <div className="panel-row">
-              <span>Backend</span>
-              <StatusPill label={monitoringHook.state.health?.status ?? "offline"} tone={appTone} />
-            </div>
-            <div className="panel-row">
-              <span>Database</span>
-              <StatusPill label={monitoringHook.state.health?.services.database ?? "offline"} tone={databaseTone} />
-            </div>
-            <div className="panel-row">
-              <span>Worker</span>
-              <StatusPill label={monitoringHook.state.health?.services.worker ?? "unknown"} tone={workerTone} />
-            </div>
-            <div className="panel-row">
-              <span>Environment</span>
-              <strong>{monitoringHook.state.health?.app.environment ?? "development"}</strong>
-            </div>
-          </div>
-        </section>
-
-        <section className="surface auth-card">
-          <div className="section-heading">
-            <h2>Login</h2>
-            <StatusPill label="session cookie" tone="slate" />
-          </div>
-          <form className="form-grid" onSubmit={handleLogin}>
-            <label>
-              <span>Username</span>
-              <input
-                className={inputClassName(loginErrors.username)}
-                value={loginForm.username}
-                onChange={(event) =>
-                  setLoginForm((current) => ({ ...current, username: event.target.value }))
-                }
-              />
-              {renderInlineError(loginErrors.username)}
-            </label>
-            <label>
-              <span>Password</span>
-              <input
-                className={inputClassName(loginErrors.password)}
-                type="password"
-                value={loginForm.password}
-                onChange={(event) =>
-                  setLoginForm((current) => ({ ...current, password: event.target.value }))
-                }
-              />
-              {renderInlineError(loginErrors.password)}
-            </label>
-            <button className="primary-button" disabled={submitting}>
-              {isBusy("login") ? "Masuk..." : "Masuk"}
-            </button>
-          </form>
-        </section>
-      </main>
+      <LoginPage
+        health={monitoringHook.state.health}
+        loginForm={loginForm}
+        loginErrors={loginErrors}
+        submitting={submitting}
+        isBusy={isBusy}
+        onFormChange={(field, value) =>
+          setLoginForm((current) => ({ ...current, [field]: value }))
+        }
+        onLogin={handleLogin}
+      />
     );
   }
 
