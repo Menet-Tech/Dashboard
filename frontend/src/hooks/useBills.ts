@@ -1,0 +1,84 @@
+import { useState, type FormEvent } from "react";
+import { fetchBills, generateBills, markBillPaid, uploadBillProof, fetchBillNotifications } from "../lib/api";
+import { validateBillPeriod, type FieldErrors } from "../utils/validation";
+import { currentPeriod } from "../utils/format";
+import type { BillItem, NotificationLog } from "../types";
+import type { HookDeps } from "./types";
+
+export function useBills({ withFeedback, askForConfirmation, onSuccess, onError }: HookDeps) {
+  const [bills, setBills] = useState<BillItem[]>([]);
+  const [billPeriod, setBillPeriod] = useState(currentPeriod());
+  const [billErrors, setBillErrors] = useState<FieldErrors>({});
+  const [proofFiles, setProofFiles] = useState<Record<number, File | null>>({});
+  const [notificationLogs, setNotificationLogs] = useState<Record<number, NotificationLog[]>>({});
+  const [expandedBillId, setExpandedBillId] = useState<number | null>(null);
+
+  async function refreshBills() {
+    const payload = await fetchBills();
+    setBills(payload.data);
+  }
+
+  async function handleGenerateBills(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextErrors = validateBillPeriod(billPeriod);
+    setBillErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+    askForConfirmation({
+      title: "Generate tagihan bulanan",
+      body: `Sistem akan membuat tagihan untuk periode ${billPeriod} hanya untuk pelanggan aktif/limit yang belum memiliki invoice pada periode tersebut.`,
+      confirmLabel: "Generate sekarang",
+      tone: "primary",
+      onConfirm: async () => {
+        await withFeedback(async () => {
+          const response = await generateBills(billPeriod);
+          setBillErrors({});
+          onSuccess(`Generate tagihan periode ${response.data.period} selesai. ${response.data.generated} tagihan baru dibuat.`);
+          await refreshBills();
+        }, "generate-bills");
+      },
+    });
+  }
+
+  function handleMarkBillPaid(id: number) {
+    askForConfirmation({
+      title: "Tandai tagihan lunas",
+      body: "Apakah Anda yakin? Tindakan ini akan mencatat pembayaran, memicu notifikasi lunas, dan tidak dirancang untuk dibatalkan dari UI operator.",
+      confirmLabel: "Ya, tandai lunas",
+      tone: "danger",
+      onConfirm: async () => {
+        await withFeedback(async () => {
+          await markBillPaid(id, "transfer");
+          onSuccess("Tagihan berhasil ditandai lunas.");
+          await refreshBills();
+        }, "mark-paid");
+      },
+    });
+  }
+
+  async function handleUploadProof(id: number) {
+    const file = proofFiles[id];
+    if (!file) { onError("Pilih file bukti bayar terlebih dahulu."); return; }
+    await withFeedback(async () => {
+      await uploadBillProof(id, file);
+      setProofFiles((current) => ({ ...current, [id]: null }));
+      onSuccess("Bukti bayar berhasil diunggah.");
+      await refreshBills();
+    }, "upload-proof");
+  }
+
+  async function handleToggleNotifications(billId: number) {
+    if (expandedBillId === billId) { setExpandedBillId(null); return; }
+    setExpandedBillId(billId);
+    if (!notificationLogs[billId]) {
+      try {
+        const res = await fetchBillNotifications(billId);
+        setNotificationLogs((prev) => ({ ...prev, [billId]: res.data }));
+      } catch (err) { console.error("Failed to fetch logs", err); }
+    }
+  }
+
+  return {
+    state: { bills, billPeriod, billErrors, proofFiles, notificationLogs, expandedBillId },
+    handlers: { setBills, setBillPeriod, setProofFiles, refreshBills, handleGenerateBills, handleMarkBillPaid, handleUploadProof, handleToggleNotifications },
+  };
+}
