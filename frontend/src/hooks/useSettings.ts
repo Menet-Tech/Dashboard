@@ -2,18 +2,19 @@ import { useState, type FormEvent } from "react";
 import { fetchSettings, updateSettings } from "../lib/api";
 import { validateSettings, type FieldErrors } from "../utils/validation";
 import type { HookDeps } from "./types";
+import type { SettingsState } from "../types";
 
 export function useSettings({
   withFeedback,
   onSuccess,
   refreshHealth,
 }: Pick<HookDeps, "withFeedback" | "onSuccess"> & { refreshHealth: () => Promise<void> }) {
-  const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
+  const [settingsForm, setSettingsForm] = useState<SettingsState>({});
   const [settingsErrors, setSettingsErrors] = useState<FieldErrors>({});
 
   async function refreshSettings() {
     const payload = await fetchSettings();
-    setSettingsForm(payload.data as Record<string, string>);
+    setSettingsForm(payload.data as SettingsState);
   }
 
   async function handleSettingsSubmit(event: FormEvent<HTMLFormElement>) {

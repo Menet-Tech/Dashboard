@@ -133,13 +133,7 @@ export function UsersPage({
                     </td>
                     <td>
                       {item.last_login_at ? (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            fontSize: "0.85em",
-                          }}
-                        >
+                        <div className="flex flex-col text-sm">
                           <span>{new Date(item.last_login_at).toLocaleString("id-ID")}</span>
                           <span className="muted">{item.last_login_ip || "-"}</span>
                         </div>

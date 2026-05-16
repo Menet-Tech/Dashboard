@@ -3,7 +3,7 @@
  * Pure business logic — no React, no side-effects.
  */
 
-import type { CustomerItem, BillItem } from "../types";
+import type { CustomerItem, BillItem, SettingsState } from "../types";
 import { startOfDay, addDays, daysDiff } from "../utils/date";
 import { formatDateId } from "../utils/format";
 
@@ -133,7 +133,7 @@ function customerLifecycleFromBill(
 export function buildCustomerLifecycleMap(
   customers: CustomerItem[],
   bills: BillItem[],
-  settingsForm: Record<string, string>,
+  settingsForm: SettingsState,
 ): CustomerLifecycleMap {
   const reminderDays = parseInt(settingsForm["billing_reminder_days"] ?? "3", 10) || 3;
   const menunggakDays = parseInt(settingsForm["billing_menunggak_days"] ?? "30", 10) || 30;

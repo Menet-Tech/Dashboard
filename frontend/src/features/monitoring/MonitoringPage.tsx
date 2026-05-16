@@ -251,7 +251,7 @@ export function MonitoringPage({
           <h2>Backup Database</h2>
           <StatusPill label={`${backups.length} backup tersedia`} tone="slate" />
         </div>
-        <div className="button-row" style={{ marginBottom: "1rem" }}>
+        <div className="button-row mb-4">
           <button
             type="button"
             className="primary-button"
@@ -312,20 +312,12 @@ export function MonitoringPage({
           </table>
         </div>
         {restoreSimulation && (
-          <div
-            className="top-gap"
-            style={{
-              padding: "1rem",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius)",
-              backgroundColor: "var(--surface)",
-            }}
-          >
+          <div className="top-gap p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--surface)]">
             <h3>Simulasi Restore: {restoreSimulation.filename}</h3>
             <p>
               Status:{" "}
               {restoreSimulation.result.valid ? (
-                <span style={{ color: "var(--success)" }}>Valid</span>
+                <span className="text-[var(--success)]">Valid</span>
               ) : (
                 "Invalid"
               )}

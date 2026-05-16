@@ -169,14 +169,14 @@ export function BillsPage({
                           <div className="expanded-content p-4">
                             <h4>Riwayat Notifikasi</h4>
                             {notificationLogs[bill.id]?.length ? (
-                              <table className="compact-table mt-2" style={{ width: "100%" }}>
+                              <table className="compact-table mt-2 w-full">
                                 <thead>
                                   <tr>
-                                    <th style={{ textAlign: "left" }}>Waktu</th>
-                                    <th style={{ textAlign: "left" }}>Tujuan</th>
-                                    <th style={{ textAlign: "left" }}>Trigger</th>
-                                    <th style={{ textAlign: "left" }}>Status</th>
-                                    <th style={{ textAlign: "left" }}>Response</th>
+                                    <th className="text-left">Waktu</th>
+                                    <th className="text-left">Tujuan</th>
+                                    <th className="text-left">Trigger</th>
+                                    <th className="text-left">Status</th>
+                                    <th className="text-left">Response</th>
                                   </tr>
                                 </thead>
                                 <tbody>

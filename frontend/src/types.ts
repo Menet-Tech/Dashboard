@@ -80,7 +80,32 @@ export type NotificationLog = {
   created_at: string;
 };
 
-export type SettingsPayload = Record<string, string>;
+export type SettingsState = {
+  wa_gateway_url?: string;
+  wa_api_key?: string;
+  wa_account_id?: string;
+  discord_webhook_url?: string;
+  discord_notify_payment?: string;
+  discord_notify_generate?: string;
+  discord_notify_worker?: string;
+  billing_reminder_days?: string;
+  billing_limit_days?: string;
+  billing_menunggak_days?: string;
+  billing_auto_generate_enabled?: string;
+  billing_generate_day?: string;
+  billing_generate_time?: string;
+  billing_generate_retry_attempts?: string;
+  billing_generate_retry_backoff_seconds?: string;
+  worker_interval_seconds?: string;
+  backup_auto_enabled?: string;
+  backup_auto_time?: string;
+  backup_retention_count?: string;
+  mikrotik_host?: string;
+  mikrotik_user?: string;
+  mikrotik_pass?: string;
+  mikrotik_test_username?: string;
+  trial_overdue_grace_days?: string;
+};
 
 export type AuditLogItem = {
   id: number;
