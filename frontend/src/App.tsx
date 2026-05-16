@@ -38,7 +38,7 @@ import { buildCustomerLifecycleMap } from "./lib/lifecycle";
 import { Modal } from "./components/ui/Modal";
 import { SkeletonCard } from "./components/ui/SkeletonCard";
 import { ToastStack, type ToastItem } from "./components/ui/Toast";
-import { inputClassName, renderInlineError } from "./components/ui";
+import { inputClassName, renderInlineError, ErrorState } from "./components/ui";
 
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { PackagesPage } from "./features/packages/PackagesPage";
@@ -304,18 +304,13 @@ export default function App() {
         />
 
         {loadFailure ? (
-          <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm retry-panel">
-            <div>
-              <p className="text-xs font-bold tracking-wider text-indigo-500 uppercase mb-2">load failure</p>
-              <h2 className="text-lg font-bold text-slate-900">Data panel belum berhasil dimuat penuh</h2>
-              <p className="text-slate-500 max-w-2xl leading-relaxed">{loadFailure}</p>
-            </div>
-            <div className="button-row">
-              <button type="button" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={() => void feedback.withFeedback(reloadProtectedData, "retry-load")} disabled={feedback.submitting}>
-                {feedback.isBusy("retry-load") ? "Memuat ulang..." : "Coba Muat Ulang"}
-              </button>
-            </div>
-          </section>
+          <div className="mb-6">
+            <ErrorState 
+              title="Data panel belum berhasil dimuat penuh" 
+              message={loadFailure} 
+              onRetry={() => void feedback.withFeedback(reloadProtectedData, "retry-load")} 
+            />
+          </div>
         ) : null}
 
       {view === "dashboard" ? (
