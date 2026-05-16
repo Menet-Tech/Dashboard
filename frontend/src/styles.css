@@ -1,3 +1,23 @@
+/*
+ * styles.css — Menet-Tech Dashboard
+ *
+ * CSS Architecture:
+ *   - Tailwind v4 is imported via `@import "tailwindcss"` (line below).
+ *     Tailwind utility classes (e.g. mt-4, flex, text-sm) are used freely
+ *     alongside the legacy custom class system.
+ *
+ *   - CSS custom properties defined in :root (--border, --radius, --surface,
+ *     --success, --brand-deep, --ink-strong, etc.) are intentionally preserved
+ *     and used in both custom CSS rules AND Tailwind arbitrary values
+ *     (e.g. `border-[var(--border)]`, `text-[var(--success)]`).
+ *
+ *   - If migrating to Tailwind v4 theme tokens (@theme), map these custom
+ *     properties to Tailwind design tokens BEFORE removing :root declarations.
+ *     Example: `@theme { --color-success: var(--success); }`
+ *
+ *   - Do NOT remove :root custom properties until all usages in
+ *     MonitoringPage, DashboardPage, and component CSS classes are updated.
+ */
 @import "tailwindcss";
 
 :root {
