@@ -7,7 +7,7 @@ type EmptyStateProps = {
 export function EmptyTableRow({ message, colSpan = 5 }: EmptyStateProps) {
   return (
     <tr>
-      <td colSpan={colSpan}>
+      <td className="px-6 py-4 text-gray-700" colSpan={colSpan}>
         <span className="muted">{message}</span>
       </td>
     </tr>

@@ -1,12 +1,8 @@
 import { FormEvent } from "react";
-import { StatusPill } from "../../components/StatusPill";
 import { inputClassName, renderInlineError } from "../../components/ui";
-import { statusTone } from "../../utils/status";
-import type { HealthPayload } from "../../lib/api";
 import type { FieldErrors } from "../../utils/validation";
 
 type LoginPageProps = {
-  health: HealthPayload | null;
   loginForm: { username: string; password: string };
   loginErrors: FieldErrors;
   submitting: boolean;
@@ -16,7 +12,6 @@ type LoginPageProps = {
 };
 
 export function LoginPage({
-  health,
   loginForm,
   loginErrors,
   submitting,
@@ -24,50 +19,16 @@ export function LoginPage({
   onFormChange,
   onLogin,
 }: LoginPageProps) {
-  const databaseTone = statusTone(health?.services.database);
-  const workerTone = statusTone(health?.services.worker);
-  const appTone = statusTone(health?.status);
-
   return (
-    <main className="page-shell auth-shell">
-      <section className="hero">
-        <div>
-          <p className="eyebrow">go-dev rewrite</p>
-          <h1>Masuk ke Menet-Tech Dashboard</h1>
-          <p className="hero-copy">
-            Backend Go, frontend React, dan SQLite sekarang sudah mulai membentuk
-            admin panel baru. Login default bootstrap tetap `admin / password`
-            sampai nanti kita pindah ke user management penuh.
-          </p>
+    <main className="min-h-screen bg-gradient-to-br from-slate-100 to-sky-100 flex items-center justify-center p-4">
+      <section className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+        <div className="text-center mb-8">
+          <p className="text-xs font-bold tracking-wider text-indigo-500 uppercase mb-2">go-dev rewrite</p>
+          <h1 className="text-2xl font-bold text-slate-900">Masuk ke Menet-Tech</h1>
         </div>
-        <div className="hero-panel">
-          <div className="panel-row">
-            <span>Backend</span>
-            <StatusPill label={health?.status ?? "offline"} tone={appTone} />
-          </div>
-          <div className="panel-row">
-            <span>Database</span>
-            <StatusPill label={health?.services.database ?? "offline"} tone={databaseTone} />
-          </div>
-          <div className="panel-row">
-            <span>Worker</span>
-            <StatusPill label={health?.services.worker ?? "unknown"} tone={workerTone} />
-          </div>
-          <div className="panel-row">
-            <span>Environment</span>
-            <strong>{health?.app.environment ?? "development"}</strong>
-          </div>
-        </div>
-      </section>
-
-      <section className="surface auth-card">
-        <div className="section-heading">
-          <h2>Login</h2>
-          <StatusPill label="session cookie" tone="slate" />
-        </div>
-        <form className="form-grid" onSubmit={onLogin}>
-          <label>
-            <span>Username</span>
+        <form className="flex flex-col gap-5" onSubmit={onLogin}>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-slate-700">Username</span>
             <input
               className={inputClassName(loginErrors.username)}
               value={loginForm.username}
@@ -75,8 +36,8 @@ export function LoginPage({
             />
             {renderInlineError(loginErrors.username)}
           </label>
-          <label>
-            <span>Password</span>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-slate-700">Password</span>
             <input
               className={inputClassName(loginErrors.password)}
               type="password"
@@ -85,7 +46,7 @@ export function LoginPage({
             />
             {renderInlineError(loginErrors.password)}
           </label>
-          <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
+          <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50 mt-2" disabled={submitting}>
             {isBusy("login") ? "Masuk..." : "Masuk"}
           </button>
         </form>

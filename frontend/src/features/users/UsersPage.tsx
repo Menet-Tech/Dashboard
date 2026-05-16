@@ -44,11 +44,11 @@ export function UsersPage({
 
   return (
     <section className="grid feature-grid">
-      <article className="surface">
-        <div className="section-heading">
-          <h2>Tambah User Tim</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Tambah User Tim</h2>
         </div>
-        <form className="form-grid" onSubmit={onSubmit}>
+        <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onSubmit}>
           <label>
             <span>Username</span>
             <input
@@ -90,30 +90,30 @@ export function UsersPage({
         </p>
       </article>
 
-      <article className="surface">
-        <div className="section-heading">
-          <h2>Daftar User</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Daftar User</h2>
           <StatusPill label={`${managedUsers.length} user`} tone="slate" />
         </div>
-        <div className="table-shell">
-          <table>
-            <thead>
+        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
               <tr>
-                <th>Username</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Terakhir Login</th>
-                <th>Aksi</th>
+                <th className="px-6 py-4 font-medium">Username</th>
+                <th className="px-6 py-4 font-medium">Role</th>
+                <th className="px-6 py-4 font-medium">Status</th>
+                <th className="px-6 py-4 font-medium">Terakhir Login</th>
+                <th className="px-6 py-4 font-medium">Aksi</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200">
               {managedUsers.length === 0 ? (
                 <EmptyTableRow message="Belum ada user tim tambahan." colSpan={5} />
               ) : (
                 managedUsers.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.username}</td>
-                    <td>
+                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 text-gray-700">{item.username}</td>
+                    <td className="px-6 py-4 text-gray-700">
                       <select
                         value={item.role}
                         onChange={(e) => onUpdateRole(item, e.target.value)}
@@ -122,7 +122,7 @@ export function UsersPage({
                         <option value="admin">Admin</option>
                       </select>
                     </td>
-                    <td>
+                    <td className="px-6 py-4 text-gray-700">
                       <select
                         value={item.is_active ? "1" : "0"}
                         onChange={(e) => onUpdateStatus(item, e.target.value === "1")}
@@ -131,7 +131,7 @@ export function UsersPage({
                         <option value="0">Nonaktif</option>
                       </select>
                     </td>
-                    <td>
+                    <td className="px-6 py-4 text-gray-700">
                       {item.last_login_at ? (
                         <div className="flex flex-col text-sm">
                           <span>{new Date(item.last_login_at).toLocaleString("id-ID")}</span>
@@ -141,7 +141,7 @@ export function UsersPage({
                         <span className="muted">Belum pernah</span>
                       )}
                     </td>
-                    <td>
+                    <td className="px-6 py-4 text-gray-700">
                       <button
                         type="button"
                         className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"

@@ -49,11 +49,11 @@ export function PackagesPage({
 
   return (
     <section className="grid feature-grid">
-      <article className="surface">
-        <div className="section-heading">
-          <h2>{editingPackageId ? "Edit Paket" : "Tambah Paket"}</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">{editingPackageId ? "Edit Paket" : "Tambah Paket"}</h2>
         </div>
-        <form className="form-grid" onSubmit={onSubmit}>
+        <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onSubmit}>
           <label>
             <span>Nama Paket</span>
             <input
@@ -108,33 +108,33 @@ export function PackagesPage({
         </form>
       </article>
 
-      <article className="surface">
-        <div className="section-heading">
-          <h2>Daftar Paket</h2>
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Daftar Paket</h2>
           <StatusPill label={`${packages.length} item`} tone="slate" />
         </div>
-        <div className="table-shell">
-          <table>
-            <thead>
+        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
               <tr>
-                <th>Nama</th>
-                <th>Speed</th>
-                <th>Harga</th>
-                <th>Pelanggan</th>
-                <th>Aksi</th>
+                <th className="px-6 py-4 font-medium">Nama</th>
+                <th className="px-6 py-4 font-medium">Speed</th>
+                <th className="px-6 py-4 font-medium">Harga</th>
+                <th className="px-6 py-4 font-medium">Pelanggan</th>
+                <th className="px-6 py-4 font-medium">Aksi</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200">
               {packages.length === 0 ? (
                 <EmptyTableRow message="Belum ada master paket. Tambahkan paket pertama untuk mulai operasional." />
               ) : (
                 packages.map((pkg) => (
-                  <tr key={pkg.id}>
-                    <td>{pkg.name}</td>
-                    <td>{pkg.speed_mbps} Mbps</td>
-                    <td>{formatCurrency(pkg.price)}</td>
-                    <td>{pkg.customer_count}</td>
-                    <td>
+                  <tr key={pkg.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 text-gray-700">{pkg.name}</td>
+                    <td className="px-6 py-4 text-gray-700">{pkg.speed_mbps} Mbps</td>
+                    <td className="px-6 py-4 text-gray-700">{formatCurrency(pkg.price)}</td>
+                    <td className="px-6 py-4 text-gray-700">{pkg.customer_count}</td>
+                    <td className="px-6 py-4 text-gray-700">
                       <div className="table-actions">
                         <button type="button" className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" onClick={() => onEdit(pkg)}>
                           Edit

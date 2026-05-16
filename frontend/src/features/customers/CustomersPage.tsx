@@ -73,11 +73,11 @@ export function CustomersPage({
   return (
     <section className="grid feature-grid">
       {user?.role !== "viewer" && (
-        <article className="surface">
-          <div className="section-heading">
-            <h2>{editingCustomerId ? "Edit Pelanggan" : "Tambah Pelanggan"}</h2>
+        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-slate-900">{editingCustomerId ? "Edit Pelanggan" : "Tambah Pelanggan"}</h2>
           </div>
-          <form className="form-grid" onSubmit={onSubmit}>
+          <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onSubmit}>
             <label>
               <span>Nama</span>
               <input
@@ -214,13 +214,13 @@ export function CustomersPage({
         </article>
       )}
 
-      <article className="surface">
-        <div className="section-heading">
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h2>Daftar Pelanggan</h2>
+            <h2 className="text-lg font-bold text-slate-900">Daftar Pelanggan</h2>
             <p className="section-copy">Pantau role pelanggan dari trial aktif sampai tertagih, jatuh tempo, dan menunggak dalam satu daftar.</p>
           </div>
-          <div className="section-heading-actions">
+          <div className="flex items-center gap-3">
             <label className="toolbar-field">
               <span>Filter Role</span>
               <select
@@ -239,20 +239,20 @@ export function CustomersPage({
             <StatusPill label={`${filteredCustomers.length} item`} tone="slate" />
           </div>
         </div>
-        <div className="table-shell">
-          <table>
-            <thead>
+        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
               <tr>
-                <th>Nama</th>
-                <th>Paket</th>
-                <th>Jatuh Tempo</th>
-                <th>Role</th>
-                <th>Layanan</th>
-                <th>WA</th>
-                <th>Aksi</th>
+                <th className="px-6 py-4 font-medium">Nama</th>
+                <th className="px-6 py-4 font-medium">Paket</th>
+                <th className="px-6 py-4 font-medium">Jatuh Tempo</th>
+                <th className="px-6 py-4 font-medium">Role</th>
+                <th className="px-6 py-4 font-medium">Layanan</th>
+                <th className="px-6 py-4 font-medium">WA</th>
+                <th className="px-6 py-4 font-medium">Aksi</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200">
               {filteredCustomers.length === 0 ? (
                 <EmptyTableRow
                   message={
@@ -264,11 +264,11 @@ export function CustomersPage({
                 />
               ) : (
                 filteredCustomers.map((customer) => (
-                  <tr key={customer.id}>
-                    <td>{customer.name}</td>
-                    <td>{customer.package_name ?? "-"}</td>
-                    <td>Tanggal {customer.due_day}</td>
-                    <td>
+                  <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 text-gray-700">{customer.name}</td>
+                    <td className="px-6 py-4 text-gray-700">{customer.package_name ?? "-"}</td>
+                    <td className="px-6 py-4 text-gray-700">Tanggal {customer.due_day}</td>
+                    <td className="px-6 py-4 text-gray-700">
                       <div className="meta-stack">
                         <StatusPill
                           label={customerLifecycleMap[customer.id]?.label ?? "Lunas"}
@@ -279,7 +279,7 @@ export function CustomersPage({
                         </span>
                       </div>
                     </td>
-                    <td>
+                    <td className="px-6 py-4 text-gray-700">
                       <select
                         value={customer.status}
                         onChange={(e) => onStatusChange(customer.id, e.target.value as CustomerItem["status"])}
@@ -289,8 +289,8 @@ export function CustomersPage({
                         <option value="inactive">Inactive</option>
                       </select>
                     </td>
-                    <td>{customer.whatsapp || "-"}</td>
-                    <td>
+                    <td className="px-6 py-4 text-gray-700">{customer.whatsapp || "-"}</td>
+                    <td className="px-6 py-4 text-gray-700">
                       {user?.role !== "viewer" && (
                         <button type="button" className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" onClick={() => onEdit(customer)}>
                           Edit
