@@ -2,7 +2,7 @@ import type { FormEvent } from "react";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
 import type { CustomerItem, PackageItem, User } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
-import type { CustomerLifecycleEntry, CustomerLifecycleKey } from "../../lib/lifecycle";
+import type { CustomerLifecycleEntry } from "../../lib/lifecycle";
 import type { CustomerLifecycleFilter } from "../../hooks/useCustomers";
 
 export type CustomerFormState = {
@@ -71,7 +71,7 @@ export function CustomersPage({
   const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
 
   return (
-    <section className="grid feature-grid">
+    <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {user?.role !== "viewer" && (
         <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
@@ -139,6 +139,7 @@ export function CustomersPage({
             <label>
               <span>Nomor WhatsApp</span>
               <input
+                className={inputClassName()}
                 value={customerForm.whatsapp}
                 onChange={(e) =>
                   onFormChange((curr) => ({
@@ -151,6 +152,7 @@ export function CustomersPage({
             <label>
               <span>SN ONT</span>
               <input
+                className={inputClassName()}
                 value={customerForm.sn_ont}
                 onChange={(e) =>
                   onFormChange((curr) => ({ ...curr, sn_ont: e.target.value }))
@@ -177,6 +179,7 @@ export function CustomersPage({
             <label>
               <span>Status</span>
               <select
+                className={inputClassName()}
                 value={customerForm.status}
                 onChange={(e) =>
                   onFormChange((curr) => ({
@@ -190,9 +193,10 @@ export function CustomersPage({
                 <option value="inactive">Inactive</option>
               </select>
             </label>
-            <label className="full-width">
+            <label className="col-span-full">
               <span>Alamat</span>
               <textarea
+                className={inputClassName()}
                 rows={4}
                 value={customerForm.address}
                 onChange={(e) =>
@@ -200,12 +204,12 @@ export function CustomersPage({
                 }
               />
             </label>
-            <div className="button-row">
+            <div className="flex gap-3 mt-4">
               <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
                 {isBusy("save-customer") ? "Menyimpan..." : editingCustomerId ? "Update Pelanggan" : "Simpan Pelanggan"}
               </button>
               {editingCustomerId ? (
-                <button type="button" className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={onCancelEdit}>
+                <button type="button" className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={onCancelEdit}>
                   Batal Edit
                 </button>
               ) : null}
@@ -281,6 +285,7 @@ export function CustomersPage({
                     </td>
                     <td className="px-6 py-4 text-gray-700">
                       <select
+                        className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         value={customer.status}
                         onChange={(e) => onStatusChange(customer.id, e.target.value as CustomerItem["status"])}
                       >
@@ -292,7 +297,7 @@ export function CustomersPage({
                     <td className="px-6 py-4 text-gray-700">{customer.whatsapp || "-"}</td>
                     <td className="px-6 py-4 text-gray-700">
                       {user?.role !== "viewer" && (
-                        <button type="button" className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" onClick={() => onEdit(customer)}>
+                        <button type="button" className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={() => onEdit(customer)}>
                           Edit
                         </button>
                       )}

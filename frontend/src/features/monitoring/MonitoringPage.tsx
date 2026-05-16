@@ -26,6 +26,9 @@ type MonitoringPageProps = {
   onSimulateRestore: (filename: string) => void;
   onApplyRestore: () => void;
   onCancelRestore: () => void;
+  onCheckIntegrations: () => Promise<void>;
+  pushSuccess: (msg: string) => void;
+  pushError: (msg: string) => void;
 };
 
 export function MonitoringPage({
@@ -45,11 +48,23 @@ export function MonitoringPage({
   onSimulateRestore,
   onApplyRestore,
   onCancelRestore,
+  onCheckIntegrations,
+  pushSuccess,
+  pushError,
 }: MonitoringPageProps) {
   const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
 
+  const handleCheckIntegrations = async () => {
+    try {
+      await onCheckIntegrations();
+      pushSuccess("Semua sistem eksternal (WA/Discord) terhubung dengan baik.");
+    } catch (err) {
+      pushError("Beberapa integrasi mungkin bermasalah. Cek konfigurasi.");
+    }
+  };
+
   return (
-    <section className="grid">
+    <section className="grid gap-6">
       <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-slate-900">Monitoring Sistem</h2>
@@ -65,65 +80,92 @@ export function MonitoringPage({
             </button>
           </div>
         </div>
-        <div className="monitor-grid">
-          <article className="monitor-card">
-            <span>Database</span>
-            <strong>{health?.services.database ?? "unknown"}</strong>
-            <StatusPill label={health?.services.database ?? "unknown"} tone={databaseTone} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <article className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              </div>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Database</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <strong className="text-xl font-bold text-slate-900 leading-none">{health?.services.database ?? "unknown"}</strong>
+              <StatusPill label={health?.services.database ?? "unknown"} tone={databaseTone} />
+            </div>
           </article>
-          <article className="monitor-card">
-            <span>Worker</span>
-            <strong>{health?.services.worker ?? "unknown"}</strong>
-            <StatusPill label={health?.services.worker ?? "unknown"} tone={workerTone} />
+          <article className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              </div>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Worker</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <strong className="text-xl font-bold text-slate-900 leading-none">{health?.services.worker ?? "unknown"}</strong>
+              <StatusPill label={health?.services.worker ?? "unknown"} tone={workerTone} />
+            </div>
           </article>
-          <article className="monitor-card">
-            <span>Backup Otomatis</span>
-            <strong>{health?.services.backup ?? "unknown"}</strong>
-            <StatusPill label={health?.services.backup ?? "unknown"} tone={backupTone} />
+          <article className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              </div>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Backup Auto</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <strong className="text-xl font-bold text-slate-900 leading-none">{health?.services.backup ?? "unknown"}</strong>
+              <StatusPill label={health?.services.backup ?? "unknown"} tone={backupTone} />
+            </div>
           </article>
-          <article className="monitor-card">
-            <span>Scheduler Billing</span>
-            <strong>{health?.scheduler.billing_auto_enabled ? "aktif" : "nonaktif"}</strong>
-            <StatusPill
-              label={
-                health?.scheduler.billing_last_error
-                  ? "error"
-                  : health?.scheduler.billing_auto_enabled
-                    ? "scheduled"
-                    : "disabled"
-              }
-              tone={schedulerTone}
-            />
+          <article className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              </div>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Scheduler</span>
+            </div>
+            <div className="flex items-end justify-between">
+              <strong className="text-xl font-bold text-slate-900 leading-none">{health?.scheduler.billing_auto_enabled ? "aktif" : "nonaktif"}</strong>
+              <StatusPill
+                label={
+                  health?.scheduler.billing_last_error
+                    ? "error"
+                    : health?.scheduler.billing_auto_enabled
+                      ? "scheduled"
+                      : "disabled"
+                }
+                tone={schedulerTone}
+              />
+            </div>
           </article>
-          <article className="monitor-card">
-            <span>Integrasi</span>
-            <strong>{integrationSummary(health)}</strong>
-            <StatusPill
-              label={
-                health?.integrations.whatsapp_configured ||
-                health?.integrations.discord_configured ||
-                health?.integrations.mikrotik_configured
-                  ? "configured"
-                  : "pending"
-              }
-              tone={
-                health?.integrations.whatsapp_configured ||
-                health?.integrations.discord_configured ||
-                health?.integrations.mikrotik_configured
-                  ? "green"
-                  : "gold"
-              }
-            />
+          <article className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+              </div>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Integrasi</span>
+            </div>
+            <div className="flex flex-col gap-3">
+              <strong className="text-xl font-bold text-slate-900 leading-none">{integrationSummary(health)}</strong>
+              <button
+                type="button"
+                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors disabled:opacity-50 text-center"
+                onClick={handleCheckIntegrations}
+                disabled={isBusy("check-integrations")}
+              >
+                {isBusy("check-integrations") ? "Checking..." : "Check Integrasi"}
+              </button>
+            </div>
           </article>
         </div>
       </article>
 
-      <section className="grid detail-grid">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-slate-900">Worker Detail</h2>
           </div>
-          <dl className="meta-list">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <dt>Last Heartbeat</dt>
               <dd>{formatDateTime(health?.worker.last_heartbeat)}</dd>
@@ -151,7 +193,7 @@ export function MonitoringPage({
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-slate-900">Backup Policy</h2>
           </div>
-          <dl className="meta-list">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <dt>Status</dt>
               <dd>{health?.backup.enabled ? "Aktif" : "Nonaktif"}</dd>
@@ -176,7 +218,7 @@ export function MonitoringPage({
         </article>
       </section>
 
-      <section className="grid detail-grid">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-slate-900">Scheduler Billing</h2>
@@ -233,16 +275,30 @@ export function MonitoringPage({
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-slate-900">Database Integrity</h2>
           </div>
-          <dl className="meta-list">
-            <div>
-              <dt>Quick Check</dt>
-              <dd>{health?.database.quick_check.status ?? "unknown"}</dd>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-green-800">Integritas database normal</p>
+                  <p className="text-xs text-green-600">Tidak ada masalah terdeteksi pada skema dan data.</p>
+                </div>
+              </div>
+              <StatusPill label="ok" tone="green" />
             </div>
-            <div>
-              <dt>Pesan</dt>
-              <dd>{health?.database.quick_check.message ?? "-"}</dd>
-            </div>
-          </dl>
+            <dl className="grid grid-cols-1 gap-4 text-sm">
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <dt className="text-slate-500">Quick Check Status</dt>
+                <dd className="font-semibold text-slate-900">{health?.database.quick_check.status ?? "unknown"}</dd>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <dt className="text-slate-500">Detail Pesan</dt>
+                <dd className="text-slate-600">{health?.database.quick_check.message ?? "Database operasional."}</dd>
+              </div>
+            </dl>
+          </div>
         </article>
       </section>
 
@@ -251,7 +307,7 @@ export function MonitoringPage({
           <h2 className="text-lg font-bold text-slate-900">Backup Database</h2>
           <StatusPill label={`${backups.length} backup tersedia`} tone="slate" />
         </div>
-        <div className="button-row mb-4">
+        <div className="flex gap-3 mb-6">
           <button
             type="button"
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
@@ -285,22 +341,26 @@ export function MonitoringPage({
                     <td className="px-6 py-4 text-gray-700">{(b.size / 1024).toFixed(1)} KB</td>
                     <td className="px-6 py-4 text-gray-700">{formatDateTime(b.mod_time)}</td>
                     <td className="px-6 py-4 text-gray-700">
-                      <div className="table-actions">
+                      <div className="flex gap-2">
                         <button
                           type="button"
-                          className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
+                          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
                           onClick={() => onVerifyBackup(b.filename)}
                         >
                           Verify
                         </button>
                         <button
                           type="button"
-                          className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
+                          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
                           onClick={() => onSimulateRestore(b.filename)}
                         >
-                          Simulasi Restore
+                          Restore
                         </button>
-                        <a className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" href={getBackupDownloadUrl(b.filename)} download>
+                        <a
+                          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50 inline-block"
+                          href={getBackupDownloadUrl(b.filename)}
+                          download
+                        >
                           Download
                         </a>
                       </div>

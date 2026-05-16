@@ -50,6 +50,7 @@ export function useBills({ withFeedback, askForConfirmation, onSuccess, onError 
           await markBillPaid(id, "transfer");
           onSuccess("Tagihan berhasil ditandai lunas.");
           await refreshBills();
+          await handleToggleNotifications(id);
         }, "mark-paid");
       },
     });
