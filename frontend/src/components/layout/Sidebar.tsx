@@ -53,7 +53,7 @@ export function Sidebar({
           <strong>{user.username}</strong>
           <span>{user.role}</span>
         </div>
-        <button className="secondary-button" onClick={onLogout} disabled={submitting}>
+        <button className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={onLogout} disabled={submitting}>
           {isBusy("logout") ? "Keluar..." : "Logout"}
         </button>
       </div>

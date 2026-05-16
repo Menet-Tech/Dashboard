@@ -18,7 +18,7 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
             <StatusPill label={`${auditLogs.length} event`} tone="slate" />
             <button
               type="button"
-              className="ghost-button"
+              className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
               disabled={submitting}
               onClick={onRefresh}
             >

@@ -57,7 +57,7 @@ export function MonitoringPage({
             <StatusPill label={health?.status ?? "checking"} tone={appTone} />
             <button
               type="button"
-              className="ghost-button"
+              className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
               disabled={submitting}
               onClick={onRefresh}
             >
@@ -254,7 +254,7 @@ export function MonitoringPage({
         <div className="button-row mb-4">
           <button
             type="button"
-            className="primary-button"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
             disabled={submitting}
             onClick={onCreateBackup}
           >
@@ -288,19 +288,19 @@ export function MonitoringPage({
                       <div className="table-actions">
                         <button
                           type="button"
-                          className="ghost-button"
+                          className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
                           onClick={() => onVerifyBackup(b.filename)}
                         >
                           Verify
                         </button>
                         <button
                           type="button"
-                          className="ghost-button"
+                          className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
                           onClick={() => onSimulateRestore(b.filename)}
                         >
                           Simulasi Restore
                         </button>
-                        <a className="ghost-button" href={getBackupDownloadUrl(b.filename)} download>
+                        <a className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" href={getBackupDownloadUrl(b.filename)} download>
                           Download
                         </a>
                       </div>
@@ -329,10 +329,10 @@ export function MonitoringPage({
               <li>Total Tagihan: {restoreSimulation.result.total_tagihan}</li>
             </ul>
             <div className="button-row top-gap">
-              <button type="button" className="danger-button" onClick={onApplyRestore}>
+              <button type="button" className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={onApplyRestore}>
                 Apply to Live (Restart)
               </button>
-              <button type="button" className="ghost-button" onClick={onCancelRestore}>
+              <button type="button" className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" onClick={onCancelRestore}>
                 Batal
               </button>
             </div>

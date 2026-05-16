@@ -96,11 +96,11 @@ export function PackagesPage({
             />
           </label>
           <div className="button-row">
-            <button className="primary-button" disabled={submitting}>
+            <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
               {isBusy("save-package") ? "Menyimpan..." : editingPackageId ? "Update Paket" : "Simpan Paket"}
             </button>
             {editingPackageId ? (
-              <button type="button" className="secondary-button" onClick={onCancelEdit}>
+              <button type="button" className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={onCancelEdit}>
                 Batal Edit
               </button>
             ) : null}
@@ -136,12 +136,12 @@ export function PackagesPage({
                     <td>{pkg.customer_count}</td>
                     <td>
                       <div className="table-actions">
-                        <button type="button" className="ghost-button" onClick={() => onEdit(pkg)}>
+                        <button type="button" className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" onClick={() => onEdit(pkg)}>
                           Edit
                         </button>
                         <button
                           type="button"
-                          className="ghost-button danger-button"
+                          className="text-red-600 hover:bg-red-50 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
                           onClick={() => onDelete(pkg.id)}
                         >
                           Hapus

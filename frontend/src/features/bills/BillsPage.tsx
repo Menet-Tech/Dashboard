@@ -61,7 +61,7 @@ export function BillsPage({
               {renderInlineError(billErrors.period)}
             </label>
             <div className="button-row">
-              <button className="primary-button" disabled={submitting}>
+              <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
                 {isBusy("generate-bills") ? "Menghasilkan..." : "Generate Sekarang"}
               </button>
             </div>
@@ -123,7 +123,7 @@ export function BillsPage({
                         <div className="stack-actions">
                           <button
                             type="button"
-                            className="ghost-button"
+                            className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
                             onClick={() => window.open(`/api/v1/bills/${bill.id}/invoice`, "_blank")}
                           >
                             Invoice
@@ -131,7 +131,7 @@ export function BillsPage({
                           {user?.role !== "viewer" && bill.status === "belum_bayar" ? (
                             <button
                               type="button"
-                              className="ghost-button"
+                              className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
                               onClick={() => onMarkBillPaid(bill.id)}
                             >
                               Tandai Lunas
@@ -139,7 +139,7 @@ export function BillsPage({
                           ) : null}
                           <button
                             type="button"
-                            className="ghost-button"
+                            className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
                             onClick={() => onToggleNotifications(bill.id)}
                           >
                             Log WA
@@ -153,7 +153,7 @@ export function BillsPage({
                               />
                               <button
                                 type="button"
-                                className="secondary-button"
+                                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
                                 onClick={() => onUploadProof(bill.id)}
                               >
                                 {isBusy("upload-proof") ? "Mengunggah..." : "Upload Bukti"}
