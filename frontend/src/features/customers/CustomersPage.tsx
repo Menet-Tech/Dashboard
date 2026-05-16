@@ -2,7 +2,8 @@ import type { FormEvent } from "react";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
 import type { CustomerItem, PackageItem, User } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
-import type { CustomerLifecycleEntry } from "../../lib/lifecycle";
+import type { CustomerLifecycleEntry, CustomerLifecycleKey } from "../../lib/lifecycle";
+import type { CustomerLifecycleFilter } from "../../hooks/useCustomers";
 
 export type CustomerFormState = {
   name: string;
@@ -36,12 +37,12 @@ type CustomersPageProps = {
   customerForm: CustomerFormState;
   customerErrors: FieldErrors;
   editingCustomerId: number | null;
-  customerLifecycleFilter: string;
+  customerLifecycleFilter: CustomerLifecycleFilter;
   customerLifecycleMap: Record<number, CustomerLifecycleEntry>;
   submitting: boolean;
   busyAction: string | null;
   onFormChange: (updater: (current: CustomerFormState) => CustomerFormState) => void;
-  onFilterChange: (filter: string) => void;
+  onFilterChange: (filter: CustomerLifecycleFilter) => void;
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   onStatusChange: (id: number, status: CustomerItem["status"]) => void;
   onEdit: (customer: CustomerItem) => void;
@@ -224,7 +225,7 @@ export function CustomersPage({
               <span>Filter Role</span>
               <select
                 value={customerLifecycleFilter}
-                onChange={(e) => onFilterChange(e.target.value)}
+                onChange={(e) => onFilterChange(e.target.value as CustomerLifecycleFilter)}
                 aria-label="Filter role billing pelanggan"
               >
                 <option value="all">Semua</option>

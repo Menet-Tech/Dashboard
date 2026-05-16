@@ -526,7 +526,7 @@ export default function App() {
           submitting={submitting}
           busyAction={busyAction}
           onFormChange={customersHook.handlers.setCustomerForm}
-          onFilterChange={(filter) => customersHook.handlers.setCustomerLifecycleFilter(filter as any)}
+          onFilterChange={(filter) => customersHook.handlers.setCustomerLifecycleFilter(filter)}
           onSubmit={customersHook.handlers.handleCustomerSubmit}
           onStatusChange={(id, status) => void customersHook.handlers.handleStatusChange(id, status)}
           onEdit={(customer) => {
