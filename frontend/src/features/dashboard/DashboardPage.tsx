@@ -66,10 +66,10 @@ export function DashboardPage({
             <p className="muted">Lihat kesehatan sistem, generate tagihan, dan pantau tunggakan dari satu area.</p>
           </div>
           <div className="button-row">
-            <button type="button" className="primary-button" onClick={() => onSwitchView("bills")}>
+            <button type="button" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={() => onSwitchView("bills")}>
               Buka Tagihan
             </button>
-            <button type="button" className="ghost-button" onClick={() => onSwitchView("monitoring")}>
+            <button type="button" className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" onClick={() => onSwitchView("monitoring")}>
               Buka Monitoring
             </button>
           </div>

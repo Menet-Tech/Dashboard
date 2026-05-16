@@ -312,7 +312,7 @@ export default function App() {
               <p className="hero-copy">{loadFailure}</p>
             </div>
             <div className="button-row">
-              <button type="button" className="primary-button" onClick={() => void feedback.withFeedback(reloadProtectedData, "retry-load")} disabled={feedback.submitting}>
+              <button type="button" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={() => void feedback.withFeedback(reloadProtectedData, "retry-load")} disabled={feedback.submitting}>
                 {feedback.isBusy("retry-load") ? "Memuat ulang..." : "Coba Muat Ulang"}
               </button>
             </div>
@@ -520,12 +520,12 @@ export default function App() {
           onClose={feedback.dismissConfirmDialog}
           actions={
             <>
-              <button type="button" className="secondary-button" onClick={feedback.dismissConfirmDialog}>
+              <button type="button" className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={feedback.dismissConfirmDialog}>
                 Batal
               </button>
               <button
                 type="button"
-                className={feedback.confirmDialog.tone === "danger" ? "ghost-button danger-button" : "primary-button"}
+                className={feedback.confirmDialog.tone === "danger" ? "text-red-600 hover:bg-red-50 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" : "bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50"}
                 onClick={() => void feedback.confirmAndRun()}
                 disabled={feedback.submitting}
               >
@@ -544,10 +544,10 @@ export default function App() {
           onClose={() => usersHook.handlers.setPasswordResetState(null)}
           actions={
             <>
-              <button type="button" className="secondary-button" onClick={() => usersHook.handlers.setPasswordResetState(null)}>
+              <button type="button" className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={() => usersHook.handlers.setPasswordResetState(null)}>
                 Batal
               </button>
-              <button type="submit" form="password-reset-form" className="primary-button" disabled={feedback.submitting}>
+              <button type="submit" form="password-reset-form" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={feedback.submitting}>
                 Simpan Password Baru
               </button>
             </>

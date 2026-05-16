@@ -85,7 +85,7 @@ export function LoginPage({
             />
             {renderInlineError(loginErrors.password)}
           </label>
-          <button className="primary-button" disabled={submitting}>
+          <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
             {isBusy("login") ? "Masuk..." : "Masuk"}
           </button>
         </form>

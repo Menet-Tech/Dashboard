@@ -201,11 +201,11 @@ export function CustomersPage({
               />
             </label>
             <div className="button-row">
-              <button className="primary-button" disabled={submitting}>
+              <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
                 {isBusy("save-customer") ? "Menyimpan..." : editingCustomerId ? "Update Pelanggan" : "Simpan Pelanggan"}
               </button>
               {editingCustomerId ? (
-                <button type="button" className="secondary-button" onClick={onCancelEdit}>
+                <button type="button" className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={onCancelEdit}>
                   Batal Edit
                 </button>
               ) : null}
@@ -292,7 +292,7 @@ export function CustomersPage({
                     <td>{customer.whatsapp || "-"}</td>
                     <td>
                       {user?.role !== "viewer" && (
-                        <button type="button" className="ghost-button" onClick={() => onEdit(customer)}>
+                        <button type="button" className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" onClick={() => onEdit(customer)}>
                           Edit
                         </button>
                       )}
