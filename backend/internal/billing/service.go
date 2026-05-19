@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"log/slog"
 
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/notifications"
@@ -127,6 +128,8 @@ func (s Service) Generate(ctx context.Context, period string) (GenerateResult, e
 		}()
 	}
 
+	slog.Info("bill generation triggered", "period", period, "generated", generated)
+
 	return GenerateResult{
 		Period:    period,
 		Generated: generated,
@@ -180,6 +183,8 @@ func (s Service) MarkPaid(ctx context.Context, billID int64, method string, user
 			_ = s.Discord.SendAlert(bgCtx, msg.Error())
 		}()
 	}
+
+	slog.Info("bill marked as paid", "bill_id", billID, "method", method, "user_id", userID)
 
 	return nil
 }
