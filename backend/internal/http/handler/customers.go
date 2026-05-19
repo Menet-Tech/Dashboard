@@ -41,6 +41,11 @@ func (h CustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if payload.Name == "" || payload.PackageID <= 0 || payload.DueDay < 1 || payload.DueDay > 31 {
+		WriteError(w, http.StatusBadRequest, "invalid customer payload details")
+		return
+	}
+
 	item, err := h.Service.Create(r.Context(), payload)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
@@ -62,6 +67,11 @@ func (h CustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var payload customers.Customer
 	if err := decodeJSON(r, &payload); err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid customer payload")
+		return
+	}
+
+	if payload.Name == "" || payload.PackageID <= 0 || payload.DueDay < 1 || payload.DueDay > 31 {
+		WriteError(w, http.StatusBadRequest, "invalid customer payload details")
 		return
 	}
 

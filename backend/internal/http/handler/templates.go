@@ -33,6 +33,10 @@ func (h TemplateHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "invalid template payload")
 		return
 	}
+	if payload.Name == "" || payload.TriggerKey == "" || payload.Content == "" {
+		WriteError(w, http.StatusBadRequest, "invalid template payload details")
+		return
+	}
 	item, err := h.Service.Create(r.Context(), payload)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
@@ -50,6 +54,10 @@ func (h TemplateHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var payload templates.Template
 	if err := decodeJSON(r, &payload); err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid template payload")
+		return
+	}
+	if payload.Name == "" || payload.TriggerKey == "" || payload.Content == "" {
+		WriteError(w, http.StatusBadRequest, "invalid template payload details")
 		return
 	}
 	item, err := h.Service.Update(r.Context(), id, payload)

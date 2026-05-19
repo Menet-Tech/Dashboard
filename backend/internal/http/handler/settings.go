@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"net/url"
 
 	"menettech/dashboard/backend/internal/settings"
 )
@@ -42,6 +43,12 @@ func (h SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for key, value := range payload {
+		if (key == settings.KeyWAGatewayURL || key == settings.KeyDiscordWebhookURL) && value != "" {
+			if _, err := url.ParseRequestURI(value); err != nil {
+				WriteError(w, http.StatusBadRequest, "URL tidak valid untuk: "+key)
+				return
+			}
+		}
 		if err := h.Service.Set(r.Context(), key, value); err != nil {
 			WriteError(w, http.StatusInternalServerError, "Gagal menyimpan pengaturan: "+key)
 			return
