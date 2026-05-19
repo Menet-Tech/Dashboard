@@ -38,11 +38,11 @@ func NewBillHandler(service billing.Service, appName, storagePath string) BillHa
 func (h BillHandler) List(w http.ResponseWriter, r *http.Request) {
 	items, err := h.Service.List(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to load bills")
+		WriteError(w, http.StatusInternalServerError, "failed to load bills")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	WriteJSON(w, http.StatusOK, map[string]any{
 		"data": items,
 	})
 }
@@ -50,17 +50,17 @@ func (h BillHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h BillHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	var payload billGeneratePayload
 	if err := decodeJSON(r, &payload); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid generate payload")
+		WriteError(w, http.StatusBadRequest, "invalid generate payload")
 		return
 	}
 
 	result, err := h.Service.Generate(r.Context(), payload.Period)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	WriteJSON(w, http.StatusOK, map[string]any{
 		"data": result,
 	})
 }
@@ -68,32 +68,32 @@ func (h BillHandler) Generate(w http.ResponseWriter, r *http.Request) {
 func (h BillHandler) Pay(w http.ResponseWriter, r *http.Request) {
 	user, err := currentUser(r)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
+		WriteError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid bill id")
+		WriteError(w, http.StatusBadRequest, "invalid bill id")
 		return
 	}
 
 	var payload billPayPayload
 	if err := decodeJSON(r, &payload); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid payment payload")
+		WriteError(w, http.StatusBadRequest, "invalid payment payload")
 		return
 	}
 
 	if err := h.Service.MarkPaid(r.Context(), id, payload.Method, user.ID); err != nil {
 		if errors.Is(err, billing.ErrBillNotFound) {
-			writeError(w, http.StatusNotFound, "bill not found")
+			WriteError(w, http.StatusNotFound, "bill not found")
 			return
 		}
-		writeError(w, http.StatusBadRequest, err.Error())
+		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	WriteJSON(w, http.StatusOK, map[string]any{
 		"message": "bill marked as paid",
 	})
 }
@@ -101,17 +101,17 @@ func (h BillHandler) Pay(w http.ResponseWriter, r *http.Request) {
 func (h BillHandler) Invoice(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid bill id")
+		WriteError(w, http.StatusBadRequest, "invalid bill id")
 		return
 	}
 
 	item, err := h.Service.FindByID(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, billing.ErrBillNotFound) {
-			writeError(w, http.StatusNotFound, "bill not found")
+			WriteError(w, http.StatusNotFound, "bill not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "failed to load invoice")
+		WriteError(w, http.StatusInternalServerError, "failed to load invoice")
 		return
 	}
 
@@ -122,38 +122,38 @@ func (h BillHandler) Invoice(w http.ResponseWriter, r *http.Request) {
 func (h BillHandler) UploadProof(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid bill id")
+		WriteError(w, http.StatusBadRequest, "invalid bill id")
 		return
 	}
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid multipart form")
+		WriteError(w, http.StatusBadRequest, "invalid multipart form")
 		return
 	}
 
 	file, header, err := r.FormFile("proof")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "proof file is required")
+		WriteError(w, http.StatusBadRequest, "proof file is required")
 		return
 	}
 	defer file.Close()
 
 	proofPath, err := h.storeProofFile(file, header.Filename)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to store proof file")
+		WriteError(w, http.StatusInternalServerError, "failed to store proof file")
 		return
 	}
 
 	if err := h.Service.AttachProof(r.Context(), id, proofPath); err != nil {
 		if errors.Is(err, billing.ErrBillNotFound) {
-			writeError(w, http.StatusNotFound, "bill not found")
+			WriteError(w, http.StatusNotFound, "bill not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "failed to attach proof")
+		WriteError(w, http.StatusInternalServerError, "failed to attach proof")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	WriteJSON(w, http.StatusOK, map[string]any{
 		"message":    "proof uploaded",
 		"proof_path": proofPath,
 	})

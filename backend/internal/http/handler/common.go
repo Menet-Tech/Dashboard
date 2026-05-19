@@ -8,15 +8,16 @@ import (
 	"menettech/dashboard/backend/internal/auth"
 )
 
-func writeJSON(w http.ResponseWriter, status int, data any) {
+func WriteJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(data)
 }
 
-func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, map[string]any{
-		"error": message,
+func WriteError(w http.ResponseWriter, status int, message string) {
+	WriteJSON(w, status, map[string]any{
+		"success": false,
+		"error":   message,
 	})
 }
 

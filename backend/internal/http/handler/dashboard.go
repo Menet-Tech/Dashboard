@@ -20,9 +20,9 @@ func NewDashboardHandler(db *sql.DB) DashboardHandler {
 func (h DashboardHandler) Summary(w http.ResponseWriter, r *http.Request) {
 	summary, err := h.SummaryService.Get(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to load dashboard summary")
+		WriteError(w, http.StatusInternalServerError, "failed to load dashboard summary")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, summary)
+	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "data": summary})
 }
