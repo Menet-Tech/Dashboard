@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
+
 	"menettech/dashboard/backend/internal/audit"
 	"menettech/dashboard/backend/internal/auth"
 	"menettech/dashboard/backend/internal/http/handler"
@@ -16,9 +18,18 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			next.ServeHTTP(w, r)
+			reqID := middleware.GetReqID(r.Context())
+			
+			recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+			next.ServeHTTP(recorder, r)
+			
 			if logger != nil {
-				logger.Debug("request completed", "method", r.Method, "path", r.URL.Path, "duration", time.Since(start))
+				logger.Debug("request completed", 
+					"request_id", reqID, 
+					"method", r.Method, 
+					"path", r.URL.Path, 
+					"status", recorder.status, 
+					"duration", time.Since(start))
 			}
 		})
 	}

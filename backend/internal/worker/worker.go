@@ -84,6 +84,12 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 }
 
 func (s Service) RunOnce(ctx context.Context) error {
+	start := time.Now()
+	s.Logger.Debug("worker cycle started")
+	defer func() {
+		s.Logger.Debug("worker cycle completed", "duration_ms", time.Since(start).Milliseconds())
+	}()
+
 	now := time.Now()
 
 	_ = s.Settings.Set(ctx, "worker_last_heartbeat", now.UTC().Format(time.RFC3339))

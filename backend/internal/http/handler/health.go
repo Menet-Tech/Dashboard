@@ -91,6 +91,8 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 		dbQuickCheckMessage = "integrity ok"
 	}
 
+	dbSizeBytes, _ := h.getDatabaseSize(ctx)
+
 	if lastHeartbeatStr != "" {
 		if lastRun, err := time.Parse(time.RFC3339, lastHeartbeatStr); err == nil {
 			// Add 60 seconds buffer
@@ -151,6 +153,7 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 			"backup":   backupStatus,
 		},
 		"database": map[string]any{
+			"size_bytes": dbSizeBytes,
 			"quick_check": map[string]string{
 				"status":  dbQuickCheck,
 				"message": dbQuickCheckMessage,
@@ -204,6 +207,17 @@ func (h HealthHandler) quickCheckDatabase(ctx context.Context) (string, error) {
 		return "ok", nil
 	}
 	return "error", fmt.Errorf("quick check result: %s", result)
+}
+
+func (h HealthHandler) getDatabaseSize(ctx context.Context) (int64, error) {
+	var pageCount, pageSize int64
+	if err := h.DB.QueryRowContext(ctx, "PRAGMA page_count").Scan(&pageCount); err != nil {
+		return 0, err
+	}
+	if err := h.DB.QueryRowContext(ctx, "PRAGMA page_size").Scan(&pageSize); err != nil {
+		return 0, err
+	}
+	return pageCount * pageSize, nil
 }
 
 func contextWithTimeout(r *http.Request, timeout time.Duration) (context.Context, context.CancelFunc) {

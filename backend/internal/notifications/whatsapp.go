@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"log/slog"
 
 	"menettech/dashboard/backend/internal/settings"
 	"menettech/dashboard/backend/internal/templates"
@@ -93,6 +94,7 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 	response, err := client.Do(request)
 	if err != nil {
 		_ = s.Logs.Record(ctx, payload.BillID, payload.TriggerKey, payload.PhoneNumber, "failed", err.Error())
+		slog.Error("whatsapp notification failed", "bill_id", payload.BillID, "error", err)
 		return fmt.Errorf("send whatsapp message: %w", err)
 	}
 	defer response.Body.Close()
@@ -101,6 +103,9 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 	message := response.Status
 	if response.StatusCode >= 400 {
 		status = "failed"
+		slog.Error("whatsapp notification failed", "bill_id", payload.BillID, "status_code", response.StatusCode)
+	} else {
+		slog.Info("whatsapp notification sent", "bill_id", payload.BillID, "phone", payload.PhoneNumber)
 	}
 
 	if err := s.Logs.Record(ctx, payload.BillID, payload.TriggerKey, payload.PhoneNumber, status, message); err != nil {
