@@ -13,7 +13,10 @@ import (
 
 	"menettech/dashboard/backend/internal/auth"
 	"menettech/dashboard/backend/internal/config"
+	"menettech/dashboard/backend/internal/http/handler"
 	"menettech/dashboard/backend/internal/http/router"
+	"menettech/dashboard/backend/internal/notifications"
+	"menettech/dashboard/backend/internal/settings"
 )
 
 type healthSmokeResponse struct {
@@ -275,4 +278,142 @@ func generateBillForTest(t *testing.T, db *sql.DB, custID, pkgID int64) int64 {
 
 	id, _ := result.LastInsertId()
 	return id
+}
+
+type mockRoundTripper struct {
+	roundTripFunc func(req *http.Request) (*http.Response, error)
+}
+
+func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m.roundTripFunc(req)
+}
+
+func TestIntegrationHandlerCheck(t *testing.T) {
+	t.Run("WA and Discord not configured", func(t *testing.T) {
+		db := handlerTestDB(t)
+		svc := settings.Service{Repository: settings.Repository{DB: db}}
+
+		whatsAppService := notifications.WhatsAppService{}
+		discordService := &notifications.DiscordService{}
+
+		h := handler.NewIntegrationHandler(svc, whatsAppService, discordService)
+
+		req := httptest.NewRequest(http.MethodGet, "/integration/check", nil)
+		w := httptest.NewRecorder()
+		h.Check(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", w.Code)
+		}
+
+		var res map[string]string
+		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+
+		if res["whatsapp"] != "not_configured" {
+			t.Errorf("expected whatsapp not_configured, got %v", res["whatsapp"])
+		}
+		if res["discord"] != "not_configured" {
+			t.Errorf("expected discord not_configured, got %v", res["discord"])
+		}
+	})
+
+	t.Run("WA configured but gateway unreachable", func(t *testing.T) {
+		db := handlerTestDB(t)
+		svc := settings.Service{Repository: settings.Repository{DB: db}}
+
+		_ = svc.Set(context.Background(), settings.KeyWAGatewayURL, "http://invalid-gateway-url.local")
+		_ = svc.Set(context.Background(), settings.KeyWAAPIKey, "test-api-key")
+
+		whatsAppService := notifications.WhatsAppService{}
+		discordService := &notifications.DiscordService{}
+
+		h := handler.NewIntegrationHandler(svc, whatsAppService, discordService)
+
+		h.HTTPClient = &http.Client{
+			Transport: &mockRoundTripper{
+				roundTripFunc: func(req *http.Request) (*http.Response, error) {
+					return nil, http.ErrHandlerTimeout
+				},
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/integration/check", nil)
+		w := httptest.NewRecorder()
+		h.Check(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", w.Code)
+		}
+
+		var res map[string]string
+		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+
+		if res["whatsapp"] != "disconnected" {
+			t.Errorf("expected whatsapp disconnected, got %v", res["whatsapp"])
+		}
+		if res["discord"] != "not_configured" {
+			t.Errorf("expected discord not_configured, got %v", res["discord"])
+		}
+	})
+
+	t.Run("WA and Discord connected", func(t *testing.T) {
+		db := handlerTestDB(t)
+		svc := settings.Service{Repository: settings.Repository{DB: db}}
+
+		_ = svc.Set(context.Background(), settings.KeyWAGatewayURL, "http://whatsapp.local")
+		_ = svc.Set(context.Background(), settings.KeyWAAPIKey, "test-api-key")
+		_ = svc.Set(context.Background(), settings.KeyDiscordWebhookURL, "http://discord.local")
+
+		whatsAppService := notifications.WhatsAppService{}
+		discordService := &notifications.DiscordService{}
+
+		h := handler.NewIntegrationHandler(svc, whatsAppService, discordService)
+
+		h.HTTPClient = &http.Client{
+			Transport: &mockRoundTripper{
+				roundTripFunc: func(req *http.Request) (*http.Response, error) {
+					if req.URL.Host == "whatsapp.local" {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       http.NoBody,
+						}, nil
+					}
+					if req.URL.Host == "discord.local" {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       http.NoBody,
+						}, nil
+					}
+					return &http.Response{
+						StatusCode: http.StatusNotFound,
+						Body:       http.NoBody,
+					}, nil
+				},
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/integration/check", nil)
+		w := httptest.NewRecorder()
+		h.Check(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", w.Code)
+		}
+
+		var res map[string]string
+		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+
+		if res["whatsapp"] != "connected" {
+			t.Errorf("expected whatsapp connected, got %v", res["whatsapp"])
+		}
+		if res["discord"] != "connected" {
+			t.Errorf("expected discord connected, got %v", res["discord"])
+		}
+	})
 }

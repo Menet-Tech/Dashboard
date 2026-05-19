@@ -78,6 +78,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	notificationHandler := handler.NewNotificationHandler(notifications.NotificationLogRepository{DB: db})
 	backupDir := filepath.Join(cfg.StoragePath, "backups")
 	backupHandler := &handler.BackupHandler{Service: backup.NewService(db, backupDir)}
+	integrationHandler := handler.NewIntegrationHandler(settingsService, whatsAppService, discordService)
 
 	r.Get("/health", healthHandler.Show)
 	r.Get("/livez", healthHandler.Live)
@@ -120,6 +121,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Get("/backups/{filename}/download", backupHandler.Download)
 				admin.Post("/backups/{filename}/restore", backupHandler.SimulateRestore)
 				admin.Post("/backups/staging/apply", backupHandler.ApplyRestore)
+				admin.Get("/integration/check", integrationHandler.Check)
 			})
 
 			// Admin + Petugas
