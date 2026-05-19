@@ -37,6 +37,11 @@ func (h PackageHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if payload.Name == "" || payload.SpeedMbps <= 0 || payload.Price < 0 {
+		WriteError(w, http.StatusBadRequest, "invalid package payload details")
+		return
+	}
+
 	item, err := h.Service.Create(r.Context(), payload)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
@@ -58,6 +63,11 @@ func (h PackageHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var payload packages.Package
 	if err := decodeJSON(r, &payload); err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid package payload")
+		return
+	}
+
+	if payload.Name == "" || payload.SpeedMbps <= 0 || payload.Price < 0 {
+		WriteError(w, http.StatusBadRequest, "invalid package payload details")
 		return
 	}
 

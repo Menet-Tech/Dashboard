@@ -41,6 +41,10 @@ func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "invalid user payload")
 		return
 	}
+	if payload.Username == "" || len(payload.Password) < 6 {
+		WriteError(w, http.StatusBadRequest, "invalid user payload details")
+		return
+	}
 	item, err := h.Service.Create(r.Context(), payload)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
