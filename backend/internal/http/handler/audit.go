@@ -18,19 +18,19 @@ func NewAuditHandler(service audit.Service) AuditHandler {
 func (h AuditHandler) List(w http.ResponseWriter, r *http.Request) {
 	user, err := currentUser(r)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
+		WriteError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	if user.Role != "admin" {
-		writeError(w, http.StatusForbidden, "hanya admin yang dapat melihat audit log")
+		WriteError(w, http.StatusForbidden, "hanya admin yang dapat melihat audit log")
 		return
 	}
 
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	items, err := h.Service.List(r.Context(), limit)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to load audit logs")
+		WriteError(w, http.StatusInternalServerError, "failed to load audit logs")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": items})
+	WriteJSON(w, http.StatusOK, map[string]any{"data": items})
 }

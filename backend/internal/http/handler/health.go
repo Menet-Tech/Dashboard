@@ -139,7 +139,7 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 		alerts = append(alerts, "generate tagihan otomatis terakhir gagal")
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	WriteJSON(w, http.StatusOK, map[string]any{
 		"status": status,
 		"app": map[string]string{
 			"name":        h.Config.AppName,
@@ -211,7 +211,7 @@ func contextWithTimeout(r *http.Request, timeout time.Duration) (context.Context
 }
 
 func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
+	WriteJSON(w, http.StatusOK, map[string]any{
 		"status":    "ok",
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
@@ -222,7 +222,7 @@ func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := h.DB.PingContext(ctx); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+		WriteJSON(w, http.StatusServiceUnavailable, map[string]any{
 			"status":    "error",
 			"message":   "database not ready",
 			"timestamp": time.Now().Format(time.RFC3339),
@@ -230,7 +230,7 @@ func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	WriteJSON(w, http.StatusOK, map[string]any{
 		"status":    "ok",
 		"message":   "ready",
 		"timestamp": time.Now().Format(time.RFC3339),

@@ -25,11 +25,11 @@ func NewCustomerHandler(service customers.Service) CustomerHandler {
 func (h CustomerHandler) List(w http.ResponseWriter, r *http.Request) {
 	items, err := h.Service.List(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to load customers")
+		WriteError(w, http.StatusInternalServerError, "failed to load customers")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	WriteJSON(w, http.StatusOK, map[string]any{
 		"data": items,
 	})
 }
@@ -37,17 +37,17 @@ func (h CustomerHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h CustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var payload customers.Customer
 	if err := decodeJSON(r, &payload); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid customer payload")
+		WriteError(w, http.StatusBadRequest, "invalid customer payload")
 		return
 	}
 
 	item, err := h.Service.Create(r.Context(), payload)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]any{
+	WriteJSON(w, http.StatusCreated, map[string]any{
 		"data": item,
 	})
 }
@@ -55,28 +55,28 @@ func (h CustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h CustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid customer id")
+		WriteError(w, http.StatusBadRequest, "invalid customer id")
 		return
 	}
 
 	var payload customers.Customer
 	if err := decodeJSON(r, &payload); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid customer payload")
+		WriteError(w, http.StatusBadRequest, "invalid customer payload")
 		return
 	}
 
 	item, err := h.Service.Update(r.Context(), id, payload)
 	if err != nil {
 		if errors.Is(err, customers.ErrCustomerNotFound) {
-			writeError(w, http.StatusNotFound, "customer not found")
+			WriteError(w, http.StatusNotFound, "customer not found")
 			return
 		}
 
-		writeError(w, http.StatusBadRequest, err.Error())
+		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	WriteJSON(w, http.StatusOK, map[string]any{
 		"data": item,
 	})
 }
@@ -84,27 +84,27 @@ func (h CustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h CustomerHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid customer id")
+		WriteError(w, http.StatusBadRequest, "invalid customer id")
 		return
 	}
 
 	var payload statusPayload
 	if err := decodeJSON(r, &payload); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid status payload")
+		WriteError(w, http.StatusBadRequest, "invalid status payload")
 		return
 	}
 
 	if err := h.Service.UpdateStatus(r.Context(), id, payload.Status); err != nil {
 		if errors.Is(err, customers.ErrCustomerNotFound) {
-			writeError(w, http.StatusNotFound, "customer not found")
+			WriteError(w, http.StatusNotFound, "customer not found")
 			return
 		}
 
-		writeError(w, http.StatusBadRequest, err.Error())
+		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	WriteJSON(w, http.StatusOK, map[string]any{
 		"message": "customer status updated",
 	})
 }

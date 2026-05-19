@@ -84,7 +84,7 @@ func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{
+	WriteJSON(w, http.StatusOK, map[string]string{
 		"whatsapp": waStatus,
 		"discord":  discordStatus,
 	})
