@@ -66,8 +66,8 @@ func (s Service) UpdateStatus(ctx context.Context, id int64, status string) erro
 }
 
 // ListTrialExpired returns all customers whose trial period has expired
-func (s Service) ListTrialExpired(ctx context.Context) ([]Customer, error) {
-	return s.Repository.ListTrialExpired(ctx)
+func (s Service) ListTrialExpired(ctx context.Context, now time.Time) ([]Customer, error) {
+	return s.Repository.ListTrialExpired(ctx, now)
 }
 
 // EndTrial marks customer trial as finished
@@ -262,7 +262,7 @@ func (r Repository) ensurePackageExists(ctx context.Context, packageID int64) er
 }
 
 // ListTrialExpired returns all customers whose trial period has expired
-func (r Repository) ListTrialExpired(ctx context.Context) ([]Customer, error) {
+func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Customer, error) {
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),
 		       COALESCE(c.password_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
@@ -271,9 +271,9 @@ func (r Repository) ListTrialExpired(ctx context.Context) ([]Customer, error) {
 		INNER JOIN paket p ON p.id = c.paket_id
 		WHERE c.is_trial = 1
 		  AND c.trial_started_at IS NOT NULL
-		  AND datetime(c.trial_started_at, '+' || c.trial_days || ' days') <= CURRENT_TIMESTAMP
+		  AND datetime(c.trial_started_at, '+' || c.trial_days || ' days') <= ?
 		ORDER BY c.id ASC
-	`)
+	`, now.UTC().Format("2006-01-02 15:04:05"))
 	if err != nil {
 		return nil, fmt.Errorf("list trial expired customers: %w", err)
 	}

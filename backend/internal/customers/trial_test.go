@@ -90,7 +90,7 @@ func TestListTrialExpiredReturnsOnlyExpiredCustomers(t *testing.T) {
 	}
 
 	// Get expired trials
-	expired, err := service.ListTrialExpired(context.Background())
+	expired, err := service.ListTrialExpired(context.Background(), time.Now().UTC())
 	if err != nil {
 		t.Fatalf("list trial expired: %v", err)
 	}

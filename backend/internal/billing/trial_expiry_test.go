@@ -428,6 +428,8 @@ func trialTestDB(t *testing.T) *sql.DB {
 		_ = db.Close()
 	})
 
+	db.SetMaxOpenConns(1)
+
 	if _, err := db.Exec(`PRAGMA foreign_keys = ON;`); err != nil {
 		t.Fatalf("enable sqlite foreign keys: %v", err)
 	}

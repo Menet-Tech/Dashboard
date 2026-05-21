@@ -68,9 +68,16 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 		return nil
 	}
 
+	timeoutSecs, _ := s.Settings.GetInt(ctx, "wa_client_timeout_seconds")
+	if timeoutSecs <= 0 {
+		timeoutSecs = 15
+	}
+
 	client := s.HTTPClient
 	if client == nil {
-		client = &http.Client{Timeout: 15 * time.Second}
+		client = &http.Client{Timeout: time.Duration(timeoutSecs) * time.Second}
+	} else if client.Timeout == 0 {
+		client.Timeout = time.Duration(timeoutSecs) * time.Second
 	}
 
 	body, err := json.Marshal(map[string]string{
