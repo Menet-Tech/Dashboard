@@ -51,6 +51,87 @@ func TestServiceCreateRequiresExistingPackage(t *testing.T) {
 	}
 }
 
+func TestServiceCreateUpdateList(t *testing.T) {
+	db := customerTestDB(t)
+	service := Service{Repository: Repository{DB: db}}
+
+	_, err := db.Exec(`INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
+	if err != nil {
+		t.Fatalf("insert package: %v", err)
+	}
+
+	cust, err := service.Create(context.Background(), Customer{
+		Name:      "Test Cust",
+		PackageID: 1,
+		DueDay:    15,
+		Status:    "active",
+		TrialDays: 5,
+	})
+	if err != nil {
+		t.Fatalf("create customer: %v", err)
+	}
+	if cust.ID == 0 {
+		t.Fatal("expected assigned ID")
+	}
+	if !cust.IsTrial {
+		t.Fatal("expected customer to be created as trial by default")
+	}
+
+	updated, err := service.Update(context.Background(), cust.ID, Customer{
+		Name:      "Updated Cust",
+		PackageID: 1,
+		DueDay:    10,
+		Status:    "inactive",
+	})
+	if err != nil {
+		t.Fatalf("update customer: %v", err)
+	}
+	if updated.Name != "Updated Cust" {
+		t.Fatal("expected updated name")
+	}
+
+	list, err := service.List(context.Background())
+	if err != nil {
+		t.Fatalf("list customers: %v", err)
+	}
+	if len(list) != 1 || list[0].Name != "Updated Cust" {
+		t.Fatalf("expected list to contain updated customer, got len=%d", len(list))
+	}
+}
+
+func TestServiceUpdateStatus(t *testing.T) {
+	db := customerTestDB(t)
+	service := Service{Repository: Repository{DB: db}}
+
+	_, err := db.Exec(`INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
+	if err != nil {
+		t.Fatalf("insert package: %v", err)
+	}
+
+	cust, err := service.Create(context.Background(), Customer{
+		Name:      "Test Cust",
+		PackageID: 1,
+		DueDay:    15,
+		Status:    "active",
+	})
+	if err != nil {
+		t.Fatalf("create customer: %v", err)
+	}
+
+	if err := service.UpdateStatus(context.Background(), cust.ID, "limit"); err != nil {
+		t.Fatalf("update status: %v", err)
+	}
+
+	list, _ := service.List(context.Background())
+	if list[0].Status != "limit" {
+		t.Fatalf("expected status limit, got %q", list[0].Status)
+	}
+
+	if err := service.UpdateStatus(context.Background(), cust.ID, "invalid_status"); err == nil {
+		t.Fatal("expected error for invalid status")
+	}
+}
+
 func customerTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 

@@ -39,6 +39,54 @@ func TestServiceDeleteRejectsPackageInUse(t *testing.T) {
 	}
 }
 
+func TestServiceCreateAndList(t *testing.T) {
+	db := packageTestDB(t)
+	service := Service{Repository: Repository{DB: db}}
+
+	pkg, err := service.Create(context.Background(), Package{
+		Name:      "New Package",
+		SpeedMbps: 50,
+		Price:     350000,
+	})
+	if err != nil {
+		t.Fatalf("create package: %v", err)
+	}
+	if pkg.ID == 0 {
+		t.Fatal("expected assigned ID")
+	}
+
+	list, err := service.List(context.Background())
+	if err != nil {
+		t.Fatalf("list packages: %v", err)
+	}
+	if len(list) != 1 || list[0].Name != "New Package" {
+		t.Fatalf("expected 1 package named New Package, got %d", len(list))
+	}
+}
+
+func TestServiceUpdateAndFind(t *testing.T) {
+	db := packageTestDB(t)
+	service := Service{Repository: Repository{DB: db}}
+
+	pkg, _ := service.Create(context.Background(), Package{
+		Name:      "Old Name",
+		SpeedMbps: 10,
+		Price:     150000,
+	})
+
+	updated, err := service.Update(context.Background(), pkg.ID, Package{
+		Name:      "Updated Name",
+		SpeedMbps: 20,
+		Price:     200000,
+	})
+	if err != nil {
+		t.Fatalf("update package: %v", err)
+	}
+	if updated.Name != "Updated Name" {
+		t.Fatalf("expected updated name")
+	}
+}
+
 func packageTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
