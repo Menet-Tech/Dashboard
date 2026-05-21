@@ -417,3 +417,100 @@ func TestIntegrationHandlerCheck(t *testing.T) {
 		}
 	})
 }
+
+func TestIntegrationFlow_PackageCustomerBill(t *testing.T) {
+	db := handlerTestDB(t)
+	cfg := config.Config{
+		AppName:                "test",
+		HTTPAddr:               ":8080",
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		BootstrapAdminUsername: "admin",
+		BootstrapAdminPassword: "admin123",
+	}
+
+	authSvc := auth.Service{
+		Repository:             auth.Repository{DB: db},
+		SessionCookieName:      cfg.SessionCookieName,
+		SessionTTL:             cfg.SessionTTL,
+		BootstrapAdminUsername: cfg.BootstrapAdminUsername,
+		BootstrapAdminPassword: cfg.BootstrapAdminPassword,
+	}
+
+	if err := authSvc.Bootstrap(context.Background()); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+
+	server := httptest.NewServer(router.New(cfg, nil, db, authSvc))
+	defer server.Close()
+
+	// 1. Admin login to get session cookie
+	payload := map[string]string{"username": "admin", "password": "admin123"}
+	body, _ := json.Marshal(payload)
+	resp, err := http.Post(fmt.Sprintf("%s/api/v1/auth/login", server.URL), "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var sessionCookie *http.Cookie
+	for _, c := range resp.Cookies() {
+		if c.Name == "session" {
+			sessionCookie = c
+			break
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatal("expected session cookie")
+	}
+
+	// 2. Create Package via API
+	pkgPayload := map[string]interface{}{"name": "Int-Pkg", "speed_mbps": 20, "price": 150000}
+	pkgBody, _ := json.Marshal(pkgPayload)
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/v1/packages", server.URL), bytes.NewReader(pkgBody))
+	req.AddCookie(sessionCookie)
+	req.Header.Set("X-CSRF-Token", sessionCookie.Value)
+	req.Header.Set("Content-Type", "application/json")
+	
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("create package: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected status 201 created for package, got %d", resp.StatusCode)
+	}
+	
+	var pkgRes struct {
+		Success bool `json:"success"`
+		Data    struct {
+			ID int64 `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&pkgRes); err != nil {
+		t.Fatalf("decode package response: %v", err)
+	}
+	
+	// 3. Create Customer via API
+	custPayload := map[string]interface{}{
+		"name": "Int-Cust",
+		"package_id": pkgRes.Data.ID,
+		"due_day": 15,
+		"status": "active",
+		"trial_days": 3,
+	}
+	custBody, _ := json.Marshal(custPayload)
+	req, _ = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/v1/customers", server.URL), bytes.NewReader(custBody))
+	req.AddCookie(sessionCookie)
+	req.Header.Set("X-CSRF-Token", sessionCookie.Value)
+	req.Header.Set("Content-Type", "application/json")
+	
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("create customer: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected status 201 created for customer, got %d", resp.StatusCode)
+	}
+}
