@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -116,7 +117,15 @@ func (h BillHandler) Invoice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(renderInvoiceHTML(h.AppName, item)))
+	html, err := renderInvoiceHTML(h.AppName, item)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to render invoice HTML")
+		return
+	}
+	if _, err := w.Write([]byte(html)); err != nil {
+		// Bug #14: Log w.Write() error
+		slog.Error("invoice handler: failed to write response", "error", err)
+	}
 }
 
 func (h BillHandler) UploadProof(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +147,15 @@ func (h BillHandler) UploadProof(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	proofPath, err := h.storeProofFile(file, header.Filename)
+	// Bug #17: size validation + io.LimitReader
+	const maxUploadSize = 5 << 20 // 5 MB limit
+	if header.Size > maxUploadSize {
+		WriteError(w, http.StatusBadRequest, "file size exceeds limit of 5MB")
+		return
+	}
+	limitedReader := io.LimitReader(file, maxUploadSize)
+
+	proofPath, err := h.storeProofFile(limitedReader, header.Filename)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to store proof file")
 		return
@@ -160,6 +177,9 @@ func (h BillHandler) UploadProof(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h BillHandler) storeProofFile(source io.Reader, originalName string) (string, error) {
+	// Bug #10: Validate original filename to prevent path traversal
+	originalName = filepath.Base(originalName)
+
 	directory := filepath.Join(h.StoragePath, "uploads", "payment-proofs")
 	if err := os.MkdirAll(directory, 0o755); err != nil {
 		return "", err
@@ -168,6 +188,19 @@ func (h BillHandler) storeProofFile(source io.Reader, originalName string) (stri
 	extension := filepath.Ext(originalName)
 	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), safeExtension(extension))
 	targetPath := filepath.Join(directory, filename)
+
+	// Bug #10: absolute path comparison validation
+	absDir, err := filepath.Abs(directory)
+	if err != nil {
+		return "", fmt.Errorf("resolve uploads dir: %w", err)
+	}
+	absTarget, err := filepath.Abs(targetPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve target path: %w", err)
+	}
+	if !strings.HasPrefix(absTarget, absDir+string(filepath.Separator)) && absTarget != absDir {
+		return "", fmt.Errorf("invalid path traversal attempt")
+	}
 
 	target, err := os.Create(targetPath)
 	if err != nil {
@@ -192,8 +225,8 @@ func safeExtension(value string) string {
 	}
 }
 
-func renderInvoiceHTML(appName string, item billing.BillDetail) string {
-	tpl := template.Must(template.New("invoice").Parse(`<!doctype html>
+func renderInvoiceHTML(appName string, item billing.BillDetail) (string, error) {
+	tpl, err := template.New("invoice").Parse(`<!doctype html>
 <html lang="id">
 <head>
 <meta charset="utf-8">
@@ -257,15 +290,20 @@ th,td{text-align:left;padding:12px 10px;border-bottom:1px solid #e2e8f0}
 </div>
 </div>
 </body>
-</html>`))
+</html>`)
+	if err != nil {
+		return "", err
+	}
 
 	var builder strings.Builder
-	_ = tpl.Execute(&builder, map[string]any{
+	if err := tpl.Execute(&builder, map[string]any{
 		"AppName": appName,
 		"Item":    item,
 		"Amount":  formatCurrency(item.Amount),
-	})
-	return builder.String()
+	}); err != nil {
+		return "", err
+	}
+	return builder.String(), nil
 }
 
 func formatCurrency(amount int) string {

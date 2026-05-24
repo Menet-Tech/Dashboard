@@ -48,7 +48,7 @@ func requireAdmin(r *http.Request) error {
 }
 
 func csrfTokenFromRequest(r *http.Request) string {
-	token, ok := auth.SessionTokenFromContext(r.Context())
+	token, ok := auth.CSRFTokenFromContext(r.Context())
 	if ok {
 		return token
 	}

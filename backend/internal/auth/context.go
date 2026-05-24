@@ -6,6 +6,7 @@ type contextKey string
 
 const userContextKey contextKey = "authenticated-user"
 const sessionTokenContextKey contextKey = "authenticated-session-token"
+const csrfTokenContextKey contextKey = "authenticated-csrf-token"
 
 func WithUser(ctx context.Context, user User) context.Context {
 	return context.WithValue(ctx, userContextKey, user)
@@ -22,5 +23,14 @@ func WithSessionToken(ctx context.Context, token string) context.Context {
 
 func SessionTokenFromContext(ctx context.Context) (string, bool) {
 	token, ok := ctx.Value(sessionTokenContextKey).(string)
+	return token, ok
+}
+
+func WithCSRFToken(ctx context.Context, token string) context.Context {
+	return context.WithValue(ctx, csrfTokenContextKey, token)
+}
+
+func CSRFTokenFromContext(ctx context.Context) (string, bool) {
+	token, ok := ctx.Value(csrfTokenContextKey).(string)
 	return token, ok
 }

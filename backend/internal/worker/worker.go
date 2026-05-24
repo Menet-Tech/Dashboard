@@ -177,10 +177,13 @@ func (s Service) runScheduledBackup(ctx context.Context, now time.Time) error {
 		return nil
 	}
 
-	today := now.UTC().Format("2006-01-02")
-	lastBackup, _ := s.Settings.GetString(ctx, "worker_last_backup_date")
-	if lastBackup == today {
-		return nil
+	// Bug #24: use RFC3339 timestamp key to track last backup time
+	lastBackupAt, _ := s.Settings.GetString(ctx, "worker_last_backup_at")
+	if lastBackupAt != "" {
+		lastTime, err := time.Parse(time.RFC3339, lastBackupAt)
+		if err == nil && lastTime.UTC().Format("2006-01-02") == now.UTC().Format("2006-01-02") {
+			return nil // Already backed up today
+		}
 	}
 
 	filename, err := s.Backup.CreateBackup(ctx)
@@ -192,7 +195,9 @@ func (s Service) runScheduledBackup(ctx context.Context, now time.Time) error {
 	}
 
 	s.Logger.Info("auto backup created", "filename", filename)
-	_ = s.Settings.Set(ctx, "worker_last_backup_date", today)
+	// Bug #24: store full RFC3339 timestamp instead of just date string
+	// to avoid edge-case double-backup when worker restarts near midnight.
+	_ = s.Settings.Set(ctx, "worker_last_backup_at", now.UTC().Format(time.RFC3339))
 	_ = s.Settings.Set(ctx, "worker_last_backup_filename", filename)
 
 	if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
@@ -243,6 +248,15 @@ func (s Service) runScheduledBilling(ctx context.Context, now time.Time) error {
 		return nil
 	}
 
+	// Bug #25: use in-progress lock to prevent duplicate generation on crash+restart
+	inProgressPeriod, _ := s.Settings.GetString(ctx, "worker_billing_in_progress")
+	if inProgressPeriod == period {
+		s.Logger.Info("scheduled billing: generation already in progress, skipping", "period", period)
+		return nil
+	}
+	// Mark as in-progress before attempting generation
+	_ = s.Settings.Set(ctx, "worker_billing_in_progress", period)
+
 	var lastErr error
 	for attempt := 1; attempt <= retryAttempts; attempt++ {
 		_ = s.Settings.Set(ctx, "worker_billing_last_attempt_at", time.Now().UTC().Format(time.RFC3339))
@@ -256,6 +270,8 @@ func (s Service) runScheduledBilling(ctx context.Context, now time.Time) error {
 			_ = s.Settings.Set(ctx, "worker_billing_last_error", "")
 			_ = s.Settings.Set(ctx, "worker_billing_last_success_period", period)
 			_ = s.Settings.Set(ctx, "worker_billing_retry_count", "0")
+			// Bug #25: clear in-progress lock on success
+			_ = s.Settings.Set(ctx, "worker_billing_in_progress", "")
 			s.Logger.Info("scheduled billing completed", "period", period, "generated", result.Generated, "attempt", attempt)
 			return nil
 		}
@@ -278,21 +294,12 @@ func (s Service) runScheduledBilling(ctx context.Context, now time.Time) error {
 	return nil
 }
 
+// shouldRunBackupNow returns true when the current time matches the scheduled backup time.
+// Bug #8: now uses parseScheduleTime which validates hour (0-23) and minute (0-59),
+// fixing the inconsistency where a failed minute parse would silently use 0 while
+// a failed hour parse would return the default fallback.
 func shouldRunBackupNow(now time.Time, scheduledTime string) bool {
-	parts := strings.Split(strings.TrimSpace(scheduledTime), ":")
-	if len(parts) != 2 {
-		return now.Hour() == 2
-	}
-
-	hour, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return now.Hour() == 2
-	}
-	minute, err := strconv.Atoi(parts[1])
-	if err != nil {
-		minute = 0
-	}
-
+	hour, minute := parseScheduleTime(scheduledTime, 2, 0) // default 02:00
 	return now.Hour() == hour && now.Minute() >= minute
 }
 

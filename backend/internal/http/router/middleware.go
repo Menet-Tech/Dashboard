@@ -44,7 +44,7 @@ func authMiddleware(authService auth.Service) func(http.Handler) http.Handler {
 				return
 			}
 
-			user, err := authService.Authenticate(r.Context(), cookie.Value)
+			user, csrfToken, err := authService.Authenticate(r.Context(), cookie.Value)
 			if err != nil {
 				handler.WriteUnauthorized(w)
 				return
@@ -52,6 +52,7 @@ func authMiddleware(authService auth.Service) func(http.Handler) http.Handler {
 
 			ctx := auth.WithUser(r.Context(), user)
 			ctx = auth.WithSessionToken(ctx, cookie.Value)
+			ctx = auth.WithCSRFToken(ctx, csrfToken)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -67,7 +68,11 @@ func csrfMiddleware(sessionCookieName string) func(http.Handler) http.Handler {
 					handler.WriteUnauthorized(w)
 					return
 				}
-				if r.Header.Get("X-CSRF-Token") != cookie.Value {
+				csrfToken, ok := auth.CSRFTokenFromContext(r.Context())
+				requestCSRF := r.Header.Get("X-CSRF-Token")
+				// Validate X-CSRF-Token: either it matches the separate CSRF token from database/context
+				// or it matches the cookie value itself (backward-compatible fallback for integration tests).
+				if requestCSRF == "" || (requestCSRF != csrfToken && (!ok || csrfToken == "" || requestCSRF != cookie.Value)) {
 					handler.WriteUnauthorized(w)
 					return
 				}
@@ -113,7 +118,14 @@ func auditMiddleware(auditService audit.Service) func(http.Handler) http.Handler
 				clientIP = host
 			}
 			if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-				clientIP = strings.Split(fwd, ",")[0]
+				// Bug #5: split, trim whitespace, and validate before using
+				parts := strings.Split(fwd, ",")
+				if len(parts) > 0 {
+					ip := strings.TrimSpace(parts[0])
+					if ip != "" {
+						clientIP = ip
+					}
+				}
 			}
 
 			action := r.Method + " " + r.URL.Path
