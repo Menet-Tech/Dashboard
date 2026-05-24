@@ -3,7 +3,10 @@ package billing
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 
@@ -128,5 +131,98 @@ func mustBillingExec(t *testing.T, db *sql.DB, query string) {
 
 	if _, err := db.Exec(query); err != nil {
 		t.Fatalf("exec query %q: %v", query, err)
+	}
+}
+
+func TestServiceProcessAutomation(t *testing.T) {
+	db := billingTestDB(t)
+
+	// Insert package
+	mustBillingExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
+
+	// Customer 1: Bad due date. Should be skipped, doesn't halt others.
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (1, 'BadDateCust', 1, 8, 'active')`)
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (1, 1, 1, '2026-04', '08-04-2026/1/20/001', 250000, 'invalid-date-format', 'belum_bayar')`)
+
+	// Customer 2: Good due date, WhatsApp send fails. Should log and continue processing without returning error.
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (2, 'WAFailCust', 1, 14, 'active')`)
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (2, 2, 1, '2026-04', '14-04-2026/2/20/002', 250000, '2026-04-14', 'belum_bayar')`)
+
+	// Customer 3: Limit transition. Transition should happen from 'active' to 'limit', causing a Discord alert.
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (3, 'LimitCustFirst', 1, 8, 'active')`)
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (3, 3, 1, '2026-04', '08-04-2026/3/20/003', 250000, '2026-04-08', 'belum_bayar')`)
+
+	// Customer 4: Already limited. Should not trigger Discord alert or status update again.
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (4, 'LimitCustSecond', 1, 8, 'limit')`)
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (4, 4, 1, '2026-04', '08-04-2026/4/20/004', 250000, '2026-04-08', 'belum_bayar')`)
+
+	service := Service{Repository: Repository{DB: db}}
+
+	waCalls := make(map[int64]int)
+	discordAlerts := []string{}
+
+	now := time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC) // 6 days overdue for April 8th due dates
+
+	options := AutomationOptions{
+		Now:            now,
+		ReminderDays:   3,
+		LimitDays:      5,
+		TrialGraceDays: 7,
+		SendWhatsApp: func(ctx context.Context, msg AutomationMessage) error {
+			waCalls[msg.BillID]++
+			if msg.BillID == 2 {
+				return errors.New("simulated WhatsApp gateway down")
+			}
+			return nil
+		},
+		SendDiscord: func(ctx context.Context, msg string) error {
+			discordAlerts = append(discordAlerts, msg)
+			return nil
+		},
+	}
+
+	err := service.ProcessAutomation(context.Background(), options)
+	if err != nil {
+		t.Fatalf("ProcessAutomation failed: %v", err)
+	}
+
+	// Verify Customer 1 (Bad date) skipped
+
+	// Verify Customer 2 (WA Fail) did not halt execution, and SendWhatsApp was called
+	if waCalls[2] != 1 {
+		t.Errorf("expected SendWhatsApp to be called for Bill 2, got %d", waCalls[2])
+	}
+
+	// Verify Customer 3 transitioned to 'limit' in DB and sent Discord alert
+	var status3 string
+	if err := db.QueryRow(`SELECT status FROM pelanggan WHERE id = 3`).Scan(&status3); err != nil {
+		t.Fatalf("failed to query status for customer 3: %v", err)
+	}
+	if status3 != "limit" {
+		t.Errorf("expected customer 3 status to transition to 'limit', got %q", status3)
+	}
+
+	// Verify Customer 4 remained 'limit' and did not trigger DB update or Discord alert again
+	var status4 string
+	if err := db.QueryRow(`SELECT status FROM pelanggan WHERE id = 4`).Scan(&status4); err != nil {
+		t.Fatalf("failed to query status for customer 4: %v", err)
+	}
+	if status4 != "limit" {
+		t.Errorf("expected customer 4 status to remain 'limit', got %q", status4)
+	}
+
+	// Check Discord Alerts:
+	limitAlertCount := 0
+	for _, alert := range discordAlerts {
+		if strings.Contains(alert, "Isolir (Limit)") {
+			limitAlertCount++
+			if strings.Contains(alert, "LimitCustSecond") {
+				t.Errorf("unexpected Discord alert for already-limited customer LimitCustSecond: %q", alert)
+			}
+		}
+	}
+
+	if limitAlertCount != 1 {
+		t.Errorf("expected exactly 1 limit Discord alert, got %d. Alerts: %v", limitAlertCount, discordAlerts)
 	}
 }

@@ -1,0 +1,129 @@
+setelah dashboard tagihan selesai, tambahkan fitur
+1. whatsapp.js gabung kesini, nanti akan ada:
+    1. tab login dengan qr code, 
+    2. tab history, ini menampilkan log chat
+    3. tab log ini bisa diakses oleh admin, user, dan monitoring, jadi harus di encrypt berdasarkan role
+    4. client bisa open ticket kalo ada kendala
+    5. client bisa daftar untuk pemasangan wifi di lewat whatsapp
+    6. whatsapp bisa multi account
+
+kalo regisstrasi mandiri sama tiket support itu nanti soalnya daftar dan open tiket paketnya chat wa loh jadi
+
+```customer -> chat wa admin, misalnya "hi" -> sistem akan cek, nomer ini terdaftar di db atau gak, kalo gak terdaftar, kirim pesan :
+"hai, selamat datang di menet dashboard, silahkan ikuti panduan tersebut:
+kirim 1 untuk mendaftar, dan menggunakan internet menet
+kirim 2 jika ada kendala mengenai wifi
+kirim 3 untuk melihat paket yang disediakan
+kirim 4 untuk melihat pertanyaan umum
+kirim 5 untuk chat ke admin
+
+kalo user pilih 1 nanti muncul lagi message kayak gini :
+silahkan lengkapi form ini
+nama : 
+no hp : 
+alamat :
+paket yang diambil
+nama wifi (ssid) : 
+password wifi : 
+mengetahui kami dari siapa :
+apakah saat ini masih langganan ke wifi (ISP) lain :
+
+kalo dia kirim nomer 2 :
+halo, kami mohon maaf jika, kamu memiliki masalah, silahkan lengkapi masalah tersebut, akan kami sampaikan ke teknisi kami
+Nama : 
+Alamat : 
+Kendala : 
+
+kalo kirim nomer 3 : 
+ini paket yang kami punya, 
+{retrive dari daftar paket. cukup nama, speed dan Harga aja}
+
+kirim 4 :
+halo, ini adalah pertanyaan yang paling umum di tanyakan, 
+
+> pertanyaan
+
+> jawaban
+
+> pertanyaan
+
+> jawaban
+
+kalo dia kirim 5, system bakal bales ke client :
+"baik, tunggu sebentar ya, kami akan menghubungin admin"
+
+system bakal hubungin karyawan isp lewat wa dan discord, jadi nanti pesannya
+di wa :
+WOI, ada yang chat ke admin nih
+Nomer : 
+Nama kontak :
+wa.me/+62(nomer)
+GC GANTI NOMER KE SINI
+
+di dc:
+<@tag>
+WOI, ada yang chat ke admin nih
+Nomer : 
+Nama kontak :
+wa.me/+62(nomer)
+GC GANTI NOMER KE SINI
+
+NOTE : pemasangan hanya akan dilakukan di sabtu minggu
+kalo terdaftar :
+hai, selamat (pagi/siang/malam) (user), apa ada yang bisa di bantu ?
+ketik 1 untuk cek tagihan anda
+ketik 2 jika ada kendala mengenai wifi
+kirim 3 untuk melihat paket yang disediakan
+kirim 4 untuk melihat pertanyaan umum
+kirim 5 untuk chat ke admin
+
+kalo client ketik nomer 1, system bakal cek untuk bulan ini ada tagihan gak, kalo ada :
+halo (nama), kamu punya tagihan aktif untuk periode (periode) dengan nominal sebesar {nominal}, dan akan jatuh tempo pada {jatuh_tempo}.
+
+kalo gak ada :
+halo {nama}, kamu gak ada tagihan aktif di periode {periode}, terimakasih telah menggunakan menet
+
+kalo lagi masa trial :
+halo {nama} terimakaish telah mengugunakan menet, kamu sedang ada di dalam masa trial, tidak akan ada tagihan selama 3 hari kedepan, terimakasih.
+
+kalo jatuh tempo :
+halo {nama}, tagihan kamu sudah jatuh tempo, mohon segera di bayar, agar service tidak terganggu
+
+kalo dia ketik nomer 2:
+halo {nama}, apa kendala yang kamu hadapi saat ini ?
+kendala : 
+
+kalo kirim nomer 3 : 
+ini paket yang kami punya, 
+{retrive dari daftar paket. cukup nama, speed dan Harga aja}
+
+kirim 4 :
+halo, ini adalah pertanyaan yang paling umum di tanyakan, 
+
+> pertanyaan
+
+> jawaban
+
+> pertanyaan
+
+> jawaban
+
+kalo dia kirim 5, system bakal bales ke client :
+"baik, tunggu sebentar ya, kami akan menghubungin admin"
+
+system bakal hubungin karyawan isp lewat wa dan discord, jadi nanti pesannya
+di wa :
+WOI, ada yang chat ke admin nih
+Nomer : 
+Nama kontak :
+wa.me/+62(nomer)
+GC GANTI NOMER KE SINI
+
+di dc:
+<@tag>
+WOI, ada yang chat ke admin nih
+Nomer : 
+Nama kontak :
+wa.me/+62(nomer)
+GC GANTI NOMER KE SINI
+```

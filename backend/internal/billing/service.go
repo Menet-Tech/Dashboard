@@ -212,41 +212,60 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 	for _, item := range candidates {
 		dueDate, err := time.Parse("2006-01-02", item.DueDate)
 		if err != nil {
-			return fmt.Errorf("parse due date for automation: %w", err)
+			// Bad due-date in DB: skip this candidate, don't halt all automation.
+			slog.Error("automation: invalid due date, skipping candidate",
+				"bill_id", item.ID, "due_date", item.DueDate, "error", err)
+			continue
 		}
 		effectiveDueDate := dueDate
 		if adjustedDueDate, ok := trialGraceDueDate(item.TrialStartedAt, item.TrialDays, dueDate, options.TrialGraceDays); ok {
 			effectiveDueDate = adjustedDueDate
 		}
 
+		// Reminder notification (N days before due date)
 		if sameDate(dueDate, options.Now.AddDate(0, 0, options.ReminderDays)) {
 			if err := sendAutomationMessage(ctx, options, item, "reminder_custom"); err != nil {
-				return err
-			}
-			if options.SendDiscord != nil {
+				// WA failure must not stop processing other candidates. AlreadySent
+				// dedup prevents double-sends on the next cycle.
+				slog.Error("automation: send reminder WA failed, continuing",
+					"bill_id", item.ID, "customer", item.CustomerName, "error", err)
+			} else if options.SendDiscord != nil {
 				msg := fmt.Sprintf("⏳ **Reminder Terkirim**: Pengingat tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
 				_ = options.SendDiscord(ctx, msg)
 			}
 		}
 
+		// Due-date notification
 		if sameDate(dueDate, options.Now) {
 			if err := sendAutomationMessage(ctx, options, item, "jatuh_tempo"); err != nil {
-				return err
-			}
-			if options.SendDiscord != nil {
+				slog.Error("automation: send jatuh_tempo WA failed, continuing",
+					"bill_id", item.ID, "customer", item.CustomerName, "error", err)
+			} else if options.SendDiscord != nil {
 				msg := fmt.Sprintf("⚠️ **Jatuh Tempo**: Notifikasi jatuh tempo tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
 				_ = options.SendDiscord(ctx, msg)
 			}
 		}
 
+		// Limit / isolir: only act when the customer is NOT already limited to avoid
+		// spamming Discord on every worker cycle (every minute).
 		if overdueDays(effectiveDueDate, options.Now) >= options.LimitDays {
-			if err := s.Repository.UpdateCustomerStatus(ctx, item.CustomerID, "limit"); err != nil {
-				return err
+			wasAlreadyLimited := item.CustomerStatus == "limit"
+
+			if !wasAlreadyLimited {
+				// Update status in DB – this IS a critical state change; return on error.
+				if err := s.Repository.UpdateCustomerStatus(ctx, item.CustomerID, "limit"); err != nil {
+					return err
+				}
 			}
+
+			// WA: AlreadySent check inside SendTemplate prevents duplicates, so always try.
 			if err := sendAutomationMessage(ctx, options, item, "limit_5hari"); err != nil {
-				return err
+				slog.Error("automation: send limit WA failed, continuing",
+					"bill_id", item.ID, "customer", item.CustomerName, "error", err)
 			}
-			if options.SendDiscord != nil {
+
+			// Discord: only alert on the cycle where the customer first becomes limited.
+			if !wasAlreadyLimited && options.SendDiscord != nil {
 				msg := fmt.Sprintf("🚫 **Isolir (Limit)**: Pelanggan **%s** telah otomatis dilimit karena menunggak > %d hari.", item.CustomerName, options.LimitDays)
 				_ = options.SendDiscord(ctx, msg)
 			}
@@ -263,7 +282,7 @@ func (s Service) ProcessTrialExpiry(ctx context.Context, now time.Time) error {
 	}
 
 	// Get all trial-expired customers
-	expiredTrials, err := s.Customers.ListTrialExpired(ctx)
+	expiredTrials, err := s.Customers.ListTrialExpired(ctx, now)
 	if err != nil {
 		return fmt.Errorf("list trial expired customers: %w", err)
 	}

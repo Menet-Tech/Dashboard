@@ -22,6 +22,13 @@ go run ./cmd/api api
 go run ./cmd/api worker
 ```
 
+#### Billing Automation & Resilience Behavior
+The background worker automatically executes scheduled billing generation, trial expiry, auto backups, and reminder/limit actions. To ensure high reliability and prevent failure cascades in production, the worker implements the following stability measures:
+- **WhatsApp Gateway Fault Tolerance**: WhatsApp transmission failures or API gateway downtime (e.g., connection timeouts or REST gateway errors) are logged as `slog` errors but do **not** abort the background worker cycle or halt processing for other customers.
+- **Discord Alert Deduplication**: Discord notifications for **Isolir (Limit)** are strictly triggered only during the initial state transition (from active to limit). Subsequent worker cycles will not generate duplicate Discord alerts for already-limited customers.
+- **Data Integrity Fail-Safes**: Any database records with malformed or invalid due dates are logged and safely skipped, preventing a single malformed record from blocking the entire billing pipeline.
+- **Distributed Lease Pattern**: The worker uses a database-backed lock lease pattern (`worker_lock`) to coordinate single-active worker execution in multi-replica environments.
+
 ### Legacy Import (MySQL -> SQLite)
 
 ```bash
