@@ -39,14 +39,19 @@ func (s *Service) SimulateRestore(ctx context.Context, filename string) (Restore
 
 	stagingPath := s.getStagingPath()
 
+	// Clean any existing staging file before copying
+	_ = os.Remove(stagingPath)
+
 	// Copy backup to staging
 	if err := copyFile(backupPath, stagingPath); err != nil {
+		_ = os.Remove(stagingPath) // clean up on failure
 		return RestoreSimulationResult{}, fmt.Errorf("copy backup to staging: %w", err)
 	}
 
 	// Open staging DB to verify
 	db, err := sql.Open("sqlite", stagingPath)
 	if err != nil {
+		_ = os.Remove(stagingPath) // clean up on failure
 		return RestoreSimulationResult{}, fmt.Errorf("open staging db: %w", err)
 	}
 	defer db.Close()
@@ -70,15 +75,23 @@ func (s *Service) SimulateRestore(ctx context.Context, filename string) (Restore
 	result.Valid = true
 	result.Message = "Staging database is healthy"
 
-	_ = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&result.TotalUsers)
-	_ = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM pelanggan").Scan(&result.TotalPelanggan)
-	_ = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM tagihan").Scan(&result.TotalTagihan)
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&result.TotalUsers); err != nil {
+		return RestoreSimulationResult{}, fmt.Errorf("count users in staging: %w", err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM pelanggan").Scan(&result.TotalPelanggan); err != nil {
+		return RestoreSimulationResult{}, fmt.Errorf("count pelanggan in staging: %w", err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM tagihan").Scan(&result.TotalTagihan); err != nil {
+		return RestoreSimulationResult{}, fmt.Errorf("count tagihan in staging: %w", err)
+	}
 
+	// Staging file is intentionally kept — ApplyRestore will use it
 	return result, nil
 }
 
-// ApplyRestore replaces the live database with staging.db. 
-// Note: This function will copy the file, and then the caller should restart the application.
+// ApplyRestore replaces the live database with staging.db.
+// It creates a timestamped backup of the current live DB first, then replaces it.
+// Note: After this call, the caller should restart the application so it re-opens the new file.
 func (s *Service) ApplyRestore(ctx context.Context) error {
 	stagingPath := s.getStagingPath()
 	if _, err := os.Stat(stagingPath); os.IsNotExist(err) {
@@ -87,16 +100,33 @@ func (s *Service) ApplyRestore(ctx context.Context) error {
 
 	livePath := s.getLiveDbPath()
 
-	// Wait for any pending SQLite writes (best effort)
-	time.Sleep(500 * time.Millisecond)
-
-	// In a real production scenario, replacing a SQLite db file while it is open 
-	// can cause issues. The safest way is to copy the staging file over the live file,
-	// and then forcefully restart the Go application so it re-opens the new file.
-	if err := copyFile(stagingPath, livePath); err != nil {
-		return fmt.Errorf("failed to replace live database: %w", err)
+	// Create a timestamped backup of the current live database BEFORE replacing it
+	backupPath := livePath + ".pre-restore-" + time.Now().UTC().Format("20060102-150405") + ".bak"
+	if err := copyFile(livePath, backupPath); err != nil {
+		return fmt.Errorf("failed to backup current database before restore: %w", err)
 	}
 
+	// Replace live database with staging
+	if err := copyFile(stagingPath, livePath); err != nil {
+		// Attempt to recover from the backup
+		if recoverErr := copyFile(backupPath, livePath); recoverErr != nil {
+			return fmt.Errorf("restore failed AND recovery failed: restore=%w, recovery=%v", err, recoverErr)
+		}
+		return fmt.Errorf("restore failed but database recovered from backup: %w", err)
+	}
+
+	// Clean up the pre-restore backup after successful replace
+	_ = os.Remove(backupPath)
+
+	return nil
+}
+
+// CleanupStaging removes the staging database file if it exists.
+func (s *Service) CleanupStaging() error {
+	stagingPath := s.getStagingPath()
+	if err := os.Remove(stagingPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("cleanup staging db: %w", err)
+	}
 	return nil
 }
 

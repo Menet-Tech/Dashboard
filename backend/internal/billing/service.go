@@ -124,7 +124,9 @@ func (s Service) Generate(ctx context.Context, period string) (GenerateResult, e
 
 	if generated > 0 && s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_generate") {
 		go func() {
-			_ = s.Discord.SendAlert(context.Background(), fmt.Sprintf("📢 **Generate Tagihan**: %d tagihan baru dibuat untuk periode **%s**", generated, period))
+			alertCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_ = s.Discord.SendAlert(alertCtx, fmt.Sprintf("📢 **Generate Tagihan**: %d tagihan baru dibuat untuk periode **%s**", generated, period))
 		}()
 	}
 
@@ -149,7 +151,8 @@ func (s Service) MarkPaid(ctx context.Context, billID int64, method string, user
 
 	if s.WhatsApp != nil {
 		go func() {
-			bgCtx := context.Background()
+			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
 			detail, err := s.FindByID(bgCtx, billID)
 			if err != nil {
 				return
@@ -174,13 +177,26 @@ func (s Service) MarkPaid(ctx context.Context, billID int64, method string, user
 
 	if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_payment") {
 		go func() {
-			bgCtx := context.Background()
+			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
 			detail, err := s.FindByID(bgCtx, billID)
 			if err != nil {
 				return
 			}
-			msg := fmt.Errorf("💰 **Pembayaran Diterima**: Tagihan **%s** sejumlah **%s** atas nama **%s** telah dilunasi via **%s**", detail.InvoiceNumber, formatIDRCurrency(detail.Amount), detail.CustomerName, method)
-			_ = s.Discord.SendAlert(bgCtx, msg.Error())
+			// Bug #6: use fmt.Sprintf instead of fmt.Errorf
+			msg := fmt.Sprintf("💰 **Pembayaran Diterima**: Tagihan **%s** sejumlah **%s** atas nama **%s** telah dilunasi via **%s**",
+				detail.InvoiceNumber, formatIDRCurrency(detail.Amount), detail.CustomerName, method)
+
+			sendErr := s.Discord.SendAlert(bgCtx, msg)
+
+			// Bug #20: log Discord notification to audit trail
+			status := "sent"
+			logMsg := ""
+			if sendErr != nil {
+				status = "failed"
+				logMsg = sendErr.Error()
+			}
+			_ = s.Notifications.Record(bgCtx, billID, "payment_notification_discord", "discord", status, logMsg)
 		}()
 	}
 
@@ -209,6 +225,15 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		return err
 	}
 
+	// discordSentThisCycle tracks which (billID, eventType) combos have already
+	// had a Discord notification sent in this automation cycle, to prevent spam
+	// when the worker runs every minute but the reminder/due-date date stays the same.
+	type discordKey struct {
+		BillID int64
+		Event  string
+	}
+	discordSentThisCycle := make(map[discordKey]bool)
+
 	for _, item := range candidates {
 		dueDate, err := time.Parse("2006-01-02", item.DueDate)
 		if err != nil {
@@ -224,25 +249,46 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 
 		// Reminder notification (N days before due date)
 		if sameDate(dueDate, options.Now.AddDate(0, 0, options.ReminderDays)) {
-			if err := sendAutomationMessage(ctx, options, item, "reminder_custom"); err != nil {
-				// WA failure must not stop processing other candidates. AlreadySent
-				// dedup prevents double-sends on the next cycle.
+			waErr := sendAutomationMessage(ctx, options, item, "reminder_custom")
+			if waErr != nil {
+				// Bug #19: log WA failure, don't skip Discord
 				slog.Error("automation: send reminder WA failed, continuing",
-					"bill_id", item.ID, "customer", item.CustomerName, "error", err)
-			} else if options.SendDiscord != nil {
-				msg := fmt.Sprintf("⏳ **Reminder Terkirim**: Pengingat tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+					"bill_id", item.ID, "customer", item.CustomerName, "error", waErr)
+			}
+			// Bug #18: only send Discord once per bill per cycle
+			key := discordKey{item.ID, "reminder"}
+			if options.SendDiscord != nil && !discordSentThisCycle[key] {
+				var msg string
+				if waErr != nil {
+					// Bug #19: notify Discord even when WA fails
+					msg = fmt.Sprintf("⚠️ **Reminder Gagal (WA)**: Gagal mengirim pengingat tagihan **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
+				} else {
+					msg = fmt.Sprintf("⏳ **Reminder Terkirim**: Pengingat tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+				}
 				_ = options.SendDiscord(ctx, msg)
+				discordSentThisCycle[key] = true
 			}
 		}
 
 		// Due-date notification
 		if sameDate(dueDate, options.Now) {
-			if err := sendAutomationMessage(ctx, options, item, "jatuh_tempo"); err != nil {
+			waErr := sendAutomationMessage(ctx, options, item, "jatuh_tempo")
+			if waErr != nil {
 				slog.Error("automation: send jatuh_tempo WA failed, continuing",
-					"bill_id", item.ID, "customer", item.CustomerName, "error", err)
-			} else if options.SendDiscord != nil {
-				msg := fmt.Sprintf("⚠️ **Jatuh Tempo**: Notifikasi jatuh tempo tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+					"bill_id", item.ID, "customer", item.CustomerName, "error", waErr)
+			}
+			// Bug #18: only send Discord once per bill per cycle
+			key := discordKey{item.ID, "jatuh_tempo"}
+			if options.SendDiscord != nil && !discordSentThisCycle[key] {
+				var msg string
+				if waErr != nil {
+					// Bug #19: notify Discord even when WA fails
+					msg = fmt.Sprintf("⚠️ **Jatuh Tempo Gagal (WA)**: Gagal mengirim notifikasi jatuh tempo tagihan **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
+				} else {
+					msg = fmt.Sprintf("⚠️ **Jatuh Tempo**: Notifikasi jatuh tempo tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+				}
 				_ = options.SendDiscord(ctx, msg)
+				discordSentThisCycle[key] = true
 			}
 		}
 

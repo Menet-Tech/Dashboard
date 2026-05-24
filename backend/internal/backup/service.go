@@ -49,8 +49,23 @@ func (s *Service) CreateBackup(ctx context.Context) (string, error) {
 	filename := fmt.Sprintf("dashboard_%s.db", timestamp)
 	backupPath := filepath.Join(s.BackupDir, filename)
 
-	// Use SQLite VACUUM INTO for a safe online backup
-	query := fmt.Sprintf("VACUUM INTO '%s'", backupPath)
+	// Validate that backupPath is within BackupDir (prevent directory traversal)
+	absBackupDir, err := filepath.Abs(s.BackupDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve backup dir: %w", err)
+	}
+	absBackupPath, err := filepath.Abs(backupPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve backup path: %w", err)
+	}
+	if !strings.HasPrefix(absBackupPath, absBackupDir+string(filepath.Separator)) && absBackupPath != absBackupDir {
+		return "", fmt.Errorf("backup path outside backup directory")
+	}
+
+	// Use SQLite VACUUM INTO for a safe online backup.
+	// VACUUM INTO does not support parameterized queries, so we escape single quotes manually.
+	escapedPath := strings.ReplaceAll(absBackupPath, "'", "''")
+	query := fmt.Sprintf("VACUUM INTO '%s'", escapedPath)
 	if _, err := s.DB.ExecContext(ctx, query); err != nil {
 		return "", fmt.Errorf("execute vacuum into: %w", err)
 	}

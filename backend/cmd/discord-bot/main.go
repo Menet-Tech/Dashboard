@@ -102,7 +102,11 @@ func registerCommands() error {
 			url = fmt.Sprintf("https://discord.com/api/v10/applications/%s/commands", applicationID)
 		}
 
-		body, _ := json.Marshal(cmd)
+		body, err := json.Marshal(cmd)
+		if err != nil {
+			logger.Error("marshal command failed", "name", cmd["name"], "error", err)
+			return err
+		}
 		req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(string(body)))
 		if err != nil {
 			return err
@@ -129,7 +133,10 @@ func registerCommands() error {
 func discordRequest(method, path string, payload any) ([]byte, int, error) {
 	var bodyStr string
 	if payload != nil {
-		b, _ := json.Marshal(payload)
+		b, err := json.Marshal(payload)
+		if err != nil {
+			return nil, 0, fmt.Errorf("marshal discord payload: %w", err)
+		}
 		bodyStr = string(b)
 	}
 
@@ -146,7 +153,10 @@ func discordRequest(method, path string, payload any) ([]byte, int, error) {
 	}
 	defer resp.Body.Close()
 
-	data, _ := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("read discord response: %w", err)
+	}
 	return data, resp.StatusCode, nil
 }
 
@@ -166,11 +176,21 @@ func querySummary() (dashboardSummary, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM customers`).Scan(&s.TotalCustomers)
-	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM customers WHERE status = 'active'`).Scan(&s.ActiveCustomers)
-	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM bills`).Scan(&s.TotalBills)
-	_ = db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(SUM(amount),0) FROM bills WHERE status = 'belum_bayar'`).Scan(&s.UnpaidBills, &s.UnpaidAmount)
-	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM bills WHERE status = 'lunas'`).Scan(&s.PaidBills)
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM customers`).Scan(&s.TotalCustomers); err != nil {
+		return s, fmt.Errorf("count customers: %w", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM customers WHERE status = 'active'`).Scan(&s.ActiveCustomers); err != nil {
+		return s, fmt.Errorf("count active customers: %w", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM bills`).Scan(&s.TotalBills); err != nil {
+		return s, fmt.Errorf("count bills: %w", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(SUM(amount),0) FROM bills WHERE status = 'belum_bayar'`).Scan(&s.UnpaidBills, &s.UnpaidAmount); err != nil {
+		return s, fmt.Errorf("count unpaid bills: %w", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM bills WHERE status = 'lunas'`).Scan(&s.PaidBills); err != nil {
+		return s, fmt.Errorf("count paid bills: %w", err)
+	}
 	return s, nil
 }
 
@@ -265,18 +285,18 @@ func buildSummaryMessage() string {
 }
 
 func buildHealthMessage() string {
-	resp, status, err := discordRequest("", "", nil)
-	// Actually call the local API health endpoint
-	httpResp, err2 := http.Get(apiBaseURL + "/api/v1/health")
-	if err != nil || err2 != nil || status == 0 {
-		_ = resp
-		if err2 != nil {
-			return "❌ Gagal menghubungi API: " + err2.Error()
-		}
-		return "❌ Gagal menghubungi API"
+	// Call the local API health endpoint directly
+	httpResp, err := http.Get(apiBaseURL + "/api/v1/health")
+	if err != nil {
+		return "❌ Gagal menghubungi API: " + err.Error()
 	}
 	defer httpResp.Body.Close()
-	body, _ := io.ReadAll(httpResp.Body)
+
+	body, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return "❌ Gagal membaca response API"
+	}
+
 	var result map[string]any
 	if jsonErr := json.Unmarshal(body, &result); jsonErr != nil {
 		return "❌ Response tidak valid"

@@ -144,9 +144,14 @@ func (s Service) Login(ctx context.Context, username, password, identifier, ip s
 		return User{}, Session{}, fmt.Errorf("generate session token: %w", err)
 	}
 
+	csrfToken, err := generateToken()
+	if err != nil {
+		return User{}, Session{}, fmt.Errorf("generate csrf token: %w", err)
+	}
+
 	session := Session{
 		Token:     token,
-		CSRFToken: token,
+		CSRFToken: csrfToken,
 		UserID:    user.ID,
 		ExpiresAt: time.Now().UTC().Add(sessionTTL(s.SessionTTL)),
 	}
@@ -169,29 +174,29 @@ func sessionTTL(value time.Duration) time.Duration {
 	return value
 }
 
-func (s Service) Authenticate(ctx context.Context, token string) (User, error) {
+func (s Service) Authenticate(ctx context.Context, token string) (User, string, error) {
 	if strings.TrimSpace(token) == "" {
-		return User{}, ErrUnauthorized
+		return User{}, "", ErrUnauthorized
 	}
 
-	user, expiresAt, err := s.Repository.FindUserBySessionToken(ctx, token)
+	user, csrfToken, expiresAt, err := s.Repository.FindUserBySessionToken(ctx, token)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return User{}, ErrUnauthorized
+			return User{}, "", ErrUnauthorized
 		}
-		return User{}, err
+		return User{}, "", err
 	}
 
 	if expiresAt.Before(time.Now().UTC()) {
 		_ = s.Repository.DeleteSession(ctx, token)
-		return User{}, ErrUnauthorized
+		return User{}, "", ErrUnauthorized
 	}
 
 	if err := s.Repository.TouchSession(ctx, token); err != nil {
-		return User{}, err
+		return User{}, "", err
 	}
 
-	return user, nil
+	return user, csrfToken, nil
 }
 
 func (s Service) Logout(ctx context.Context, token string) error {
@@ -260,9 +265,9 @@ func (r Repository) UpdateLastLogin(ctx context.Context, userID int64, ip string
 
 func (r Repository) CreateSession(ctx context.Context, session Session) error {
 	_, err := r.DB.ExecContext(ctx, `
-		INSERT INTO sessions (token, user_id, expires_at, last_seen_at)
-		VALUES (?, ?, ?, ?)
-	`, session.Token, session.UserID, session.ExpiresAt.Format(time.RFC3339), time.Now().UTC().Format(time.RFC3339))
+		INSERT INTO sessions (token, csrf_token, user_id, expires_at, last_seen_at)
+		VALUES (?, ?, ?, ?, ?)
+	`, session.Token, session.CSRFToken, session.UserID, session.ExpiresAt.Format(time.RFC3339), time.Now().UTC().Format(time.RFC3339))
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
@@ -270,9 +275,9 @@ func (r Repository) CreateSession(ctx context.Context, session Session) error {
 	return nil
 }
 
-func (r Repository) FindUserBySessionToken(ctx context.Context, token string) (User, time.Time, error) {
+func (r Repository) FindUserBySessionToken(ctx context.Context, token string) (User, string, time.Time, error) {
 	row := r.DB.QueryRowContext(ctx, `
-		SELECT u.id, u.username, u.role, u.is_active, s.expires_at
+		SELECT u.id, u.username, u.role, u.is_active, s.expires_at, COALESCE(s.csrf_token, '')
 		FROM sessions s
 		INNER JOIN users u ON u.id = s.user_id
 		WHERE s.token = ?
@@ -282,20 +287,21 @@ func (r Repository) FindUserBySessionToken(ctx context.Context, token string) (U
 	var user User
 	var isActive int
 	var expiresAtRaw string
-	if err := row.Scan(&user.ID, &user.Username, &user.Role, &isActive, &expiresAtRaw); err != nil {
-		return User{}, time.Time{}, err
+	var csrfToken string
+	if err := row.Scan(&user.ID, &user.Username, &user.Role, &isActive, &expiresAtRaw, &csrfToken); err != nil {
+		return User{}, "", time.Time{}, err
 	}
 	user.IsActive = isActive == 1
 
 	expiresAt, err := time.Parse(time.RFC3339, expiresAtRaw)
 	if err != nil {
-		return User{}, time.Time{}, fmt.Errorf("parse session expiry: %w", err)
+		return User{}, "", time.Time{}, fmt.Errorf("parse session expiry: %w", err)
 	}
 	if !user.IsActive {
-		return User{}, time.Time{}, ErrUnauthorized
+		return User{}, "", time.Time{}, ErrUnauthorized
 	}
 
-	return user, expiresAt, nil
+	return user, csrfToken, expiresAt, nil
 }
 
 func (r Repository) TouchSession(ctx context.Context, token string) error {
