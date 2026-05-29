@@ -1,0 +1,34 @@
+const express = require('express');
+const router  = express.Router();
+const { getAllSessions, deleteSession, getForms } = require('../../utils/database');
+
+/**
+ * GET /api/v1/chatbot/sessions
+ * Daftar sesi chatbot aktif — untuk monitoring di dashboard
+ */
+router.get('/sessions', (req, res) => {
+    const sessions = getAllSessions();
+    res.json({ status: 'success', count: sessions.length, data: sessions });
+});
+
+/**
+ * DELETE /api/v1/chatbot/sessions/:phone
+ * Reset sesi chatbot (paksa kembali ke IDLE)
+ */
+router.delete('/sessions/:phone', (req, res) => {
+    const phone = decodeURIComponent(req.params.phone);
+    deleteSession(phone);
+    res.json({ status: 'success', message: `Sesi ${phone} direset` });
+});
+
+/**
+ * GET /api/v1/chatbot/forms?type=registration|support
+ * Lihat form yang masuk (pendaftaran / tiket support)
+ */
+router.get('/forms', (req, res) => {
+    const { type, limit } = req.query;
+    const forms = getForms(type || null, parseInt(limit, 10) || 50);
+    res.json({ status: 'success', count: forms.length, data: forms });
+});
+
+module.exports = router;

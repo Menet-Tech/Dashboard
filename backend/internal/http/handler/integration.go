@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -44,7 +46,8 @@ func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 			client = &http.Client{Timeout: 5 * time.Second}
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, waGatewayURL, nil)
+		statusURL := fmt.Sprintf("%s/api/v1/status", strings.TrimRight(waGatewayURL, "/"))
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, statusURL, nil)
 		if err == nil {
 			req.Header.Set("X-API-Key", waAPIKey)
 			if strings.TrimSpace(waAccountID) != "" {
@@ -52,9 +55,18 @@ func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 			}
 			resp, err := client.Do(req)
 			if err == nil {
-				resp.Body.Close()
+				defer resp.Body.Close()
 				if resp.StatusCode < 400 {
+					// Fallback to connected if status is OK, but try to parse JSON
 					waStatus = "connected"
+					var result map[string]any
+					if err := json.NewDecoder(resp.Body).Decode(&result); err == nil {
+						if ready, ok := result["whatsapp_ready"].(bool); ok {
+							if !ready {
+								waStatus = "disconnected"
+							}
+						}
+					}
 				}
 			}
 		}
