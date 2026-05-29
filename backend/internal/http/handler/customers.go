@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -27,6 +28,29 @@ func (h CustomerHandler) List(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to load customers")
 		return
+	}
+
+	waNumber := strings.TrimSpace(r.URL.Query().Get("wa_number"))
+	if waNumber != "" {
+		cleanWA := func(s string) string {
+			s = strings.TrimSpace(s)
+			s = strings.ReplaceAll(s, "+", "")
+			s = strings.ReplaceAll(s, "-", "")
+			s = strings.ReplaceAll(s, " ", "")
+			if strings.HasPrefix(s, "0") {
+				s = "62" + s[1:]
+			}
+			return s
+		}
+		target := cleanWA(waNumber)
+
+		filtered := []customers.Customer{}
+		for _, item := range items {
+			if cleanWA(item.WhatsApp) == target {
+				filtered = append(filtered, item)
+			}
+		}
+		items = filtered
 	}
 
 	WriteJSON(w, http.StatusOK, map[string]any{

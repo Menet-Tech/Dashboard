@@ -52,6 +52,7 @@ import { UsersPage } from "./features/users/UsersPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { TicketsPage } from "./features/tickets/TicketsPage";
 import { RegistrationPage } from "./features/registration/RegistrationPage";
+import { WhatsAppPage } from "./features/whatsapp/WhatsAppPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { useAppFeedback } from "./hooks/useAppFeedback";
@@ -86,6 +87,7 @@ const navItems: NavItem[] = [
   { key: "settings", label: "Pengaturan", caption: "Konfigurasi sistem" },
   { key: "tickets", label: "Tiket Support", caption: "Bantuan & keluhan" },
   { key: "registration", label: "Registrasi", caption: "Daftar mandiri" },
+  { key: "whatsapp", label: "WhatsApp Gateway", caption: "Multi-akun & Chatbot" },
 ];
 
 export default function App() {
@@ -519,6 +521,16 @@ export default function App() {
 
       {view === "tickets" ? <TicketsPage /> : null}
       {view === "registration" ? <RegistrationPage /> : null}
+      {view === "whatsapp" ? (
+        <WhatsAppPage
+          user={user}
+          waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
+          waApiKey={settingsHook.state.settingsForm.wa_api_key}
+          pushSuccess={feedback.pushSuccess}
+          pushError={feedback.pushError}
+          withFeedback={feedback.withFeedback}
+        />
+      ) : null}
       </div>
 
       <ToastStack toasts={feedback.toasts} />

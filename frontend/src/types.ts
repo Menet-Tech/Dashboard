@@ -142,4 +142,5 @@ export type ViewKey =
   | "users"
   | "settings"
   | "tickets"
-  | "registration";
+  | "registration"
+  | "whatsapp";
