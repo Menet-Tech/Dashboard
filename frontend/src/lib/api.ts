@@ -10,6 +10,9 @@ import type {
   AgingReport,
   NotificationLog,
   SettingsState,
+  TicketItem,
+  TicketMessageItem,
+  TicketDetailItem,
 } from "../types";
 
 let csrfToken = "";
@@ -391,3 +394,37 @@ export function resetUserPassword(id: number, password: string) {
     body: JSON.stringify({ password }),
   });
 }
+
+export function fetchTickets(status?: string) {
+  const path = status ? `/api/v1/tickets?status=${status}` : "/api/v1/tickets";
+  return request<{ data: TicketItem[] }>(path);
+}
+
+export function fetchTicketDetail(id: number) {
+  return request<{ data: TicketDetailItem }>(`/api/v1/tickets/${id}`);
+}
+
+export function addTicketMessage(id: number, message: string) {
+  return request<{ data: TicketMessageItem }>(`/api/v1/tickets/${id}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+}
+
+export function closeTicket(id: number) {
+  return request<{ message: string }>(`/api/v1/tickets/${id}/close`, {
+    method: "POST",
+  });
+}
+
+export function sendBroadcast(targetType: string, targetIDs: number[], message: string) {
+  return request<{ message: string; queued: number }>("/api/v1/broadcast", {
+    method: "POST",
+    body: JSON.stringify({
+      target_type: targetType,
+      target_ids: targetIDs,
+      message,
+    }),
+  });
+}
+

@@ -25,6 +25,8 @@ import (
 	"menettech/dashboard/backend/internal/settings"
 	"menettech/dashboard/backend/internal/templates"
 	"menettech/dashboard/backend/internal/users"
+	"menettech/dashboard/backend/internal/tickets"
+	"menettech/dashboard/backend/internal/broadcast"
 )
 
 func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Service) http.Handler {
@@ -81,6 +83,18 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	backupHandler := &handler.BackupHandler{Service: backup.NewService(db, backupDir)}
 	integrationHandler := handler.NewIntegrationHandler(settingsService, whatsAppService, discordService)
 
+	ticketsService := tickets.Service{
+		Repository: tickets.Repository{DB: db},
+		WhatsApp:   whatsAppService,
+	}
+	ticketHandler := handler.NewTicketHandler(ticketsService)
+
+	broadcastService := broadcast.Service{
+		DB:       db,
+		WhatsApp: whatsAppService,
+	}
+	broadcastHandler := handler.NewBroadcastHandler(broadcastService)
+
 	r.Get("/health", healthHandler.Show)
 	r.Get("/livez", healthHandler.Live)
 	r.Get("/readyz", healthHandler.Ready)
@@ -134,6 +148,9 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				staff.Post("/bills/generate", billHandler.Generate)
 				staff.Post("/bills/{id}/pay", billHandler.Pay)
 				staff.Post("/bills/{id}/proof", billHandler.UploadProof)
+				staff.Post("/tickets/{id}/messages", ticketHandler.AddMessage)
+				staff.Post("/tickets/{id}/close", ticketHandler.Close)
+				staff.Post("/broadcast", broadcastHandler.Send)
 			})
 
 			// All logged in users (Admin, Petugas, Viewer)
@@ -148,6 +165,9 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				all.Get("/templates", templateHandler.List)
 				all.Get("/reports/revenue", reportsHandler.Revenue)
 				all.Get("/reports/aging", reportsHandler.Aging)
+				all.Post("/tickets", ticketHandler.CreateInternal)
+				all.Get("/tickets", ticketHandler.List)
+				all.Get("/tickets/{id}", ticketHandler.FindByID)
 			})
 		})
 	})

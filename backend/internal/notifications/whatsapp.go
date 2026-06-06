@@ -34,6 +34,17 @@ type BillMessagePayload struct {
 	MessageData map[string]string
 }
 
+type QueuedMessage struct {
+	ID         int64
+	AccountID  string
+	ToNumber   string
+	Body       string
+	Status     string
+	Attempts   int
+	BillID     sql.NullInt64
+	TriggerKey sql.NullString
+}
+
 func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePayload) error {
 	if strings.TrimSpace(payload.PhoneNumber) == "" {
 		return nil
@@ -52,20 +63,6 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 		return err
 	}
 
-	url, err := s.Settings.GetString(ctx, settings.KeyWAGatewayURL)
-	if err != nil {
-		return err
-	}
-	trimmedURL := strings.TrimSpace(url)
-	if envValue := strings.TrimSpace(os.Getenv("WA_GATEWAY_URL")); envValue != "" && (trimmedURL == "" || trimmedURL == "http://localhost:3001") {
-		url = envValue
-	}
-	if strings.TrimSpace(url) == "" {
-		url = os.Getenv("WA_GATEWAY_URL")
-	}
-	if strings.TrimSpace(url) == "" {
-		url = "http://localhost:3001"
-	}
 	accountID, err := s.accountIDForTrigger(ctx, payload.TriggerKey)
 	if err != nil {
 		return err
@@ -80,13 +77,129 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 	if strings.TrimSpace(accountID) == "" {
 		accountID = "default"
 	}
+
+	renderedText := templates.Render(tpl.Content, payload.MessageData)
+
+	return s.QueueMessage(ctx, accountID, payload.PhoneNumber, renderedText, payload.BillID, payload.TriggerKey)
+}
+
+func (s WhatsAppService) QueueDirectMessage(ctx context.Context, accountID, toNumber, body string) error {
+	return s.QueueMessage(ctx, accountID, toNumber, body, 0, "")
+}
+
+func (s WhatsAppService) QueueMessage(ctx context.Context, accountID, toNumber, body string, billID int64, triggerKey string) error {
+	var bID sql.NullInt64
+	if billID > 0 {
+		bID = sql.NullInt64{Int64: billID, Valid: true}
+	}
+	var tKey sql.NullString
+	if triggerKey != "" {
+		tKey = sql.NullString{String: triggerKey, Valid: true}
+	}
+
+	_, err := s.Logs.DB.ExecContext(ctx, `
+		INSERT INTO whatsapp_queue (account_id, to_number, body, status, attempts, bill_id, trigger_key)
+		VALUES (?, ?, ?, 'pending', 0, ?, ?)
+	`, accountID, toNumber, body, bID, tKey)
+	if err != nil {
+		return fmt.Errorf("insert into whatsapp_queue: %w", err)
+	}
+	return nil
+}
+
+func (s WhatsAppService) ProcessQueue(ctx context.Context) (bool, error) {
+	row := s.Logs.DB.QueryRowContext(ctx, `
+		SELECT id, account_id, to_number, body, status, attempts, bill_id, trigger_key
+		FROM whatsapp_queue
+		WHERE status = 'pending' AND attempts < 3
+		ORDER BY id ASC
+		LIMIT 1
+	`)
+
+	var msg QueuedMessage
+	err := row.Scan(&msg.ID, &msg.AccountID, &msg.ToNumber, &msg.Body, &msg.Status, &msg.Attempts, &msg.BillID, &msg.TriggerKey)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, fmt.Errorf("query pending message: %w", err)
+	}
+
+	_, _ = s.Logs.DB.ExecContext(ctx, `
+		UPDATE whatsapp_queue
+		SET attempts = attempts + 1
+		WHERE id = ?
+	`, msg.ID)
+	msg.Attempts++
+
+	sendErr := s.sendDirect(ctx, msg)
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if sendErr == nil {
+		_, err = s.Logs.DB.ExecContext(ctx, `
+			UPDATE whatsapp_queue
+			SET status = 'sent', sent_at = ?
+			WHERE id = ?
+		`, now, msg.ID)
+		if err != nil {
+			slog.Error("failed to mark message as sent", "id", msg.ID, "error", err)
+		}
+
+		if msg.BillID.Valid && msg.TriggerKey.Valid {
+			_ = s.Logs.Record(ctx, msg.BillID.Int64, msg.TriggerKey.String, msg.ToNumber, "sent", "OK")
+		}
+		slog.Info("queue: whatsapp message sent", "id", msg.ID, "to", msg.ToNumber)
+		return true, nil
+	}
+
+	errMsg := sendErr.Error()
+	status := "pending"
+	if msg.Attempts >= 3 {
+		status = "failed"
+	}
+
+	_, err = s.Logs.DB.ExecContext(ctx, `
+		UPDATE whatsapp_queue
+		SET status = ?, error_message = ?
+		WHERE id = ?
+	`, status, errMsg, msg.ID)
+	if err != nil {
+		slog.Error("failed to update failed message status", "id", msg.ID, "error", err)
+	}
+
+	if status == "failed" && msg.BillID.Valid && msg.TriggerKey.Valid {
+		_ = s.Logs.Record(ctx, msg.BillID.Int64, msg.TriggerKey.String, msg.ToNumber, "failed", errMsg)
+	}
+
+	slog.Error("queue: whatsapp message failed to send", "id", msg.ID, "to", msg.ToNumber, "attempts", msg.Attempts, "error", sendErr)
+	return true, sendErr
+}
+
+func (s WhatsAppService) sendDirect(ctx context.Context, msg QueuedMessage) error {
+	url, err := s.Settings.GetString(ctx, settings.KeyWAGatewayURL)
+	if err != nil {
+		return err
+	}
+	trimmedURL := strings.TrimSpace(url)
+	if envValue := strings.TrimSpace(os.Getenv("WA_GATEWAY_URL")); envValue != "" && (trimmedURL == "" || trimmedURL == "http://localhost:3001") {
+		url = envValue
+	}
+	if strings.TrimSpace(url) == "" {
+		url = os.Getenv("WA_GATEWAY_URL")
+	}
+	if strings.TrimSpace(url) == "" {
+		url = "http://localhost:3001"
+	}
+
 	apiKey, err := s.Settings.GetString(ctx, settings.KeyWAAPIKey)
 	if err != nil {
 		return err
 	}
-
 	if strings.TrimSpace(apiKey) == "" {
-		return nil
+		apiKey = os.Getenv("DASHBOARD_INTERNAL_API_KEY")
+	}
+	if strings.TrimSpace(apiKey) == "" {
+		return fmt.Errorf("WA API Key is not configured")
 	}
 
 	timeoutSecs, _ := s.Settings.GetInt(ctx, "wa_client_timeout_seconds")
@@ -102,8 +215,8 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 	}
 
 	body, err := json.Marshal(map[string]string{
-		"to":   payload.PhoneNumber,
-		"text": templates.Render(tpl.Content, payload.MessageData),
+		"to":   msg.ToNumber,
+		"text": msg.Body,
 	})
 	if err != nil {
 		return fmt.Errorf("marshal whatsapp payload: %w", err)
@@ -115,30 +228,15 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-API-Key", apiKey)
-	if strings.TrimSpace(accountID) != "" {
-		request.Header.Set("X-Account-Id", accountID)
+	if strings.TrimSpace(msg.AccountID) != "" {
+		request.Header.Set("X-Account-Id", msg.AccountID)
 	}
 
 	response, err := client.Do(request)
 	if err != nil {
-		_ = s.Logs.Record(ctx, payload.BillID, payload.TriggerKey, payload.PhoneNumber, "failed", err.Error())
-		slog.Error("whatsapp notification failed", "bill_id", payload.BillID, "error", err)
-		return fmt.Errorf("send whatsapp message: %w", err)
+		return fmt.Errorf("send whatsapp message HTTP: %w", err)
 	}
 	defer response.Body.Close()
-
-	status := "sent"
-	message := response.Status
-	if response.StatusCode >= 400 {
-		status = "failed"
-		slog.Error("whatsapp notification failed", "bill_id", payload.BillID, "status_code", response.StatusCode)
-	} else {
-		slog.Info("whatsapp notification sent", "bill_id", payload.BillID, "phone", payload.PhoneNumber)
-	}
-
-	if err := s.Logs.Record(ctx, payload.BillID, payload.TriggerKey, payload.PhoneNumber, status, message); err != nil {
-		return err
-	}
 
 	if response.StatusCode >= 400 {
 		return fmt.Errorf("whatsapp gateway returned status %d", response.StatusCode)

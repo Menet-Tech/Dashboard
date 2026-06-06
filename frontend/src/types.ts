@@ -156,3 +156,28 @@ export type ViewKey =
   | "tickets"
   | "registration"
   | "whatsapp";
+
+export type TicketItem = {
+  id: number;
+  pelanggan_id?: number;
+  nama: string;
+  no_hp: string;
+  alamat: string;
+  kendala: string;
+  status: "open" | "closed";
+  created_at: string;
+  updated_at: string;
+};
+
+export type TicketMessageItem = {
+  id: number;
+  ticket_id: number;
+  sender_type: "admin" | "customer";
+  message: string;
+  created_at: string;
+};
+
+export type TicketDetailItem = TicketItem & {
+  customer_name?: string;
+  messages: TicketMessageItem[];
+};
