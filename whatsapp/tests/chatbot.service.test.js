@@ -5,6 +5,7 @@ const mockGetActiveBill = jest.fn();
 const mockGetPackageList = jest.fn();
 const mockNotifyAdminViaWA = jest.fn();
 const mockNotifyAdminViaDiscord = jest.fn();
+const mockCreateTicket = jest.fn();
 
 jest.mock('../src/utils/database', () => ({
     getSession: jest.fn((phone) => mockSessions.get(phone) || null),
@@ -23,6 +24,7 @@ jest.mock('../src/services/isp.service', () => ({
     getPackageList: mockGetPackageList,
     notifyAdminViaWA: mockNotifyAdminViaWA,
     notifyAdminViaDiscord: mockNotifyAdminViaDiscord,
+    createTicket: mockCreateTicket,
 }));
 
 const database = require('../src/utils/database');
@@ -124,6 +126,12 @@ describe('Chatbot ISP state machine', () => {
 
         expect(mockSaveContactForm).toHaveBeenCalledWith('support', phone, 'support', expect.objectContaining({
             nama: 'Ani',
+            kendala: 'wifi lambat',
+        }));
+        expect(mockCreateTicket).toHaveBeenCalledWith(expect.objectContaining({
+            nama: 'Ani',
+            no_hp: phone,
+            alamat: 'Jl. Mawar',
             kendala: 'wifi lambat',
         }));
         expect(sendFn).toHaveBeenCalledWith('support', phone, expect.stringContaining('Laporan'));

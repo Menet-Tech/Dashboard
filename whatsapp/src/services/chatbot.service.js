@@ -13,7 +13,7 @@
 
 const logger = require('../utils/logger');
 const { getSession, upsertSession, deleteSession, saveContactForm } = require('../utils/database');
-const { findCustomerByPhone, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord } = require('./isp.service');
+const { findCustomerByPhone, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket } = require('./isp.service');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -74,7 +74,7 @@ const REG_STEPS = [
     { key: 'paket',      prompt: 'paket yang diambil\nnama wifi (ssid) : ' }, // Combines nicely with prompt structure
     { key: 'ssid',       prompt: 'nama wifi (ssid) : ' },
     { key: 'password',   prompt: 'password wifi : ' },
-    { key: 'referral',   prompt: 'mengetahui kami dari siapa : ' },
+    { key: 'referral',   prompt: 'mengetahui kami dari siapa atau berikan kode referal : ' },
     { key: 'isp_lain',   prompt: 'apakah saat ini masih langganan ke wifi (ISP) lain : ' },
 ];
 
@@ -192,9 +192,21 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
             upsertSession(rawFrom, accountId, 'UNREG_MENU', {});
             saveContactForm('registration', rawFrom, accountId, updatedForm);
 
-            // Notif admin
-            await notifyAdminViaWA({ phone: rawFrom, contactName: updatedForm.nama, accountId }, sendFn);
-            await notifyAdminViaDiscord({ phone: rawFrom, contactName: updatedForm.nama });
+            // Notif admin with detailed registration info
+            const cleanPhone = rawFrom.replace(/@c\.us$/, '').replace(/^\+/, '');
+            const linkNumber = cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone.replace(/^0/, '');
+            const customMsg = `📝 *Pendaftaran Baru*
+Nama: ${updatedForm.nama}
+No HP: ${updatedForm.no_hp}
+Alamat: ${updatedForm.alamat}
+SSID: ${updatedForm.ssid}
+Password: ${updatedForm.password}
+Sponsor/Referral: ${updatedForm.referral}
+ISP Lain: ${updatedForm.isp_lain}
+Nomor WA: wa.me/+${linkNumber}`;
+
+            await notifyAdminViaWA({ phone: rawFrom, contactName: updatedForm.nama, accountId }, sendFn, customMsg);
+            await notifyAdminViaDiscord({ phone: rawFrom, contactName: updatedForm.nama }, customMsg);
 
             await sendFn(accountId, rawFrom,
                 `✅ *Terima kasih, ${updatedForm.nama}!*\n\nData pendaftaranmu sudah kami terima. Admin kami akan segera menghubungimu.\n\n📌 *Pemasangan dilakukan setiap Sabtu & Minggu.*\n\nKetik *menu* untuk kembali ke menu utama.`
@@ -217,8 +229,26 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
             upsertSession(rawFrom, accountId, isRegistered ? 'REG_MENU' : 'UNREG_MENU', formData);
             saveContactForm('support', rawFrom, accountId, updatedForm);
 
-            await notifyAdminViaWA({ phone: rawFrom, contactName: updatedForm.nama, accountId }, sendFn);
-            await notifyAdminViaDiscord({ phone: rawFrom, contactName: updatedForm.nama });
+            // POST support ticket to Go backend
+            await createTicket({
+                pelanggan_id: formData.customerId || null,
+                nama: updatedForm.nama,
+                no_hp: rawFrom,
+                alamat: updatedForm.alamat,
+                kendala: updatedForm.kendala
+            });
+
+            // Notif admin with detailed support info
+            const cleanPhone = rawFrom.replace(/@c\.us$/, '').replace(/^\+/, '');
+            const linkNumber = cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone.replace(/^0/, '');
+            const customMsg = `🔧 *Laporan Kendala Baru*
+Nama: ${updatedForm.nama}
+Alamat: ${updatedForm.alamat}
+Kendala: ${updatedForm.kendala}
+Nomor WA: wa.me/+${linkNumber}`;
+
+            await notifyAdminViaWA({ phone: rawFrom, contactName: updatedForm.nama, accountId }, sendFn, customMsg);
+            await notifyAdminViaDiscord({ phone: rawFrom, contactName: updatedForm.nama }, customMsg);
 
             await sendFn(accountId, rawFrom,
                 `✅ *Laporan kendalamu sudah kami terima!*\n\nTeknisi kami akan segera menghubungi dan membantu menyelesaikan masalahmu, ${updatedForm.nama}.\n\nKetik *menu* untuk kembali ke menu utama.`

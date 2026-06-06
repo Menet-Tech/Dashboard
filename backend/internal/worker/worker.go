@@ -37,6 +37,10 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 	if lockTTLSeconds <= 0 {
 		lockTTLSeconds = int(interval.Seconds())*3 + 60
 	}
+
+	// Start queue processor in background
+	go s.startQueueProcessor(ctx)
+
 	acquiredLease, err := s.acquireWorkerLease(ctx, owner, lockTTLSeconds)
 	if err != nil {
 		return err
@@ -85,6 +89,39 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 				if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
 					_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Worker Run Error**: %v", err))
 				}
+			}
+		}
+	}
+}
+
+func (s Service) startQueueProcessor(ctx context.Context) {
+	if s.WhatsApp.Logs.DB == nil {
+		s.Logger.Warn("whatsapp queue processor: database connection is nil, skipping")
+		return
+	}
+	s.Logger.Info("whatsapp queue processor started")
+	for {
+		select {
+		case <-ctx.Done():
+			s.Logger.Info("whatsapp queue processor stopped")
+			return
+		default:
+			processed, err := s.WhatsApp.ProcessQueue(ctx)
+			if err != nil {
+				s.Logger.Error("queue processing encountered error", "error", err)
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			if processed {
+				throttleSecs, _ := s.Settings.GetInt(ctx, "wa_queue_throttle_seconds")
+				if throttleSecs <= 0 {
+					throttleSecs = 2 // default 2 seconds throttling
+				}
+				time.Sleep(time.Duration(throttleSecs) * time.Second)
+			} else {
+				// No pending messages, wait a short time before checking again
+				time.Sleep(500 * time.Millisecond)
 			}
 		}
 	}

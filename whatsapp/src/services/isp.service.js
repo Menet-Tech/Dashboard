@@ -69,17 +69,11 @@ const getPackageList = async () => {
     }
 };
 
-/**
- * Kirim notifikasi ke nomor-nomor admin via WhatsApp gateway sendiri
- * (dipanggil dari chatbot.service setelah client kirim "5" = minta chat admin)
- * @param {object} info  — { phone, contactName, accountId }
- * @param {Function} sendFn  — fungsi sendTextMessage dari whatsapp.service
- */
-const notifyAdminViaWA = async (info, sendFn) => {
+const notifyAdminViaWA = async (info, sendFn, customMsg = null) => {
     const adminNumbers = (process.env.ADMIN_WA_NUMBERS || '').split(',').map(n => n.trim()).filter(Boolean);
     const cleanPhone = info.phone.replace(/@c\.us$/, '').replace(/^\+/, '');
     const linkNumber = cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone.replace(/^0/, '');
-    const msg =
+    const msg = customMsg ||
 `WOI, ada yang chat ke admin nih
 Nomer : ${cleanPhone}
 Nama kontak : ${info.contactName || '(tidak diketahui)'}
@@ -95,17 +89,13 @@ GC GANTI NOMER KE SINI`;
     }
 };
 
-/**
- * Kirim notifikasi ke Discord webhook.
- * @param {object} info  — { phone, contactName }
- */
-const notifyAdminViaDiscord = async (info) => {
+const notifyAdminViaDiscord = async (info, customMsg = null) => {
     const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
     if (!webhookUrl) return;
     const cleanPhone = info.phone.replace(/@c\.us$/, '').replace(/^\+/, '');
     const linkNumber = cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone.replace(/^0/, '');
     const mention = process.env.DISCORD_ADMIN_ROLE_ID ? `<@&${process.env.DISCORD_ADMIN_ROLE_ID}>` : '@everyone';
-    const content =
+    const content = customMsg ? `${mention}\n${customMsg}` :
 `${mention}
 WOI, ada yang chat ke admin nih
 Nomer : ${cleanPhone}
@@ -120,10 +110,21 @@ GC GANTI NOMER KE SINI`;
     }
 };
 
+const createTicket = async (data) => {
+    try {
+        const res = await client.post('/api/v1/tickets', data);
+        return res.data?.data ?? null;
+    } catch (err) {
+        logger.error('[ISP] createTicket failed:', err.message);
+        return null;
+    }
+};
+
 module.exports = {
     findCustomerByPhone,
     getActiveBill,
     getPackageList,
     notifyAdminViaWA,
     notifyAdminViaDiscord,
+    createTicket,
 };
