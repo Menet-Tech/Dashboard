@@ -176,19 +176,19 @@ func querySummary() (dashboardSummary, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM customers`).Scan(&s.TotalCustomers); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pelanggan`).Scan(&s.TotalCustomers); err != nil {
 		return s, fmt.Errorf("count customers: %w", err)
 	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM customers WHERE status = 'active'`).Scan(&s.ActiveCustomers); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pelanggan WHERE status = 'active'`).Scan(&s.ActiveCustomers); err != nil {
 		return s, fmt.Errorf("count active customers: %w", err)
 	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM bills`).Scan(&s.TotalBills); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tagihan`).Scan(&s.TotalBills); err != nil {
 		return s, fmt.Errorf("count bills: %w", err)
 	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(SUM(amount),0) FROM bills WHERE status = 'belum_bayar'`).Scan(&s.UnpaidBills, &s.UnpaidAmount); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(SUM(nominal),0) FROM tagihan WHERE status = 'belum_bayar'`).Scan(&s.UnpaidBills, &s.UnpaidAmount); err != nil {
 		return s, fmt.Errorf("count unpaid bills: %w", err)
 	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM bills WHERE status = 'lunas'`).Scan(&s.PaidBills); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tagihan WHERE status = 'lunas'`).Scan(&s.PaidBills); err != nil {
 		return s, fmt.Errorf("count paid bills: %w", err)
 	}
 	return s, nil
@@ -207,11 +207,11 @@ func queryUnpaidBills(limit int) ([]billRow, error) {
 	defer cancel()
 
 	rows, err := db.QueryContext(ctx, `
-		SELECT b.invoice_number, c.name, b.period, b.amount, b.due_date
-		FROM bills b
-		JOIN customers c ON c.id = b.customer_id
+		SELECT b.invoice_number, c.nama, b.periode, b.nominal, b.jatuh_tempo
+		FROM tagihan b
+		JOIN pelanggan c ON c.id = b.pelanggan_id
 		WHERE b.status = 'belum_bayar'
-		ORDER BY b.due_date ASC
+		ORDER BY b.jatuh_tempo ASC
 		LIMIT ?
 	`, limit)
 	if err != nil {
@@ -243,11 +243,11 @@ func queryCustomers(name string) ([]customerRow, error) {
 	defer cancel()
 
 	rows, err := db.QueryContext(ctx, `
-		SELECT c.name, c.status, COALESCE(p.name,'—'), c.whatsapp, c.due_day
-		FROM customers c
-		LEFT JOIN packages p ON p.id = c.package_id
-		WHERE c.name LIKE ?
-		ORDER BY c.name
+		SELECT c.nama, c.status, COALESCE(p.nama,'—'), c.nomor_wa, c.tgl_jatuh_tempo
+		FROM pelanggan c
+		LEFT JOIN paket p ON p.id = c.paket_id
+		WHERE c.nama LIKE ?
+		ORDER BY c.nama
 		LIMIT 10
 	`, "%"+name+"%")
 	if err != nil {

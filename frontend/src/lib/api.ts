@@ -13,6 +13,11 @@ import type {
 } from "../types";
 
 let csrfToken = "";
+let onUnauthorizedCallback: (() => void) | null = null;
+
+export function registerOnUnauthorized(callback: () => void) {
+  onUnauthorizedCallback = callback;
+}
 
 function maybeStoreCSRF(payload: unknown) {
   if (
@@ -94,10 +99,12 @@ export type GenerateBillsPayload = {
 
 export class ApiError extends Error {
   status: number;
+  requestId?: string;
 
-  constructor(status: number, message: string) {
-    super(message);
+  constructor(status: number, message: string, requestId?: string) {
+    super(requestId ? `${message} (trace: ${requestId})` : message);
     this.status = status;
+    this.requestId = requestId;
   }
 }
 
@@ -121,9 +128,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     | null;
 
   if (!response.ok) {
+    if (response.status === 401) {
+      if (onUnauthorizedCallback) {
+        onUnauthorizedCallback();
+      }
+    }
+    const requestId = response.headers.get("X-Request-Id") ?? undefined;
     throw new ApiError(
       response.status,
       payload?.error ?? `Request failed: ${response.status}`,
+      requestId,
     );
   }
 

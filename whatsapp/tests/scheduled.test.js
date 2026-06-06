@@ -13,14 +13,39 @@ jest.mock('../src/whatsapp/client', () => ({
     scheduleReconnect: jest.fn(),
 }));
 jest.mock('../src/utils/database', () => ({
-    saveMessage: jest.fn(),
-    getMessages: jest.fn().mockReturnValue([]),
-    getMessageById: jest.fn().mockReturnValue(null),
-    getDb: jest.fn(),
+    ...(() => {
+        const scheduled = new Map();
+        return {
+            saveMessage: jest.fn(),
+            getMessages: jest.fn().mockReturnValue([]),
+            getMessageById: jest.fn().mockReturnValue(null),
+            getDb: jest.fn(),
+            saveScheduledMessage: jest.fn((entry) => {
+                const now = new Date().toISOString();
+                const saved = {
+                    ...entry,
+                    createdAt: entry.createdAt || now,
+                    updatedAt: now,
+                    lastSentAt: entry.lastSentAt || null,
+                };
+                scheduled.set(entry.id, saved);
+                return saved;
+            }),
+            updateScheduledMessage: jest.fn((id, changes) => {
+                const current = scheduled.get(id);
+                if (!current) return null;
+                const next = { ...current, ...changes, updatedAt: new Date().toISOString() };
+                scheduled.set(id, next);
+                return next;
+            }),
+            listScheduledMessages: jest.fn(() => Array.from(scheduled.values())),
+            listActiveScheduledMessages: jest.fn(() => Array.from(scheduled.values()).filter((entry) => ['active', 'pending', 'failed'].includes(entry.status))),
+        };
+    })(),
 }));
 
 const app = require('../src/app');
-const { createScheduledMessage, getAllScheduledMessages, cancelScheduledMessage } = require('../src/services/scheduledMessages.service');
+const { buildSchedule, createScheduledMessage, getAllScheduledMessages, cancelScheduledMessage } = require('../src/services/scheduledMessages.service');
 const API_KEY = process.env.API_KEY;
 
 describe('⏰ ScheduledMessages Service — Unit Tests', () => {
@@ -47,6 +72,18 @@ describe('⏰ ScheduledMessages Service — Unit Tests', () => {
         expect(result.type).toBe('monthly');
         // Cleanup
         cancelScheduledMessage(result.id);
+    });
+
+    it('harus menolak jadwal bulanan di tanggal tidak aman', () => {
+        expect(() => {
+            buildSchedule({ type: 'monthly', day: '31', time: '08:00' });
+        }).toThrow('1-28');
+    });
+
+    it('harus menolak jam bulanan invalid', () => {
+        expect(() => {
+            buildSchedule({ type: 'monthly', day: '7', time: '99:00' });
+        }).toThrow('HH:mm');
     });
 
     it('cancelScheduledMessage() harus return null jika ID tidak ditemukan', () => {

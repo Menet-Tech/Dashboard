@@ -30,10 +30,6 @@ router.use('/ai', aiRoutes);
 router.use('/autoreply', autoreplyRoutes);
 router.use('/chatbot', chatbotRoutes);
 
-// Endpoint status ringkas untuk Go backend integration check
-const { getStatus } = require('../../controllers/accounts.controller');
-router.get('/status', getStatus);
-
 // Terapkan readinessMiddleware hanya untuk rute yang butuh WA client
 router.use(readinessMiddleware);
 

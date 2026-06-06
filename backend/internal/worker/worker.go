@@ -25,6 +25,8 @@ type Service struct {
 	Backup   *backup.Service
 }
 
+const scheduledBillingLockTTL = 30 * time.Minute
+
 func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 	if interval <= 0 {
 		interval = time.Minute
@@ -35,24 +37,23 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 	if lockTTLSeconds <= 0 {
 		lockTTLSeconds = int(interval.Seconds())*3 + 60
 	}
-	leaseUntil := time.Now().UTC().Add(time.Duration(lockTTLSeconds) * time.Second).Format(time.RFC3339)
-	acquired, err := s.Settings.TryAcquireLease(ctx, "worker_lock", owner, leaseUntil)
+	acquiredLease, err := s.acquireWorkerLease(ctx, owner, lockTTLSeconds)
 	if err != nil {
-		return fmt.Errorf("acquire worker lease: %w", err)
-	}
-	if !acquired {
-		s.Logger.Warn("worker lease already held, skipping startup", "owner", owner)
-		return nil
+		return err
 	}
 	defer func() {
 		_ = s.Settings.ReleaseLease(context.Background(), "worker_lock", owner)
 	}()
 
-	if err := s.RunOnce(ctx); err != nil {
-		s.Logger.Error("worker run failed", "error", err)
-		if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
-			_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Worker Run Error**: %v", err))
+	if acquiredLease {
+		if err := s.RunOnce(ctx); err != nil {
+			s.Logger.Error("worker run failed", "error", err)
+			if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
+				_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Worker Run Error**: %v", err))
+			}
 		}
+	} else {
+		s.Logger.Warn("worker lease already held, waiting to acquire", "owner", owner)
 	}
 
 	ticker := time.NewTicker(interval)
@@ -63,16 +64,22 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			leaseUntil := time.Now().UTC().Add(time.Duration(lockTTLSeconds) * time.Second).Format(time.RFC3339)
-			acquired, err := s.Settings.TryAcquireLease(ctx, "worker_lock", owner, leaseUntil)
+			acquired, err := s.acquireWorkerLease(ctx, owner, lockTTLSeconds)
 			if err != nil {
 				s.Logger.Error("worker lease refresh failed", "error", err)
 				continue
 			}
 			if !acquired {
-				s.Logger.Warn("worker lease lost, stopping loop", "owner", owner)
-				return nil
+				if acquiredLease {
+					s.Logger.Warn("worker lease lost, waiting to reacquire", "owner", owner)
+				}
+				acquiredLease = false
+				continue
 			}
+			if !acquiredLease {
+				s.Logger.Info("worker lease acquired", "owner", owner)
+			}
+			acquiredLease = true
 			if err := s.RunOnce(ctx); err != nil {
 				s.Logger.Error("worker run failed", "error", err)
 				if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
@@ -81,6 +88,15 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 			}
 		}
 	}
+}
+
+func (s Service) acquireWorkerLease(ctx context.Context, owner string, lockTTLSeconds int) (bool, error) {
+	leaseUntil := time.Now().UTC().Add(time.Duration(lockTTLSeconds) * time.Second).Format(time.RFC3339)
+	acquired, err := s.Settings.TryAcquireLease(ctx, "worker_lock", owner, leaseUntil)
+	if err != nil {
+		return false, fmt.Errorf("acquire worker lease: %w", err)
+	}
+	return acquired, nil
 }
 
 func (s Service) RunOnce(ctx context.Context) error {
@@ -248,14 +264,20 @@ func (s Service) runScheduledBilling(ctx context.Context, now time.Time) error {
 		return nil
 	}
 
-	// Bug #25: use in-progress lock to prevent duplicate generation on crash+restart
-	inProgressPeriod, _ := s.Settings.GetString(ctx, "worker_billing_in_progress")
-	if inProgressPeriod == period {
+	inProgressValue, _ := s.Settings.GetString(ctx, "worker_billing_in_progress")
+	if billingInProgressActive(inProgressValue, period, now, scheduledBillingLockTTL) {
 		s.Logger.Info("scheduled billing: generation already in progress, skipping", "period", period)
 		return nil
 	}
-	// Mark as in-progress before attempting generation
-	_ = s.Settings.Set(ctx, "worker_billing_in_progress", period)
+
+	// Keep the marker crash-safe but time-bound. A failed process must not block
+	// billing generation for the entire month.
+	_ = s.Settings.Set(ctx, "worker_billing_in_progress", formatBillingInProgress(period, now))
+	defer func() {
+		// Success and handled failures both clear the marker. A real crash leaves
+		// the marker behind, where billingInProgressActive will expire it by TTL.
+		_ = s.Settings.Set(context.Background(), "worker_billing_in_progress", "")
+	}()
 
 	var lastErr error
 	for attempt := 1; attempt <= retryAttempts; attempt++ {
@@ -270,8 +292,6 @@ func (s Service) runScheduledBilling(ctx context.Context, now time.Time) error {
 			_ = s.Settings.Set(ctx, "worker_billing_last_error", "")
 			_ = s.Settings.Set(ctx, "worker_billing_last_success_period", period)
 			_ = s.Settings.Set(ctx, "worker_billing_retry_count", "0")
-			// Bug #25: clear in-progress lock on success
-			_ = s.Settings.Set(ctx, "worker_billing_in_progress", "")
 			s.Logger.Info("scheduled billing completed", "period", period, "generated", result.Generated, "attempt", attempt)
 			return nil
 		}
@@ -374,6 +394,34 @@ func waitRetryBackoff(ctx context.Context, duration time.Duration) error {
 	case <-timer.C:
 		return nil
 	}
+}
+
+func formatBillingInProgress(period string, now time.Time) string {
+	return period + "|" + now.UTC().Format(time.RFC3339)
+}
+
+func billingInProgressActive(value, period string, now time.Time, ttl time.Duration) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	parts := strings.SplitN(value, "|", 2)
+	if strings.TrimSpace(parts[0]) != period {
+		return false
+	}
+	if len(parts) != 2 {
+		// Legacy markers only stored the period and could deadlock generation
+		// forever after a failed attempt. Treat them as stale.
+		return false
+	}
+	startedAt, err := time.Parse(time.RFC3339, strings.TrimSpace(parts[1]))
+	if err != nil {
+		return false
+	}
+	if ttl <= 0 {
+		ttl = scheduledBillingLockTTL
+	}
+	return now.UTC().Before(startedAt.UTC().Add(ttl))
 }
 
 func workerOwner() string {

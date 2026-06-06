@@ -2,16 +2,17 @@ const { getClient, isReady } = require('../whatsapp/client');
 
 const getStatus = (req, res, next) => {
     try {
-        const ready = isReady();
+        const accountId = req.accountId || 'default';
+        const ready = isReady(accountId);
         if (!ready) {
-            return res.json({ status: 'ok', whatsapp_ready: false });
+            return res.json({ status: 'ok', account_id: accountId, whatsapp_ready: false });
         }
 
-        // Asumsikan kita punya client info
-        const client = getClient();
+        const client = getClient(accountId);
         const info = client.info || {};
         res.json({
             status: 'ok',
+            account_id: accountId,
             whatsapp_ready: true,
             user: info.pushname || 'Unknown',
             phone: info.wid ? info.wid._serialized : 'Unknown',

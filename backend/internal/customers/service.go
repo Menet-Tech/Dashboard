@@ -27,6 +27,11 @@ type Customer struct {
 	IsTrial        bool    `json:"is_trial"`
 	TrialStartedAt *string `json:"trial_started_at,omitempty"`
 	TrialDays      int     `json:"trial_days"`
+	Diskon         int     `json:"diskon"`
+	ReferredByID   *int64  `json:"referred_by_id,omitempty"`
+	ReferralBalance int     `json:"referral_balance"`
+	ReferralCode   string  `json:"referral_code,omitempty"`
+	ReferredByName string  `json:"referred_by_name,omitempty"`
 }
 
 type Repository struct {
@@ -119,9 +124,11 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),
 		       COALESCE(c.password_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
-		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days
+		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days,
+		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, '')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
+		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
 		ORDER BY c.id DESC
 	`)
 	if err != nil {
@@ -134,6 +141,9 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		var item Customer
 		var isTrial int
 		var trialStartedAt string
+		var referredByID sql.NullInt64
+		var referralCode sql.NullString
+		var referredByName sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.Name,
@@ -150,12 +160,26 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 			&isTrial,
 			&trialStartedAt,
 			&item.TrialDays,
+			&item.Diskon,
+			&referredByID,
+			&item.ReferralBalance,
+			&referralCode,
+			&referredByName,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
 		item.IsTrial = isTrial != 0
 		if trialStartedAt != "" {
 			item.TrialStartedAt = &trialStartedAt
+		}
+		if referredByID.Valid {
+			item.ReferredByID = &referredByID.Int64
+		}
+		if referralCode.Valid {
+			item.ReferralCode = referralCode.String
+		}
+		if referredByName.Valid {
+			item.ReferredByName = referredByName.String
 		}
 		items = append(items, item)
 	}
@@ -174,20 +198,58 @@ func (r Repository) Create(ctx context.Context, customer Customer) (Customer, er
 		trialDays = 3
 	}
 
-	result, err := r.DB.ExecContext(ctx, `
+	referralCode := strings.TrimSpace(customer.ReferralCode)
+	if referralCode == "" {
+		cleanName := ""
+		for _, char := range strings.ToUpper(customer.Name) {
+			if (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') {
+				cleanName += string(char)
+			}
+		}
+		if len(cleanName) > 6 {
+			cleanName = cleanName[:6]
+		}
+		referralCode = fmt.Sprintf("REF-%s-%d", cleanName, time.Now().UnixNano()%10000)
+	}
+
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return Customer{}, fmt.Errorf("begin create customer tx: %w", err)
+	}
+
+	result, err := tx.ExecContext(ctx, `
 		INSERT INTO pelanggan (
 			nama, paket_id, user_pppoe, password_pppoe, nomor_wa, sn_ont, tgl_jatuh_tempo, status, alamat,
-			is_trial, trial_started_at, trial_days, updated_at
+			is_trial, trial_started_at, trial_days, diskon, referred_by_id, referral_balance, referral_code, updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP)
-	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address, 1, trialDays)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address, 1, trialDays, customer.Diskon, customer.ReferredByID, customer.ReferralBalance, referralCode)
 	if err != nil {
+		_ = tx.Rollback()
 		return Customer{}, fmt.Errorf("create customer: %w", err)
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
+		_ = tx.Rollback()
 		return Customer{}, fmt.Errorf("get customer id: %w", err)
+	}
+
+	// Reward referrer
+	if customer.ReferredByID != nil {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE pelanggan
+			SET referral_balance = referral_balance + 50000, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, *customer.ReferredByID)
+		if err != nil {
+			_ = tx.Rollback()
+			return Customer{}, fmt.Errorf("reward referrer: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Customer{}, fmt.Errorf("commit create customer tx: %w", err)
 	}
 
 	customer.ID = id
@@ -195,6 +257,7 @@ func (r Repository) Create(ctx context.Context, customer Customer) (Customer, er
 	now := time.Now().UTC().Format(time.RFC3339)
 	customer.TrialStartedAt = &now
 	customer.TrialDays = trialDays
+	customer.ReferralCode = referralCode
 
 	return customer, nil
 }
@@ -206,9 +269,11 @@ func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Cu
 
 	result, err := r.DB.ExecContext(ctx, `
 		UPDATE pelanggan
-		SET nama = ?, paket_id = ?, user_pppoe = ?, password_pppoe = ?, nomor_wa = ?, sn_ont = ?, tgl_jatuh_tempo = ?, status = ?, alamat = ?, updated_at = CURRENT_TIMESTAMP
+		SET nama = ?, paket_id = ?, user_pppoe = ?, password_pppoe = ?, nomor_wa = ?, sn_ont = ?, tgl_jatuh_tempo = ?, status = ?, alamat = ?,
+		    diskon = ?, referred_by_id = ?, referral_balance = ?, referral_code = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address, id)
+	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address,
+		customer.Diskon, customer.ReferredByID, customer.ReferralBalance, customer.ReferralCode, id)
 	if err != nil {
 		return Customer{}, fmt.Errorf("update customer: %w", err)
 	}
@@ -266,9 +331,11 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),
 		       COALESCE(c.password_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
-		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days
+		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days,
+		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, '')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
+		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
 		WHERE c.is_trial = 1
 		  AND c.trial_started_at IS NOT NULL
 		  AND datetime(c.trial_started_at, '+' || c.trial_days || ' days') <= ?
@@ -284,6 +351,9 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 		var item Customer
 		var isTrial int
 		var trialStartedAt string
+		var referredByID sql.NullInt64
+		var referralCode sql.NullString
+		var referredByName sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.Name,
@@ -300,12 +370,26 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 			&isTrial,
 			&trialStartedAt,
 			&item.TrialDays,
+			&item.Diskon,
+			&referredByID,
+			&item.ReferralBalance,
+			&referralCode,
+			&referredByName,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
 		item.IsTrial = isTrial != 0
 		if trialStartedAt != "" {
 			item.TrialStartedAt = &trialStartedAt
+		}
+		if referredByID.Valid {
+			item.ReferredByID = &referredByID.Int64
+		}
+		if referralCode.Valid {
+			item.ReferralCode = referralCode.String
+		}
+		if referredByName.Valid {
+			item.ReferredByName = referredByName.String
 		}
 		items = append(items, item)
 	}

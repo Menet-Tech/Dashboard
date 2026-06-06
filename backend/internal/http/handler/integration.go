@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -34,8 +35,22 @@ func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Check WhatsApp
 	waGatewayURL, _ := h.Settings.GetString(ctx, settings.KeyWAGatewayURL)
+	trimmedWAGatewayURL := strings.TrimSpace(waGatewayURL)
+	if envValue := strings.TrimSpace(os.Getenv("WA_GATEWAY_URL")); envValue != "" && (trimmedWAGatewayURL == "" || trimmedWAGatewayURL == "http://localhost:3001") {
+		waGatewayURL = envValue
+	}
+	if strings.TrimSpace(waGatewayURL) == "" {
+		waGatewayURL = "http://localhost:3001"
+	}
 	waAPIKey, _ := h.Settings.GetString(ctx, settings.KeyWAAPIKey)
 	waAccountID, _ := h.Settings.GetString(ctx, settings.KeyWAAccountID)
+	trimmedWAAccountID := strings.TrimSpace(waAccountID)
+	if envValue := strings.TrimSpace(os.Getenv("WA_ACCOUNT_ID")); envValue != "" && (trimmedWAAccountID == "" || trimmedWAAccountID == "default") {
+		waAccountID = envValue
+	}
+	if strings.TrimSpace(waAccountID) == "" {
+		waAccountID = "default"
+	}
 
 	waStatus := "not_configured"
 	if strings.TrimSpace(waGatewayURL) != "" && strings.TrimSpace(waAPIKey) != "" {

@@ -325,7 +325,7 @@ func TestIntegrationHandlerCheck(t *testing.T) {
 		db := handlerTestDB(t)
 		svc := settings.Service{Repository: settings.Repository{DB: db}}
 
-		_ = svc.Set(context.Background(), settings.KeyWAGatewayURL, "http://invalid-gateway-url.local")
+		t.Setenv("WA_GATEWAY_URL", "http://invalid-gateway-url.local")
 		_ = svc.Set(context.Background(), settings.KeyWAAPIKey, "test-api-key")
 
 		whatsAppService := notifications.WhatsAppService{}
@@ -366,7 +366,7 @@ func TestIntegrationHandlerCheck(t *testing.T) {
 		db := handlerTestDB(t)
 		svc := settings.Service{Repository: settings.Repository{DB: db}}
 
-		_ = svc.Set(context.Background(), settings.KeyWAGatewayURL, "http://whatsapp.local")
+		t.Setenv("WA_GATEWAY_URL", "http://whatsapp.local")
 		_ = svc.Set(context.Background(), settings.KeyWAAPIKey, "test-api-key")
 		_ = svc.Set(context.Background(), settings.KeyDiscordWebhookURL, "http://discord.local")
 
@@ -423,7 +423,7 @@ func TestIntegrationHandlerCheck(t *testing.T) {
 		db := handlerTestDB(t)
 		svc := settings.Service{Repository: settings.Repository{DB: db}}
 
-		_ = svc.Set(context.Background(), settings.KeyWAGatewayURL, "http://wa-gateway.local")
+		t.Setenv("WA_GATEWAY_URL", "http://wa-gateway.local")
 		_ = svc.Set(context.Background(), settings.KeyWAAPIKey, "api-key-123")
 
 		whatsAppService := notifications.WhatsAppService{}
@@ -461,7 +461,7 @@ func TestIntegrationHandlerCheck(t *testing.T) {
 		db := handlerTestDB(t)
 		svc := settings.Service{Repository: settings.Repository{DB: db}}
 
-		_ = svc.Set(context.Background(), settings.KeyWAGatewayURL, "http://wa-gateway.local")
+		t.Setenv("WA_GATEWAY_URL", "http://wa-gateway.local")
 		_ = svc.Set(context.Background(), settings.KeyWAAPIKey, "api-key-123")
 
 		whatsAppService := notifications.WhatsAppService{}
@@ -499,7 +499,7 @@ func TestIntegrationHandlerCheck(t *testing.T) {
 		db := handlerTestDB(t)
 		svc := settings.Service{Repository: settings.Repository{DB: db}}
 
-		_ = svc.Set(context.Background(), settings.KeyWAGatewayURL, "http://wa-legacy.local")
+		t.Setenv("WA_GATEWAY_URL", "http://wa-legacy.local")
 		_ = svc.Set(context.Background(), settings.KeyWAAPIKey, "api-key-456")
 
 		whatsAppService := notifications.WhatsAppService{}
@@ -537,7 +537,7 @@ func TestIntegrationHandlerCheck(t *testing.T) {
 		db := handlerTestDB(t)
 		svc := settings.Service{Repository: settings.Repository{DB: db}}
 
-		_ = svc.Set(context.Background(), settings.KeyWAGatewayURL, "http://wa-unauthorized.local")
+		t.Setenv("WA_GATEWAY_URL", "http://wa-unauthorized.local")
 		_ = svc.Set(context.Background(), settings.KeyWAAPIKey, "bad-key")
 
 		whatsAppService := notifications.WhatsAppService{}
@@ -573,9 +573,9 @@ func TestIntegrationHandlerCheck(t *testing.T) {
 		db := handlerTestDB(t)
 		svc := settings.Service{Repository: settings.Repository{DB: db}}
 
-		_ = svc.Set(context.Background(), settings.KeyWAGatewayURL, "http://wa-multi.local")
+		t.Setenv("WA_GATEWAY_URL", "http://wa-multi.local")
 		_ = svc.Set(context.Background(), settings.KeyWAAPIKey, "api-key-multi")
-		_ = svc.Set(context.Background(), settings.KeyWAAccountID, "account-001")
+		t.Setenv("WA_ACCOUNT_ID", "account-001")
 
 		whatsAppService := notifications.WhatsAppService{}
 		discordService := &notifications.DiscordService{}

@@ -43,7 +43,11 @@ func (h SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for key, value := range payload {
-		if (key == settings.KeyWAGatewayURL || key == settings.KeyDiscordWebhookURL) && value != "" {
+		if !settings.IsAllowedKey(key) {
+			WriteError(w, http.StatusBadRequest, "Pengaturan tidak dikenal: "+key)
+			return
+		}
+		if (key == "wa_gateway_url" || key == settings.KeyDiscordWebhookURL) && value != "" {
 			if _, err := url.ParseRequestURI(value); err != nil {
 				WriteError(w, http.StatusBadRequest, "URL tidak valid untuk: "+key)
 				return

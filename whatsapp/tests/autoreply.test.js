@@ -47,6 +47,27 @@ describe('🤖 AutoReply Service — Unit Tests', () => {
         expect(findReply('minta info')).toBeNull();
     });
 
+    it('findReply() harus menghormati accountId spesifik', () => {
+        addRule('tagihan', 'Balasan billing', 'contains', { accountId: 'billing' });
+        addRule('tagihan', 'Balasan umum', 'contains', { accountId: 'support' });
+        expect(findReply('cek tagihan saya', 'billing')).toBe('Balasan billing');
+        expect(findReply('cek tagihan saya', 'support')).toBe('Balasan umum');
+        expect(findReply('cek tagihan saya', 'default')).toBeNull();
+    });
+
+    it('findReply() harus memprioritaskan rule akun spesifik dibanding rule global', () => {
+        addRule('rekening', 'Balasan global', 'contains', { accountId: '*' });
+        addRule('rekening', 'Balasan billing', 'contains', { accountId: 'billing' });
+        expect(findReply('minta rekening', 'billing')).toBe('Balasan billing');
+    });
+
+    it('findReply() mendukung endsWith dan regex', () => {
+        addRule('admin$', 'Regex admin', 'regex');
+        addRule('rekening', 'Ends rekening', 'endsWith');
+        expect(findReply('chat admin')).toBe('Regex admin');
+        expect(findReply('info rekening')).toBe('Ends rekening');
+    });
+
     it('findReply() harus return null jika tidak ada rule yang cocok', () => {
         expect(findReply('tidak ada yang cocok')).toBeNull();
     });
@@ -69,10 +90,11 @@ describe('🤖 AutoReply API — Integration Tests', () => {
         const res = await request(app)
             .post('/api/v1/autoreply')
             .set('X-API-Key', API_KEY)
-            .send({ keyword: 'stok', reply: 'Stok tersedia!', matchType: 'contains' });
+            .send({ accountId: 'billing', keyword: 'stok', reply: 'Stok tersedia!', matchType: 'contains' });
         expect(res.statusCode).toBe(200);
         expect(res.body.status).toBe('success');
         expect(res.body.data.keyword).toBe('stok');
+        expect(res.body.data.accountId).toBe('billing');
     });
 
     it('POST /api/v1/autoreply harus gagal jika keyword kosong (400)', async () => {
@@ -103,5 +125,20 @@ describe('🤖 AutoReply API — Integration Tests', () => {
             .set('X-API-Key', API_KEY);
         expect(del.statusCode).toBe(200);
         expect(del.body.status).toBe('success');
+    });
+
+    it('PATCH /api/v1/autoreply/:id harus menolak matchType tidak valid', async () => {
+        const create = await request(app)
+            .post('/api/v1/autoreply')
+            .set('X-API-Key', API_KEY)
+            .send({ keyword: 'ubah', reply: 'reply ubah' });
+        const id = create.body.data.id;
+
+        const res = await request(app)
+            .patch(`/api/v1/autoreply/${id}`)
+            .set('X-API-Key', API_KEY)
+            .send({ matchType: 'invalid' });
+
+        expect(res.statusCode).toBe(400);
     });
 });

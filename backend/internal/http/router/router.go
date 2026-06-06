@@ -30,6 +30,7 @@ import (
 func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Service) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
+	r.Use(traceIDHeader)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(15 * time.Second))

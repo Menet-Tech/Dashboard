@@ -6,10 +6,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
-	"log/slog"
 
 	"menettech/dashboard/backend/internal/settings"
 	"menettech/dashboard/backend/internal/templates"
@@ -55,16 +56,36 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 	if err != nil {
 		return err
 	}
+	trimmedURL := strings.TrimSpace(url)
+	if envValue := strings.TrimSpace(os.Getenv("WA_GATEWAY_URL")); envValue != "" && (trimmedURL == "" || trimmedURL == "http://localhost:3001") {
+		url = envValue
+	}
+	if strings.TrimSpace(url) == "" {
+		url = os.Getenv("WA_GATEWAY_URL")
+	}
+	if strings.TrimSpace(url) == "" {
+		url = "http://localhost:3001"
+	}
+	accountID, err := s.accountIDForTrigger(ctx, payload.TriggerKey)
+	if err != nil {
+		return err
+	}
+	trimmedAccountID := strings.TrimSpace(accountID)
+	if envValue := strings.TrimSpace(os.Getenv("WA_ACCOUNT_ID")); envValue != "" && (trimmedAccountID == "" || trimmedAccountID == "default") {
+		accountID = envValue
+	}
+	if strings.TrimSpace(accountID) == "" {
+		accountID = os.Getenv("WA_ACCOUNT_ID")
+	}
+	if strings.TrimSpace(accountID) == "" {
+		accountID = "default"
+	}
 	apiKey, err := s.Settings.GetString(ctx, settings.KeyWAAPIKey)
 	if err != nil {
 		return err
 	}
-	accountID, err := s.Settings.GetString(ctx, settings.KeyWAAccountID)
-	if err != nil {
-		return err
-	}
 
-	if strings.TrimSpace(url) == "" || strings.TrimSpace(apiKey) == "" {
+	if strings.TrimSpace(apiKey) == "" {
 		return nil
 	}
 
@@ -124,6 +145,31 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 	}
 
 	return nil
+}
+
+func (s WhatsAppService) accountIDForTrigger(ctx context.Context, triggerKey string) (string, error) {
+	settingKey := settings.KeyWAAccountID
+	switch triggerKey {
+	case "reminder_custom":
+		settingKey = settings.KeyWAReminderAccountID
+	case "jatuh_tempo", "trial_expired":
+		settingKey = settings.KeyWADueAccountID
+	case "limit_5hari":
+		settingKey = settings.KeyWALimitAccountID
+	case "lunas":
+		settingKey = settings.KeyWAPaymentAccountID
+	default:
+		settingKey = settings.KeyWABillingAccountID
+	}
+
+	accountID, err := s.Settings.GetString(ctx, settingKey)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(accountID) != "" {
+		return accountID, nil
+	}
+	return s.Settings.GetString(ctx, settings.KeyWAAccountID)
 }
 
 func (r NotificationLogRepository) AlreadySent(ctx context.Context, billID int64, triggerKey string) (bool, error) {

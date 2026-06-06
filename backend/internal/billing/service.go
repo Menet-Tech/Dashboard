@@ -18,22 +18,24 @@ import (
 var ErrBillNotFound = errors.New("bill not found")
 
 type Bill struct {
-	ID            int64   `json:"id"`
-	CustomerID    int64   `json:"customer_id"`
-	CustomerName  string  `json:"customer_name"`
-	CustomerPhone string  `json:"customer_phone,omitempty"`
-	PackageID     int64   `json:"package_id"`
-	PackageName   string  `json:"package_name"`
-	PackageSpeed  int     `json:"package_speed"`
-	Period        string  `json:"period"`
-	InvoiceNumber string  `json:"invoice_number"`
-	Amount        int     `json:"amount"`
-	DueDate       string  `json:"due_date"`
-	Status        string  `json:"status"`
-	DisplayStatus string  `json:"display_status"`
-	PaidAt        *string `json:"paid_at,omitempty"`
-	PaymentMethod string  `json:"payment_method,omitempty"`
-	ProofPath     *string `json:"proof_path,omitempty"`
+	ID             int64   `json:"id"`
+	CustomerID     int64   `json:"customer_id"`
+	CustomerName   string  `json:"customer_name"`
+	CustomerPhone  string  `json:"customer_phone,omitempty"`
+	PackageID      int64   `json:"package_id"`
+	PackageName    string  `json:"package_name"`
+	PackageSpeed   int     `json:"package_speed"`
+	Period         string  `json:"period"`
+	InvoiceNumber  string  `json:"invoice_number"`
+	Amount         int     `json:"amount"`
+	DueDate        string  `json:"due_date"`
+	Status         string  `json:"status"`
+	DisplayStatus  string  `json:"display_status"`
+	PaidAt         *string `json:"paid_at,omitempty"`
+	PaymentMethod  string  `json:"payment_method,omitempty"`
+	ProofPath      *string `json:"proof_path,omitempty"`
+	Diskon         int     `json:"diskon"`
+	DiskonReferral int     `json:"diskon_referral"`
 }
 
 type PaymentHistory struct {
@@ -415,14 +417,16 @@ func (s Service) getReminderDays(ctx context.Context) (int, error) {
 }
 
 type billCandidate struct {
-	CustomerID    int64
-	CustomerName  string
-	CustomerPhone string
-	PackageID     int64
-	PackageName   string
-	PackageSpeed  int
-	PackagePrice  int
-	DueDay        int
+	CustomerID      int64
+	CustomerName    string
+	CustomerPhone   string
+	PackageID       int64
+	PackageName     string
+	PackageSpeed    int
+	PackagePrice    int
+	DueDay          int
+	Diskon          int
+	ReferralBalance int
 }
 
 type automationCandidate struct {
@@ -436,7 +440,7 @@ func (r Repository) List(ctx context.Context, menunggakDays int, now time.Time) 
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT t.id, t.pelanggan_id, c.nama, COALESCE(c.nomor_wa, ''), t.paket_id, p.nama, p.kecepatan_mbps,
 		       t.periode, t.invoice_number, t.nominal, t.jatuh_tempo, t.status, t.paid_at,
-		       COALESCE(t.payment_method, ''), t.proof_path
+		       COALESCE(t.payment_method, ''), t.proof_path, t.diskon, t.diskon_referral
 		FROM tagihan t
 		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
 		INNER JOIN paket p ON p.id = t.paket_id
@@ -463,7 +467,7 @@ func (r Repository) FindByID(ctx context.Context, billID int64, menunggakDays in
 	row := r.DB.QueryRowContext(ctx, `
 		SELECT t.id, t.pelanggan_id, c.nama, COALESCE(c.nomor_wa, ''), t.paket_id, p.nama, p.kecepatan_mbps,
 		       t.periode, t.invoice_number, t.nominal, t.jatuh_tempo, t.status, t.paid_at,
-		       COALESCE(t.payment_method, ''), t.proof_path, COALESCE(c.alamat, ''), c.status
+		       COALESCE(t.payment_method, ''), t.proof_path, COALESCE(c.alamat, ''), c.status, t.diskon, t.diskon_referral
 		FROM tagihan t
 		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
 		INNER JOIN paket p ON p.id = t.paket_id
@@ -492,6 +496,8 @@ func (r Repository) FindByID(ctx context.Context, billID int64, menunggakDays in
 		&proofPath,
 		&item.CustomerAddress,
 		&item.CustomerStatus,
+		&item.Diskon,
+		&item.DiskonReferral,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return BillDetail{}, ErrBillNotFound
@@ -553,14 +559,45 @@ func (r Repository) Generate(ctx context.Context, period string) (int, error) {
 			serial,
 		)
 
+		diskon := candidate.Diskon
+		if diskon < 0 {
+			diskon = 0
+		}
+		afterDiskon := candidate.PackagePrice - diskon
+		if afterDiskon < 0 {
+			afterDiskon = 0
+		}
+
+		diskonReferral := candidate.ReferralBalance
+		if diskonReferral > afterDiskon {
+			diskonReferral = afterDiskon
+		}
+		if diskonReferral < 0 {
+			diskonReferral = 0
+		}
+
+		finalAmount := afterDiskon - diskonReferral
+
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO tagihan (
-				pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status, updated_at
+				pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status, diskon, diskon_referral, updated_at
 			)
-			VALUES (?, ?, ?, ?, ?, ?, 'belum_bayar', CURRENT_TIMESTAMP)
-		`, candidate.CustomerID, candidate.PackageID, period, invoiceNumber, candidate.PackagePrice, dueDate.Format("2006-01-02")); err != nil {
+			VALUES (?, ?, ?, ?, ?, ?, 'belum_bayar', ?, ?, CURRENT_TIMESTAMP)
+		`, candidate.CustomerID, candidate.PackageID, period, invoiceNumber, finalAmount, dueDate.Format("2006-01-02"), diskon, diskonReferral); err != nil {
 			_ = tx.Rollback()
 			return 0, fmt.Errorf("insert generated bill: %w", err)
+		}
+
+		if diskonReferral > 0 {
+			_, err = tx.ExecContext(ctx, `
+				UPDATE pelanggan
+				SET referral_balance = referral_balance - ?, updated_at = CURRENT_TIMESTAMP
+				WHERE id = ?
+			`, diskonReferral, candidate.CustomerID)
+			if err != nil {
+				_ = tx.Rollback()
+				return 0, fmt.Errorf("deduct referral balance: %w", err)
+			}
 		}
 
 		generated++
@@ -613,12 +650,31 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 		serial,
 	)
 
+	diskon := candidate.Diskon
+	if diskon < 0 {
+		diskon = 0
+	}
+	afterDiskon := candidate.PackagePrice - diskon
+	if afterDiskon < 0 {
+		afterDiskon = 0
+	}
+
+	diskonReferral := candidate.ReferralBalance
+	if diskonReferral > afterDiskon {
+		diskonReferral = afterDiskon
+	}
+	if diskonReferral < 0 {
+		diskonReferral = 0
+	}
+
+	finalAmount := afterDiskon - diskonReferral
+
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO tagihan (
-			pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status, updated_at
+			pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status, diskon, diskon_referral, updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, 'belum_bayar', CURRENT_TIMESTAMP)
-	`, candidate.CustomerID, candidate.PackageID, period, invoiceNumber, candidate.PackagePrice, dueDate.Format("2006-01-02"))
+		VALUES (?, ?, ?, ?, ?, ?, 'belum_bayar', ?, ?, CURRENT_TIMESTAMP)
+	`, candidate.CustomerID, candidate.PackageID, period, invoiceNumber, finalAmount, dueDate.Format("2006-01-02"), diskon, diskonReferral)
 	if err != nil {
 		_ = tx.Rollback()
 		return Bill{}, false, fmt.Errorf("insert single generated bill: %w", err)
@@ -630,24 +686,38 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 		return Bill{}, false, fmt.Errorf("single generated bill id: %w", err)
 	}
 
+	if diskonReferral > 0 {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE pelanggan
+			SET referral_balance = referral_balance - ?, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, diskonReferral, candidate.CustomerID)
+		if err != nil {
+			_ = tx.Rollback()
+			return Bill{}, false, fmt.Errorf("deduct referral balance: %w", err)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return Bill{}, false, fmt.Errorf("commit single generated bill: %w", err)
 	}
 
 	return Bill{
-		ID:            billID,
-		CustomerID:    candidate.CustomerID,
-		CustomerName:  candidate.CustomerName,
-		CustomerPhone: candidate.CustomerPhone,
-		PackageID:     candidate.PackageID,
-		PackageName:   candidate.PackageName,
-		PackageSpeed:  candidate.PackageSpeed,
-		Period:        period,
-		InvoiceNumber: invoiceNumber,
-		Amount:        candidate.PackagePrice,
-		DueDate:       dueDate.Format("2006-01-02"),
-		Status:        "belum_bayar",
-		DisplayStatus: computeDisplayStatus("belum_bayar", dueDate.Format("2006-01-02"), menunggakDays, now),
+		ID:             billID,
+		CustomerID:     candidate.CustomerID,
+		CustomerName:   candidate.CustomerName,
+		CustomerPhone:  candidate.CustomerPhone,
+		PackageID:      candidate.PackageID,
+		PackageName:    candidate.PackageName,
+		PackageSpeed:   candidate.PackageSpeed,
+		Period:         period,
+		InvoiceNumber:  invoiceNumber,
+		Amount:         finalAmount,
+		DueDate:        dueDate.Format("2006-01-02"),
+		Status:         "belum_bayar",
+		DisplayStatus:  computeDisplayStatus("belum_bayar", dueDate.Format("2006-01-02"), menunggakDays, now),
+		Diskon:         diskon,
+		DiskonReferral: diskonReferral,
 	}, true, nil
 }
 
@@ -841,7 +911,8 @@ func (r Repository) UpdateCustomerStatus(ctx context.Context, customerID int64, 
 
 func (r Repository) findCandidates(ctx context.Context, period string) ([]billCandidate, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo
+		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo,
+		       c.diskon, c.referral_balance
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		WHERE c.status IN ('active', 'limit')
@@ -871,6 +942,8 @@ func (r Repository) findCandidates(ctx context.Context, period string) ([]billCa
 			&item.PackageSpeed,
 			&item.PackagePrice,
 			&item.DueDay,
+			&item.Diskon,
+			&item.ReferralBalance,
 		); err != nil {
 			return nil, fmt.Errorf("scan bill candidate: %w", err)
 		}
@@ -882,7 +955,8 @@ func (r Repository) findCandidates(ctx context.Context, period string) ([]billCa
 
 func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int64, period string) (billCandidate, bool, error) {
 	row := r.DB.QueryRowContext(ctx, `
-		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo
+		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo,
+		       c.diskon, c.referral_balance
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		WHERE c.id = ?
@@ -906,6 +980,8 @@ func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int
 		&item.PackageSpeed,
 		&item.PackagePrice,
 		&item.DueDay,
+		&item.Diskon,
+		&item.ReferralBalance,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return billCandidate{}, false, nil
@@ -920,7 +996,7 @@ func (r Repository) FindByCustomerAndPeriod(ctx context.Context, customerID int6
 	row := r.DB.QueryRowContext(ctx, `
 		SELECT t.id, t.pelanggan_id, c.nama, COALESCE(c.nomor_wa, ''), t.paket_id, p.nama, p.kecepatan_mbps,
 		       t.periode, t.invoice_number, t.nominal, t.jatuh_tempo, t.status, t.paid_at,
-		       COALESCE(t.payment_method, ''), t.proof_path
+		       COALESCE(t.payment_method, ''), t.proof_path, t.diskon, t.diskon_referral
 		FROM tagihan t
 		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
 		INNER JOIN paket p ON p.id = t.paket_id
@@ -998,6 +1074,8 @@ func scanBill(scanner interface {
 		&paidAt,
 		&item.PaymentMethod,
 		&proofPath,
+		&item.Diskon,
+		&item.DiskonReferral,
 	); err != nil {
 		return Bill{}, fmt.Errorf("scan bill: %w", err)
 	}

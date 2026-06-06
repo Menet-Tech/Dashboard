@@ -19,20 +19,30 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			reqID := middleware.GetReqID(r.Context())
-			
+
 			recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(recorder, r)
-			
+
 			if logger != nil {
-				logger.Debug("request completed", 
-					"request_id", reqID, 
-					"method", r.Method, 
-					"path", r.URL.Path, 
-					"status", recorder.status, 
+				logger.Debug("request completed",
+					"request_id", reqID,
+					"method", r.Method,
+					"path", r.URL.Path,
+					"status", recorder.status,
 					"duration", time.Since(start))
 			}
 		})
 	}
+}
+
+func traceIDHeader(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqID := middleware.GetReqID(r.Context())
+		if strings.TrimSpace(reqID) != "" {
+			w.Header().Set("X-Request-Id", reqID)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func authMiddleware(authService auth.Service) func(http.Handler) http.Handler {

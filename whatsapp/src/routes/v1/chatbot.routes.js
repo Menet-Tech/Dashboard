@@ -1,6 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const { getAllSessions, deleteSession, getForms } = require('../../utils/database');
+const { getAllSessions, deleteSession, getForms, getGatewaySettings, setGatewaySetting } = require('../../utils/database');
 
 /**
  * GET /api/v1/chatbot/sessions
@@ -29,6 +29,29 @@ router.get('/forms', (req, res) => {
     const { type, limit } = req.query;
     const forms = getForms(type || null, parseInt(limit, 10) || 50);
     res.json({ status: 'success', count: forms.length, data: forms });
+});
+
+router.get('/settings', (req, res) => {
+    const settings = getGatewaySettings();
+    res.json({
+        status: 'success',
+        data: {
+            chatbot_account_id: settings.chatbot_account_id || '*',
+            auto_reply_account_id: settings.auto_reply_account_id || '*',
+            auto_reply_before_chatbot: settings.auto_reply_before_chatbot || '1',
+        },
+    });
+});
+
+router.put('/settings', (req, res) => {
+    const allowed = ['chatbot_account_id', 'auto_reply_account_id', 'auto_reply_before_chatbot'];
+    const result = {};
+    for (const key of allowed) {
+        if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+            result[key] = setGatewaySetting(key, String(req.body[key] ?? '')).value;
+        }
+    }
+    res.json({ status: 'success', message: 'Pengaturan chatbot diperbarui', data: result });
 });
 
 module.exports = router;

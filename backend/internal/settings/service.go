@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -14,14 +15,21 @@ const (
 	KeyLimitDays             = "billing_limit_days"
 	KeyMenunggakDays         = "billing_menunggak_days"
 	KeyTrialGraceDays        = "trial_overdue_grace_days"
+	KeyTrialPeriodDays       = "trial_period_days"
+	KeyTrialAutoGenerate     = "trial_auto_generate_bills"
 	KeyBillingAutoEnabled    = "billing_auto_generate_enabled"
 	KeyBillingGenerateDay    = "billing_generate_day"
 	KeyBillingGenerateTime   = "billing_generate_time"
 	KeyBillingRetryAttempts  = "billing_generate_retry_attempts"
 	KeyBillingRetryBackoff   = "billing_generate_retry_backoff_seconds"
 	KeyWAGatewayURL          = "wa_gateway_url"
-	KeyWAAPIKey              = "wa_api_key"
 	KeyWAAccountID           = "wa_account_id"
+	KeyWABillingAccountID    = "wa_billing_account_id"
+	KeyWAReminderAccountID   = "wa_reminder_account_id"
+	KeyWADueAccountID        = "wa_due_account_id"
+	KeyWALimitAccountID      = "wa_limit_account_id"
+	KeyWAPaymentAccountID    = "wa_payment_account_id"
+	KeyWAAPIKey              = "wa_api_key"
 	KeyWorkerIntervalSecs    = "worker_interval_seconds"
 	KeyWorkerLockTTLSeconds  = "worker_lock_ttl_seconds"
 	KeyBackupAutoEnabled     = "backup_auto_enabled"
@@ -42,14 +50,21 @@ var defaults = map[string]string{
 	KeyLimitDays:             "5",
 	KeyMenunggakDays:         "30",
 	KeyTrialGraceDays:        "7",
+	KeyTrialPeriodDays:       "3",
+	KeyTrialAutoGenerate:     "1",
 	KeyBillingAutoEnabled:    "1",
 	KeyBillingGenerateDay:    "1",
 	KeyBillingGenerateTime:   "00:05",
 	KeyBillingRetryAttempts:  "3",
 	KeyBillingRetryBackoff:   "2",
-	KeyWAGatewayURL:          "",
-	KeyWAAPIKey:              "",
+	KeyWAGatewayURL:          "http://localhost:3001",
 	KeyWAAccountID:           "default",
+	KeyWABillingAccountID:    "",
+	KeyWAReminderAccountID:   "",
+	KeyWADueAccountID:        "",
+	KeyWALimitAccountID:      "",
+	KeyWAPaymentAccountID:    "",
+	KeyWAAPIKey:              "",
 	KeyWorkerIntervalSecs:    "60",
 	KeyWorkerLockTTLSeconds:  "180",
 	KeyBackupAutoEnabled:     "1",
@@ -65,6 +80,19 @@ var defaults = map[string]string{
 	KeyMikrotikTestUsername:  "test-user",
 }
 
+func IsAllowedKey(key string) bool {
+	_, ok := defaults[key]
+	if ok {
+		return true
+	}
+	switch {
+	case strings.HasPrefix(key, "worker_"):
+		return true
+	default:
+		return false
+	}
+}
+
 type Repository struct {
 	DB *sql.DB
 }
@@ -76,9 +104,19 @@ type Service struct {
 func (s Service) GetString(ctx context.Context, key string) (string, error) {
 	value, err := s.Repository.GetString(ctx, key)
 	if err == nil {
+		if key == KeyWAAPIKey && strings.TrimSpace(value) == "" {
+			if envVal := os.Getenv("DASHBOARD_INTERNAL_API_KEY"); envVal != "" {
+				return envVal, nil
+			}
+		}
 		return value, nil
 	}
 	if err == sql.ErrNoRows {
+		if key == KeyWAAPIKey {
+			if envVal := os.Getenv("DASHBOARD_INTERNAL_API_KEY"); envVal != "" {
+				return envVal, nil
+			}
+		}
 		return defaults[key], nil
 	}
 	return "", err
@@ -113,10 +151,18 @@ func (s Service) GetAll(ctx context.Context) (map[string]string, error) {
 	for k, v := range dbSettings {
 		result[k] = v
 	}
+	if strings.TrimSpace(result[KeyWAAPIKey]) == "" {
+		if envVal := os.Getenv("DASHBOARD_INTERNAL_API_KEY"); envVal != "" {
+			result[KeyWAAPIKey] = envVal
+		}
+	}
 	return result, nil
 }
 
 func (s Service) Set(ctx context.Context, key, value string) error {
+	if !IsAllowedKey(key) {
+		return fmt.Errorf("unknown setting key: %s", key)
+	}
 	return s.Repository.Set(ctx, key, value)
 }
 

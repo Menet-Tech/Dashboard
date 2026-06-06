@@ -54,7 +54,11 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	backupEnabledValue, _ := h.Settings.GetString(ctx, settings.KeyBackupAutoEnabled)
 	backupTime, _ := h.Settings.GetString(ctx, settings.KeyBackupAutoTime)
 	backupRetention, _ := h.Settings.GetInt(ctx, settings.KeyBackupRetentionCount)
+	lastBackupAt, _ := h.Settings.GetString(ctx, "worker_last_backup_at")
 	lastBackupDate, _ := h.Settings.GetString(ctx, "worker_last_backup_date")
+	if strings.TrimSpace(lastBackupDate) == "" {
+		lastBackupDate = backupDateFromTimestamp(lastBackupAt)
+	}
 	lastBackupFilename, _ := h.Settings.GetString(ctx, "worker_last_backup_filename")
 	billingAutoEnabledValue, _ := h.Settings.GetString(ctx, settings.KeyBillingAutoEnabled)
 	billingDay, _ := h.Settings.GetInt(ctx, settings.KeyBillingGenerateDay)
@@ -70,6 +74,9 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	billingRetryCount, _ := h.Settings.GetString(ctx, "worker_billing_retry_count")
 	billingNextRun, _ := h.Settings.GetString(ctx, "worker_billing_next_run")
 	waGatewayURL, _ := h.Settings.GetString(ctx, settings.KeyWAGatewayURL)
+	if strings.TrimSpace(waGatewayURL) == "" {
+		waGatewayURL = "http://localhost:3001"
+	}
 	waAPIKey, _ := h.Settings.GetString(ctx, settings.KeyWAAPIKey)
 	discordWebhookURL, _ := h.Settings.GetString(ctx, settings.KeyDiscordWebhookURL)
 	mikrotikHost, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
@@ -184,6 +191,7 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 			"enabled":         backupEnabled,
 			"scheduled_time":  backupTime,
 			"last_run_date":   lastBackupDate,
+			"last_run_at":     lastBackupAt,
 			"last_filename":   lastBackupFilename,
 			"retention_count": backupRetention,
 		},
@@ -249,6 +257,18 @@ func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 		"message":   "ready",
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
+}
+
+func backupDateFromTimestamp(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return ""
+	}
+	return parsed.UTC().Format("2006-01-02")
 }
 
 func atoiDefault(value string, fallback int) int {
