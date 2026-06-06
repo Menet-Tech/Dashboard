@@ -4,14 +4,21 @@ import type { GatewayAccount, GatewayMessage } from "../lib/gatewayApi";
 
 type UseWhatsAppGatewayProps = {
   gatewayUrl?: string;
+  apiKey?: string;
   onChatMessage?: (message: GatewayMessage) => void;
 };
 
-export function useWhatsAppGateway({ gatewayUrl, onChatMessage }: UseWhatsAppGatewayProps) {
+export function useWhatsAppGateway({ gatewayUrl, apiKey, onChatMessage }: UseWhatsAppGatewayProps) {
   const [socketConnected, setSocketConnected] = useState(false);
   const [accounts, setAccounts] = useState<GatewayAccount[]>([]);
   const [qrs, setQrs] = useState<Record<string, string>>({});
   const socketRef = useRef<Socket | null>(null);
+
+  // Use a ref to store the latest callback to avoid dependency changes triggering re-connection
+  const onChatMessageRef = useRef(onChatMessage);
+  useEffect(() => {
+    onChatMessageRef.current = onChatMessage;
+  }, [onChatMessage]);
 
   useEffect(() => {
     if (!gatewayUrl) {
@@ -23,6 +30,8 @@ export function useWhatsAppGateway({ gatewayUrl, onChatMessage }: UseWhatsAppGat
     const socket = io(gatewayUrl, {
       transports: ["websocket", "polling"],
       reconnectionAttempts: 10,
+      auth: apiKey ? { apiKey } : undefined,
+      extraHeaders: apiKey ? { "X-API-Key": apiKey } : undefined,
     });
 
     socketRef.current = socket;
@@ -85,8 +94,8 @@ export function useWhatsAppGateway({ gatewayUrl, onChatMessage }: UseWhatsAppGat
     });
 
     socket.on("chat_message", (message: GatewayMessage) => {
-      if (onChatMessage) {
-        onChatMessage(message);
+      if (onChatMessageRef.current) {
+        onChatMessageRef.current(message);
       }
     });
 
@@ -94,7 +103,7 @@ export function useWhatsAppGateway({ gatewayUrl, onChatMessage }: UseWhatsAppGat
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [gatewayUrl, onChatMessage]);
+  }, [gatewayUrl, apiKey]);
 
   return {
     socketConnected,

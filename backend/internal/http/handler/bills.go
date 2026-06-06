@@ -32,6 +32,9 @@ type billPayPayload struct {
 	Method string `json:"method"`
 }
 
+var errUploadTooLarge = errors.New("upload too large")
+var errUploadTypeNotAllowed = errors.New("upload file type not allowed")
+
 func NewBillHandler(service billing.Service, appName, storagePath string) BillHandler {
 	return BillHandler{Service: service, AppName: appName, StoragePath: storagePath}
 }
@@ -147,16 +150,22 @@ func (h BillHandler) UploadProof(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Bug #17: size validation + io.LimitReader
 	const maxUploadSize = 5 << 20 // 5 MB limit
 	if header.Size > maxUploadSize {
 		WriteError(w, http.StatusBadRequest, "file size exceeds limit of 5MB")
 		return
 	}
-	limitedReader := io.LimitReader(file, maxUploadSize)
 
-	proofPath, err := h.storeProofFile(limitedReader, header.Filename)
+	proofPath, err := h.storeProofFile(file, header.Filename, maxUploadSize)
 	if err != nil {
+		if errors.Is(err, errUploadTooLarge) {
+			WriteError(w, http.StatusBadRequest, "file size exceeds limit of 5MB")
+			return
+		}
+		if errors.Is(err, errUploadTypeNotAllowed) {
+			WriteError(w, http.StatusBadRequest, "file type is not allowed")
+			return
+		}
 		WriteError(w, http.StatusInternalServerError, "failed to store proof file")
 		return
 	}
@@ -176,9 +185,17 @@ func (h BillHandler) UploadProof(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h BillHandler) storeProofFile(source io.Reader, originalName string) (string, error) {
+func (h BillHandler) storeProofFile(source io.Reader, originalName string, maxSize int64) (string, error) {
 	// Bug #10: Validate original filename to prevent path traversal
 	originalName = filepath.Base(originalName)
+
+	data, err := io.ReadAll(io.LimitReader(source, maxSize+1))
+	if err != nil {
+		return "", err
+	}
+	if int64(len(data)) > maxSize {
+		return "", errUploadTooLarge
+	}
 
 	directory := filepath.Join(h.StoragePath, "uploads", "payment-proofs")
 	if err := os.MkdirAll(directory, 0o755); err != nil {
@@ -186,6 +203,9 @@ func (h BillHandler) storeProofFile(source io.Reader, originalName string) (stri
 	}
 
 	extension := filepath.Ext(originalName)
+	if !allowedProofContentType(http.DetectContentType(data), safeExtension(extension)) {
+		return "", errUploadTypeNotAllowed
+	}
 	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), safeExtension(extension))
 	targetPath := filepath.Join(directory, filename)
 
@@ -202,17 +222,26 @@ func (h BillHandler) storeProofFile(source io.Reader, originalName string) (stri
 		return "", fmt.Errorf("invalid path traversal attempt")
 	}
 
-	target, err := os.Create(targetPath)
-	if err != nil {
-		return "", err
-	}
-	defer target.Close()
-
-	if _, err := io.Copy(target, source); err != nil {
+	if err := os.WriteFile(targetPath, data, 0o644); err != nil {
 		return "", err
 	}
 
 	return "/uploads/payment-proofs/" + filename, nil
+}
+
+func allowedProofContentType(contentType, extension string) bool {
+	switch extension {
+	case ".jpg", ".jpeg":
+		return strings.HasPrefix(contentType, "image/jpeg")
+	case ".png":
+		return strings.HasPrefix(contentType, "image/png")
+	case ".webp":
+		return strings.HasPrefix(contentType, "image/webp")
+	case ".pdf":
+		return contentType == "application/pdf" || contentType == "application/octet-stream"
+	default:
+		return false
+	}
 }
 
 func safeExtension(value string) string {

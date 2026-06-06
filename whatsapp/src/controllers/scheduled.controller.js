@@ -10,7 +10,7 @@ const scheduleMessage = (req, res, next) => {
         let config = { type: type || 'once' };
         if (config.type === 'monthly') {
             if (!day || !time) return res.status(400).json({ status: 'error', message: 'Untuk tipe monthly, day dan time wajib diisi' });
-            config.day = day;
+            config.day = Number(day);
             config.time = time;
         } else {
             if (!scheduledAt) return res.status(400).json({ status: 'error', message: 'Field scheduledAt wajib diisi untuk tipe once' });

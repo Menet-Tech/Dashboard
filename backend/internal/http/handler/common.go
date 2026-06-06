@@ -15,10 +15,14 @@ func WriteJSON(w http.ResponseWriter, status int, data any) {
 }
 
 func WriteError(w http.ResponseWriter, status int, message string) {
-	WriteJSON(w, status, map[string]any{
+	payload := map[string]any{
 		"success": false,
 		"error":   message,
-	})
+	}
+	if requestID := w.Header().Get("X-Request-Id"); requestID != "" {
+		payload["request_id"] = requestID
+	}
+	WriteJSON(w, status, payload)
 }
 
 func decodeJSON(r *http.Request, destination any) error {

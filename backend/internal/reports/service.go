@@ -29,12 +29,12 @@ func (s Service) MonthlyRevenue(ctx context.Context, limit int) ([]RevenueItem, 
 	}
 
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT period, 
-		       COALESCE(SUM(amount), 0) as total_billed,
-		       COALESCE(SUM(CASE WHEN status = 'lunas' THEN amount ELSE 0 END), 0) as total_paid
-		FROM bills
-		GROUP BY period
-		ORDER BY period DESC
+		SELECT periode, 
+		       COALESCE(SUM(nominal), 0) as total_billed,
+		       COALESCE(SUM(CASE WHEN status = 'lunas' THEN nominal ELSE 0 END), 0) as total_paid
+		FROM tagihan
+		GROUP BY periode
+		ORDER BY periode DESC
 		LIMIT ?
 	`, limit)
 	if err != nil {
@@ -57,11 +57,11 @@ func (s Service) Aging(ctx context.Context) (AgingReport, error) {
 	var report AgingReport
 	row := s.DB.QueryRowContext(ctx, `
 		SELECT 
-			COALESCE(SUM(CASE WHEN due_date >= DATE('now') THEN amount ELSE 0 END), 0) as current,
-			COALESCE(SUM(CASE WHEN due_date < DATE('now') AND due_date >= DATE('now', '-30 days') THEN amount ELSE 0 END), 0) as days_1_30,
-			COALESCE(SUM(CASE WHEN due_date < DATE('now', '-30 days') AND due_date >= DATE('now', '-60 days') THEN amount ELSE 0 END), 0) as days_31_60,
-			COALESCE(SUM(CASE WHEN due_date < DATE('now', '-60 days') THEN amount ELSE 0 END), 0) as over_60
-		FROM bills
+			COALESCE(SUM(CASE WHEN jatuh_tempo >= DATE('now') THEN nominal ELSE 0 END), 0) as current,
+			COALESCE(SUM(CASE WHEN jatuh_tempo < DATE('now') AND jatuh_tempo >= DATE('now', '-30 days') THEN nominal ELSE 0 END), 0) as days_1_30,
+			COALESCE(SUM(CASE WHEN jatuh_tempo < DATE('now', '-30 days') AND jatuh_tempo >= DATE('now', '-60 days') THEN nominal ELSE 0 END), 0) as days_31_60,
+			COALESCE(SUM(CASE WHEN jatuh_tempo < DATE('now', '-60 days') THEN nominal ELSE 0 END), 0) as over_60
+		FROM tagihan
 		WHERE status = 'belum_bayar'
 	`)
 	if err := row.Scan(&report.Current, &report.Days1_30, &report.Days31_60, &report.Over60); err != nil {

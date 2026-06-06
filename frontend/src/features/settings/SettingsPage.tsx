@@ -1,7 +1,8 @@
-import type { FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { inputClassName, renderInlineError } from "../../components/ui";
 import type { FieldErrors } from "../../utils/validation";
 import type { SettingsState } from "../../types";
+import { getGatewayAccounts } from "../../lib/gatewayApi";
 
 type SettingsPageProps = {
   settingsForm: SettingsState;
@@ -22,6 +23,29 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
 
+  const gatewayUrl = settingsForm.wa_gateway_url || "http://localhost:3001";
+  const apiKey = settingsForm.wa_api_key || "";
+  const [accounts, setAccounts] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!gatewayUrl || !apiKey) return;
+    let active = true;
+    async function load() {
+      try {
+        const res = await getGatewayAccounts(gatewayUrl, apiKey);
+        if (active) {
+          setAccounts(res.data.map((a) => a.accountId));
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [gatewayUrl, apiKey]);
+
   return (
     <section className="grid">
       <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
@@ -34,33 +58,179 @@ export function SettingsPage({
             <h4 className="text-sm font-bold text-indigo-600 uppercase tracking-wider">WhatsApp Gateway</h4>
           </div>
 
+          {/* Status info card for the JS gateway bridge used by billing automation. */}
+          <div className="col-span-full bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
+            <div className="bg-emerald-100 text-emerald-600 rounded-full p-2 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.61 4.46a2 2 0 0 1 1.99-2.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.18 6.18l.95-.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.02z"/></svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-emerald-800">Gateway Terintegrasi</p>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                WhatsApp Gateway berjalan sebagai service JS terpisah. Dashboard Go memakai URL dan Account ID di bawah ini untuk billing otomatis.
+                Default lokal: <code className="bg-emerald-100 px-1 rounded">http://localhost:3001</code>.
+              </p>
+            </div>
+          </div>
+
           <label>
             <span>Gateway URL</span>
             <input
-              className={inputClassName()}
+              className={inputClassName(settingsErrors.wa_gateway_url)}
               type="text"
-              value={settingsForm["wa_gateway_url"] ?? ""}
+              value={settingsForm["wa_gateway_url"] ?? "http://localhost:3001"}
               onChange={(e) => onFormChange({ ...settingsForm, wa_gateway_url: e.target.value })}
-              placeholder="https://api.gateway.com/v1/messages"
+              placeholder="http://localhost:3001"
             />
+            {renderInlineError(settingsErrors.wa_gateway_url)}
+            <span className="text-xs text-slate-400 mt-1 block">Dipakai dashboard, worker billing, dan test integrasi untuk menghubungi gateway JS.</span>
           </label>
+
           <label>
-            <span>API Key</span>
+            <span>Default Account ID</span>
+            <select
+              className={inputClassName()}
+              value={settingsForm["wa_account_id"] ?? "default"}
+              onChange={(e) => onFormChange({ ...settingsForm, wa_account_id: e.target.value })}
+            >
+              {!accounts.includes("default") && (
+                <option value="default">default</option>
+              )}
+              {accounts.map((acc) => (
+                <option key={acc} value={acc}>
+                  {acc}
+                </option>
+              ))}
+              {settingsForm["wa_account_id"] &&
+                settingsForm["wa_account_id"] !== "default" &&
+                !accounts.includes(settingsForm["wa_account_id"]) && (
+                  <option value={settingsForm["wa_account_id"]}>
+                    {settingsForm["wa_account_id"]} (Tidak aktif)
+                  </option>
+                )}
+            </select>
+            <span className="text-xs text-slate-400 mt-1 block">Akun WhatsApp utama untuk notifikasi otomatis seperti billing, reminder, dan pembayaran lunas.</span>
+          </label>
+
+          <label>
+            <span>Akun Generate/Billing</span>
+            <select
+              className={inputClassName()}
+              value={settingsForm["wa_billing_account_id"] ?? ""}
+              onChange={(e) => onFormChange({ ...settingsForm, wa_billing_account_id: e.target.value })}
+            >
+              <option value="">Ikut default</option>
+              {accounts.map((acc) => (
+                <option key={acc} value={acc}>
+                  {acc}
+                </option>
+              ))}
+              {settingsForm["wa_billing_account_id"] &&
+                !accounts.includes(settingsForm["wa_billing_account_id"]) && (
+                  <option value={settingsForm["wa_billing_account_id"]}>
+                    {settingsForm["wa_billing_account_id"]} (Tidak aktif)
+                  </option>
+                )}
+            </select>
+          </label>
+
+          <label>
+            <span>Akun Reminder</span>
+            <select
+              className={inputClassName()}
+              value={settingsForm["wa_reminder_account_id"] ?? ""}
+              onChange={(e) => onFormChange({ ...settingsForm, wa_reminder_account_id: e.target.value })}
+            >
+              <option value="">Ikut default</option>
+              {accounts.map((acc) => (
+                <option key={acc} value={acc}>
+                  {acc}
+                </option>
+              ))}
+              {settingsForm["wa_reminder_account_id"] &&
+                !accounts.includes(settingsForm["wa_reminder_account_id"]) && (
+                  <option value={settingsForm["wa_reminder_account_id"]}>
+                    {settingsForm["wa_reminder_account_id"]} (Tidak aktif)
+                  </option>
+                )}
+            </select>
+          </label>
+
+          <label>
+            <span>Akun Jatuh Tempo / Trial</span>
+            <select
+              className={inputClassName()}
+              value={settingsForm["wa_due_account_id"] ?? ""}
+              onChange={(e) => onFormChange({ ...settingsForm, wa_due_account_id: e.target.value })}
+            >
+              <option value="">Ikut default</option>
+              {accounts.map((acc) => (
+                <option key={acc} value={acc}>
+                  {acc}
+                </option>
+              ))}
+              {settingsForm["wa_due_account_id"] &&
+                !accounts.includes(settingsForm["wa_due_account_id"]) && (
+                  <option value={settingsForm["wa_due_account_id"]}>
+                    {settingsForm["wa_due_account_id"]} (Tidak aktif)
+                  </option>
+                )}
+            </select>
+          </label>
+
+          <label>
+            <span>Akun Limit / Isolir</span>
+            <select
+              className={inputClassName()}
+              value={settingsForm["wa_limit_account_id"] ?? ""}
+              onChange={(e) => onFormChange({ ...settingsForm, wa_limit_account_id: e.target.value })}
+            >
+              <option value="">Ikut default</option>
+              {accounts.map((acc) => (
+                <option key={acc} value={acc}>
+                  {acc}
+                </option>
+              ))}
+              {settingsForm["wa_limit_account_id"] &&
+                !accounts.includes(settingsForm["wa_limit_account_id"]) && (
+                  <option value={settingsForm["wa_limit_account_id"]}>
+                    {settingsForm["wa_limit_account_id"]} (Tidak aktif)
+                  </option>
+                )}
+            </select>
+          </label>
+
+          <label>
+            <span>Akun Pembayaran Lunas</span>
+            <select
+              className={inputClassName()}
+              value={settingsForm["wa_payment_account_id"] ?? ""}
+              onChange={(e) => onFormChange({ ...settingsForm, wa_payment_account_id: e.target.value })}
+            >
+              <option value="">Ikut default</option>
+              {accounts.map((acc) => (
+                <option key={acc} value={acc}>
+                  {acc}
+                </option>
+              ))}
+              {settingsForm["wa_payment_account_id"] &&
+                !accounts.includes(settingsForm["wa_payment_account_id"]) && (
+                  <option value={settingsForm["wa_payment_account_id"]}>
+                    {settingsForm["wa_payment_account_id"]} (Tidak aktif)
+                  </option>
+                )}
+            </select>
+          </label>
+
+          <label>
+            <span>Internal API Key</span>
             <input
               className={inputClassName()}
               type="text"
               value={settingsForm["wa_api_key"] ?? ""}
               onChange={(e) => onFormChange({ ...settingsForm, wa_api_key: e.target.value })}
+              placeholder="Harus sama dengan DASHBOARD_INTERNAL_API_KEY di .env"
             />
-          </label>
-          <label>
-            <span>Account ID / Device ID</span>
-            <input
-              className={inputClassName()}
-              type="text"
-              value={settingsForm["wa_account_id"] ?? ""}
-              onChange={(e) => onFormChange({ ...settingsForm, wa_account_id: e.target.value })}
-            />
+            <span className="text-xs text-slate-400 mt-1 block">Digunakan gateway untuk autentikasi ke backend. Simpan di <code>backend/.env</code> sebagai <code>DASHBOARD_INTERNAL_API_KEY</code>.</span>
           </label>
 
           <div className="col-span-full border-b border-slate-100 pb-2 mt-6">

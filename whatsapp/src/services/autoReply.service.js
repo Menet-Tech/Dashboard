@@ -1,62 +1,93 @@
 const logger = require('../utils/logger');
+const {
+    saveAutoReplyRule,
+    listAutoReplyRules,
+    updateAutoReplyRule,
+    deleteAutoReplyRule,
+} = require('../utils/database');
 
-// Map: id -> { id, keyword, reply, matchType, enabled }
-const rules = new Map();
+const toLegacyRule = (rule) => ({
+    ...rule,
+    accountId: rule.account_id,
+    matchType: rule.match_type,
+    createdAt: rule.created_at,
+    updatedAt: rule.updated_at,
+});
 
-/**
- * Tambah rule auto-reply baru
- * @param {string} keyword - kata kunci yang dicari
- * @param {string} reply - balasan otomatis
- * @param {'exact'|'contains'|'startsWith'} matchType
- */
-const addRule = (keyword, reply, matchType = 'contains') => {
-    const id = require('crypto').randomBytes(6).toString('hex');
-    const rule = { id, keyword: keyword.toLowerCase(), reply, matchType, enabled: true, createdAt: new Date().toISOString() };
-    rules.set(id, rule);
-    logger.info(`[AutoReply] Rule ${id} added: "${keyword}" → "${reply}" (${matchType})`);
-    return rule;
+const addRule = (keyword, reply, matchType = 'contains', options = {}) => {
+    const rule = saveAutoReplyRule({
+        account_id: options.accountId || options.account_id || '*',
+        keyword: String(keyword || '').trim(),
+        reply: String(reply || '').trim(),
+        match_type: matchType,
+        enabled: options.enabled !== false,
+        priority: options.priority ?? 100,
+    });
+    logger.info(`[AutoReply] Rule ${rule.id} added: "${keyword}" -> "${reply}" (${matchType})`);
+    return toLegacyRule(rule);
 };
 
-const getAllRules = () => [...rules.values()];
+const getAllRules = (accountId = null) => listAutoReplyRules(accountId).map(toLegacyRule);
 
 const deleteRule = (id) => {
-    if (!rules.has(id)) return null;
-    const rule = rules.get(id);
-    rules.delete(id);
-    logger.info(`[AutoReply] Rule ${id} deleted`);
-    return rule;
-};
-
-const toggleRule = (id, enabled) => {
-    const rule = rules.get(id);
+    const rule = deleteAutoReplyRule(id);
     if (!rule) return null;
-    rule.enabled = enabled;
-    return rule;
+    logger.info(`[AutoReply] Rule ${id} deleted`);
+    return toLegacyRule(rule);
 };
 
-/**
- * Cek apakah ada rule yang cocok dengan pesan masuk, return balasan atau null
- * @param {string} messageBody - isi pesan masuk (case-insensitive)
- */
-const findReply = (messageBody) => {
-    const body = messageBody.toLowerCase().trim();
-    for (const rule of rules.values()) {
+const updateRule = (id, changes) => {
+    const payload = {
+        account_id: changes.accountId ?? changes.account_id,
+        keyword: changes.keyword,
+        reply: changes.reply,
+        match_type: changes.matchType ?? changes.match_type,
+        enabled: changes.enabled,
+        priority: changes.priority,
+    };
+    Object.keys(payload).forEach((key) => payload[key] === undefined && delete payload[key]);
+    const rule = updateAutoReplyRule(id, payload);
+    return rule ? toLegacyRule(rule) : null;
+};
+
+const toggleRule = (id, enabled) => updateRule(id, { enabled });
+
+const findReply = (messageBody, accountId = null) => {
+    const body = String(messageBody || '').trim();
+    const lowerBody = body.toLowerCase();
+
+    for (const rule of listAutoReplyRules(accountId)) {
         if (!rule.enabled) continue;
+        const keyword = String(rule.keyword || '').trim();
+        const lowerKeyword = keyword.toLowerCase();
         let matched = false;
-        switch (rule.matchType) {
+
+        switch (rule.match_type) {
             case 'exact':
-                matched = body === rule.keyword;
+                matched = lowerBody === lowerKeyword;
                 break;
             case 'startsWith':
-                matched = body.startsWith(rule.keyword);
+                matched = lowerBody.startsWith(lowerKeyword);
+                break;
+            case 'endsWith':
+                matched = lowerBody.endsWith(lowerKeyword);
+                break;
+            case 'regex':
+                try {
+                    matched = new RegExp(keyword, 'i').test(body);
+                } catch (_) {
+                    matched = false;
+                }
                 break;
             case 'contains':
             default:
-                matched = body.includes(rule.keyword);
+                matched = lowerBody.includes(lowerKeyword);
         }
+
         if (matched) return rule.reply;
     }
+
     return null;
 };
 
-module.exports = { addRule, getAllRules, deleteRule, toggleRule, findReply };
+module.exports = { addRule, getAllRules, deleteRule, updateRule, toggleRule, findReply };

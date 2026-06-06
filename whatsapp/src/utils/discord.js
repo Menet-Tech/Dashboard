@@ -5,11 +5,14 @@ const sendDiscordNotification = async (message) => {
     if (!webhookUrl) return;
 
     try {
-        await fetch(webhookUrl, {
+        const res = await fetch(webhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: message })
         });
+        if (!res.ok) {
+            logger.warn(`Discord webhook responded with status ${res.status}: ${message.substring(0, 80)}`);
+        }
     } catch (err) {
         logger.error('Failed to send Discord notification: ' + err.message);
     }

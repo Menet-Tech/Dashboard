@@ -4,6 +4,23 @@ const { MessageMedia, Buttons, List } = require('whatsapp-web.js');
 const { WhatsAppError } = require('../utils/errors');
 const { saveMessage } = require('../utils/database');
 
+const recordOutboundMessage = (accountId, to, body, type, result) => {
+    const newId = saveMessage(to, body, type, result?.id?._serialized, 'outbound', null, accountId);
+    if (global.io) {
+        global.io.emit('chat_message', {
+            id: newId,
+            account_id: accountId,
+            direction: 'outbound',
+            from_number: null,
+            to_number: to,
+            body,
+            type,
+            wa_message_id: result?.id?._serialized,
+            created_at: new Date().toISOString()
+        });
+    }
+};
+
 const sendTextMessage = async (accountId, to, text, quotedMessageId = null) => {
     const client = getClient(accountId);
     const chatId = formatPhoneNumber(to);
@@ -60,7 +77,7 @@ const sendButtonMessage = async (accountId, to, body, buttons, title, footer) =>
     try {
         const buttonObj = new Buttons(body, buttons, title, footer);
         const result = await client.sendMessage(chatId, buttonObj);
-        try { saveMessage(to, title || 'Button Message', 'button', result?.id?._serialized); } catch (_) { }
+        try { recordOutboundMessage(accountId, to, title || body || 'Button Message', 'button', result); } catch (_) { }
         return result;
     } catch (err) {
         throw new WhatsAppError('Gagal mengirim pesan tombol: ' + err.message);
@@ -73,7 +90,7 @@ const sendListMessage = async (accountId, to, body, buttonText, sections, title,
     try {
         const listObj = new List(body, buttonText, sections, title, footer);
         const result = await client.sendMessage(chatId, listObj);
-        try { saveMessage(to, title || 'List Message', 'list', result?.id?._serialized); } catch (_) { }
+        try { recordOutboundMessage(accountId, to, title || body || 'List Message', 'list', result); } catch (_) { }
         return result;
     } catch (err) {
         throw new WhatsAppError('Gagal mengirim pesan list: ' + err.message);

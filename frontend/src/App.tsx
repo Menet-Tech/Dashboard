@@ -1,4 +1,4 @@
-import { FormEvent, startTransition, useEffect, useMemo, useState } from "react";
+import { FormEvent, lazy, Suspense, startTransition, useEffect, useMemo, useState } from "react";
 import { StatusPill } from "./components/StatusPill";
 import {
   ApiError,
@@ -10,6 +10,7 @@ import {
   fetchAuditLogs,
   login,
   logout,
+  registerOnUnauthorized,
   type SummaryPayload,
 } from "./lib/api";
 import type {
@@ -50,9 +51,6 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { AuditLogsPage } from "./features/audit/AuditLogsPage";
 import { UsersPage } from "./features/users/UsersPage";
 import { LoginPage } from "./features/auth/LoginPage";
-import { TicketsPage } from "./features/tickets/TicketsPage";
-import { RegistrationPage } from "./features/registration/RegistrationPage";
-import { WhatsAppPage } from "./features/whatsapp/WhatsAppPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { useAppFeedback } from "./hooks/useAppFeedback";
@@ -68,6 +66,16 @@ import { useMonitoring } from "./hooks/useMonitoring";
 import { defaultPackageForm } from "./features/packages/PackagesPage";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
+
+const TicketsPage = lazy(() =>
+  import("./features/tickets/TicketsPage").then((module) => ({ default: module.TicketsPage }))
+);
+const RegistrationPage = lazy(() =>
+  import("./features/registration/RegistrationPage").then((module) => ({ default: module.RegistrationPage }))
+);
+const WhatsAppPage = lazy(() =>
+  import("./features/whatsapp/WhatsAppPage").then((module) => ({ default: module.WhatsAppPage }))
+);
 
 type NavItem = {
   key: ViewKey;
@@ -116,6 +124,12 @@ export default function App() {
   const templatesHook = useTemplates({ withFeedback: feedback.withFeedback, askForConfirmation: feedback.askForConfirmation, onSuccess: feedback.pushSuccess });
   const usersHook = useUsers({ withFeedback: feedback.withFeedback, onSuccess: feedback.pushSuccess });
   const settingsHook = useSettings({ withFeedback: feedback.withFeedback, onSuccess: feedback.pushSuccess, refreshHealth: monitoringHook.handlers.refreshHealth });
+
+  useEffect(() => {
+    registerOnUnauthorized(() => {
+      setUser(null);
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -390,6 +404,9 @@ export default function App() {
               due_day: customer.due_day,
               status: customer.status,
               address: customer.address,
+              diskon: customer.diskon ?? 0,
+              referred_by_id: customer.referred_by_id ?? 0,
+              referral_balance: customer.referral_balance ?? 0,
             });
           }}
           onCancelEdit={() => {
@@ -519,17 +536,29 @@ export default function App() {
         />
       ) : null}
 
-      {view === "tickets" ? <TicketsPage /> : null}
-      {view === "registration" ? <RegistrationPage /> : null}
+      {view === "tickets" ? (
+        <Suspense fallback={<SkeletonCard />}>
+          <TicketsPage />
+        </Suspense>
+      ) : null}
+      {view === "registration" ? (
+        <Suspense fallback={<SkeletonCard />}>
+          <RegistrationPage />
+        </Suspense>
+      ) : null}
       {view === "whatsapp" ? (
-        <WhatsAppPage
-          user={user}
-          waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
-          waApiKey={settingsHook.state.settingsForm.wa_api_key}
-          pushSuccess={feedback.pushSuccess}
-          pushError={feedback.pushError}
-          withFeedback={feedback.withFeedback}
-        />
+        <Suspense fallback={<SkeletonCard />}>
+          <WhatsAppPage
+            user={user}
+            waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
+            waAccountId={settingsHook.state.settingsForm.wa_account_id}
+            waApiKey={settingsHook.state.settingsForm.wa_api_key}
+            pushSuccess={feedback.pushSuccess}
+            pushError={feedback.pushError}
+            withFeedback={feedback.withFeedback}
+            askForConfirmation={feedback.askForConfirmation}
+          />
+        </Suspense>
       ) : null}
       </div>
 

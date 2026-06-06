@@ -15,6 +15,9 @@ export type CustomerFormState = {
   due_day: number;
   status: CustomerItem["status"];
   address: string;
+  diskon: number;
+  referred_by_id: number;
+  referral_balance: number;
 };
 
 export const defaultCustomerForm = (): CustomerFormState => ({
@@ -27,6 +30,9 @@ export const defaultCustomerForm = (): CustomerFormState => ({
   due_day: 8,
   status: "active",
   address: "",
+  diskon: 0,
+  referred_by_id: 0,
+  referral_balance: 0,
 });
 
 type CustomersPageProps = {
@@ -193,6 +199,50 @@ export function CustomersPage({
                 <option value="inactive">Inactive</option>
               </select>
             </label>
+            <label>
+              <span>Diskon Bulanan (Rp)</span>
+              <input
+                type="number"
+                className={inputClassName()}
+                value={customerForm.diskon}
+                onChange={(e) =>
+                  onFormChange((curr) => ({ ...curr, diskon: Number(e.target.value) || 0 }))
+                }
+              />
+            </label>
+            <label>
+              <span>Saldo Referral Reward (Rp)</span>
+              <input
+                type="number"
+                className={inputClassName()}
+                value={customerForm.referral_balance}
+                onChange={(e) =>
+                  onFormChange((curr) => ({ ...curr, referral_balance: Number(e.target.value) || 0 }))
+                }
+              />
+            </label>
+            <label className="col-span-full">
+              <span>Direkomendasikan Oleh (Referral)</span>
+              <select
+                className={inputClassName()}
+                value={customerForm.referred_by_id}
+                onChange={(e) =>
+                  onFormChange((curr) => ({
+                    ...curr,
+                    referred_by_id: Number(e.target.value) || 0,
+                  }))
+                }
+              >
+                <option value={0}>Tidak ada (Pilih pelanggan)</option>
+                {customers
+                  .filter((c) => c.id !== editingCustomerId)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.whatsapp || "Tanpa WA"})
+                    </option>
+                  ))}
+              </select>
+            </label>
             <label className="col-span-full">
               <span>Alamat</span>
               <textarea
@@ -251,6 +301,9 @@ export function CustomersPage({
                 <th className="px-6 py-4 font-medium">Paket</th>
                 <th className="px-6 py-4 font-medium">Jatuh Tempo</th>
                 <th className="px-6 py-4 font-medium">Role</th>
+                <th className="px-6 py-4 font-medium">Diskon</th>
+                <th className="px-6 py-4 font-medium">Reward Referral</th>
+                <th className="px-6 py-4 font-medium">Referred By</th>
                 <th className="px-6 py-4 font-medium">Layanan</th>
                 <th className="px-6 py-4 font-medium">WA</th>
                 <th className="px-6 py-4 font-medium">Aksi</th>
@@ -264,7 +317,7 @@ export function CustomersPage({
                       ? "Belum ada pelanggan terdaftar."
                       : "Tidak ada pelanggan yang cocok dengan filter role saat ini."
                   }
-                  colSpan={7}
+                  colSpan={10}
                 />
               ) : (
                 filteredCustomers.map((customer) => (
@@ -283,6 +336,13 @@ export function CustomersPage({
                         </span>
                       </div>
                     </td>
+                    <td className="px-6 py-4 text-gray-700">
+                      {customer.diskon > 0 ? `Rp ${customer.diskon.toLocaleString("id-ID")}` : "-"}
+                    </td>
+                    <td className="px-6 py-4 text-gray-700">
+                      {customer.referral_balance > 0 ? `Rp ${customer.referral_balance.toLocaleString("id-ID")}` : "-"}
+                    </td>
+                    <td className="px-6 py-4 text-gray-700">{customer.referred_by_name || "-"}</td>
                     <td className="px-6 py-4 text-gray-700">
                       <select
                         className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"

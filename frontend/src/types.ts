@@ -41,6 +41,11 @@ export type CustomerItem = {
   is_trial?: boolean;
   trial_started_at?: string;
   trial_days?: number;
+  diskon: number;
+  referred_by_id?: number;
+  referral_balance: number;
+  referral_code?: string;
+  referred_by_name?: string;
 };
 
 export type BillItem = {
@@ -60,6 +65,8 @@ export type BillItem = {
   paid_at?: string;
   payment_method?: string;
   proof_path?: string;
+  diskon?: number;
+  diskon_referral?: number;
 };
 
 export type TemplateItem = {
@@ -82,8 +89,13 @@ export type NotificationLog = {
 
 export type SettingsState = {
   wa_gateway_url?: string;
-  wa_api_key?: string;
   wa_account_id?: string;
+  wa_billing_account_id?: string;
+  wa_reminder_account_id?: string;
+  wa_due_account_id?: string;
+  wa_limit_account_id?: string;
+  wa_payment_account_id?: string;
+  wa_api_key?: string;
   discord_webhook_url?: string;
   discord_notify_payment?: string;
   discord_notify_generate?: string;

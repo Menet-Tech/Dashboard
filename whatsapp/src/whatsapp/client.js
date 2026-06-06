@@ -1,4 +1,6 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
+const fs = require('fs/promises');
+const path = require('path');
 const qrcode = require('qrcode-terminal');
 const logger = require('../utils/logger');
 const { sendDiscordNotification } = require('../utils/discord');
@@ -9,17 +11,35 @@ const clients = new Map();
 const qrs = new Map();
 const readyStatuses = new Map();
 
+const sessionRoot = path.resolve(__dirname, 'sessions');
+
+const assertSafeAccountId = (accountId) => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(accountId)) {
+        throw new Error('Account ID hanya boleh berisi huruf, angka, underscore, dan dash');
+    }
+};
+
+const resolveSessionPath = (accountId) => {
+    assertSafeAccountId(accountId);
+    const target = path.resolve(sessionRoot, accountId);
+    if (!target.startsWith(sessionRoot + path.sep) && target !== sessionRoot) {
+        throw new Error('Invalid session path');
+    }
+    return target;
+};
+
 /**
  * Inisialisasi WhatsApp Client baru
  * @param {string} accountId 
  */
 const initWhatsAppClient = (accountId = 'default') => {
+    assertSafeAccountId(accountId);
     if (clients.has(accountId)) return clients.get(accountId);
 
     logger.info(`Initializing client for account: ${accountId}`);
     const client = new Client({
         authStrategy: new LocalAuth({
-            dataPath: `./src/whatsapp/sessions/${accountId}`
+            dataPath: resolveSessionPath(accountId)
         }),
         puppeteer: {
             args: process.env.PUPPETEER_ARGS ? process.env.PUPPETEER_ARGS.split(',') : ['--no-sandbox', '--disable-setuid-sandbox']
@@ -104,6 +124,7 @@ const getAllAccounts = () => {
 };
 
 const removeAccount = async (accountId) => {
+    assertSafeAccountId(accountId);
     if (!clients.has(accountId)) return false;
     const client = clients.get(accountId);
     
@@ -116,6 +137,12 @@ const removeAccount = async (accountId) => {
         await client.destroy();
     } catch (err) {
         logger.error(`Error destroying client ${accountId}:`, err);
+    }
+
+    try {
+        await fs.rm(resolveSessionPath(accountId), { recursive: true, force: true });
+    } catch (err) {
+        logger.error(`Error removing session folder ${accountId}:`, err);
     }
     
     if (global.io) {
@@ -143,5 +170,6 @@ module.exports = {
     getQr, 
     getAllAccounts, 
     removeAccount, 
-    scheduleReconnect 
+    scheduleReconnect,
+    resolveSessionPath,
 };

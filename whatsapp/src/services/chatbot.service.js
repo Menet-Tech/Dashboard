@@ -37,62 +37,53 @@ const formatDate = (d) => new Date(d).toLocaleDateString('id-ID', { day: 'numeri
 
 // ─── Menu Teks ───────────────────────────────────────────────────────────────
 
-const MENU_UNREG = `Hai! Selamat datang di *Menet Dashboard* 👋
+const MENU_UNREG = `hai, selamat datang di menet dashboard, silahkan ikuti panduan tersebut:
+kirim 1 untuk mendaftar, dan menggunakan internet menet
+kirim 2 jika ada kendala mengenai wifi
+kirim 3 untuk melihat paket yang disediakan
+kirim 4 untuk melihat pertanyaan umum
+kirim 5 untuk chat ke admin`;
 
-Silahkan ikuti panduan berikut:
-*1* — Daftar & gunakan internet Menet
-*2* — Laporkan kendala wifi
-*3* — Lihat paket yang tersedia
-*4* — Pertanyaan umum (FAQ)
-*5* — Chat ke admin
+const MENU_REG = (nama) => `hai, selamat ${greeting()} ${nama}, apa ada yang bisa di bantu ?
+ketik 1 untuk cek tagihan anda
+ketik 2 jika ada kendala mengenai wifi
+kirim 3 untuk melihat paket yang disediakan
+kirim 4 untuk melihat pertanyaan umum
+kirim 5 untuk chat ke admin`;
 
-Ketik angka pilihanmu ya 😊`;
+const FAQ_TEXT = `halo, ini adalah pertanyaan yang paling umum di tanyakan,
 
-const MENU_REG = (nama) => `Hai, selamat ${greeting()} *${nama}* 👋 Ada yang bisa kami bantu?
-
-*1* — Cek tagihan kamu
-*2* — Laporkan kendala wifi
-*3* — Lihat paket yang tersedia
-*4* — Pertanyaan umum (FAQ)
-*5* — Chat ke admin
-
-Ketik angka pilihanmu 😊`;
-
-const FAQ_TEXT = `Halo! Ini pertanyaan yang paling sering ditanyakan 😊
-
-❓ *Kapan wifi dipasang setelah daftar?*
+> Kapan wifi dipasang setelah daftar?
 > Pemasangan dilakukan setiap hari Sabtu & Minggu.
 
-❓ *Bagaimana cara bayar tagihan?*
+> Bagaimana cara bayar tagihan?
 > Tagihan bisa dibayar via transfer bank atau e-wallet sesuai info yang dikirim admin.
 
-❓ *Wifi saya lambat, kenapa?*
-> Coba restart router dulu. Jika masih lambat, kirim laporan lewat menu *2*.
+> Wifi saya lambat, kenapa?
+> Coba restart router dulu. Jika masih lambat, kirim laporan lewat menu 2.
 
-❓ *Bisakah saya ganti paket?*
-> Bisa! Hubungi admin lewat menu *5* untuk info lebih lanjut.
-
-Ketik *0* untuk kembali ke menu utama.`;
+> Bisakah saya ganti paket?
+> Bisa! Hubungi admin lewat menu 5 untuk info lebih lanjut.`;
 
 // ─── Alur Registrasi ─────────────────────────────────────────────────────────
 
 const REG_STEPS = [
-    { key: 'nama',       prompt: '📝 Silahkan lengkapi form pendaftaran:\n\n*Nama lengkap kamu:*' },
-    { key: 'no_hp',      prompt: '*Nomor HP (selain nomor ini):*' },
-    { key: 'alamat',     prompt: '*Alamat lengkap pemasangan:*' },
-    { key: 'paket',      prompt: '*Paket yang ingin diambil:*\n_(ketik nama paket, misal: "Menet 20 Mbps")_' },
-    { key: 'ssid',       prompt: '*Nama WiFi (SSID) yang kamu inginkan:*' },
-    { key: 'password',   prompt: '*Password WiFi yang kamu inginkan:*' },
-    { key: 'referral',   prompt: '*Mengetahui Menet dari siapa?*\n_(teman, medsos, spanduk, dll)_' },
-    { key: 'isp_lain',   prompt: '*Apakah saat ini masih berlangganan ke ISP lain?*\n_(ya/tidak)_' },
+    { key: 'nama',       prompt: 'silahkan lengkapi form ini\nnama : ' },
+    { key: 'no_hp',      prompt: 'no hp : ' },
+    { key: 'alamat',     prompt: 'alamat : ' },
+    { key: 'paket',      prompt: 'paket yang diambil\nnama wifi (ssid) : ' }, // Combines nicely with prompt structure
+    { key: 'ssid',       prompt: 'nama wifi (ssid) : ' },
+    { key: 'password',   prompt: 'password wifi : ' },
+    { key: 'referral',   prompt: 'mengetahui kami dari siapa : ' },
+    { key: 'isp_lain',   prompt: 'apakah saat ini masih langganan ke wifi (ISP) lain : ' },
 ];
 
 // ─── Alur Support/Kendala ────────────────────────────────────────────────────
 
 const SUPPORT_STEPS = [
-    { key: 'nama',    prompt: '🔧 Kami mohon maaf atas kendalanya.\n\n*Nama kamu:*' },
-    { key: 'alamat',  prompt: '*Alamat kamu:*' },
-    { key: 'kendala', prompt: '*Ceritakan kendalamu:*' },
+    { key: 'nama',    prompt: 'halo, kami mohon maaf jika, kamu memiliki masalah, silahkan lengkapi masalah tersebut, akan kami sampaikan ke teknisi kami\nNama : ' },
+    { key: 'alamat',  prompt: 'Alamat : ' },
+    { key: 'kendala', prompt: 'Kendala : ' },
 ];
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
@@ -126,8 +117,8 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
     if (state === 'IDLE') {
         const customer = await findCustomerByPhone(rawFrom);
         if (customer) {
-            upsertSession(rawFrom, accountId, 'REG_MENU', { customerId: customer.id, customerName: customer.nama });
-            await sendFn(accountId, rawFrom, MENU_REG(customer.nama));
+            upsertSession(rawFrom, accountId, 'REG_MENU', { customerId: customer.id, customerName: customer.name });
+            await sendFn(accountId, rawFrom, MENU_REG(customer.name));
         } else {
             upsertSession(rawFrom, accountId, 'UNREG_MENU', {});
             await sendFn(accountId, rawFrom, MENU_UNREG);
@@ -253,19 +244,39 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
 
 /** Kirim info tagihan aktif */
 const sendBillInfo = async (customerId, customerName, accountId, to, sendFn) => {
+    const customer = await findCustomerByPhone(to);
+    if (customer && customer.is_trial) {
+        let remainingDays = customer.trial_days || 3;
+        if (customer.trial_started_at) {
+            const start = new Date(customer.trial_started_at);
+            const now = new Date();
+            const elapsedMs = now.getTime() - start.getTime();
+            const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
+            remainingDays = Math.max(0, customer.trial_days - elapsedDays);
+        }
+        await sendFn(accountId, to, `halo ${customerName} terimakaish telah mengugunakan menet, kamu sedang ada di dalam masa trial, tidak akan ada tagihan selama ${remainingDays} hari kedepan, terimakasih.`);
+        await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
+        return;
+    }
+
     const bill = await getActiveBill(customerId);
     if (!bill) {
         const now = new Date();
         const periode = `${now.toLocaleString('id-ID', { month: 'long' })} ${now.getFullYear()}`;
         await sendFn(accountId, to,
-            `Halo *${customerName}*, kamu tidak punya tagihan aktif di periode *${periode}*. Terima kasih telah menggunakan Menet! 🙏`
+            `halo ${customerName}, kamu gak ada tagihan aktif di periode ${periode}, terimakasih telah menggunakan menet`
         );
     } else {
         const isDue = new Date(bill.jatuh_tempo) < new Date();
-        const msg = isDue
-            ? `⚠️ Halo *${customerName}*, tagihan kamu untuk periode *${bill.periode}* sebesar *${formatRp(bill.nominal)}* sudah jatuh tempo pada *${formatDate(bill.jatuh_tempo)}*.\n\nMohon segera dibayar agar layanan tidak terganggu.`
-            : `💰 Halo *${customerName}*, kamu punya tagihan untuk periode *${bill.periode}* sebesar *${formatRp(bill.nominal)}*, jatuh tempo pada *${formatDate(bill.jatuh_tempo)}*.\n\nNo. Invoice: \`${bill.invoice_number}\``;
-        await sendFn(accountId, to, msg);
+        if (isDue) {
+            await sendFn(accountId, to,
+                `halo ${customerName}, tagihan kamu sudah jatuh tempo, mohon segera di bayar, agar service tidak terganggu`
+            );
+        } else {
+            await sendFn(accountId, to,
+                `halo ${customerName}, kamu punya tagihan aktif untuk periode ${bill.periode} dengan nominal sebesar ${formatRp(bill.nominal)}, dan akan jatuh tempo pada ${formatDate(bill.jatuh_tempo)}.`
+            );
+        }
     }
     await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
 };
@@ -277,15 +288,16 @@ const sendPackageList = async (accountId, to, sendFn) => {
         await sendFn(accountId, to, 'Maaf, daftar paket belum tersedia. Hubungi admin untuk informasi lebih lanjut.');
         return;
     }
-    const list = packages.map(p => `• *${p.nama || p.name}* — ${p.kecepatan_mbps || p.speed_mbps} Mbps — ${formatRp(p.harga || p.price)}/bulan`).join('\n');
-    await sendFn(accountId, to, `🌐 *Paket Internet Menet:*\n\n${list}\n\nKetik *menu* untuk kembali.`);
+    const list = packages.map(p => `${p.nama || p.name} - ${p.kecepatan_mbps || p.speed_mbps} Mbps - ${formatRp(p.harga || p.price)}`).join('\n');
+    await sendFn(accountId, to, `ini paket yang kami punya,\n${list}`);
+    await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
 };
 
 /** Teruskan ke admin via WA + Discord */
 const requestAdmin = async (rawFrom, accountId, contactName, sendFn) => {
     upsertSession(rawFrom, accountId, 'WAITING_ADMIN', {});
     await sendFn(accountId, rawFrom,
-        `Baik, tunggu sebentar ya 😊 Kami akan segera menghubungi admin untuk kamu.`
+        `baik, tunggu sebentar ya, kami akan menghubungin admin`
     );
     await notifyAdminViaWA({ phone: rawFrom, contactName, accountId }, sendFn);
     await notifyAdminViaDiscord({ phone: rawFrom, contactName });

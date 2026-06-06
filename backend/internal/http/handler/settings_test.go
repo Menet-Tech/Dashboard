@@ -60,4 +60,21 @@ func TestSettingsHandlerGetAndUpdate(t *testing.T) {
 			t.Errorf("expected reminder_days '5', got %q", val)
 		}
 	})
+
+	t.Run("Reject unknown settings key", func(t *testing.T) {
+		payload := map[string]string{
+			"typo_setting_key": "value",
+		}
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(body))
+		ctx := auth.WithUser(req.Context(), auth.User{Role: "admin"})
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		h.Update(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", w.Code)
+		}
+	})
 }

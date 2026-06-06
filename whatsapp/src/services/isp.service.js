@@ -77,11 +77,14 @@ const getPackageList = async () => {
  */
 const notifyAdminViaWA = async (info, sendFn) => {
     const adminNumbers = (process.env.ADMIN_WA_NUMBERS || '').split(',').map(n => n.trim()).filter(Boolean);
+    const cleanPhone = info.phone.replace(/@c\.us$/, '').replace(/^\+/, '');
+    const linkNumber = cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone.replace(/^0/, '');
     const msg =
-`🔔 *Ada yang minta chat ke admin!*
-Nomor : ${info.phone}
-Nama  : ${info.contactName || '(tidak diketahui)'}
-Link  : wa.me/${info.phone.replace(/@c\.us$/, '')}`;
+`WOI, ada yang chat ke admin nih
+Nomer : ${cleanPhone}
+Nama kontak : ${info.contactName || '(tidak diketahui)'}
+wa.me/+${linkNumber}
+GC GANTI NOMER KE SINI`;
 
     for (const admin of adminNumbers) {
         try {
@@ -99,13 +102,16 @@ Link  : wa.me/${info.phone.replace(/@c\.us$/, '')}`;
 const notifyAdminViaDiscord = async (info) => {
     const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
     if (!webhookUrl) return;
+    const cleanPhone = info.phone.replace(/@c\.us$/, '').replace(/^\+/, '');
+    const linkNumber = cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone.replace(/^0/, '');
     const mention = process.env.DISCORD_ADMIN_ROLE_ID ? `<@&${process.env.DISCORD_ADMIN_ROLE_ID}>` : '@everyone';
     const content =
 `${mention}
-🔔 **WOI, ada yang chat ke admin nih!**
-Nomor : \`${info.phone.replace(/@c\.us$/, '')}\`
-Nama  : ${info.contactName || '(tidak diketahui)'}
-Link  : https://wa.me/${info.phone.replace(/@c\.us$/, '')}`;
+WOI, ada yang chat ke admin nih
+Nomer : ${cleanPhone}
+Nama kontak : ${info.contactName || '(tidak diketahui)'}
+wa.me/+${linkNumber}
+GC GANTI NOMER KE SINI`;
 
     try {
         await client.post(webhookUrl, { content }, { baseURL: '' });

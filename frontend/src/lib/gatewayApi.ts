@@ -36,6 +36,26 @@ export type ContactForm = {
   created_at: string;
 };
 
+export type AutoReplyRule = {
+  id: string;
+  account_id: string;
+  accountId?: string;
+  keyword: string;
+  reply: string;
+  match_type: "exact" | "contains" | "startsWith" | "endsWith" | "regex";
+  matchType?: "exact" | "contains" | "startsWith" | "endsWith" | "regex";
+  enabled: boolean;
+  priority: number;
+  created_at: string;
+  updated_at?: string;
+};
+
+export type ChatbotSettings = {
+  chatbot_account_id: string;
+  auto_reply_account_id: string;
+  auto_reply_before_chatbot: string;
+};
+
 async function gatewayRequest<T>(
   url: string,
   apiKey: string,
@@ -43,12 +63,14 @@ async function gatewayRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const cleanUrl = url.replace(/\/$/, "");
+  const traceId = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
   const response = await fetch(`${cleanUrl}${path}`, {
     ...options,
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
       "X-API-Key": apiKey,
+      "X-Request-Id": traceId,
       ...(options.headers ?? {}),
     },
   });
@@ -56,8 +78,10 @@ async function gatewayRequest<T>(
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
+    const responseTraceId = response.headers.get("X-Request-Id") ?? payload?.requestId ?? payload?.request_id ?? traceId;
+    const message = payload?.message ?? `Gateway request failed with status ${response.status}`;
     throw new Error(
-      payload?.message ?? `Gateway request failed with status ${response.status}`
+      responseTraceId ? `${message} (trace: ${responseTraceId})` : message
     );
   }
 
@@ -137,4 +161,63 @@ export function getChatbotForms(
     apiKey,
     `/api/v1/chatbot/forms?limit=${limit}${typeParam}`
   );
+}
+
+export function getAutoReplyRules(url: string, apiKey: string, accountId?: string) {
+  const accountParam = accountId ? `?accountId=${encodeURIComponent(accountId)}` : "";
+  return gatewayRequest<{ data: AutoReplyRule[] }>(url, apiKey, `/api/v1/autoreply${accountParam}`);
+}
+
+export function createAutoReplyRule(
+  url: string,
+  apiKey: string,
+  payload: {
+    accountId?: string;
+    keyword: string;
+    reply: string;
+    matchType: AutoReplyRule["match_type"];
+    enabled?: boolean;
+    priority?: number;
+  }
+) {
+  return gatewayRequest<{ data: AutoReplyRule }>(url, apiKey, "/api/v1/autoreply", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateAutoReplyRule(
+  url: string,
+  apiKey: string,
+  id: string,
+  payload: Partial<{
+    accountId: string;
+    keyword: string;
+    reply: string;
+    matchType: AutoReplyRule["match_type"];
+    enabled: boolean;
+    priority: number;
+  }>
+) {
+  return gatewayRequest<{ data: AutoReplyRule }>(url, apiKey, `/api/v1/autoreply/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteAutoReplyRule(url: string, apiKey: string, id: string) {
+  return gatewayRequest<{ data: AutoReplyRule }>(url, apiKey, `/api/v1/autoreply/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function getChatbotSettings(url: string, apiKey: string) {
+  return gatewayRequest<{ data: ChatbotSettings }>(url, apiKey, "/api/v1/chatbot/settings");
+}
+
+export function updateChatbotSettings(url: string, apiKey: string, payload: ChatbotSettings) {
+  return gatewayRequest<{ data: ChatbotSettings }>(url, apiKey, "/api/v1/chatbot/settings", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
 }
