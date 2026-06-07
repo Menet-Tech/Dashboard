@@ -114,21 +114,30 @@ BOOTSTRAP_ADMIN_PASSWORD=<strong-random-password>
 
 Template unit files:
 - `deploy/go-dev/menettech-go-api.service`
-- `deploy/go-dev/menettech-go-worker.service` (also referenced as `menettech-worker.service` / `menettech-api.service`)
+- `deploy/go-dev/menettech-go-worker.service`
+- `deploy/go-dev/menettech-go-discord.service`
+- `deploy/go-dev/menettech-go-whatsapp.service`
 
 ```bash
-sudo cp deploy/go-dev/menettech-go-api.service /etc/systemd/system/
-sudo cp deploy/go-dev/menettech-go-worker.service /etc/systemd/system/
+sudo cp deploy/menettech-go-api.service /etc/systemd/system/
+sudo cp deploy/menettech-go-worker.service /etc/systemd/system/
+sudo cp deploy/menettech-go-discord.service /etc/systemd/system/
+sudo cp deploy/menettech-go-whatsapp.service /etc/systemd/system/
+
 sudo systemctl daemon-reload
 sudo systemctl enable --now menettech-go-api
 sudo systemctl enable --now menettech-go-worker
+sudo systemctl enable --now menettech-go-discord
+sudo systemctl enable --now menettech-go-whatsapp
 ```
 
 Check status:
 ```bash
-sudo systemctl status menettech-go-api menettech-go-worker
+sudo systemctl status menettech-go-api menettech-go-worker menettech-go-discord menettech-go-whatsapp
 sudo journalctl -u menettech-go-api -f
 sudo journalctl -u menettech-go-worker -f
+sudo journalctl -u menettech-go-discord -f
+sudo journalctl -u menettech-go-whatsapp -f
 ```
 
 ---

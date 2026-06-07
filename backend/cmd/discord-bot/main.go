@@ -14,13 +14,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bwmarrin/discordgo"
 	_ "modernc.org/sqlite"
 )
 
 var (
 	botToken      = envOrFatal("DISCORD_BOT_TOKEN")
 	applicationID = envOrFatal("DISCORD_APPLICATION_ID")
-	guildID       = os.Getenv("DISCORD_GUILD_ID") // optional for global commands
+	guildID       = os.Getenv("DISCORD_GUILD_ID") // optional for guild commands
 	apiBaseURL    = os.Getenv("API_BASE_URL")      // e.g. http://localhost:8080
 	sqlitePath    = envOrDefault("SQLITE_PATH", "../storage/dashboard.db")
 
@@ -44,131 +45,135 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := registerCommands(); err != nil {
-		logger.Error("register commands", "error", err)
+	dg, err := discordgo.New("Bot " + botToken)
+	if err != nil {
+		logger.Error("create discord session", "error", err)
 		os.Exit(1)
 	}
 
-	logger.Info("Discord bot starting, polling interactions...")
+	dg.AddHandler(interactionCreate)
+
+	err = dg.Open()
+	if err != nil {
+		logger.Error("open discord gateway", "error", err)
+		os.Exit(1)
+	}
+	defer dg.Close()
+
+	registeredCommands := make([]*discordgo.ApplicationCommand, len(slashCommands))
+	for i, v := range slashCommands {
+		cmd, err := dg.ApplicationCommandCreate(dg.State.User.ID, guildID, v)
+		if err != nil {
+			logger.Error("cannot create command", "name", v.Name, "error", err)
+			os.Exit(1)
+		}
+		registeredCommands[i] = cmd
+		logger.Info("registered slash command", "name", v.Name)
+	}
+
+	logger.Info("Discord bot is now running. Press CTRL-C to exit.")
 	<-ctx.Done()
+
+	logger.Info("Cleaning up commands...")
+	for _, v := range registeredCommands {
+		if v != nil {
+			err := dg.ApplicationCommandDelete(dg.State.User.ID, guildID, v.ID)
+			if err != nil {
+				logger.Error("cannot delete command", "name", v.Name, "error", err)
+			} else {
+				logger.Info("deleted command", "name", v.Name)
+			}
+		}
+	}
 	logger.Info("Discord bot stopped")
 }
 
 // ─── Command registration ────────────────────────────────────────────────────
 
-var slashCommands = []map[string]any{
+var slashCommands = []*discordgo.ApplicationCommand{
 	{
-		"name":        "summary",
-		"type":        1,
-		"description": "Tampilkan ringkasan dashboard billing ISP",
+		Name:        "summary",
+		Description: "Tampilkan ringkasan dashboard billing ISP",
 	},
 	{
-		"name":        "health",
-		"type":        1,
-		"description": "Cek status kesehatan sistem",
+		Name:        "health",
+		Description: "Tampilkan status kesehatan sistem",
 	},
 	{
-		"name":        "tagihan",
-		"type":        1,
-		"description": "Lihat daftar tagihan belum bayar",
-		"options": []map[string]any{
+		Name:        "tagihan",
+		Description: "Lihat daftar tagihan belum bayar",
+		Options: []*discordgo.ApplicationCommandOption{
 			{
-				"name":        "limit",
-				"description": "Jumlah maksimal tagihan (default 10)",
-				"type":        4, // INTEGER
-				"required":    false,
+				Type:        discordgo.ApplicationCommandOptionInteger,
+				Name:        "limit",
+				Description: "Jumlah maksimal tagihan (default 10)",
+				Required:    false,
 			},
 		},
 	},
 	{
-		"name":        "pelanggan",
-		"type":        1,
-		"description": "Cari pelanggan berdasarkan nama",
-		"options": []map[string]any{
+		Name:        "pelanggan",
+		Description: "Cari pelanggan berdasarkan nama",
+		Options: []*discordgo.ApplicationCommandOption{
 			{
-				"name":        "nama",
-				"description": "Nama pelanggan (partial match)",
-				"type":        3, // STRING
-				"required":    true,
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "nama",
+				Description: "Nama pelanggan (partial match)",
+				Required:    true,
 			},
 		},
 	},
 }
 
-func registerCommands() error {
-	for _, cmd := range slashCommands {
-		url := fmt.Sprintf("https://discord.com/api/v10/applications/%s/guilds/%s/commands", applicationID, guildID)
-		if guildID == "" {
-			url = fmt.Sprintf("https://discord.com/api/v10/applications/%s/commands", applicationID)
-		}
-
-		body, err := json.Marshal(cmd)
-		if err != nil {
-			logger.Error("marshal command failed", "name", cmd["name"], "error", err)
-			return err
-		}
-		req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(string(body)))
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", "Bot "+botToken)
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-		resp.Body.Close()
-
-		if resp.StatusCode >= 400 {
-			return fmt.Errorf("register command %q: HTTP %d", cmd["name"], resp.StatusCode)
-		}
-		logger.Info("registered command", "name", cmd["name"])
-	}
-	return nil
-}
-
-// ─── Discord API helpers ─────────────────────────────────────────────────────
-
-func discordRequest(method, path string, payload any) ([]byte, int, error) {
-	var bodyStr string
-	if payload != nil {
-		b, err := json.Marshal(payload)
-		if err != nil {
-			return nil, 0, fmt.Errorf("marshal discord payload: %w", err)
-		}
-		bodyStr = string(b)
+func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if i.Type != discordgo.InteractionApplicationCommand {
+		return
 	}
 
-	req, err := http.NewRequest(method, "https://discord.com/api/v10"+path, strings.NewReader(bodyStr))
+	cmdData := i.ApplicationCommandData()
+	var responseContent string
+
+	switch cmdData.Name {
+	case "summary":
+		responseContent = buildSummaryMessage()
+	case "health":
+		responseContent = buildHealthMessage()
+	case "tagihan":
+		limit := 10
+		if len(cmdData.Options) > 0 {
+			limit = int(cmdData.Options[0].IntValue())
+		}
+		responseContent = buildTagihanMessage(limit)
+	case "pelanggan":
+		name := ""
+		if len(cmdData.Options) > 0 {
+			name = cmdData.Options[0].StringValue()
+		}
+		responseContent = buildPelangganMessage(name)
+	default:
+		responseContent = "Unknown command"
+	}
+
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: responseContent,
+		},
+	})
 	if err != nil {
-		return nil, 0, err
+		logger.Error("respond to interaction", "error", err)
 	}
-	req.Header.Set("Authorization", "Bot "+botToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.StatusCode, fmt.Errorf("read discord response: %w", err)
-	}
-	return data, resp.StatusCode, nil
 }
 
 // ─── Database queries ─────────────────────────────────────────────────────────
 
 type dashboardSummary struct {
-	TotalCustomers    int
-	ActiveCustomers   int
-	TotalBills        int
-	UnpaidBills       int
-	PaidBills         int
-	UnpaidAmount      float64
+	TotalCustomers  int
+	ActiveCustomers int
+	TotalBills      int
+	UnpaidBills     int
+	PaidBills       int
+	UnpaidAmount    float64
 }
 
 func querySummary() (dashboardSummary, error) {
@@ -285,7 +290,6 @@ func buildSummaryMessage() string {
 }
 
 func buildHealthMessage() string {
-	// Call the local API health endpoint directly
 	httpResp, err := http.Get(apiBaseURL + "/api/v1/health")
 	if err != nil {
 		return "❌ Gagal menghubungi API: " + err.Error()
