@@ -1,0 +1,21 @@
+[Unit]
+Description=Menet-Tech Go Discord Bot
+After=network.target menettech-go-api.service
+
+[Service]
+Type=simple
+User=menettech
+Group=menettech
+WorkingDirectory=/opt/menettech-go/backend
+EnvironmentFile=/opt/menettech-go/backend/.env
+ExecStart=/opt/menettech-go/backend/menettech-go-discord
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/menettech-go/storage
+
+[Install]
+WantedBy=multi-user.target
