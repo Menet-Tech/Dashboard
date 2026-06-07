@@ -1,8 +1,9 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { inputClassName, renderInlineError } from "../../components/ui";
 import type { FieldErrors } from "../../utils/validation";
-import type { SettingsState } from "../../types";
+import type { SettingsState, MikrotikSyncSecret, MikrotikImportResult } from "../../types";
 import { getGatewayAccounts } from "../../lib/gatewayApi";
+import { RefreshCw, CheckCircle2, AlertCircle, Download, Loader2 } from "lucide-react";
 
 type SettingsPageProps = {
   settingsForm: SettingsState;
@@ -26,6 +27,74 @@ export function SettingsPage({
   const gatewayUrl = settingsForm.wa_gateway_url || "http://localhost:3001";
   const apiKey = settingsForm.wa_api_key || "";
   const [accounts, setAccounts] = useState<string[]>([]);
+
+  // MikroTik sync state
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncSecrets, setSyncSecrets] = useState<MikrotikSyncSecret[] | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [importDueDay, setImportDueDay] = useState(1);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResults, setImportResults] = useState<MikrotikImportResult[] | null>(null);
+
+  const handleSyncPreview = useCallback(async () => {
+    setSyncLoading(true);
+    setSyncError(null);
+    setSyncSecrets(null);
+    setSelected(new Set());
+    setImportResults(null);
+    try {
+      const res = await fetch("/api/v1/integration/mikrotik/sync-preview", { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Gagal mengambil data MikroTik");
+      setSyncSecrets((data.secrets as MikrotikSyncSecret[]) || []);
+    } catch (e: unknown) {
+      setSyncError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSyncLoading(false);
+    }
+  }, []);
+
+  const toggleSelect = (name: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (!syncSecrets) return;
+    const newOnes = syncSecrets.filter((s) => !s.exists).map((s) => s.name);
+    if (selected.size === newOnes.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(newOnes));
+    }
+  };
+
+  const handleImport = async () => {
+    if (selected.size === 0) return;
+    setImportLoading(true);
+    setImportResults(null);
+    try {
+      const res = await fetch("/api/v1/integration/mikrotik/sync-import", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ names: Array.from(selected), default_due_day: importDueDay }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Import gagal");
+      setImportResults(data.results as MikrotikImportResult[]);
+      // refresh preview
+      void handleSyncPreview();
+    } catch (e: unknown) {
+      setSyncError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImportLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!gatewayUrl || !apiKey) return;
@@ -485,7 +554,198 @@ export function SettingsPage({
             />
           </label>
 
-          <div className="flex gap-3 mt-8">
+          {/* MikroTik Sync Panel */}
+          <div className="col-span-full mt-4">
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm font-bold text-indigo-700">Sinkronisasi dari MikroTik</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Tarik daftar PPPoE secret dari router dan import yang belum ada di dashboard</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSyncPreview}
+                  disabled={syncLoading}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm"
+                >
+                  {syncLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  {syncLoading ? "Memuat..." : "Preview Secrets"}
+                </button>
+              </div>
+
+              {syncError && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2.5 mb-3">
+                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                  <span>{syncError}</span>
+                </div>
+              )}
+
+              {syncSecrets !== null && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-slate-500">
+                      <span className="font-semibold text-slate-700">{syncSecrets.length}</span> secret ditemukan &bull;{" "}
+                      <span className="font-semibold text-green-700">{syncSecrets.filter((s) => !s.exists).length}</span> belum di dashboard
+                    </p>
+                    <button type="button" onClick={toggleAll} className="text-xs text-indigo-600 hover:underline font-medium">
+                      {selected.size === syncSecrets.filter((s) => !s.exists).length ? "Batalkan Semua" : "Pilih Semua Baru"}
+                    </button>
+                  </div>
+
+                  <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
+                    {syncSecrets.map((secret) => (
+                      <div key={secret.name} className={`flex items-center gap-3 px-3 py-2.5 ${secret.exists ? "opacity-50" : ""}`}>
+                        <input
+                          type="checkbox"
+                          id={`sync-${secret.name}`}
+                          checked={selected.has(secret.name)}
+                          disabled={secret.exists}
+                          onChange={() => toggleSelect(secret.name)}
+                          className="accent-indigo-600 w-4 h-4 shrink-0"
+                        />
+                        <label htmlFor={`sync-${secret.name}`} className="flex-1 cursor-pointer min-w-0">
+                          <span className="block text-xs font-semibold text-slate-800 truncate">{secret.name}</span>
+                          <span className="block text-[10px] text-slate-400 truncate">Profile: {secret.profile || "default"}{secret.disabled ? " • disabled" : ""}</span>
+                        </label>
+                        {secret.exists ? (
+                          <span className="text-[10px] bg-slate-100 text-slate-500 font-medium px-2 py-0.5 rounded-full">Ada</span>
+                        ) : (
+                          <span className="text-[10px] bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded-full">Baru</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {selected.size > 0 && (
+                    <div className="flex items-center gap-3 pt-2 border-t border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <label htmlFor="import-due-day" className="text-xs text-slate-600 font-medium whitespace-nowrap">Tgl Jatuh Tempo:</label>
+                        <input
+                          id="import-due-day"
+                          type="number"
+                          min={1}
+                          max={31}
+                          value={importDueDay}
+                          onChange={(e) => setImportDueDay(Number(e.target.value))}
+                          className="w-16 text-center text-xs border border-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleImport}
+                        disabled={importLoading}
+                        className="ml-auto flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm"
+                      >
+                        {importLoading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                        {importLoading ? "Mengimport..." : `Import ${selected.size} Secret`}
+                      </button>
+                    </div>
+                  )}
+
+                  {importResults && (
+                    <div className="space-y-1 pt-2">
+                      <p className="text-xs font-bold text-slate-600 mb-1">Hasil Import:</p>
+                      {importResults.map((r) => (
+                        <div key={r.name} className={`flex items-center gap-2 text-xs rounded-lg px-3 py-1.5 ${
+                          r.status === "imported" ? "bg-emerald-50 text-emerald-700" :
+                          r.status === "error" ? "bg-red-50 text-red-700" :
+                          "bg-slate-50 text-slate-500"
+                        }`}>
+                          {r.status === "imported" ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                          <span className="font-semibold">{r.name}</span>
+                          {r.message && <span className="opacity-70">— {r.message}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="col-span-full border-b border-slate-100 pb-2 mt-6">
+            <h4 className="text-sm font-bold text-indigo-600 uppercase tracking-wider">Chatbot Triggers (WhatsApp)</h4>
+          </div>
+          <label>
+            <span>Trigger Cek Tagihan</span>
+            <input
+              className={inputClassName()}
+              type="text"
+              value={settingsForm["chatbot_trigger_billing"] ?? "1"}
+              onChange={(e) =>
+                onFormChange({ ...settingsForm, chatbot_trigger_billing: e.target.value })
+              }
+              placeholder="1, tagihan, cek tagihan"
+            />
+            <span className="text-xs text-slate-400 mt-1 block">Kata kunci cek status tagihan bulanan (pisahkan dengan koma).</span>
+          </label>
+          <label>
+            <span>Trigger Registrasi</span>
+            <input
+              className={inputClassName()}
+              type="text"
+              value={settingsForm["chatbot_trigger_register"] ?? "1"}
+              onChange={(e) =>
+                onFormChange({ ...settingsForm, chatbot_trigger_register: e.target.value })
+              }
+              placeholder="1, daftar, registrasi"
+            />
+            <span className="text-xs text-slate-400 mt-1 block">Kata kunci registrasi mandiri pelanggan baru.</span>
+          </label>
+          <label>
+            <span>Trigger Lapor Kendala (Support)</span>
+            <input
+              className={inputClassName()}
+              type="text"
+              value={settingsForm["chatbot_trigger_support"] ?? "2"}
+              onChange={(e) =>
+                onFormChange({ ...settingsForm, chatbot_trigger_support: e.target.value })
+              }
+              placeholder="2, kendala, bantuan"
+            />
+            <span className="text-xs text-slate-400 mt-1 block">Kata kunci untuk laporan kendala ke teknisi.</span>
+          </label>
+          <label>
+            <span>Trigger Daftar Paket</span>
+            <input
+              className={inputClassName()}
+              type="text"
+              value={settingsForm["chatbot_trigger_packages"] ?? "3"}
+              onChange={(e) =>
+                onFormChange({ ...settingsForm, chatbot_trigger_packages: e.target.value })
+              }
+              placeholder="3, paket"
+            />
+            <span className="text-xs text-slate-400 mt-1 block">Kata kunci untuk melihat paket wifi ISP.</span>
+          </label>
+          <label>
+            <span>Trigger Pertanyaan Umum (FAQ)</span>
+            <input
+              className={inputClassName()}
+              type="text"
+              value={settingsForm["chatbot_trigger_faq"] ?? "4"}
+              onChange={(e) =>
+                onFormChange({ ...settingsForm, chatbot_trigger_faq: e.target.value })
+              }
+              placeholder="4, faq, tanya"
+            />
+            <span className="text-xs text-slate-400 mt-1 block">Kata kunci untuk melihat list FAQ.</span>
+          </label>
+          <label>
+            <span>Trigger Hubungi Admin</span>
+            <input
+              className={inputClassName()}
+              type="text"
+              value={settingsForm["chatbot_trigger_admin"] ?? "5"}
+              onChange={(e) =>
+                onFormChange({ ...settingsForm, chatbot_trigger_admin: e.target.value })
+              }
+              placeholder="5, admin, chat"
+            />
+            <span className="text-xs text-slate-400 mt-1 block">Kata kunci untuk langsung menghubungi admin.</span>
+          </label>
+
+          <div className="flex gap-3 mt-8 col-span-full">
             <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
               {isBusy("save-settings") ? "Menyimpan..." : "Simpan Pengaturan"}
             </button>

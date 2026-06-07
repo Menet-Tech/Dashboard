@@ -31,3 +31,15 @@ func (h ReportsHandler) Aging(w http.ResponseWriter, r *http.Request) {
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": report})
 }
+
+func (h ReportsHandler) ExportBills(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=bills.csv")
+	_ = h.Service.ExportBillsCSV(r.Context(), w)
+}
+
+func (h ReportsHandler) ExportCustomers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=customers.csv")
+	_ = h.Service.ExportCustomersCSV(r.Context(), w)
+}

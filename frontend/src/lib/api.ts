@@ -80,11 +80,23 @@ export type HealthPayload = {
   };
   integrations: {
     whatsapp_configured: boolean;
+    whatsapp_online: boolean;
     discord_configured: boolean;
+    discord_online: boolean;
     mikrotik_configured: boolean;
+    mikrotik_online: boolean;
   };
   alerts: string[];
   timestamp: string;
+};
+
+export type RecentPayment = {
+  id: number;
+  invoice_number: string;
+  customer_name: string;
+  amount: number;
+  paid_at: string;
+  payment_method: string;
 };
 
 export type SummaryPayload = {
@@ -93,6 +105,10 @@ export type SummaryPayload = {
   total_limit: number;
   total_inactive: number;
   total_tagihan_belum_bayar: number;
+  total_jatuh_tempo: number;
+  total_menunggak: number;
+  pendapatan_bulan_ini: number;
+  pembayaran_terbaru: RecentPayment[];
 };
 
 export type GenerateBillsPayload = {
@@ -241,8 +257,38 @@ export function updateCustomerStatus(id: number, status: CustomerItem["status"])
   });
 }
 
-export function fetchBills() {
-  return request<{ data: BillItem[] }>("/api/v1/bills");
+export function fetchBills(params?: {
+  search?: string;
+  status?: string;
+  period?: string;
+  customer_id?: number;
+  page?: number;
+  limit?: number;
+}) {
+  const query = new URLSearchParams();
+  if (params) {
+    if (params.search) query.append("search", params.search);
+    if (params.status) query.append("status", params.status);
+    if (params.period) query.append("period", params.period);
+    if (params.customer_id) query.append("customer_id", String(params.customer_id));
+    if (params.page) query.append("page", String(params.page));
+    if (params.limit !== undefined) query.append("limit", String(params.limit));
+  }
+  const queryString = query.toString();
+  const path = queryString ? `/api/v1/bills?${queryString}` : "/api/v1/bills";
+  return request<{
+    data: BillItem[];
+    total?: number;
+    page?: number;
+    limit?: number;
+  }>(path);
+}
+
+export function notifyBill(id: number, triggerKey: string) {
+  return request<{ message: string }>(`/api/v1/bills/${id}/notify`, {
+    method: "POST",
+    body: JSON.stringify({ trigger_key: triggerKey }),
+  });
 }
 
 export function generateBills(period: string) {

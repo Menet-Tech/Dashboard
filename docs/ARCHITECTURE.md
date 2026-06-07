@@ -164,7 +164,31 @@ Webhook-based. Two configurable webhook URLs: billing channel + alert channel.
 
 ### MikroTik
 RouterOS API over TCP (port 8728). Package: `backend/internal/mikrotik/`.  
-Operations: `LimitUser` (add Simple Queue) and `UnlimitUser` (remove Simple Queue).
+Credentials configured via Settings (`mikrotik_host`, `mikrotik_user`, `mikrotik_pass`).
+
+#### Push Sync (Dashboard → Router)
+Any time a customer is created, updated, or has their status changed, the service layer calls `SyncToMikrotik()` in the background:
+- Creates a PPPoE secret in `/ppp/secret` if it doesn't exist
+- Updates password, profile, and `disabled` flag otherwise
+- Kicks the active PPPoE session so changes take effect immediately
+
+#### Pull Sync (Router → Dashboard)
+Admins can import existing PPPoE secrets from RouterOS into the dashboard via two API endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/api/v1/integration/mikrotik/sync-preview` | Lists all PPPoE secrets from RouterOS and marks which already exist in the dashboard |
+| `POST` | `/api/v1/integration/mikrotik/sync-import`  | Bulk-creates selected secrets as new customers (profile → package name match, active status) |
+
+The UI panel in **Pengaturan → MikroTik → Sinkronisasi dari MikroTik** shows a preview table, allows selecting rows, setting a default due day, and triggering the import.
+
+#### Client Operations
+- `Connect(ctx)` — TCP dial + RouterOS login
+- `Close()` — close connection
+- `TestConnection(ctx)` — validates credentials
+- `ListSecrets(ctx)` — pull all PPPoE secrets (`/ppp/secret/print`)
+- `SyncCustomer(ctx, ...)` — create/update/disable a PPPoE secret
+- `LimitUser(ctx, ...)` — set a user's profile to `isolir`
 
 ---
 
@@ -182,9 +206,8 @@ Operations: `LimitUser` (add Simple Queue) and `UnlimitUser` (remove Simple Queu
 
 ---
 
-## Known Gaps (as of May 2026)
+## Known Gaps (as of June 2026)
 
 - Legacy MySQL → SQLite import not yet run with real production DSN
-- MikroTik: config/readiness only; RouterOS real connection not tested on hardware
 - Frontend test coverage is minimal
 - Discord bot (Node.js legacy) not ported to Go

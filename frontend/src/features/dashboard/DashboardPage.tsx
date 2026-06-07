@@ -1,16 +1,28 @@
 import { Bar, Pie } from "react-chartjs-2";
-import { formatDateTime } from "../../utils/format";
+import { formatDateTime, formatCurrency } from "../../utils/format";
 import { StatusPill, SkeletonCard } from "../../components/ui";
 import type { StatusTone } from "../../utils/status";
 import type { HealthPayload, SummaryPayload } from "../../lib/api";
 import type { User, RevenueItem, AgingReport, ViewKey } from "../../types";
 
-const summaryCards = [
-  { key: "total_pelanggan", label: "Total Pelanggan", note: "Basis pelanggan yang tercatat di database operasional." },
-  { key: "total_active", label: "Status Active", note: "Layanan normal yang bisa dipantau tanpa tindakan isolir." },
-  { key: "total_limit", label: "Status Limit", note: "Pelanggan yang perlu follow-up karena pembatasan layanan." },
-  { key: "total_tagihan_belum_bayar", label: "Tagihan Belum Bayar", note: "Piutang berjalan yang masih perlu ditagih." },
-] as const;
+type SummaryCard = {
+  key: keyof SummaryPayload;
+  label: string;
+  note: string;
+  color: string;
+  isCurrency?: boolean;
+};
+
+const summaryCards: SummaryCard[] = [
+  { key: "total_pelanggan", label: "Total Pelanggan", note: "Basis pelanggan yang tercatat di database operasional.", color: "border-t-indigo-500" },
+  { key: "total_active", label: "Status Active", note: "Layanan normal yang bisa dipantau tanpa tindakan isolir.", color: "border-t-emerald-500" },
+  { key: "total_limit", label: "Status Limit", note: "Pelanggan yang perlu follow-up karena pembatasan layanan.", color: "border-t-rose-500" },
+  { key: "total_inactive", label: "Status Inactive", note: "Pelanggan dengan status dinonaktifkan.", color: "border-t-slate-500" },
+  { key: "total_tagihan_belum_bayar", label: "Tagihan Belum Bayar", note: "Piutang berjalan yang masih perlu ditagih.", color: "border-t-amber-500" },
+  { key: "total_jatuh_tempo", label: "Jatuh Tempo", note: "Tagihan belum lunas yang telah melewati batas pembayaran.", color: "border-t-orange-500" },
+  { key: "total_menunggak", label: "Menunggak (>30 Hari)", note: "Tagihan menunggak lama yang memerlukan tindakan isolir.", color: "border-t-red-500" },
+  { key: "pendapatan_bulan_ini", label: "Realisasi Bulan Ini", note: "Total pembayaran tagihan yang diterima bulan ini.", color: "border-t-teal-500", isCurrency: true },
+];
 
 export type DashboardPageProps = {
   pageLoading: boolean;
@@ -52,12 +64,23 @@ export function DashboardPage({
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
           </>
         ) : (
           summaryCards.map((card) => (
-            <article key={card.key} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+            <article
+              key={card.key}
+              className={`bg-white border-x border-b border-slate-200 ${card.color} border-t-4 rounded-2xl p-6 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between`}
+            >
               <span className="text-sm font-semibold text-slate-500 mb-2">{card.label}</span>
-              <strong className="text-3xl font-bold text-slate-900">{summary?.[card.key] ?? 0}</strong>
+              <strong className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                {card.isCurrency
+                  ? formatCurrency(summary?.[card.key] as number ?? 0)
+                  : (summary?.[card.key] as number ?? 0)}
+              </strong>
               <p className="text-xs text-slate-400 mt-4 leading-relaxed">{card.note}</p>
             </article>
           ))
@@ -178,6 +201,51 @@ export function DashboardPage({
 
       <section className="grid grid-cols-1">
         <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-slate-900">5 Pembayaran Terbaru</h2>
+            <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">Realisasi Kas</span>
+          </div>
+          <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200 text-gray-550">
+                <tr>
+                  <th className="px-6 py-4 font-medium">Tanggal</th>
+                  <th className="px-6 py-4 font-medium">Invoice</th>
+                  <th className="px-6 py-4 font-medium">Pelanggan</th>
+                  <th className="px-6 py-4 font-medium">Nominal</th>
+                  <th className="px-6 py-4 font-medium">Metode</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {!summary?.pembayaran_terbaru || summary.pembayaran_terbaru.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                      Belum ada riwayat pembayaran terbaru.
+                    </td>
+                  </tr>
+                ) : (
+                  summary.pembayaran_terbaru.map((p) => (
+                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4 text-slate-500">{formatDateTime(p.paid_at)}</td>
+                      <td className="px-6 py-4 text-slate-900 font-semibold">{p.invoice_number}</td>
+                      <td className="px-6 py-4 text-slate-700">{p.customer_name}</td>
+                      <td className="px-6 py-4 text-emerald-600 font-bold">{formatCurrency(p.amount)}</td>
+                      <td className="px-6 py-4">
+                        <span className="uppercase tracking-wider text-[10px] font-extrabold bg-slate-100 text-slate-700 px-2 py-1 rounded-lg">
+                          {p.payment_method}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section className="grid grid-cols-1">
+        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-slate-900">Service Snapshot</h2>
             <StatusPill label={health?.status ?? "checking"} tone={appTone} />
@@ -201,8 +269,6 @@ export function DashboardPage({
             </div>
           </dl>
         </article>
-
-
       </section>
     </div>
   );

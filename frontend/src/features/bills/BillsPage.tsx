@@ -2,6 +2,7 @@ import { Fragment, type FormEvent } from "react";
 import { formatCurrency } from "../../utils/format";
 import { displayStatusLabel, displayStatusTone } from "../../utils/status";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
+import { notifyBill } from "../../lib/api";
 import type { BillItem, User, NotificationLog } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
 
@@ -15,12 +16,20 @@ type BillsPageProps = {
   expandedBillId: number | null;
   notificationLogs: Record<number, NotificationLog[]>;
   proofFiles: Record<number, File | null>;
+  search: string;
+  status: string;
+  page: number;
+  total: number;
+  limit: number;
   onBillPeriodChange: (period: string) => void;
   onGenerateBills: (e: FormEvent<HTMLFormElement>) => void;
   onMarkBillPaid: (id: number) => void;
   onToggleNotifications: (id: number) => void;
   onProofFileChange: (id: number, file: File | null) => void;
   onUploadProof: (id: number) => void;
+  onSearchChange: (search: string) => void;
+  onStatusChange: (status: string) => void;
+  onPageChange: (page: number) => void;
   pushToast: (tone: any, msg: string) => void;
   pushSuccess: (msg: string) => void;
   pushError: (msg: string) => void;
@@ -36,25 +45,38 @@ export function BillsPage({
   expandedBillId,
   notificationLogs,
   proofFiles,
+  search,
+  status,
+  page,
+  total,
+  limit,
   onBillPeriodChange,
   onGenerateBills,
   onMarkBillPaid,
   onToggleNotifications,
   onProofFileChange,
   onUploadProof,
+  onSearchChange,
+  onStatusChange,
+  onPageChange,
   pushToast,
   pushSuccess,
   pushError,
 }: BillsPageProps) {
   const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
 
-  const handleSendWA = async (id: number) => {
-    pushToast("slate", "Notifikasi WA sedang dikirim...");
+  const handleSendManualWA = async (id: number, triggerKey: string) => {
+    pushToast("slate", "Mengirim notifikasi WhatsApp...");
     try {
-      await onToggleNotifications(id);
-      pushSuccess("Notifikasi WA berhasil dikirim");
+      await notifyBill(id, triggerKey);
+      pushSuccess("Notifikasi WhatsApp berhasil dikirim");
+      if (expandedBillId === id) {
+        // Toggle off then back on to reload notification logs
+        await onToggleNotifications(id);
+        await onToggleNotifications(id);
+      }
     } catch (err) {
-      pushError("Gagal mengirim notifikasi WA");
+      pushError("Gagal mengirim notifikasi WhatsApp");
     }
   };
 
@@ -90,10 +112,41 @@ export function BillsPage({
       )}
 
       <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-slate-900">Daftar Tagihan</h2>
-          <StatusPill label={`${bills.length} item`} tone="slate" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Daftar Tagihan</h2>
+            <p className="text-xs text-slate-500 mt-1">Cari, saring, dan kelola tagihan bulanan pelanggan.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="text"
+              className="bg-white border border-slate-200 text-slate-750 text-xs rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors w-64"
+              placeholder="Cari Invoice atau Pelanggan..."
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+            <select
+              className="bg-white border border-slate-200 text-slate-750 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+              value={status}
+              onChange={(e) => onStatusChange(e.target.value)}
+            >
+              <option value="">Semua Status</option>
+              <option value="lunas">Lunas</option>
+              <option value="belum_bayar">Belum Bayar</option>
+              <option value="jatuh_tempo">Jatuh Tempo</option>
+              <option value="menunggak">Menunggak</option>
+            </select>
+            <a
+              href="/api/v1/reports/bills/csv"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export CSV
+            </a>
+            <StatusPill label={`${total} item`} tone="slate" />
+          </div>
         </div>
+
         <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
           <table className="w-full text-left border-collapse text-sm">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
@@ -110,12 +163,12 @@ export function BillsPage({
             </thead>
             <tbody className="divide-y divide-gray-200">
               {bills.length === 0 ? (
-                <EmptyTableRow message="Belum ada tagihan untuk ditampilkan pada database ini." colSpan={8} />
+                <EmptyTableRow message="Tidak ada data tagihan yang sesuai." colSpan={8} />
               ) : (
                 bills.map((bill) => (
                   <Fragment key={bill.id}>
                     <tr>
-                      <td className="px-6 py-4 text-gray-700">{bill.invoice_number}</td>
+                      <td className="px-6 py-4 text-gray-700 font-semibold">{bill.invoice_number}</td>
                       <td className="px-6 py-4 text-gray-700">{bill.customer_name}</td>
                       <td className="px-6 py-4 text-gray-700">{bill.period}</td>
                       <td className="px-6 py-4 text-gray-700">{bill.due_date}</td>
@@ -128,7 +181,7 @@ export function BillsPage({
                       </td>
                       <td className="px-6 py-4 text-gray-700">
                         {bill.proof_path ? (
-                          <a href={bill.proof_path} target="_blank" rel="noreferrer">
+                          <a href={bill.proof_path} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
                             Lihat bukti
                           </a>
                         ) : (
@@ -144,15 +197,25 @@ export function BillsPage({
                           >
                             Invoice
                           </button>
-                          <button
-                            type="button"
-                            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                            onClick={() => handleSendWA(bill.id)}
+                          
+                          <select
+                            className="bg-white border border-slate-200 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
+                            defaultValue=""
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                void handleSendManualWA(bill.id, e.target.value);
+                                e.target.value = "";
+                              }
+                            }}
                             disabled={isBusy(`notify-${bill.id}`)}
                           >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .018 5.394 0 12.03c0 2.12.54 4.19 1.563 6.04L0 24l6.102-1.601a11.803 11.803 0 005.94 1.579h.005c6.637 0 12.032-5.395 12.035-12.032a11.762 11.762 0 00-3.417-8.281z"/></svg>
-                            Kirim WA
-                          </button>
+                            <option value="" disabled>Kirim WA</option>
+                            <option value="reminder_custom">Reminder Custom</option>
+                            <option value="jatuh_tempo">Jatuh Tempo</option>
+                            <option value="limit_5hari">Limit 5 Hari</option>
+                            <option value="lunas">Lunas</option>
+                          </select>
+
                           <button
                             type="button"
                             className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
@@ -175,14 +238,22 @@ export function BillsPage({
                               <input
                                 type="file"
                                 accept=".jpg,.jpeg,.png,.pdf,.webp"
+                                className="hidden"
+                                id={`proof-upload-${bill.id}`}
                                 onChange={(e) => onProofFileChange(bill.id, e.target.files?.[0] ?? null)}
                               />
-                               <button
+                              <label
+                                htmlFor={`proof-upload-${bill.id}`}
+                                className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
+                              >
+                                {proofFiles[bill.id] ? proofFiles[bill.id]?.name : "Pilih Bukti"}
+                              </label>
+                              <button
                                 type="button"
                                 className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
                                 onClick={() => onUploadProof(bill.id)}
                               >
-                                {isBusy("upload-proof") ? "Mengunggah..." : "Upload Bukti"}
+                                {isBusy("upload-proof") ? "Mengunggah..." : "Upload"}
                               </button>
                             </>
                           )}
@@ -192,38 +263,40 @@ export function BillsPage({
                     {expandedBillId === bill.id && (
                       <tr className="expanded-row">
                         <td className="px-6 py-4 text-gray-700" colSpan={8}>
-                          <div className="expanded-content p-4">
-                            <h4>Riwayat Notifikasi</h4>
+                          <div className="expanded-content p-4 bg-slate-50 rounded-xl">
+                            <h4 className="font-bold text-slate-800 mb-2">Riwayat Notifikasi</h4>
                             {notificationLogs[bill.id]?.length ? (
-                              <table className="compact-table mt-2 w-full">
-                                <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
-                                  <tr>
-                                    <th className="text-left">Waktu</th>
-                                    <th className="text-left">Tujuan</th>
-                                    <th className="text-left">Trigger</th>
-                                    <th className="text-left">Status</th>
-                                    <th className="text-left">Response</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                  {notificationLogs[bill.id].map((log) => (
-                                    <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                                      <td className="px-6 py-4 text-gray-700">{new Date(log.created_at).toLocaleString()}</td>
-                                      <td className="px-6 py-4 text-gray-700">{log.sent_to}</td>
-                                      <td className="px-6 py-4 text-gray-700">{log.trigger_key}</td>
-                                      <td className="px-6 py-4 text-gray-700">
-                                        <StatusPill
-                                          label={log.status}
-                                          tone={log.status === "sent" ? "green" : "slate"}
-                                        />
-                                      </td>
-                                      <td className="px-6 py-4 text-gray-700">{log.response_message}</td>
+                              <div className="overflow-hidden border border-slate-200 rounded-lg">
+                                <table className="compact-table w-full text-xs">
+                                  <thead className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+                                    <tr>
+                                      <th className="px-4 py-2 text-left">Waktu</th>
+                                      <th className="px-4 py-2 text-left">Tujuan</th>
+                                      <th className="px-4 py-2 text-left">Trigger</th>
+                                      <th className="px-4 py-2 text-left">Status</th>
+                                      <th className="px-4 py-2 text-left">Response</th>
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-200 bg-white">
+                                    {notificationLogs[bill.id].map((log) => (
+                                      <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-4 py-2 text-slate-500">{new Date(log.created_at).toLocaleString()}</td>
+                                        <td className="px-4 py-2 text-slate-700">{log.sent_to}</td>
+                                        <td className="px-4 py-2 text-slate-700">{log.trigger_key}</td>
+                                        <td className="px-4 py-2 text-slate-700">
+                                          <StatusPill
+                                            label={log.status}
+                                            tone={log.status === "sent" ? "green" : "slate"}
+                                          />
+                                        </td>
+                                        <td className="px-4 py-2 text-slate-500">{log.response_message}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
                             ) : (
-                              <p className="muted mt-2">Belum ada riwayat notifikasi WhatsApp.</p>
+                              <p className="muted text-xs">Belum ada riwayat notifikasi WhatsApp.</p>
                             )}
                           </div>
                         </td>
@@ -235,6 +308,35 @@ export function BillsPage({
             </tbody>
           </table>
         </div>
+
+        {total > limit && (
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 text-slate-500 text-xs font-semibold">
+            <span>
+              Menampilkan {Math.min((page - 1) * limit + 1, total)} - {Math.min(page * limit, total)} dari {total} item
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-2 px-4 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                disabled={page <= 1}
+                onClick={() => onPageChange(page - 1)}
+              >
+                Sebelumnya
+              </button>
+              <span className="flex items-center px-2 text-slate-700">
+                Halaman {page} dari {Math.ceil(total / limit)}
+              </span>
+              <button
+                type="button"
+                className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-2 px-4 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                disabled={page >= Math.ceil(total / limit)}
+                onClick={() => onPageChange(page + 1)}
+              >
+                Berikutnya
+              </button>
+            </div>
+          </div>
+        )}
       </article>
     </section>
   );

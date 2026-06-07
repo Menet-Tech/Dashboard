@@ -6,10 +6,10 @@ const pillVariants = cva(
   {
     variants: {
       tone: {
-        green: "text-green-800 bg-green-100",
-        gold:  "text-amber-800 bg-amber-100",
-        red:   "text-red-800 bg-red-100",
-        slate: "text-slate-800 bg-slate-100",
+        green: "text-green-800 bg-green-100 dark:text-green-450 dark:bg-green-950/45",
+        gold:  "text-amber-800 bg-amber-100 dark:text-amber-400 dark:bg-amber-950/45",
+        red:   "text-red-800 bg-red-100 dark:text-red-400 dark:bg-red-950/45",
+        slate: "text-slate-800 bg-slate-100 dark:text-slate-400 dark:bg-slate-800",
       },
     },
     defaultVariants: { tone: "slate" },

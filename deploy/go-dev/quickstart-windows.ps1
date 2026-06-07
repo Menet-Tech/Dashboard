@@ -34,7 +34,10 @@
 param(
     [Parameter(Position = 0)]
     [ValidateSet("api", "worker", "frontend", "whatsapp", "test", "watch", "check", "setup-env", "clean", "reset", "help", $null)]
-    [string]$Command = ""
+    [string]$Command = "",
+
+    [Parameter(Position = 1)]
+    [switch]$Force
 )
 
 # Handle null/empty command
@@ -280,7 +283,12 @@ function Invoke-StartFrontend {
             & npm install
         }
         
-        & npm run dev
+        if ($Force) {
+            Write-Log "Forcing Vite dependency re-optimization..." -Type Info
+            & npm run dev -- --force
+        } else {
+            & npm run dev
+        }
     }
     finally {
         Pop-Location
@@ -455,13 +463,22 @@ function Invoke-StartAll {
 }
 
 function Invoke-Clean {
-    Write-Header "Cleaning Temporary Files"
+    Write-Header "Cleaning Temporary Files & Binaries"
+    
+    Write-Log "Cleaning repository root binaries..." -Type Info
+    Remove-Item -Path "$($script:Config.RepoRoot)\*.exe" -Force -ErrorAction SilentlyContinue
     
     Write-Log "Cleaning backend..." -Type Info
     Push-Location $script:Config.BackendDir
     try {
-        Remove-Item -Path @("build", "dist", "bin", "*.exe") -Recurse -Force -ErrorAction SilentlyContinue
-        & go clean -cache -testcache 2>$null
+        Get-ChildItem -Path . -Filter *.exe -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path @("build", "dist", "bin") -Recurse -Force -ErrorAction SilentlyContinue
+        
+        $prevPref = $ErrorActionPreference
+        $ErrorActionPreference = 'SilentlyContinue'
+        $null = & go clean -cache -testcache 2>&1
+        $ErrorActionPreference = $prevPref
+        
         Write-Log "Backend cleaned" -Type Success
     }
     finally {
@@ -594,7 +611,7 @@ function Invoke-Reset {
     try {
         $prevPref = $ErrorActionPreference
         $ErrorActionPreference = 'SilentlyContinue'
-        $goCleanOut = & go clean -cache -testcache 2>&1
+        $null = & go clean -cache -testcache 2>&1
         $ErrorActionPreference = $prevPref
         if ($LASTEXITCODE -eq 0) {
             Write-Log "      Go cache cleared" -Type Success
@@ -661,6 +678,9 @@ EXAMPLES:
 
   # Frontend only
   .\quickstart-windows.ps1 frontend
+
+  # Frontend only with forced dependency optimization (fixes outdated/504 dependencies cache)
+  .\quickstart-windows.ps1 frontend -Force
 
   # Run tests
   .\quickstart-windows.ps1 test

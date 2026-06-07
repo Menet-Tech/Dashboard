@@ -13,9 +13,34 @@ export function useBills({ withFeedback, askForConfirmation, onSuccess, onError 
   const [notificationLogs, setNotificationLogs] = useState<Record<number, NotificationLog[]>>({});
   const [expandedBillId, setExpandedBillId] = useState<number | null>(null);
 
-  async function refreshBills() {
-    const payload = await fetchBills();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 50;
+
+  async function refreshBills(params?: {
+    search?: string;
+    status?: string;
+    period?: string;
+    page?: number;
+  }) {
+    const activeSearch = params?.search !== undefined ? params.search : search;
+    const activeStatus = params?.status !== undefined ? params.status : status;
+    const activePeriod = params?.period !== undefined ? params.period : billPeriod;
+    const activePage = params?.page !== undefined ? params.page : page;
+
+    const payload = await fetchBills({
+      search: activeSearch || undefined,
+      status: activeStatus || undefined,
+      period: activePeriod || undefined,
+      page: activePage,
+      limit,
+    });
     setBills(payload.data);
+    if (payload.total !== undefined) {
+      setTotal(payload.total);
+    }
   }
 
   async function handleGenerateBills(event: FormEvent<HTMLFormElement>) {
@@ -78,8 +103,25 @@ export function useBills({ withFeedback, askForConfirmation, onSuccess, onError 
     }
   }
 
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setPage(1);
+    void refreshBills({ search: val, page: 1 });
+  };
+
+  const handleStatusChange = (val: string) => {
+    setStatus(val);
+    setPage(1);
+    void refreshBills({ status: val, page: 1 });
+  };
+
+  const handlePageChange = (val: number) => {
+    setPage(val);
+    void refreshBills({ page: val });
+  };
+
   return {
-    state: { bills, billPeriod, billErrors, proofFiles, notificationLogs, expandedBillId },
-    handlers: { setBills, setBillPeriod, setProofFiles, refreshBills, handleGenerateBills, handleMarkBillPaid, handleUploadProof, handleToggleNotifications },
+    state: { bills, billPeriod, billErrors, proofFiles, notificationLogs, expandedBillId, search, status, page, total, limit },
+    handlers: { setBills, setBillPeriod, setProofFiles, refreshBills, handleGenerateBills, handleMarkBillPaid, handleUploadProof, handleToggleNotifications, handleSearchChange, handleStatusChange, handlePageChange },
   };
 }

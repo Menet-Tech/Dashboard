@@ -9,7 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"menettech/dashboard/backend/internal/customers"
+	"menettech/dashboard/backend/internal/mikrotik"
 	"menettech/dashboard/backend/internal/notifications"
+	"menettech/dashboard/backend/internal/packages"
 	"menettech/dashboard/backend/internal/settings"
 )
 
@@ -18,6 +21,8 @@ type IntegrationHandler struct {
 	WhatsApp   notifications.WhatsAppService
 	Discord    notifications.DiscordSender
 	HTTPClient *http.Client
+	Customers  customers.Service
+	Packages   packages.Service
 }
 
 func NewIntegrationHandler(settingsService settings.Service, whatsAppService notifications.WhatsAppService, discordSender notifications.DiscordSender) IntegrationHandler {
@@ -114,5 +119,223 @@ func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]string{
 		"whatsapp": waStatus,
 		"discord":  discordStatus,
+	})
+}
+
+// mikrotikPreviewItem is one PPPoE secret from MikroTik returned in sync preview.
+type mikrotikPreviewItem struct {
+	Name     string `json:"name"`
+	Password string `json:"password"`
+	Profile  string `json:"profile"`
+	Disabled bool   `json:"disabled"`
+	Exists   bool   `json:"exists"` // already in dashboard?
+}
+
+// SyncPreview connects to MikroTik, lists all PPPoE secrets, and marks which ones
+// already exist in the dashboard database (matched by user_pppoe).
+func (h IntegrationHandler) SyncPreview(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+
+	host, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
+	user, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
+	pass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
+
+	if strings.TrimSpace(host) == "" || strings.TrimSpace(user) == "" || strings.TrimSpace(pass) == "" {
+		WriteError(w, http.StatusBadRequest, "konfigurasi MikroTik belum lengkap — isi host, user, dan password terlebih dahulu")
+		return
+	}
+
+	client := mikrotik.NewClient(host, user, pass)
+	if err := client.Connect(ctx); err != nil {
+		WriteError(w, http.StatusBadGateway, fmt.Sprintf("gagal terhubung ke MikroTik: %v", err))
+		return
+	}
+	defer client.Close()
+
+	secrets, err := client.ListSecrets(ctx)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, fmt.Sprintf("gagal membaca PPPoE secrets: %v", err))
+		return
+	}
+
+	// Build a set of existing user_pppoe values in the dashboard
+	existingCustomers, err := h.Customers.List(ctx)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "gagal membaca daftar pelanggan")
+		return
+	}
+	existingSet := make(map[string]bool, len(existingCustomers))
+	for _, c := range existingCustomers {
+		if c.UserPPPoE != "" {
+			existingSet[strings.ToLower(strings.TrimSpace(c.UserPPPoE))] = true
+		}
+	}
+
+	items := make([]mikrotikPreviewItem, 0, len(secrets))
+	for _, s := range secrets {
+		items = append(items, mikrotikPreviewItem{
+			Name:     s.Name,
+			Password: s.Password,
+			Profile:  s.Profile,
+			Disabled: s.Disabled,
+			Exists:   existingSet[strings.ToLower(s.Name)],
+		})
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"secrets": items,
+		"total":   len(items),
+	})
+}
+
+// syncImportPayload is the request body for SyncImport.
+type syncImportPayload struct {
+	// Names is the list of PPPoE username to import from the last preview.
+	Names []string `json:"names"`
+	// DefaultPackageID is the package_id to assign when profile cannot be matched.
+	DefaultPackageID int64 `json:"default_package_id"`
+	// DefaultDueDay is the tgl_jatuh_tempo to assign (1-31).
+	DefaultDueDay int `json:"default_due_day"`
+}
+
+// SyncImport bulk-creates customers from MikroTik PPPoE secrets.
+// It fetches the named secrets from RouterOS, resolves their profile to a package_id,
+// and inserts them as new active customers. Already-existing users are skipped.
+func (h IntegrationHandler) SyncImport(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	var payload syncImportPayload
+	if err := decodeJSON(r, &payload); err != nil || len(payload.Names) == 0 {
+		WriteError(w, http.StatusBadRequest, "payload tidak valid atau names kosong")
+		return
+	}
+
+	dueDay := payload.DefaultDueDay
+	if dueDay < 1 || dueDay > 31 {
+		dueDay = 1
+	}
+
+	host, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
+	user, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
+	pass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
+
+	if strings.TrimSpace(host) == "" {
+		WriteError(w, http.StatusBadRequest, "konfigurasi MikroTik belum lengkap")
+		return
+	}
+
+	client := mikrotik.NewClient(host, user, pass)
+	if err := client.Connect(ctx); err != nil {
+		WriteError(w, http.StatusBadGateway, fmt.Sprintf("gagal terhubung ke MikroTik: %v", err))
+		return
+	}
+	defer client.Close()
+
+	secrets, err := client.ListSecrets(ctx)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, fmt.Sprintf("gagal membaca PPPoE secrets: %v", err))
+		return
+	}
+
+	// Build a lookup map by name
+	secretMap := make(map[string]mikrotik.PPPoESecret, len(secrets))
+	for _, s := range secrets {
+		secretMap[strings.ToLower(s.Name)] = s
+	}
+
+	// Build a lookup of existing dashboard customers
+	existingCustomers, err := h.Customers.List(ctx)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "gagal membaca daftar pelanggan")
+		return
+	}
+	existingSet := make(map[string]bool, len(existingCustomers))
+	for _, c := range existingCustomers {
+		if c.UserPPPoE != "" {
+			existingSet[strings.ToLower(strings.TrimSpace(c.UserPPPoE))] = true
+		}
+	}
+
+	// Load all packages to match profile names
+	allPackages, err := h.Packages.List(ctx)
+	if err != nil {
+		allPackages = nil // not fatal, will use default
+	}
+	packageByProfile := make(map[string]int64, len(allPackages))
+	var fallbackPackageID int64 = payload.DefaultPackageID
+	for _, p := range allPackages {
+		packageByProfile[strings.ToLower(strings.TrimSpace(p.Name))] = p.ID
+		if fallbackPackageID == 0 {
+			fallbackPackageID = p.ID // use first available as fallback
+		}
+	}
+
+	if fallbackPackageID == 0 {
+		WriteError(w, http.StatusBadRequest, "tidak ada paket yang tersedia — tambahkan minimal satu paket terlebih dahulu")
+		return
+	}
+
+	type importResult struct {
+		Name    string `json:"name"`
+		Status  string `json:"status"` // "imported", "skipped", "error"
+		Message string `json:"message,omitempty"`
+	}
+
+	var results []importResult
+	importedCount := 0
+
+	for _, name := range payload.Names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+
+		key := strings.ToLower(name)
+		if existingSet[key] {
+			results = append(results, importResult{Name: name, Status: "skipped", Message: "sudah ada di dashboard"})
+			continue
+		}
+
+		secret, ok := secretMap[key]
+		if !ok {
+			results = append(results, importResult{Name: name, Status: "skipped", Message: "tidak ditemukan di MikroTik"})
+			continue
+		}
+
+		// Resolve package from profile name
+		packageID := fallbackPackageID
+		if pid, found := packageByProfile[strings.ToLower(secret.Profile)]; found {
+			packageID = pid
+		}
+
+		status := "active"
+		if secret.Disabled {
+			status = "inactive"
+		}
+
+		newCustomer := customers.Customer{
+			Name:          secret.Name,
+			PackageID:     packageID,
+			UserPPPoE:     secret.Name,
+			PasswordPPPoE: secret.Password,
+			DueDay:        dueDay,
+			Status:        status,
+		}
+
+		_, createErr := h.Customers.Create(ctx, newCustomer)
+		if createErr != nil {
+			results = append(results, importResult{Name: name, Status: "error", Message: createErr.Error()})
+			continue
+		}
+
+		importedCount++
+		results = append(results, importResult{Name: name, Status: "imported"})
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"imported": importedCount,
+		"results":  results,
 	})
 }

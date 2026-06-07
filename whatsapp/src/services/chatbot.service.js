@@ -13,7 +13,7 @@
 
 const logger = require('../utils/logger');
 const { getSession, upsertSession, deleteSession, saveContactForm } = require('../utils/database');
-const { findCustomerByPhone, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket } = require('./isp.service');
+const { findCustomerByPhone, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket, getTemplateByTrigger, getSettings } = require('./isp.service');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -35,21 +35,62 @@ const formatRp = (n) => `Rp ${Number(n).toLocaleString('id-ID')}`;
 /** Format tanggal Indonesia */
 const formatDate = (d) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
+/** Render simple template with placeholders */
+const renderTemplate = (templateStr, variables) => {
+    let result = templateStr;
+    for (const key in variables) {
+        result = result.split(`{${key}}`).join(variables[key] !== undefined ? variables[key] : '');
+    }
+    return result;
+};
+
 // ─── Menu Teks ───────────────────────────────────────────────────────────────
 
-const MENU_UNREG = `hai, selamat datang di menet dashboard, silahkan ikuti panduan tersebut:
-kirim 1 untuk mendaftar, dan menggunakan internet menet
-kirim 2 jika ada kendala mengenai wifi
-kirim 3 untuk melihat paket yang disediakan
-kirim 4 untuk melihat pertanyaan umum
-kirim 5 untuk chat ke admin`;
+const defaultMenuUnreg = (triggerRegister, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin) => 
+`hai, selamat datang di menet dashboard, silahkan ikuti panduan tersebut:
+kirim ${triggerRegister} untuk mendaftar, dan menggunakan internet menet
+kirim ${triggerSupport} jika ada kendala mengenai wifi
+kirim ${triggerPackages} untuk melihat paket yang disediakan
+kirim ${triggerFAQ} untuk melihat pertanyaan umum
+kirim ${triggerAdmin} untuk chat ke admin`;
 
-const MENU_REG = (nama) => `hai, selamat ${greeting()} ${nama}, apa ada yang bisa di bantu ?
-ketik 1 untuk cek tagihan anda
-ketik 2 jika ada kendala mengenai wifi
-kirim 3 untuk melihat paket yang disediakan
-kirim 4 untuk melihat pertanyaan umum
-kirim 5 untuk chat ke admin`;
+const defaultMenuReg = (nama, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin) => 
+`hai, selamat ${greeting()} ${nama}, apa ada yang bisa di bantu ?
+ketik ${triggerBilling} untuk cek tagihan anda
+ketik ${triggerSupport} jika ada kendala mengenai wifi
+kirim ${triggerPackages} untuk melihat paket yang disediakan
+kirim ${triggerFAQ} untuk melihat pertanyaan umum
+kirim ${triggerAdmin} untuk chat ke admin`;
+
+const getMenuUnreg = async (triggerRegister, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin) => {
+    const tpl = await getTemplateByTrigger('chatbot_menu_unreg');
+    if (tpl) {
+        return renderTemplate(tpl.content || tpl.isi_template, {
+            trigger_register: triggerRegister,
+            trigger_support: triggerSupport,
+            trigger_packages: triggerPackages,
+            trigger_faq: triggerFAQ,
+            trigger_admin: triggerAdmin
+        });
+    }
+    return defaultMenuUnreg(triggerRegister, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+};
+
+const getMenuReg = async (nama, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin) => {
+    const tpl = await getTemplateByTrigger('chatbot_menu_reg');
+    if (tpl) {
+        return renderTemplate(tpl.content || tpl.isi_template, {
+            greeting: greeting(),
+            nama,
+            trigger_billing: triggerBilling,
+            trigger_support: triggerSupport,
+            trigger_packages: triggerPackages,
+            trigger_faq: triggerFAQ,
+            trigger_admin: triggerAdmin
+        });
+    }
+    return defaultMenuReg(nama, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+};
 
 const FAQ_TEXT = `halo, ini adalah pertanyaan yang paling umum di tanyakan,
 
@@ -113,41 +154,52 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
 
     logger.debug(`[Chatbot] ${phone} state=${state} msg="${text}"`);
 
+    // Fetch dynamic chatbot triggers
+    const settings = await getSettings();
+    const triggerBilling = settings.chatbot_trigger_billing || '1';
+    const triggerRegister = settings.chatbot_trigger_register || '1';
+    const triggerSupport = settings.chatbot_trigger_support || '2';
+    const triggerPackages = settings.chatbot_trigger_packages || '3';
+    const triggerFAQ = settings.chatbot_trigger_faq || '4';
+    const triggerAdmin = settings.chatbot_trigger_admin || '5';
+
+    const matchTrigger = (inputStr, triggerStr) => {
+        if (!triggerStr) return false;
+        return triggerStr.split(',').map(x => x.trim().toLowerCase()).includes(inputStr.trim().toLowerCase());
+    };
+
     // ── IDLE: cek apakah terdaftar ──────────────────────────────────────────
     if (state === 'IDLE') {
         const customer = await findCustomerByPhone(rawFrom);
         if (customer) {
             upsertSession(rawFrom, accountId, 'REG_MENU', { customerId: customer.id, customerName: customer.name });
-            await sendFn(accountId, rawFrom, MENU_REG(customer.name));
+            const mRegText = await getMenuReg(customer.name, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+            await sendFn(accountId, rawFrom, mRegText);
         } else {
             upsertSession(rawFrom, accountId, 'UNREG_MENU', {});
-            await sendFn(accountId, rawFrom, MENU_UNREG);
+            const mUnregText = await getMenuUnreg(triggerRegister, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+            await sendFn(accountId, rawFrom, mUnregText);
         }
         return;
     }
 
     // ── UNREG_MENU ──────────────────────────────────────────────────────────
     if (state === 'UNREG_MENU') {
-        switch (text) {
-            case '1':
-                upsertSession(rawFrom, accountId, 'REG_FORM_0', {});
-                await sendFn(accountId, rawFrom, REG_STEPS[0].prompt);
-                break;
-            case '2':
-                upsertSession(rawFrom, accountId, 'SUPPORT_FORM_0', {});
-                await sendFn(accountId, rawFrom, SUPPORT_STEPS[0].prompt);
-                break;
-            case '3':
-                await sendPackageList(accountId, rawFrom, sendFn);
-                break;
-            case '4':
-                await sendFn(accountId, rawFrom, FAQ_TEXT);
-                break;
-            case '5':
-                await requestAdmin(rawFrom, accountId, contactName, sendFn);
-                break;
-            default:
-                await sendFn(accountId, rawFrom, `Hm, aku kurang ngerti 😅\n\n${MENU_UNREG}`);
+        if (matchTrigger(text, triggerRegister)) {
+            upsertSession(rawFrom, accountId, 'REG_FORM_0', {});
+            await sendFn(accountId, rawFrom, REG_STEPS[0].prompt);
+        } else if (matchTrigger(text, triggerSupport)) {
+            upsertSession(rawFrom, accountId, 'SUPPORT_FORM_0', {});
+            await sendFn(accountId, rawFrom, SUPPORT_STEPS[0].prompt);
+        } else if (matchTrigger(text, triggerPackages)) {
+            await sendPackageList(accountId, rawFrom, sendFn);
+        } else if (matchTrigger(text, triggerFAQ)) {
+            await sendFn(accountId, rawFrom, FAQ_TEXT);
+        } else if (matchTrigger(text, triggerAdmin)) {
+            await requestAdmin(rawFrom, accountId, contactName, sendFn);
+        } else {
+            const mUnregText = await getMenuUnreg(triggerRegister, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+            await sendFn(accountId, rawFrom, `Hm, aku kurang ngerti 😅\n\n${mUnregText}`);
         }
         return;
     }
@@ -155,25 +207,20 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
     // ── REG_MENU ────────────────────────────────────────────────────────────
     if (state === 'REG_MENU') {
         const { customerId, customerName } = formData;
-        switch (text) {
-            case '1':
-                await sendBillInfo(customerId, customerName, accountId, rawFrom, sendFn);
-                break;
-            case '2':
-                upsertSession(rawFrom, accountId, 'SUPPORT_FORM_0', { ...formData });
-                await sendFn(accountId, rawFrom, `Halo ${customerName}, ${SUPPORT_STEPS[0].prompt.replace(/^🔧.*\n\n/, '')}`);
-                break;
-            case '3':
-                await sendPackageList(accountId, rawFrom, sendFn);
-                break;
-            case '4':
-                await sendFn(accountId, rawFrom, FAQ_TEXT);
-                break;
-            case '5':
-                await requestAdmin(rawFrom, accountId, contactName || customerName, sendFn);
-                break;
-            default:
-                await sendFn(accountId, rawFrom, `Hm, aku kurang ngerti 😅\n\n${MENU_REG(customerName)}`);
+        if (matchTrigger(text, triggerBilling)) {
+            await sendBillInfo(customerId, customerName, accountId, rawFrom, sendFn);
+        } else if (matchTrigger(text, triggerSupport)) {
+            upsertSession(rawFrom, accountId, 'SUPPORT_FORM_0', { ...formData });
+            await sendFn(accountId, rawFrom, `Halo ${customerName}, ${SUPPORT_STEPS[0].prompt.replace(/^🔧.*\n\n/, '')}`);
+        } else if (matchTrigger(text, triggerPackages)) {
+            await sendPackageList(accountId, rawFrom, sendFn);
+        } else if (matchTrigger(text, triggerFAQ)) {
+            await sendFn(accountId, rawFrom, FAQ_TEXT);
+        } else if (matchTrigger(text, triggerAdmin)) {
+            await requestAdmin(rawFrom, accountId, contactName || customerName, sendFn);
+        } else {
+            const mRegText = await getMenuReg(customerName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+            await sendFn(accountId, rawFrom, `Hm, aku kurang ngerti 😅\n\n${mRegText}`);
         }
         return;
     }
@@ -241,11 +288,19 @@ Nomor WA: wa.me/+${linkNumber}`;
             // Notif admin with detailed support info
             const cleanPhone = rawFrom.replace(/@c\.us$/, '').replace(/^\+/, '');
             const linkNumber = cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone.replace(/^0/, '');
-            const customMsg = `🔧 *Laporan Kendala Baru*
-Nama: ${updatedForm.nama}
-Alamat: ${updatedForm.alamat}
-Kendala: ${updatedForm.kendala}
-Nomor WA: wa.me/+${linkNumber}`;
+            
+            let customMsg = '';
+            const tpl = await getTemplateByTrigger('alert_teknisi');
+            if (tpl) {
+                customMsg = renderTemplate(tpl.content || tpl.isi_template, {
+                    nama: updatedForm.nama,
+                    alamat: updatedForm.alamat,
+                    kendala: updatedForm.kendala,
+                    no_hp: linkNumber
+                });
+            } else {
+                customMsg = `🔧 *Laporan Kendala Baru*\nNama: ${updatedForm.nama}\nAlamat: ${updatedForm.alamat}\nKendala: ${updatedForm.kendala}\nNomor WA: wa.me/+${linkNumber}`;
+            }
 
             await notifyAdminViaWA({ phone: rawFrom, contactName: updatedForm.nama, accountId }, sendFn, customMsg);
             await notifyAdminViaDiscord({ phone: rawFrom, contactName: updatedForm.nama }, customMsg);
@@ -284,7 +339,14 @@ const sendBillInfo = async (customerId, customerName, accountId, to, sendFn) => 
             const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
             remainingDays = Math.max(0, customer.trial_days - elapsedDays);
         }
-        await sendFn(accountId, to, `halo ${customerName} terimakaish telah mengugunakan menet, kamu sedang ada di dalam masa trial, tidak akan ada tagihan selama ${remainingDays} hari kedepan, terimakasih.`);
+
+        const tpl = await getTemplateByTrigger('chatbot_trial');
+        if (tpl) {
+            const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customerName, hari_limit: remainingDays });
+            await sendFn(accountId, to, msg);
+        } else {
+            await sendFn(accountId, to, `halo ${customerName} terimakaish telah mengugunakan menet, kamu sedang ada di dalam masa trial, tidak akan ada tagihan selama ${remainingDays} hari kedepan, terimakasih.`);
+        }
         await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
         return;
     }
@@ -293,19 +355,42 @@ const sendBillInfo = async (customerId, customerName, accountId, to, sendFn) => 
     if (!bill) {
         const now = new Date();
         const periode = `${now.toLocaleString('id-ID', { month: 'long' })} ${now.getFullYear()}`;
-        await sendFn(accountId, to,
-            `halo ${customerName}, kamu gak ada tagihan aktif di periode ${periode}, terimakasih telah menggunakan menet`
-        );
+        const tpl = await getTemplateByTrigger('chatbot_no_bill');
+        if (tpl) {
+            const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customerName, periode });
+            await sendFn(accountId, to, msg);
+        } else {
+            await sendFn(accountId, to,
+                `halo ${customerName}, kamu gak ada tagihan aktif di periode ${periode}, terimakasih telah menggunakan menet`
+            );
+        }
     } else {
         const isDue = new Date(bill.jatuh_tempo) < new Date();
         if (isDue) {
-            await sendFn(accountId, to,
-                `halo ${customerName}, tagihan kamu sudah jatuh tempo, mohon segera di bayar, agar service tidak terganggu`
-            );
+            const tpl = await getTemplateByTrigger('chatbot_due_bill');
+            if (tpl) {
+                const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customerName });
+                await sendFn(accountId, to, msg);
+            } else {
+                await sendFn(accountId, to,
+                    `halo ${customerName}, tagihan kamu sudah jatuh tempo, mohon segera di bayar, agar service tidak terganggu`
+                );
+            }
         } else {
-            await sendFn(accountId, to,
-                `halo ${customerName}, kamu punya tagihan aktif untuk periode ${bill.periode} dengan nominal sebesar ${formatRp(bill.nominal)}, dan akan jatuh tempo pada ${formatDate(bill.jatuh_tempo)}.`
-            );
+            const tpl = await getTemplateByTrigger('chatbot_active_bill');
+            if (tpl) {
+                const msg = renderTemplate(tpl.content || tpl.isi_template, {
+                    nama: customerName,
+                    periode: bill.periode,
+                    nominal: formatRp(bill.nominal),
+                    jatuh_tempo: formatDate(bill.jatuh_tempo)
+                });
+                await sendFn(accountId, to, msg);
+            } else {
+                await sendFn(accountId, to,
+                    `halo ${customerName}, kamu punya tagihan aktif untuk periode ${bill.periode} dengan nominal sebesar ${formatRp(bill.nominal)}, dan akan jatuh tempo pada ${formatDate(bill.jatuh_tempo)}.`
+                );
+            }
         }
     }
     await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');

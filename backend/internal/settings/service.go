@@ -43,6 +43,12 @@ const (
 	KeyMikrotikUser          = "mikrotik_user"
 	KeyMikrotikPass          = "mikrotik_pass"
 	KeyMikrotikTestUsername  = "mikrotik_test_username"
+	KeyChatbotTriggerBilling  = "chatbot_trigger_billing"
+	KeyChatbotTriggerRegister = "chatbot_trigger_register"
+	KeyChatbotTriggerSupport  = "chatbot_trigger_support"
+	KeyChatbotTriggerPackages = "chatbot_trigger_packages"
+	KeyChatbotTriggerFAQ      = "chatbot_trigger_faq"
+	KeyChatbotTriggerAdmin    = "chatbot_trigger_admin"
 )
 
 var defaults = map[string]string{
@@ -78,6 +84,12 @@ var defaults = map[string]string{
 	KeyMikrotikUser:          "",
 	KeyMikrotikPass:          "",
 	KeyMikrotikTestUsername:  "test-user",
+	KeyChatbotTriggerBilling:  "1",
+	KeyChatbotTriggerRegister: "1",
+	KeyChatbotTriggerSupport:  "2",
+	KeyChatbotTriggerPackages: "3",
+	KeyChatbotTriggerFAQ:      "4",
+	KeyChatbotTriggerAdmin:    "5",
 }
 
 func IsAllowedKey(key string) bool {

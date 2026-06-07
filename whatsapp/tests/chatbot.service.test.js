@@ -25,6 +25,15 @@ jest.mock('../src/services/isp.service', () => ({
     notifyAdminViaWA: mockNotifyAdminViaWA,
     notifyAdminViaDiscord: mockNotifyAdminViaDiscord,
     createTicket: mockCreateTicket,
+    getTemplateByTrigger: jest.fn().mockResolvedValue(null),
+    getSettings: jest.fn().mockResolvedValue({
+        chatbot_trigger_billing: '1',
+        chatbot_trigger_register: '1',
+        chatbot_trigger_support: '2',
+        chatbot_trigger_packages: '3',
+        chatbot_trigger_faq: '4',
+        chatbot_trigger_admin: '5',
+    }),
 }));
 
 const database = require('../src/utils/database');
@@ -145,5 +154,57 @@ describe('Chatbot ISP state machine', () => {
 
         expect(database.deleteSession).toHaveBeenCalledWith(phone);
         expect(sendFn).toHaveBeenCalledWith('support', phone, expect.stringContaining('mendaftar'));
+    });
+
+    it('menggunakan custom trigger dan custom menu template', async () => {
+        const { getSettings, getTemplateByTrigger } = require('../src/services/isp.service');
+        getSettings.mockResolvedValue({
+            chatbot_trigger_billing: 'tagihan, billing, cek',
+            chatbot_trigger_register: 'daftar',
+            chatbot_trigger_support: 'lapor',
+            chatbot_trigger_packages: 'paket',
+            chatbot_trigger_faq: 'tanya',
+            chatbot_trigger_admin: 'halo admin',
+        });
+        getTemplateByTrigger.mockImplementation(async (triggerKey) => {
+            if (triggerKey === 'chatbot_menu_reg') {
+                return {
+                    trigger_key: 'chatbot_menu_reg',
+                    isi_template: 'Menu premium: ketik {trigger_billing} untuk tagihan.',
+                    is_active: true
+                };
+            }
+            return null;
+        });
+
+        mockSessions.set(phone, {
+            phone,
+            account_id: 'billing',
+            state: 'REG_MENU',
+            form_data: { customerId: 5, customerName: 'Budi' },
+        });
+
+        mockGetActiveBill.mockResolvedValue({
+            periode: '2026-06',
+            nominal: 150000,
+            jatuh_tempo: '2026-06-20',
+            invoice_number: 'INV-1',
+        });
+
+        // Test custom trigger match (case-insensitive and trimmed)
+        await handleMessage(phone, ' TAGIHAN ', 'billing', sendFn);
+
+        expect(mockGetActiveBill).toHaveBeenCalledWith(5);
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('nominal sebesar'));
+
+        // Test custom template fallback message
+        mockSessions.set(phone, {
+            phone,
+            account_id: 'billing',
+            state: 'REG_MENU',
+            form_data: { customerId: 5, customerName: 'Budi' },
+        });
+        await handleMessage(phone, 'salah-input', 'billing', sendFn);
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('Menu premium: ketik tagihan, billing, cek untuk tagihan.'));
     });
 });

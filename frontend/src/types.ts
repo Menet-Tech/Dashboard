@@ -117,6 +117,12 @@ export type SettingsState = {
   mikrotik_pass?: string;
   mikrotik_test_username?: string;
   trial_overdue_grace_days?: string;
+  chatbot_trigger_billing?: string;
+  chatbot_trigger_register?: string;
+  chatbot_trigger_support?: string;
+  chatbot_trigger_packages?: string;
+  chatbot_trigger_faq?: string;
+  chatbot_trigger_admin?: string;
 };
 
 export type AuditLogItem = {
@@ -180,4 +186,24 @@ export type TicketMessageItem = {
 export type TicketDetailItem = TicketItem & {
   customer_name?: string;
   messages: TicketMessageItem[];
+};
+
+// MikroTik Sync types
+export type MikrotikSyncSecret = {
+  name: string;
+  password: string;
+  profile: string;
+  disabled: boolean;
+  exists: boolean; // already in dashboard?
+};
+
+export type MikrotikSyncPreviewResponse = {
+  secrets: MikrotikSyncSecret[];
+  total: number;
+};
+
+export type MikrotikImportResult = {
+  name: string;
+  status: "imported" | "skipped" | "error";
+  message?: string;
 };

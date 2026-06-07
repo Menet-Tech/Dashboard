@@ -8,6 +8,14 @@ import (
 	"time"
 )
 
+// PPPoESecret represents a PPPoE secret entry from RouterOS /ppp/secret/print.
+type PPPoESecret struct {
+	Name     string
+	Password string
+	Profile  string
+	Disabled bool
+}
+
 // Client is a minimal RouterOS API client using the RouterOS API protocol (port 8728).
 // This implementation uses the raw RouterOS API sentence format, no external library required.
 type Client struct {
@@ -261,4 +269,175 @@ func hasDone(sentences [][]string) bool {
 		}
 	}
 	return false
+}
+
+// hasError checks if the RouterOS API response sentences contain a !trap or !fatal error
+// and returns it formatted as a Go error.
+func hasError(sentences [][]string) error {
+	for _, sentence := range sentences {
+		for _, word := range sentence {
+			if word == "!trap" || strings.HasPrefix(word, "!trap") {
+				msg := extractField(sentences, "message")
+				if msg == "" {
+					msg = "command rejected by RouterOS"
+				}
+				return fmt.Errorf("routeros trap: %s", msg)
+			}
+			if word == "!fatal" || strings.HasPrefix(word, "!fatal") {
+				return fmt.Errorf("routeros fatal error")
+			}
+		}
+	}
+	return nil
+}
+
+// ListSecrets retrieves all PPPoE secrets from RouterOS /ppp/secret/print.
+func (c *Client) ListSecrets(ctx context.Context) ([]PPPoESecret, error) {
+	if c.conn == nil {
+		return nil, fmt.Errorf("not connected to RouterOS")
+	}
+
+	reply, err := c.run(ctx, "/ppp/secret/print")
+	if err != nil {
+		return nil, fmt.Errorf("list ppp secrets: %w", err)
+	}
+	if err := hasError(reply); err != nil {
+		return nil, fmt.Errorf("list ppp secrets error: %w", err)
+	}
+
+	var secrets []PPPoESecret
+	for _, sentence := range reply {
+		// Each !re sentence represents one secret row
+		hasRe := false
+		for _, word := range sentence {
+			if word == "!re" {
+				hasRe = true
+				break
+			}
+		}
+		if !hasRe {
+			continue
+		}
+
+		var s PPPoESecret
+		for _, word := range sentence {
+			if strings.HasPrefix(word, "=name=") {
+				s.Name = strings.TrimPrefix(word, "=name=")
+			} else if strings.HasPrefix(word, "=password=") {
+				s.Password = strings.TrimPrefix(word, "=password=")
+			} else if strings.HasPrefix(word, "=profile=") {
+				s.Profile = strings.TrimPrefix(word, "=profile=")
+			} else if strings.HasPrefix(word, "=disabled=") {
+				s.Disabled = strings.TrimPrefix(word, "=disabled=") == "true"
+			}
+		}
+		if s.Name != "" {
+			secrets = append(secrets, s)
+		}
+	}
+
+	return secrets, nil
+}
+
+// SyncCustomer creates or updates a PPPoE secret in MikroTik, and kicks active session if status changes.
+func (c *Client) SyncCustomer(ctx context.Context, username, password, profile, status string) error {
+	if c.conn == nil {
+		return fmt.Errorf("not connected to RouterOS")
+	}
+
+	if username == "" {
+		return nil
+	}
+
+	// 1. Find the secret ID
+	reply, err := c.run(ctx,
+		"/ppp/secret/print",
+		"?name="+username,
+	)
+	if err != nil {
+		return fmt.Errorf("find ppp secret %q: %w", username, err)
+	}
+	if err := hasError(reply); err != nil {
+		return fmt.Errorf("find ppp secret error for %q: %w", username, err)
+	}
+
+	id := extractField(reply, ".id")
+
+	// Determine profile and disabled state based on status
+	var targetProfile string
+	var disabled string
+
+	switch status {
+	case "active":
+		targetProfile = profile
+		if targetProfile == "" {
+			targetProfile = "default"
+		}
+		disabled = "no"
+	case "limit":
+		targetProfile = "isolir" // default isolir profile name
+		disabled = "no"
+	case "inactive":
+		targetProfile = profile
+		if targetProfile == "" {
+			targetProfile = "default"
+		}
+		disabled = "yes"
+	default:
+		targetProfile = profile
+		if targetProfile == "" {
+			targetProfile = "default"
+		}
+		disabled = "no"
+	}
+
+	if id != "" {
+		// Update existing secret
+		setReply, err := c.run(ctx,
+			"/ppp/secret/set",
+			"=.id="+id,
+			"=password="+password,
+			"=profile="+targetProfile,
+			"=disabled="+disabled,
+		)
+		if err != nil {
+			return fmt.Errorf("update ppp secret %q: %w", username, err)
+		}
+		if err := hasError(setReply); err != nil {
+			return fmt.Errorf("update ppp secret error for %q: %w", username, err)
+		}
+	} else {
+		// Add new secret
+		addReply, err := c.run(ctx,
+			"/ppp/secret/add",
+			"=name="+username,
+			"=password="+password,
+			"=service=pppoe",
+			"=profile="+targetProfile,
+			"=disabled="+disabled,
+		)
+		if err != nil {
+			return fmt.Errorf("add ppp secret %q: %w", username, err)
+		}
+		if err := hasError(addReply); err != nil {
+			return fmt.Errorf("add ppp secret error for %q: %w", username, err)
+		}
+	}
+
+	// 2. Kick active session if one exists to apply profile/disabled changes instantly
+	activeReply, err := c.run(ctx,
+		"/ppp/active/print",
+		"?name="+username,
+	)
+	if err == nil && len(activeReply) > 0 && hasError(activeReply) == nil {
+		activeID := extractField(activeReply, ".id")
+		if activeID != "" {
+			_, _ = c.run(ctx,
+				"/ppp/active/remove",
+				"=.id="+activeID,
+			)
+		}
+	}
+
+	return nil
 }

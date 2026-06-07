@@ -48,12 +48,12 @@ export function PackagesPage({
   const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+    <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm xl:col-span-1">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-slate-900">{editingPackageId ? "Edit Paket" : "Tambah Paket"}</h2>
         </div>
-        <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onSubmit}>
+        <form className="grid grid-cols-1 gap-6" onSubmit={onSubmit}>
           <label>
             <span>Nama Paket</span>
             <input
@@ -109,20 +109,20 @@ export function PackagesPage({
         </form>
       </article>
 
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm xl:col-span-2 overflow-hidden flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-slate-900">Daftar Paket</h2>
           <StatusPill label={`${packages.length} item`} tone="slate" />
         </div>
-        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
-          <table className="w-full text-left border-collapse text-sm">
+        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm scrollbar-thin">
+          <table className="w-full text-left border-collapse text-sm min-w-[500px]">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
               <tr>
-                <th className="px-6 py-4 font-medium">Nama</th>
-                <th className="px-6 py-4 font-medium">Speed</th>
-                <th className="px-6 py-4 font-medium">Harga</th>
-                <th className="px-6 py-4 font-medium">Pelanggan</th>
-                <th className="px-6 py-4 font-medium">Aksi</th>
+                <th className="px-6 py-4 font-semibold">Nama</th>
+                <th className="px-6 py-4 font-semibold">Speed</th>
+                <th className="px-6 py-4 font-semibold">Harga</th>
+                <th className="px-6 py-4 font-semibold">Pelanggan</th>
+                <th className="px-6 py-4 font-semibold">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -130,11 +130,11 @@ export function PackagesPage({
                 <EmptyTableRow message="Belum ada master paket. Tambahkan paket pertama untuk mulai operasional." />
               ) : (
                 packages.map((pkg) => (
-                  <tr key={pkg.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-gray-700">{pkg.name}</td>
-                    <td className="px-6 py-4 text-gray-700">{pkg.speed_mbps} Mbps</td>
-                    <td className="px-6 py-4 text-gray-700">{formatCurrency(pkg.price)}</td>
-                    <td className="px-6 py-4 text-gray-700">{pkg.customer_count}</td>
+                  <tr key={pkg.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="px-6 py-4 font-semibold text-slate-900 dark:text-slate-100">{pkg.name}</td>
+                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">{pkg.speed_mbps} Mbps</td>
+                    <td className="px-6 py-4 text-slate-750 dark:text-slate-200 font-semibold">{formatCurrency(pkg.price)}</td>
+                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400 font-medium">{pkg.customer_count}</td>
                     <td className="px-6 py-4 text-gray-700">
                       <div className="flex gap-2">
                         <button type="button" className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={() => onEdit(pkg)}>

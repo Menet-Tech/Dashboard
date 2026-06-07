@@ -146,7 +146,40 @@ export function MonitoringPage({
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Integrasi</span>
             </div>
             <div className="flex flex-col gap-3">
-              <strong className="text-xl font-bold text-slate-900 leading-none">{integrationSummary(health)}</strong>
+              <div className="flex flex-col gap-2.5 my-1">
+                {health?.integrations.whatsapp_configured && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">WhatsApp</span>
+                    <StatusPill
+                      label={health.integrations.whatsapp_online ? "siap" : "mati"}
+                      tone={health.integrations.whatsapp_online ? "green" : "red"}
+                    />
+                  </div>
+                )}
+                {health?.integrations.discord_configured && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Discord</span>
+                    <StatusPill
+                      label={health.integrations.discord_online ? "siap" : "error"}
+                      tone={health.integrations.discord_online ? "green" : "red"}
+                    />
+                  </div>
+                )}
+                {health?.integrations.mikrotik_configured && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">MikroTik</span>
+                    <StatusPill
+                      label={health.integrations.mikrotik_online ? "siap" : "error"}
+                      tone={health.integrations.mikrotik_online ? "green" : "red"}
+                    />
+                  </div>
+                )}
+                {(!health || (!health.integrations.whatsapp_configured &&
+                  !health.integrations.discord_configured &&
+                  !health.integrations.mikrotik_configured)) && (
+                  <span className="text-sm font-semibold text-slate-400">Belum dikonfigurasi</span>
+                )}
+              </div>
               <button
                 type="button"
                 className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors disabled:opacity-50 text-center"
@@ -223,52 +256,67 @@ export function MonitoringPage({
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-slate-900">Scheduler Billing</h2>
           </div>
-          <dl className="meta-list">
-            <div>
-              <dt>Status</dt>
-              <dd>{health?.scheduler.billing_auto_enabled ? "Aktif" : "Nonaktif"}</dd>
+          <div className="space-y-4">
+            <div className="border-b border-slate-100 dark:border-slate-800/60 pb-3 flex justify-between items-center">
+              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Status</span>
+              <StatusPill
+                label={health?.scheduler.billing_auto_enabled ? "Aktif" : "Nonaktif"}
+                tone={health?.scheduler.billing_auto_enabled ? "green" : "slate"}
+              />
             </div>
-            <div>
-              <dt>Jadwal Generate</dt>
-              <dd>
+            <div className="border-b border-slate-100 dark:border-slate-800/60 pb-3 flex justify-between items-center">
+              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Jadwal Generate</span>
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
                 Tanggal {health?.scheduler.billing_generate_day ?? 1} pukul{" "}
                 {health?.scheduler.billing_generate_time ?? "00:05"}
-              </dd>
+              </span>
             </div>
-            <div>
-              <dt>Next Run</dt>
-              <dd>{formatDateTime(health?.scheduler.billing_next_run)}</dd>
+            <div className="border-b border-slate-100 dark:border-slate-800/60 pb-3 flex justify-between items-center">
+              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Next Run</span>
+              <span className="text-sm font-mono font-semibold text-indigo-650 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded">
+                {formatDateTime(health?.scheduler.billing_next_run)}
+              </span>
             </div>
-            <div>
-              <dt>Last Attempt</dt>
-              <dd>{formatDateTime(health?.scheduler.billing_last_attempt_at)}</dd>
+            <div className="border-b border-slate-100 dark:border-slate-800/60 pb-3 flex justify-between items-center">
+              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Last Attempt</span>
+              <span className="text-sm font-mono text-slate-700 dark:text-slate-350">
+                {formatDateTime(health?.scheduler.billing_last_attempt_at)}
+              </span>
             </div>
-            <div>
-              <dt>Last Success</dt>
-              <dd>
+            <div className="border-b border-slate-100 dark:border-slate-800/60 pb-3 flex justify-between items-center">
+              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Last Success</span>
+              <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                 {health?.scheduler.billing_last_success_period
                   ? `${health.scheduler.billing_last_success_period} (${formatDateTime(
                       health.scheduler.billing_last_run_at,
                     )})`
                   : "Belum ada"}
-              </dd>
+              </span>
             </div>
-            <div>
-              <dt>Tagihan Dibuat Terakhir</dt>
-              <dd>{health?.scheduler.billing_last_generated_count ?? 0}</dd>
+            <div className="border-b border-slate-100 dark:border-slate-800/60 pb-3 flex justify-between items-center">
+              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Tagihan Dibuat Terakhir</span>
+              <span className="text-sm font-bold text-slate-850 dark:text-slate-100">
+                {health?.scheduler.billing_last_generated_count ?? 0} invoice
+              </span>
             </div>
-            <div>
-              <dt>Retry Policy</dt>
-              <dd>
+            <div className="border-b border-slate-100 dark:border-slate-800/60 pb-3 flex justify-between items-center">
+              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Retry Policy</span>
+              <span className="text-sm font-semibold text-slate-750 dark:text-slate-300">
                 {health?.scheduler.billing_retry_attempts ?? 0} percobaan / backoff{" "}
                 {health?.scheduler.billing_retry_backoff_seconds ?? 0} detik
-              </dd>
+              </span>
             </div>
-            <div>
-              <dt>Last Error</dt>
-              <dd>{health?.scheduler.billing_last_error || "Tidak ada"}</dd>
+            <div className="pb-1 flex justify-between items-center">
+              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Last Error</span>
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${
+                health?.scheduler.billing_last_error 
+                  ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-100 dark:border-red-900/40" 
+                  : "text-slate-650 dark:text-slate-400 bg-slate-50 dark:bg-slate-850"
+              }`}>
+                {health?.scheduler.billing_last_error || "Tidak ada"}
+              </span>
             </div>
-          </dl>
+          </div>
         </article>
 
         <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">

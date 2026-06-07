@@ -9,9 +9,9 @@ type ModalShellProps = {
 
 export function Modal({ title, children, actions, onClose }: ModalShellProps) {
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="presentation" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-md z-50 flex items-center justify-center p-4" role="presentation" onClick={onClose}>
       <section
-        className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in"
         role="dialog"
         aria-modal="true"
         aria-label={title}

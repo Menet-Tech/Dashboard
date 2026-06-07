@@ -84,24 +84,47 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
+  // === Utama ===
   { key: "dashboard", label: "Dashboard", caption: "Overview & metrik" },
   { key: "bills", label: "Tagihan", caption: "Generate & bukti bayar" },
   { key: "customers", label: "Pelanggan", caption: "Data & status isolir" },
   { key: "packages", label: "Paket Internet", caption: "Kecepatan & harga" },
+  // === Operasional ===
   { key: "monitoring", label: "Monitoring", caption: "Status node & backup" },
-  { key: "templates", label: "Template WA", caption: "Draft pesan notif" },
-  { key: "audit", label: "Audit Log", caption: "Jejak aktivitas tim" },
-  { key: "users", label: "Manajemen Tim", caption: "Akses login admin" },
-  { key: "settings", label: "Pengaturan", caption: "Konfigurasi sistem" },
   { key: "tickets", label: "Tiket Support", caption: "Bantuan & keluhan" },
   { key: "registration", label: "Registrasi", caption: "Daftar mandiri" },
+  // === Komunikasi ===
   { key: "whatsapp", label: "WhatsApp Gateway", caption: "Multi-akun & Chatbot" },
+  { key: "templates", label: "Template WA", caption: "Draft pesan notif" },
+  // === Admin ===
+  { key: "audit", label: "Audit Log", caption: "Jejak aktivitas tim" },
+  { key: "users", label: "Manajemen Tim", caption: "Akses login admin" },
+  // === Pengaturan (paling bawah) ===
+  { key: "settings", label: "Pengaturan", caption: "Konfigurasi sistem" },
 ];
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<ViewKey>("dashboard");
   const [booting, setBooting] = useState(true);
+
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    const stored = localStorage.getItem("theme");
+    if (stored === "dark" || stored === "light") return stored;
+    return "light";
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((prev) => (prev === "light" ? "dark" : "light"));
   
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
   const [revenue, setRevenue] = useState<RevenueItem[]>([]);
@@ -299,7 +322,7 @@ export default function App() {
   }
 
   return (
-    <main className="flex min-h-screen bg-slate-50 text-slate-900 max-w-[1600px] mx-auto">
+    <main className="flex min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 max-w-[1600px] mx-auto transition-colors duration-300">
       <Sidebar
         navOpen={navOpen}
         navItems={visibleNavItems}
@@ -321,6 +344,8 @@ export default function App() {
           onToggleNav={() => setNavOpen((current) => !current)}
           health={monitoringHook.state.health}
           user={user}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
 
         {loadFailure ? (
@@ -333,6 +358,7 @@ export default function App() {
           </div>
         ) : null}
 
+      <div key={view} className="fade-in-slide-up flex-1 flex flex-col gap-6">
       {view === "dashboard" ? (
         <DashboardPage
           pageLoading={pageLoading}
@@ -427,10 +453,18 @@ export default function App() {
           expandedBillId={billsHook.state.expandedBillId}
           notificationLogs={billsHook.state.notificationLogs}
           proofFiles={billsHook.state.proofFiles}
+          search={billsHook.state.search}
+          status={billsHook.state.status}
+          page={billsHook.state.page}
+          total={billsHook.state.total}
+          limit={billsHook.state.limit}
           onBillPeriodChange={billsHook.handlers.setBillPeriod}
           onGenerateBills={billsHook.handlers.handleGenerateBills}
           onMarkBillPaid={(id) => void billsHook.handlers.handleMarkBillPaid(id)}
           onToggleNotifications={(id) => void billsHook.handlers.handleToggleNotifications(id)}
+          onSearchChange={billsHook.handlers.handleSearchChange}
+          onStatusChange={billsHook.handlers.handleStatusChange}
+          onPageChange={billsHook.handlers.handlePageChange}
           onProofFileChange={(id, file) =>
             billsHook.handlers.setProofFiles((current) => ({
               ...current,
@@ -560,6 +594,7 @@ export default function App() {
           />
         </Suspense>
       ) : null}
+      </div>
       </div>
 
       <ToastStack toasts={feedback.toasts} />

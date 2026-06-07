@@ -59,6 +59,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	})
 	customerHandler := handler.NewCustomerHandler(customers.Service{
 		Repository: customers.Repository{DB: db},
+		Settings:   settingsService,
 	})
 
 	discordService := notifications.NewDiscordService(settingsService)
@@ -66,6 +67,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 
 	customersService := customers.Service{
 		Repository: customers.Repository{DB: db},
+		Settings:   settingsService,
 	}
 
 	billHandler := handler.NewBillHandler(billing.Service{
@@ -82,6 +84,13 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	backupDir := filepath.Join(cfg.StoragePath, "backups")
 	backupHandler := &handler.BackupHandler{Service: backup.NewService(db, backupDir)}
 	integrationHandler := handler.NewIntegrationHandler(settingsService, whatsAppService, discordService)
+	integrationHandler.Customers = customers.Service{
+		Repository: customers.Repository{DB: db},
+		Settings:   settingsService,
+	}
+	integrationHandler.Packages = packages.Service{
+		Repository: packages.Repository{DB: db},
+	}
 
 	ticketsService := tickets.Service{
 		Repository: tickets.Repository{DB: db},
@@ -137,6 +146,8 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Post("/backups/{filename}/restore", backupHandler.SimulateRestore)
 				admin.Post("/backups/staging/apply", backupHandler.ApplyRestore)
 				admin.Get("/integration/check", integrationHandler.Check)
+				admin.Get("/integration/mikrotik/sync-preview", integrationHandler.SyncPreview)
+				admin.Post("/integration/mikrotik/sync-import", integrationHandler.SyncImport)
 			})
 
 			// Admin + Petugas
@@ -148,6 +159,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				staff.Post("/bills/generate", billHandler.Generate)
 				staff.Post("/bills/{id}/pay", billHandler.Pay)
 				staff.Post("/bills/{id}/proof", billHandler.UploadProof)
+				staff.Post("/bills/{id}/notify", billHandler.Notify)
 				staff.Post("/tickets/{id}/messages", ticketHandler.AddMessage)
 				staff.Post("/tickets/{id}/close", ticketHandler.Close)
 				staff.Post("/broadcast", broadcastHandler.Send)
@@ -159,12 +171,15 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				all.Get("/dashboard/summary", dashboardHandler.Summary)
 				all.Get("/packages", packageHandler.List)
 				all.Get("/customers", customerHandler.List)
+				all.Get("/customers/{id}", customerHandler.FindByID)
 				all.Get("/bills", billHandler.List)
 				all.Get("/bills/{id}/invoice", billHandler.Invoice)
 				all.Get("/bills/{id}/notifications", notificationHandler.ListByBill)
 				all.Get("/templates", templateHandler.List)
 				all.Get("/reports/revenue", reportsHandler.Revenue)
 				all.Get("/reports/aging", reportsHandler.Aging)
+				all.Get("/reports/bills/csv", reportsHandler.ExportBills)
+				all.Get("/reports/customers/csv", reportsHandler.ExportCustomers)
 				all.Post("/tickets", ticketHandler.CreateInternal)
 				all.Get("/tickets", ticketHandler.List)
 				all.Get("/tickets/{id}", ticketHandler.FindByID)

@@ -13,18 +13,86 @@ type Repository struct {
 	DB *sql.DB
 }
 
-func (r Repository) List(ctx context.Context, menunggakDays int, now time.Time) ([]Bill, error) {
-	rows, err := r.DB.QueryContext(ctx, `
+func (r Repository) List(ctx context.Context, menunggakDays int, now time.Time, opt FilterOptions) ([]Bill, int, error) {
+	var conds []string
+	var args []any
+
+	if opt.CustomerID > 0 {
+		conds = append(conds, "t.pelanggan_id = ?")
+		args = append(args, opt.CustomerID)
+	}
+
+	if opt.Period != "" {
+		conds = append(conds, "t.periode = ?")
+		args = append(args, opt.Period)
+	}
+
+	if opt.Search != "" {
+		conds = append(conds, "(c.nama LIKE ? OR t.invoice_number LIKE ?)")
+		term := "%" + opt.Search + "%"
+		args = append(args, term, term)
+	}
+
+	if opt.Status != "" {
+		switch opt.Status {
+		case "lunas":
+			conds = append(conds, "t.status = 'lunas'")
+		case "belum_bayar":
+			conds = append(conds, "t.status = 'belum_bayar' AND CAST(julianday(?) - julianday(t.jatuh_tempo) AS INTEGER) <= 0")
+			args = append(args, now.Format("2006-01-02"))
+		case "jatuh_tempo":
+			conds = append(conds, "t.status = 'belum_bayar' AND CAST(julianday(?) - julianday(t.jatuh_tempo) AS INTEGER) > 0 AND CAST(julianday(?) - julianday(t.jatuh_tempo) AS INTEGER) < ?")
+			args = append(args, now.Format("2006-01-02"), now.Format("2006-01-02"), menunggakDays)
+		case "menunggak":
+			conds = append(conds, "t.status = 'belum_bayar' AND CAST(julianday(?) - julianday(t.jatuh_tempo) AS INTEGER) >= ?")
+			args = append(args, now.Format("2006-01-02"), menunggakDays)
+		}
+	}
+
+	whereClause := ""
+	if len(conds) > 0 {
+		whereClause = "WHERE " + strings.Join(conds, " AND ")
+	}
+
+	// 1. Query count
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(1)
+		FROM tagihan t
+		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
+		INNER JOIN paket p ON p.id = t.paket_id
+		%s
+	`, whereClause)
+
+	var total int
+	err := r.DB.QueryRowContext(ctx, countQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count filtered bills: %w", err)
+	}
+
+	// 2. Query data
+	selectQuery := fmt.Sprintf(`
 		SELECT t.id, t.pelanggan_id, c.nama, COALESCE(c.nomor_wa, ''), t.paket_id, p.nama, p.kecepatan_mbps,
 		       t.periode, t.invoice_number, t.nominal, t.jatuh_tempo, t.status, t.paid_at,
 		       COALESCE(t.payment_method, ''), t.proof_path, t.diskon, t.diskon_referral
 		FROM tagihan t
 		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
 		INNER JOIN paket p ON p.id = t.paket_id
+		%s
 		ORDER BY t.id DESC
-	`)
+	`, whereClause)
+
+	if opt.Limit > 0 {
+		selectQuery += " LIMIT ? OFFSET ?"
+		offset := (opt.Page - 1) * opt.Limit
+		if offset < 0 {
+			offset = 0
+		}
+		args = append(args, opt.Limit, offset)
+	}
+
+	rows, err := r.DB.QueryContext(ctx, selectQuery, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list bills: %w", err)
+		return nil, 0, fmt.Errorf("list filtered bills: %w", err)
 	}
 	defer rows.Close()
 
@@ -32,12 +100,12 @@ func (r Repository) List(ctx context.Context, menunggakDays int, now time.Time) 
 	for rows.Next() {
 		item, err := scanBill(rows, menunggakDays, now)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		items = append(items, item)
 	}
 
-	return items, rows.Err()
+	return items, total, rows.Err()
 }
 
 func (r Repository) FindByID(ctx context.Context, billID int64, menunggakDays int, now time.Time) (BillDetail, error) {

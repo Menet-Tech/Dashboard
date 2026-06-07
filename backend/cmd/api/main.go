@@ -123,7 +123,10 @@ func runAPI(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth
 func runWorker(cfg config.Config, logger *slog.Logger, db *sql.DB) {
 	settingsService := settings.Service{Repository: settings.Repository{DB: db}}
 	templateService := templates.Service{Repository: templates.Repository{DB: db}}
-	customersService := customers.Service{Repository: customers.Repository{DB: db}}
+	customersService := customers.Service{
+		Repository: customers.Repository{DB: db},
+		Settings:   settingsService,
+	}
 	billingService := billing.Service{
 		Repository:    billing.Repository{DB: db},
 		Settings:      settingsService,

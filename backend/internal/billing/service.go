@@ -88,12 +88,21 @@ type Service struct {
 	Notifications notifications.NotificationLogRepository
 }
 
-func (s Service) List(ctx context.Context) ([]Bill, error) {
+type FilterOptions struct {
+	Search     string
+	Status     string
+	Period     string
+	CustomerID int64
+	Page       int
+	Limit      int
+}
+
+func (s Service) List(ctx context.Context, opt FilterOptions) ([]Bill, int, error) {
 	menunggakDays, err := s.getMenunggakDays(ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return s.Repository.List(ctx, menunggakDays, time.Now())
+	return s.Repository.List(ctx, menunggakDays, time.Now(), opt)
 }
 
 func (s Service) FindByID(ctx context.Context, billID int64) (BillDetail, error) {
@@ -146,6 +155,13 @@ func (s Service) MarkPaid(ctx context.Context, billID int64, method string, user
 		return err
 	}
 
+	// Trigger MikroTik Sync after payment to immediately lift isolir/limit limits
+	if billDetail, err := s.FindByID(ctx, billID); err == nil {
+		if customer, err := s.Customers.FindByID(ctx, billDetail.CustomerID); err == nil {
+			_ = s.Customers.SyncToMikrotik(ctx, customer)
+		}
+	}
+
 	if s.WhatsApp != nil {
 		go func() {
 			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -196,6 +212,44 @@ func (s Service) MarkPaid(ctx context.Context, billID int64, method string, user
 	}
 
 	slog.Info("bill marked as paid", "bill_id", billID, "method", method, "user_id", userID)
+
+	return nil
+}
+
+func (s Service) SendManualNotification(ctx context.Context, billID int64, triggerKey string) error {
+	triggerKey = strings.TrimSpace(triggerKey)
+	if triggerKey == "" {
+		return errors.New("trigger key is required")
+	}
+
+	detail, err := s.FindByID(ctx, billID)
+	if err != nil {
+		return err
+	}
+
+	if s.WhatsApp == nil {
+		return errors.New("whatsapp sender is not configured")
+	}
+
+	err = s.WhatsApp.SendTemplate(ctx, notifications.BillMessagePayload{
+		BillID:      billID,
+		TriggerKey:  triggerKey,
+		PhoneNumber: detail.CustomerPhone,
+		Force:       true,
+		MessageData: map[string]string{
+			"nama":              detail.CustomerName,
+			"periode":           detail.Period,
+			"jatuh_tempo":       formatDateLabel(detail.DueDate),
+			"invoice_number":    detail.InvoiceNumber,
+			"nominal":           formatIDRCurrency(detail.Amount),
+			"status_pembayaran": detail.Status,
+			"paket":             detail.PackageName,
+			"kecepatan_paket":   strconv.Itoa(detail.PackageSpeed),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to send manual notification: %w", err)
+	}
 
 	return nil
 }
@@ -280,7 +334,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 			wasAlreadyLimited := item.CustomerStatus == "limit"
 
 			if !wasAlreadyLimited {
-				if err := s.Repository.UpdateCustomerStatus(ctx, item.CustomerID, "limit"); err != nil {
+				if err := s.Customers.UpdateStatus(ctx, item.CustomerID, "limit"); err != nil {
 					return err
 				}
 			}
