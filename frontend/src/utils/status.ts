@@ -53,8 +53,16 @@ export function displayStatusTone(status: BillItem["display_status"]): StatusTon
 export function integrationSummary(health: HealthPayload | null): string {
   if (!health) return "Belum diperiksa";
   const items: string[] = [];
-  if (health.integrations.whatsapp_configured) items.push("WA siap");
-  if (health.integrations.discord_configured) items.push("Discord siap");
-  if (health.integrations.mikrotik_configured) items.push("MikroTik siap");
+  
+  if (health.integrations.whatsapp_configured) {
+    items.push(health.integrations.whatsapp_online ? "WA siap" : "WA mati");
+  }
+  if (health.integrations.discord_configured) {
+    items.push(health.integrations.discord_online ? "Discord siap" : "Discord error");
+  }
+  if (health.integrations.mikrotik_configured) {
+    items.push(health.integrations.mikrotik_online ? "MikroTik siap" : "MikroTik error");
+  }
+  
   return items.length > 0 ? items.join(" • ") : "Belum dikonfigurasi";
 }

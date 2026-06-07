@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -134,15 +136,41 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	mikrotikConfigured := strings.TrimSpace(mikrotikHost) != "" &&
 		strings.TrimSpace(mikrotikUser) != "" &&
 		strings.TrimSpace(mikrotikPass) != ""
+
+	// Real-time online checks
+	waOnline := false
+	if waConfigured {
+		waOnline = checkWhatsAppOnline(ctx, waGatewayURL, waAPIKey)
+	}
+
+	discordOnline := false
+	if discordConfigured {
+		discordOnline = checkDiscordOnline(ctx, discordWebhookURL)
+	}
+
+	mikrotikOnline := false
+	if mikrotikConfigured {
+		mikrotikOnline = checkMikrotikOnline(mikrotikHost)
+	}
+
 	if !waConfigured {
 		alerts = append(alerts, "konfigurasi WhatsApp belum lengkap")
+	} else if !waOnline {
+		alerts = append(alerts, "koneksi WhatsApp gateway terputus (offline)")
 	}
+
 	if !discordConfigured {
 		alerts = append(alerts, "konfigurasi Discord belum lengkap")
+	} else if !discordOnline {
+		alerts = append(alerts, "koneksi webhook Discord bermasalah (offline)")
 	}
+
 	if !mikrotikConfigured {
 		alerts = append(alerts, "konfigurasi MikroTik belum lengkap")
+	} else if !mikrotikOnline {
+		alerts = append(alerts, "koneksi router MikroTik terputus (offline)")
 	}
+
 	if billingAutoEnabled && strings.TrimSpace(billingLastError) != "" {
 		status = "degraded"
 		alerts = append(alerts, "generate tagihan otomatis terakhir gagal")
@@ -195,10 +223,13 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 			"last_filename":   lastBackupFilename,
 			"retention_count": backupRetention,
 		},
-		"integrations": map[string]bool{
+		"integrations": map[string]any{
 			"whatsapp_configured": waConfigured,
+			"whatsapp_online":     waOnline,
 			"discord_configured":  discordConfigured,
+			"discord_online":      discordOnline,
 			"mikrotik_configured": mikrotikConfigured,
+			"mikrotik_online":     mikrotikOnline,
 		},
 		"alerts":    alerts,
 		"timestamp": time.Now().Format(time.RFC3339),
@@ -277,4 +308,67 @@ func atoiDefault(value string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func checkWhatsAppOnline(ctx context.Context, gatewayURL string, apiKey string) bool {
+	if strings.TrimSpace(gatewayURL) == "" {
+		return false
+	}
+	cleanURL := strings.TrimRight(gatewayURL, "/")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cleanURL+"/api/v1/accounts", nil)
+	if err != nil {
+		return false
+	}
+	if apiKey != "" {
+		req.Header.Set("X-API-Key", apiKey)
+	}
+
+	client := &http.Client{Timeout: 1500 * time.Millisecond}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
+func checkDiscordOnline(ctx context.Context, webhookURL string) bool {
+	if strings.TrimSpace(webhookURL) == "" {
+		return false
+	}
+	parsed, err := url.Parse(webhookURL)
+	if err != nil {
+		return false
+	}
+	if parsed.Host == "" {
+		return false
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, webhookURL, nil)
+	if err != nil {
+		return false
+	}
+	client := &http.Client{Timeout: 1500 * time.Millisecond}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
+func checkMikrotikOnline(host string) bool {
+	if strings.TrimSpace(host) == "" {
+		return false
+	}
+	address := host
+	if !strings.Contains(host, ":") {
+		address = host + ":8728"
+	}
+	conn, err := net.DialTimeout("tcp", address, 1500 * time.Millisecond)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
 }

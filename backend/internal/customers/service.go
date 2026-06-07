@@ -7,6 +7,10 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"log/slog"
+
+	"menettech/dashboard/backend/internal/mikrotik"
+	"menettech/dashboard/backend/internal/settings"
 )
 
 var ErrCustomerNotFound = errors.New("customer not found")
@@ -40,10 +44,15 @@ type Repository struct {
 
 type Service struct {
 	Repository Repository
+	Settings   settings.Service
 }
 
 func (s Service) List(ctx context.Context) ([]Customer, error) {
 	return s.Repository.List(ctx)
+}
+
+func (s Service) FindByID(ctx context.Context, id int64) (Customer, error) {
+	return s.Repository.FindByID(ctx, id)
 }
 
 func (s Service) Create(ctx context.Context, customer Customer) (Customer, error) {
@@ -51,7 +60,14 @@ func (s Service) Create(ctx context.Context, customer Customer) (Customer, error
 		return Customer{}, err
 	}
 
-	return s.Repository.Create(ctx, normalizeCustomer(customer))
+	created, err := s.Repository.Create(ctx, normalizeCustomer(customer))
+	if err != nil {
+		return Customer{}, err
+	}
+
+	_ = s.SyncToMikrotik(ctx, created)
+
+	return created, nil
 }
 
 func (s Service) Update(ctx context.Context, id int64, customer Customer) (Customer, error) {
@@ -59,7 +75,14 @@ func (s Service) Update(ctx context.Context, id int64, customer Customer) (Custo
 		return Customer{}, err
 	}
 
-	return s.Repository.Update(ctx, id, normalizeCustomer(customer))
+	updated, err := s.Repository.Update(ctx, id, normalizeCustomer(customer))
+	if err != nil {
+		return Customer{}, err
+	}
+
+	_ = s.SyncToMikrotik(ctx, updated)
+
+	return updated, nil
 }
 
 func (s Service) UpdateStatus(ctx context.Context, id int64, status string) error {
@@ -67,7 +90,58 @@ func (s Service) UpdateStatus(ctx context.Context, id int64, status string) erro
 		return errors.New("customer status is invalid")
 	}
 
-	return s.Repository.UpdateStatus(ctx, id, status)
+	if err := s.Repository.UpdateStatus(ctx, id, status); err != nil {
+		return err
+	}
+
+	customer, err := s.FindByID(ctx, id)
+	if err == nil {
+		_ = s.SyncToMikrotik(ctx, customer)
+	}
+
+	return nil
+}
+
+// SyncToMikrotik loads the router configuration, connects, and synchronizes the customer secret state.
+func (s Service) SyncToMikrotik(ctx context.Context, customer Customer) error {
+	if s.Settings.Repository.DB == nil {
+		return nil
+	}
+
+	username := strings.TrimSpace(customer.UserPPPoE)
+	if username == "" {
+		return nil
+	}
+
+	host, _ := s.Settings.GetString(ctx, settings.KeyMikrotikHost)
+	user, _ := s.Settings.GetString(ctx, settings.KeyMikrotikUser)
+	pass, _ := s.Settings.GetString(ctx, settings.KeyMikrotikPass)
+
+	if strings.TrimSpace(host) == "" || strings.TrimSpace(user) == "" || strings.TrimSpace(pass) == "" {
+		return nil // MikroTik not configured, skip silently
+	}
+
+	// Fetch the package name to use as the profile
+	var profileName string
+	err := s.Repository.DB.QueryRowContext(ctx, "SELECT nama FROM paket WHERE id = ?", customer.PackageID).Scan(&profileName)
+	if err != nil {
+		profileName = "default"
+	}
+
+	client := mikrotik.NewClient(host, user, pass)
+	if err := client.Connect(ctx); err != nil {
+		slog.Error("failed to connect to MikroTik during sync", "customer", customer.Name, "error", err)
+		return err
+	}
+	defer client.Close()
+
+	if err := client.SyncCustomer(ctx, username, customer.PasswordPPPoE, profileName, customer.Status); err != nil {
+		slog.Error("failed to sync customer secret to MikroTik", "customer", customer.Name, "error", err)
+		return err
+	}
+
+	slog.Info("successfully synced customer secret to MikroTik", "customer", customer.Name, "status", customer.Status)
+	return nil
 }
 
 // ListTrialExpired returns all customers whose trial period has expired
@@ -418,4 +492,70 @@ func (r Repository) EndTrial(ctx context.Context, id int64) error {
 	}
 
 	return nil
+}
+
+func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
+	row := r.DB.QueryRowContext(ctx, `
+		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),
+		       COALESCE(c.password_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
+		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days,
+		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, '')
+		FROM pelanggan c
+		INNER JOIN paket p ON p.id = c.paket_id
+		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
+		WHERE c.id = ?
+		LIMIT 1
+	`, id)
+
+	var item Customer
+	var isTrial int
+	var trialStartedAt string
+	var referredByID sql.NullInt64
+	var referralCode sql.NullString
+	var referredByName sql.NullString
+
+	err := row.Scan(
+		&item.ID,
+		&item.Name,
+		&item.PackageID,
+		&item.PackageName,
+		&item.PackagePrice,
+		&item.UserPPPoE,
+		&item.PasswordPPPoE,
+		&item.WhatsApp,
+		&item.SNOnt,
+		&item.DueDay,
+		&item.Status,
+		&item.Address,
+		&isTrial,
+		&trialStartedAt,
+		&item.TrialDays,
+		&item.Diskon,
+		&referredByID,
+		&item.ReferralBalance,
+		&referralCode,
+		&referredByName,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return Customer{}, ErrCustomerNotFound
+		}
+		return Customer{}, fmt.Errorf("find customer by id: %w", err)
+	}
+
+	item.IsTrial = isTrial != 0
+	if trialStartedAt != "" {
+		item.TrialStartedAt = &trialStartedAt
+	}
+	if referredByID.Valid {
+		item.ReferredByID = &referredByID.Int64
+	}
+	if referralCode.Valid {
+		item.ReferralCode = referralCode.String
+	}
+	if referredByName.Valid {
+		item.ReferredByName = referredByName.String
+	}
+
+	return item, nil
 }

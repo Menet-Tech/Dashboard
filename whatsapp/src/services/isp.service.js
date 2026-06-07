@@ -120,6 +120,31 @@ const createTicket = async (data) => {
     }
 };
 
+const getTemplateByTrigger = async (triggerKey) => {
+    try {
+        const res = await client.get('/api/v1/templates');
+        const data = res.data?.data;
+        if (Array.isArray(data)) {
+            const found = data.find(t => t.trigger_key === triggerKey && t.is_active);
+            return found ?? null;
+        }
+        return null;
+    } catch (err) {
+        logger.error(`[ISP] getTemplateByTrigger failed for ${triggerKey}:`, err.message);
+        return null;
+    }
+};
+
+const getSettings = async () => {
+    try {
+        const res = await client.get('/api/v1/settings');
+        return res.data?.data ?? {};
+    } catch (err) {
+        logger.error('[ISP] getSettings failed:', err.message);
+        return {};
+    }
+};
+
 module.exports = {
     findCustomerByPhone,
     getActiveBill,
@@ -127,4 +152,6 @@ module.exports = {
     notifyAdminViaWA,
     notifyAdminViaDiscord,
     createTicket,
+    getTemplateByTrigger,
+    getSettings,
 };

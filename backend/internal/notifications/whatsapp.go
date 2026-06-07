@@ -32,6 +32,7 @@ type BillMessagePayload struct {
 	TriggerKey  string
 	PhoneNumber string
 	MessageData map[string]string
+	Force       bool
 }
 
 type QueuedMessage struct {
@@ -50,12 +51,14 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 		return nil
 	}
 
-	sent, err := s.Logs.AlreadySent(ctx, payload.BillID, payload.TriggerKey)
-	if err != nil {
-		return err
-	}
-	if sent {
-		return nil
+	if !payload.Force {
+		sent, err := s.Logs.AlreadySent(ctx, payload.BillID, payload.TriggerKey)
+		if err != nil {
+			return err
+		}
+		if sent {
+			return nil
+		}
 	}
 
 	tpl, err := s.Templates.FindActiveByTrigger(ctx, payload.TriggerKey)

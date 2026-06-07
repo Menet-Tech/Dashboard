@@ -3,7 +3,10 @@ package reports
 import (
 	"context"
 	"database/sql"
+	"encoding/csv"
 	"fmt"
+	"io"
+	"strconv"
 )
 
 type RevenueItem struct {
@@ -68,4 +71,96 @@ func (s Service) Aging(ctx context.Context) (AgingReport, error) {
 		return AgingReport{}, fmt.Errorf("query aging report: %w", err)
 	}
 	return report, nil
+}
+
+func (s Service) ExportBillsCSV(ctx context.Context, w io.Writer) error {
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	header := []string{"Invoice", "Nama Pelanggan", "Paket", "Periode", "Nominal", "Status", "Tanggal Bayar", "Tanggal Jatuh Tempo"}
+	if err := writer.Write(header); err != nil {
+		return fmt.Errorf("write bills csv header: %w", err)
+	}
+
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT t.invoice_number, c.nama, p.nama, t.periode, t.nominal, t.status, COALESCE(t.paid_at, ''), t.jatuh_tempo
+		FROM tagihan t
+		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
+		INNER JOIN paket p ON p.id = t.paket_id
+		ORDER BY t.id DESC
+	`)
+	if err != nil {
+		return fmt.Errorf("query bills for csv: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var invoice, customerName, packageName, period, status, paidAt, dueDate string
+		var nominal int
+		if err := rows.Scan(&invoice, &customerName, &packageName, &period, &nominal, &status, &paidAt, &dueDate); err != nil {
+			return fmt.Errorf("scan bill for csv: %w", err)
+		}
+		record := []string{
+			invoice,
+			customerName,
+			packageName,
+			period,
+			strconv.Itoa(nominal),
+			status,
+			paidAt,
+			dueDate,
+		}
+		if err := writer.Write(record); err != nil {
+			return fmt.Errorf("write bill record to csv: %w", err)
+		}
+	}
+
+	return rows.Err()
+}
+
+func (s Service) ExportCustomersCSV(ctx context.Context, w io.Writer) error {
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	header := []string{"Nama", "Paket", "PPPoE User", "WhatsApp", "SN ONT", "Jatuh Tempo", "Status", "Alamat", "Referral Balance", "Diskon"}
+	if err := writer.Write(header); err != nil {
+		return fmt.Errorf("write customers csv header: %w", err)
+	}
+
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT c.nama, p.nama, COALESCE(c.user_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
+		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.referral_balance, c.diskon
+		FROM pelanggan c
+		INNER JOIN paket p ON p.id = c.paket_id
+		ORDER BY c.id DESC
+	`)
+	if err != nil {
+		return fmt.Errorf("query customers for csv: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var name, packageName, pppoeUser, whatsapp, snOnt, status, address string
+		var dueDay, referralBalance, diskon int
+		if err := rows.Scan(&name, &packageName, &pppoeUser, &whatsapp, &snOnt, &dueDay, &status, &address, &referralBalance, &diskon); err != nil {
+			return fmt.Errorf("scan customer for csv: %w", err)
+		}
+		record := []string{
+			name,
+			packageName,
+			pppoeUser,
+			whatsapp,
+			snOnt,
+			strconv.Itoa(dueDay),
+			status,
+			address,
+			strconv.Itoa(referralBalance),
+			strconv.Itoa(diskon),
+		}
+		if err := writer.Write(record); err != nil {
+			return fmt.Errorf("write customer record to csv: %w", err)
+		}
+	}
+
+	return rows.Err()
 }

@@ -10,13 +10,17 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/platform/migrate"
 )
 
 func TestServiceGenerateCreatesBillsForEligibleCustomers(t *testing.T) {
 	db := billingTestDB(t)
-	service := Service{Repository: Repository{DB: db}}
+	service := Service{
+		Repository: Repository{DB: db},
+		Customers:  customers.Service{Repository: customers.Repository{DB: db}},
+	}
 
 	mustBillingExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
 	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (1, 'Budi', 1, 8, 'active')`)
@@ -34,7 +38,10 @@ func TestServiceGenerateCreatesBillsForEligibleCustomers(t *testing.T) {
 
 func TestServiceGenerateSkipsTrialCustomers(t *testing.T) {
 	db := billingTestDB(t)
-	service := Service{Repository: Repository{DB: db}}
+	service := Service{
+		Repository: Repository{DB: db},
+		Customers:  customers.Service{Repository: customers.Repository{DB: db}},
+	}
 
 	mustBillingExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
 	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status, is_trial, trial_started_at, trial_days) VALUES (1, 'Trial User', 1, 8, 'active', 1, '2026-04-01T00:00:00Z', 3)`)
@@ -73,6 +80,7 @@ func TestServiceMarkPaidCreatesHistoryAndRestoresCustomerStatus(t *testing.T) {
 	service := Service{
 		Repository: Repository{DB: db},
 		WhatsApp:   waSender,
+		Customers:  customers.Service{Repository: customers.Repository{DB: db}},
 	}
 
 	mustBillingExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
@@ -156,7 +164,10 @@ func TestServiceProcessAutomation(t *testing.T) {
 	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (4, 'LimitCustSecond', 1, 8, 'limit')`)
 	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (4, 4, 1, '2026-04', '08-04-2026/4/20/004', 250000, '2026-04-08', 'belum_bayar')`)
 
-	service := Service{Repository: Repository{DB: db}}
+	service := Service{
+		Repository: Repository{DB: db},
+		Customers:  customers.Service{Repository: customers.Repository{DB: db}},
+	}
 
 	waCalls := make(map[int64]int)
 	discordAlerts := []string{}

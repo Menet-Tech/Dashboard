@@ -40,14 +40,52 @@ func NewBillHandler(service billing.Service, appName, storagePath string) BillHa
 }
 
 func (h BillHandler) List(w http.ResponseWriter, r *http.Request) {
-	items, err := h.Service.List(r.Context())
+	q := r.URL.Query()
+	search := q.Get("search")
+	status := q.Get("status")
+	period := q.Get("period")
+
+	var customerID int64
+	if cID := q.Get("customer_id"); cID != "" {
+		if id, err := strconv.ParseInt(cID, 10, 64); err == nil {
+			customerID = id
+		}
+	}
+
+	page := 1
+	if p := q.Get("page"); p != "" {
+		if val, err := strconv.Atoi(p); err == nil && val > 0 {
+			page = val
+		}
+	}
+
+	limit := 50
+	if l := q.Get("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val >= 0 {
+			limit = val
+		}
+	}
+
+	opt := billing.FilterOptions{
+		Search:     search,
+		Status:     status,
+		Period:     period,
+		CustomerID: customerID,
+		Page:       page,
+		Limit:      limit,
+	}
+
+	items, total, err := h.Service.List(r.Context(), opt)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to load bills")
 		return
 	}
 
 	WriteJSON(w, http.StatusOK, map[string]any{
-		"data": items,
+		"data":  items,
+		"total": total,
+		"page":  page,
+		"limit": limit,
 	})
 }
 
@@ -99,6 +137,37 @@ func (h BillHandler) Pay(w http.ResponseWriter, r *http.Request) {
 
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"message": "bill marked as paid",
+	})
+}
+
+type billNotifyPayload struct {
+	TriggerKey string `json:"trigger_key"`
+}
+
+func (h BillHandler) Notify(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid bill id")
+		return
+	}
+
+	var payload billNotifyPayload
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+
+	if err := h.Service.SendManualNotification(r.Context(), id, payload.TriggerKey); err != nil {
+		if errors.Is(err, billing.ErrBillNotFound) {
+			WriteError(w, http.StatusNotFound, "bill not found")
+			return
+		}
+		WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"message": "whatsapp notification queued successfully",
 	})
 }
 

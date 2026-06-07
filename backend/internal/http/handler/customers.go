@@ -142,3 +142,26 @@ func (h CustomerHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		"message": "customer status updated",
 	})
 }
+
+func (h CustomerHandler) FindByID(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid customer id")
+		return
+	}
+
+	item, err := h.Service.FindByID(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, customers.ErrCustomerNotFound) {
+			WriteError(w, http.StatusNotFound, "customer not found")
+			return
+		}
+
+		WriteError(w, http.StatusInternalServerError, "failed to load customer")
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"data": item,
+	})
+}
