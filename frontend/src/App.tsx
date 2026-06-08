@@ -19,6 +19,7 @@ import type {
   RevenueItem,
   AgingReport,
   ViewKey,
+  CustomerItem,
 } from "./types";
 
 import {
@@ -47,6 +48,7 @@ import { inputClassName, renderInlineError, ErrorState } from "./components/ui";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { PackagesPage } from "./features/packages/PackagesPage";
 import { CustomersPage, defaultCustomerForm } from "./features/customers/CustomersPage";
+import { DiscountsPage } from "./features/discounts/DiscountsPage";
 import { BillsPage } from "./features/bills/BillsPage";
 import { TemplatesPage, defaultTemplateForm } from "./features/templates/TemplatesPage";
 import { MonitoringPage } from "./features/monitoring/MonitoringPage";
@@ -55,6 +57,10 @@ import { AuditLogsPage } from "./features/audit/AuditLogsPage";
 import { UsersPage } from "./features/users/UsersPage";
 import { ReportsPage } from "./features/reports/ReportsPage";
 import { LoginPage } from "./features/auth/LoginPage";
+import { OdpPage } from "./features/odp/OdpPage";
+import { CustomerDetailModal } from "./features/customers/components/CustomerDetailModal";
+import { DevicesPage } from "./features/devices/DevicesPage";
+import { NetworkMapPage } from "./features/network-map/NetworkMapPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { useAppFeedback } from "./hooks/useAppFeedback";
@@ -104,7 +110,11 @@ const navItems: NavItem[] = [
   { key: "bills", label: "Tagihan", caption: "Generate & bukti bayar" },
   { key: "customers", label: "Pelanggan", caption: "Data & status isolir" },
   { key: "packages", label: "Paket Internet", caption: "Kecepatan & harga" },
+  { key: "discounts", label: "Diskon & Referral", caption: "MGM & voucher khusus" },
   // === Operasional ===
+  { key: "odp", label: "Data ODP", caption: "Status & maintenance node" },
+  { key: "network-map", label: "Peta Jaringan", caption: "Topologi fiber & ODP" },
+  { key: "devices", label: "Perangkat ONT", caption: "Kelola CPE via GenieACS" },
   { key: "monitoring", label: "Monitoring", caption: "Status node & backup" },
   { key: "tickets", label: "Tiket Support", caption: "Bantuan & keluhan" },
   { key: "registration", label: "Registrasi", caption: "Daftar mandiri" },
@@ -121,7 +131,12 @@ const navItems: NavItem[] = [
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [view, setView] = useState<ViewKey>("dashboard");
+  const [view, setView] = useState<ViewKey>(() => {
+    const stored = localStorage.getItem("active_view");
+    if (stored) return stored as ViewKey;
+    return "dashboard";
+  });
+  const [activeDetailCustomer, setActiveDetailCustomer] = useState<CustomerItem | null>(null);
   const [booting, setBooting] = useState(true);
 
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -238,6 +253,9 @@ export default function App() {
         if (["reports", "audit", "users", "settings", "packages", "templates"].includes(item.key)) {
           return user?.role === "admin";
         }
+        if (item.key === "devices") {
+          return user?.role === "admin" || user?.role === "petugas";
+        }
         return true;
       }),
     [user?.role],
@@ -272,6 +290,7 @@ export default function App() {
   const appTone = statusTone(monitoringHook.state.health?.status);
 
   function switchView(nextView: ViewKey) {
+    localStorage.setItem("active_view", nextView);
     startTransition(() => setView(nextView));
     setNavOpen(false);
     if (nextView === "monitoring") {
@@ -284,6 +303,13 @@ export default function App() {
       });
     }
   }
+
+  const handleShowCustomerDetails = (customerId: number) => {
+    const customer = customersHook.state.customers.find((c) => c.id === customerId);
+    if (customer) {
+      setActiveDetailCustomer(customer);
+    }
+  };
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -310,6 +336,7 @@ export default function App() {
       setAuditLogs([]);
       usersHook.handlers.setManagedUsers([]);
       startTransition(() => setView("dashboard"));
+      localStorage.setItem("active_view", "dashboard");
       feedback.pushSuccess("Sesi berhasil ditutup.");
     }, "logout");
   }
@@ -317,7 +344,7 @@ export default function App() {
   if (booting) {
     return (
       <main className="page-shell centered-shell">
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm loading-state">Menyiapkan fondasi go-dev...</div>
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm loading-state">Memuat sistem...</div>
       </main>
     );
   }
@@ -449,6 +476,7 @@ export default function App() {
               diskon: customer.diskon ?? 0,
               referred_by_id: customer.referred_by_id ?? 0,
               referral_balance: customer.referral_balance ?? 0,
+              odp_id: customer.odp_id ?? 0,
             });
           }}
           onCancelEdit={() => {
@@ -458,6 +486,38 @@ export default function App() {
           pushSuccess={feedback.pushSuccess}
           pushError={feedback.pushError}
           onRefresh={reloadProtectedData}
+        />
+      ) : null}
+
+      {view === "discounts" ? (
+        <DiscountsPage
+          user={user}
+          customers={customersHook.state.customers}
+          pushSuccess={feedback.pushSuccess}
+          pushError={feedback.pushError}
+          onRefresh={reloadProtectedData}
+        />
+      ) : null}
+
+      {view === "odp" ? (
+        <OdpPage
+          user={user}
+          pushSuccess={feedback.pushSuccess}
+          pushError={feedback.pushError}
+        />
+      ) : null}
+
+      {view === "devices" ? (
+        <DevicesPage
+          pushSuccess={feedback.pushSuccess}
+          pushError={feedback.pushError}
+        />
+      ) : null}
+
+      {view === "network-map" ? (
+        <NetworkMapPage
+          pushSuccess={feedback.pushSuccess}
+          pushError={feedback.pushError}
         />
       ) : null}
 
@@ -494,6 +554,7 @@ export default function App() {
           pushToast={feedback.pushToast}
           pushSuccess={feedback.pushSuccess}
           pushError={feedback.pushError}
+          onShowCustomerDetails={handleShowCustomerDetails}
         />
       ) : null}
 
@@ -689,6 +750,17 @@ export default function App() {
           </form>
         </Modal>
       ) : null}
+
+      {activeDetailCustomer && (
+        <CustomerDetailModal
+          customer={activeDetailCustomer}
+          onClose={() => setActiveDetailCustomer(null)}
+          user={user}
+          pushSuccess={feedback.pushSuccess}
+          pushError={feedback.pushError}
+          onRefresh={reloadProtectedData}
+        />
+      )}
 
     </main>
   );

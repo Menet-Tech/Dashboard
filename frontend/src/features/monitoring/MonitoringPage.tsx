@@ -273,7 +273,7 @@ export function MonitoringPage({
             </div>
             <div className="border-b border-slate-100 dark:border-slate-800/60 pb-3 flex justify-between items-center">
               <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Next Run</span>
-              <span className="text-sm font-mono font-semibold text-indigo-650 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded">
+              <span className="text-sm font-mono font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded">
                 {formatDateTime(health?.scheduler.billing_next_run)}
               </span>
             </div>

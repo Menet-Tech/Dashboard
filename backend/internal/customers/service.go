@@ -46,6 +46,8 @@ type Customer struct {
 	PppoeIP         string  `json:"pppoe_ip"`
 	PppoeUptime     string  `json:"pppoe_uptime"`
 	LastSyncAt      string  `json:"last_sync_at"`
+	OdpID           *int64  `json:"odp_id,omitempty"`
+	OdpName         string  `json:"odp_name,omitempty"`
 }
 
 type Repository struct {
@@ -212,10 +214,12 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
-		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, '')
+		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
+		       c.odp_id, COALESCE(o.nama, '')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
+		LEFT JOIN odp o ON o.id = c.odp_id
 		ORDER BY c.id DESC
 	`)
 	if err != nil {
@@ -240,6 +244,8 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		var pppoeIP sql.NullString
 		var pppoeUptime sql.NullString
 		var lastSyncAt sql.NullString
+		var odpID sql.NullInt64
+		var odpName sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.Name,
@@ -271,6 +277,8 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 			&pppoeIP,
 			&pppoeUptime,
 			&lastSyncAt,
+			&odpID,
+			&odpName,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
@@ -296,6 +304,12 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		item.PppoeIP = pppoeIP.String
 		item.PppoeUptime = pppoeUptime.String
 		item.LastSyncAt = lastSyncAt.String
+		if odpID.Valid {
+			item.OdpID = &odpID.Int64
+		}
+		if odpName.Valid {
+			item.OdpName = odpName.String
+		}
 		items = append(items, item)
 	}
 
@@ -336,11 +350,11 @@ func (r Repository) Create(ctx context.Context, customer Customer) (Customer, er
 		INSERT INTO pelanggan (
 			nama, paket_id, user_pppoe, password_pppoe, nomor_wa, sn_ont, tgl_jatuh_tempo, status, alamat,
 			is_trial, trial_started_at, trial_days, diskon, referred_by_id, referral_balance, referral_code, voucher_discount,
-			ont_status, ont_ip, ont_uptime, ont_rx_power, ont_tx_power, pppoe_status, pppoe_ip, pppoe_uptime, last_sync_at, updated_at
+			ont_status, ont_ip, ont_uptime, ont_rx_power, ont_tx_power, pppoe_status, pppoe_ip, pppoe_uptime, last_sync_at, odp_id, updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address, 1, trialDays, customer.Diskon, customer.ReferredByID, customer.ReferralBalance, referralCode, customer.VoucherDiscount,
-		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt)
+		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt, customer.OdpID)
 	if err != nil {
 		_ = tx.Rollback()
 		return Customer{}, fmt.Errorf("create customer: %w", err)
@@ -389,11 +403,12 @@ func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Cu
 		SET nama = ?, paket_id = ?, user_pppoe = ?, password_pppoe = ?, nomor_wa = ?, sn_ont = ?, tgl_jatuh_tempo = ?, status = ?, alamat = ?,
 		    diskon = ?, referred_by_id = ?, referral_balance = ?, referral_code = ?, voucher_discount = ?,
 		    ont_status = ?, ont_ip = ?, ont_uptime = ?, ont_rx_power = ?, ont_tx_power = ?, pppoe_status = ?, pppoe_ip = ?, pppoe_uptime = ?, last_sync_at = ?,
-		    updated_at = CURRENT_TIMESTAMP
+		    odp_id = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address,
 		customer.Diskon, customer.ReferredByID, customer.ReferralBalance, customer.ReferralCode, customer.VoucherDiscount,
-		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt, id)
+		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt,
+		customer.OdpID, id)
 	if err != nil {
 		return Customer{}, fmt.Errorf("update customer: %w", err)
 	}
@@ -455,10 +470,12 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
-		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, '')
+		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
+		       c.odp_id, COALESCE(o.nama, '')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
+		LEFT JOIN odp o ON o.id = c.odp_id
 		WHERE c.is_trial = 1
 		  AND c.trial_started_at IS NOT NULL
 		  AND datetime(c.trial_started_at, '+' || c.trial_days || ' days') <= ?
@@ -486,6 +503,8 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 		var pppoeIP sql.NullString
 		var pppoeUptime sql.NullString
 		var lastSyncAt sql.NullString
+		var odpID sql.NullInt64
+		var odpName sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.Name,
@@ -517,6 +536,8 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 			&pppoeIP,
 			&pppoeUptime,
 			&lastSyncAt,
+			&odpID,
+			&odpName,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
@@ -542,6 +563,12 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 		item.PppoeIP = pppoeIP.String
 		item.PppoeUptime = pppoeUptime.String
 		item.LastSyncAt = lastSyncAt.String
+		if odpID.Valid {
+			item.OdpID = &odpID.Int64
+		}
+		if odpName.Valid {
+			item.OdpName = odpName.String
+		}
 		items = append(items, item)
 	}
 
@@ -579,10 +606,12 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
-		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, '')
+		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
+		       c.odp_id, COALESCE(o.nama, '')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
+		LEFT JOIN odp o ON o.id = c.odp_id
 		WHERE c.id = ?
 		LIMIT 1
 	`, id)
@@ -602,6 +631,8 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 	var pppoeIP sql.NullString
 	var pppoeUptime sql.NullString
 	var lastSyncAt sql.NullString
+	var odpID sql.NullInt64
+	var odpName sql.NullString
 
 	err := row.Scan(
 		&item.ID,
@@ -634,6 +665,8 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		&pppoeIP,
 		&pppoeUptime,
 		&lastSyncAt,
+		&odpID,
+		&odpName,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -664,6 +697,12 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 	item.PppoeIP = pppoeIP.String
 	item.PppoeUptime = pppoeUptime.String
 	item.LastSyncAt = lastSyncAt.String
+	if odpID.Valid {
+		item.OdpID = &odpID.Int64
+	}
+	if odpName.Valid {
+		item.OdpName = odpName.String
+	}
 
 	return item, nil
 }

@@ -7,3 +7,4 @@ export type { ToastItem } from "./Toast";
 export { EmptyState, EmptyTableRow } from "./EmptyState";
 export { ErrorState } from "./ErrorState";
 export { inputClassName, renderInlineError } from "./FormHelpers";
+export { RupiahInput } from "./RupiahInput";

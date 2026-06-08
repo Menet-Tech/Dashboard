@@ -23,7 +23,7 @@ export function LoginPage({
     <main className="min-h-screen bg-gradient-to-br from-slate-100 to-sky-100 flex items-center justify-center p-4">
       <section className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <p className="text-xs font-bold tracking-wider text-indigo-500 uppercase mb-2">go-dev rewrite</p>
+          <p className="text-xs font-bold tracking-wider text-indigo-500 uppercase mb-2">Portal Operasional</p>
           <h1 className="text-2xl font-bold text-slate-900">Masuk ke Menet-Tech</h1>
         </div>
         <form className="flex flex-col gap-5" onSubmit={onLogin}>

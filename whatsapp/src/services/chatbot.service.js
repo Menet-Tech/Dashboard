@@ -13,7 +13,7 @@
 
 const logger = require('../utils/logger');
 const { getSession, upsertSession, deleteSession, saveContactForm } = require('../utils/database');
-const { findCustomerByPhone, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket, getTemplateByTrigger, getSettings } = require('./isp.service');
+const { findCustomerByPhone, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket, getTemplateByTrigger, getSettings, getReferredCount, withdrawReferral, convertReferralToVoucher } = require('./isp.service');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -60,6 +60,7 @@ ketik ${triggerBilling} untuk cek tagihan anda
 ketik ${triggerSupport} jika ada kendala mengenai wifi
 kirim ${triggerPackages} untuk melihat paket yang disediakan
 kirim ${triggerFAQ} untuk melihat pertanyaan umum
+kirim 6 atau referral untuk cek & klaim reward referal
 kirim ${triggerAdmin} untuk chat ke admin`;
 
 const getMenuUnreg = async (triggerRegister, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin) => {
@@ -78,8 +79,9 @@ const getMenuUnreg = async (triggerRegister, triggerSupport, triggerPackages, tr
 
 const getMenuReg = async (nama, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin) => {
     const tpl = await getTemplateByTrigger('chatbot_menu_reg');
+    let baseText = "";
     if (tpl) {
-        return renderTemplate(tpl.content || tpl.isi_template, {
+        baseText = renderTemplate(tpl.content || tpl.isi_template, {
             greeting: greeting(),
             nama,
             trigger_billing: triggerBilling,
@@ -88,8 +90,14 @@ const getMenuReg = async (nama, triggerBilling, triggerSupport, triggerPackages,
             trigger_faq: triggerFAQ,
             trigger_admin: triggerAdmin
         });
+    } else {
+        baseText = defaultMenuReg(nama, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
     }
-    return defaultMenuReg(nama, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+
+    if (!baseText.toLowerCase().includes('referral') && !baseText.toLowerCase().includes('reward') && !baseText.toLowerCase().includes('klaim')) {
+        baseText += `\nkirim 6 atau referral untuk cek & klaim reward referal`;
+    }
+    return baseText;
 };
 
 const FAQ_TEXT = `halo, ini adalah pertanyaan yang paling umum di tanyakan,
@@ -218,9 +226,76 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
             await sendFn(accountId, rawFrom, FAQ_TEXT);
         } else if (matchTrigger(text, triggerAdmin)) {
             await requestAdmin(rawFrom, accountId, contactName || customerName, sendFn);
+        } else if (matchTrigger(text, '6') || matchTrigger(text, 'referral') || matchTrigger(text, 'reward') || matchTrigger(text, 'mgm')) {
+            upsertSession(rawFrom, accountId, 'REG_REFERRAL_MENU', { ...formData });
+            await sendReferralMenu(customerId, customerName, accountId, rawFrom, sendFn);
         } else {
             const mRegText = await getMenuReg(customerName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
             await sendFn(accountId, rawFrom, `Hm, aku kurang ngerti 😅\n\n${mRegText}`);
+        }
+        return;
+    }
+ 
+    // ── REG_REFERRAL_MENU ───────────────────────────────────────────────────
+    if (state === 'REG_REFERRAL_MENU') {
+        const { customerId, customerName } = formData;
+        const customer = await findCustomerByPhone(rawFrom);
+        if (!customer) {
+            deleteSession(rawFrom);
+            return handleMessage(rawFrom, '', accountId, sendFn, contactName);
+        }
+
+        const matchTarik = text.match(/^(tarik|cairkan|cair)\s+(\d+)$/i);
+        const matchVoucher = text.match(/^(voucher|tukar|tukar_voucher)\s+(\d+)$/i);
+
+        if (matchTarik) {
+            const amount = parseInt(matchTarik[2], 10);
+            if (amount <= 0) {
+                await sendFn(accountId, rawFrom, "❌ Nominal penarikan harus lebih dari 0.");
+                return;
+            }
+            if (amount > customer.referral_balance) {
+                await sendFn(accountId, rawFrom, `❌ Saldo referral kamu tidak mencukupi.\nSaldo kamu: ${formatRp(customer.referral_balance)}\nNominal yang diminta: ${formatRp(amount)}`);
+                return;
+            }
+
+            try {
+                await withdrawReferral(customer.id, amount);
+                
+                // Notif Admin via WA & Discord
+                const cleanPhone = rawFrom.replace(/@c\.us$/, '').replace(/^\+/, '');
+                const linkNumber = cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone.replace(/^0/, '');
+                const alertMsg = `💸 *Permintaan Penarikan Tunai Referral*\nNama Pelanggan: ${customerName}\nNo HP: wa.me/+${linkNumber}\nNominal Pencairan: ${formatRp(amount)}\n\nMohon segera diproses transfernya ke pelanggan terkait.`;
+                
+                await notifyAdminViaWA({ phone: rawFrom, contactName: customerName, accountId }, sendFn, alertMsg);
+                await notifyAdminViaDiscord({ phone: rawFrom, contactName: customerName }, alertMsg);
+
+                await sendFn(accountId, rawFrom, `✅ *Penarikan Tunai Berhasil Diajukan!*\n\nPermintaan penarikan saldo sebesar *${formatRp(amount)}* telah kami catat.\nAdmin akan mentransfer dana tersebut ke bank/e-wallet Anda secepatnya.\n\nKetik *menu* untuk kembali.`);
+                upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            } catch (err) {
+                await sendFn(accountId, rawFrom, `❌ Gagal memproses penarikan: ${err.message}`);
+            }
+        } else if (matchVoucher) {
+            const amount = parseInt(matchVoucher[2], 10);
+            if (amount <= 0) {
+                await sendFn(accountId, rawFrom, "❌ Nominal voucher harus lebih dari 0.");
+                return;
+            }
+            if (amount > customer.referral_balance) {
+                await sendFn(accountId, rawFrom, `❌ Saldo referral kamu tidak mencukupi.\nSaldo kamu: ${formatRp(customer.referral_balance)}\nNominal yang diminta: ${formatRp(amount)}`);
+                return;
+            }
+
+            try {
+                await convertReferralToVoucher(customer.id, amount);
+                await sendFn(accountId, rawFrom, `✅ *Tukar Voucher Diskon Berhasil!*\n\nSaldo sebesar *${formatRp(amount)}* telah berhasil ditukarkan menjadi voucher diskon.\nVoucher ini akan otomatis memotong tagihan bulanan Anda berikutnya.\n\nKetik *menu* untuk kembali.`);
+                upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            } catch (err) {
+                await sendFn(accountId, rawFrom, `❌ Gagal memproses penukaran voucher: ${err.message}`);
+            }
+        } else {
+            // Jika input tidak dikenali, kirim ulang menu referral
+            await sendReferralMenu(customerId, customerName, accountId, rawFrom, sendFn);
         }
         return;
     }
@@ -394,6 +469,41 @@ const sendBillInfo = async (customerId, customerName, accountId, to, sendFn) => 
         }
     }
     await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
+};
+
+/** Kirim menu status & pencairan referral */
+const sendReferralMenu = async (customerId, customerName, accountId, to, sendFn) => {
+    const customer = await findCustomerByPhone(to);
+    if (!customer) {
+        await sendFn(accountId, to, 'Maaf, data pelanggan Anda tidak ditemukan.');
+        return;
+    }
+    const count = await getReferredCount(customer.id);
+    const balance = customer.referral_balance || 0;
+    const voucher = customer.voucher_discount || 0;
+    const code = customer.referral_code || '-';
+
+    const msg = `Halo *${customerName}*!
+Berikut adalah informasi program Referral (Member-get-Member) Anda:
+
+👉 *Kode Referral Anda:* ${code}
+👥 *Jumlah Teman yang Diajak:* ${count} orang
+💰 *Saldo Referral (bisa dicairkan):* ${formatRp(balance)}
+🎟️ *Voucher Diskon Aktif:* ${formatRp(voucher)}
+
+*PILIHAN KLAIM REWARD REFERRAL:*
+
+💵 *A. Cairkan Saldo jadi Uang Tunai*
+   Ketik: *TARIK [nominal]*
+   (Contoh: *TARIK 50000*)
+
+🎫 *B. Tukar Saldo jadi Voucher Diskon Tagihan*
+   Ketik: *VOUCHER [nominal]*
+   (Contoh: *VOUCHER 50000*)
+
+_Ketik *menu* atau *0* untuk membatalkan dan kembali ke menu utama._`;
+
+    await sendFn(accountId, to, msg);
 };
 
 /** Kirim daftar paket */

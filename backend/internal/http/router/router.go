@@ -27,6 +27,7 @@ import (
 	"menettech/dashboard/backend/internal/users"
 	"menettech/dashboard/backend/internal/tickets"
 	"menettech/dashboard/backend/internal/broadcast"
+	"menettech/dashboard/backend/internal/odp"
 )
 
 func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Service) http.Handler {
@@ -61,6 +62,10 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 		Repository: customers.Repository{DB: db},
 		Settings:   settingsService,
 	}, auditService)
+	odpHandler := handler.NewOdpHandler(odp.Service{
+		Repository: odp.Repository{DB: db},
+	})
+	gacsHandler := handler.NewGacsHandler(db, settingsService)
 
 	discordService := notifications.NewDiscordService(settingsService)
 	reportsHandler := handler.NewReportsHandler(reports.Service{DB: db})
@@ -109,6 +114,114 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	r.Get("/readyz", healthHandler.Ready)
 	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(filepath.Join(cfg.StoragePath, "uploads")))))
 
+	r.Route("/api", func(api chi.Router) {
+		// Public routes
+		api.Get("/public/app-name", gacsHandler.GetPublicAppName)
+		api.Get("/docker/latest", gacsHandler.GetDockerLatest)
+		api.Post("/auth/validate-api-key", gacsHandler.ValidateAPIKey)
+		api.Post("/auth/login", gacsHandler.AuthLogin)
+		api.Post("/auth/refresh", gacsHandler.AuthRefresh)
+
+		// Protected GACS routes using gacsAuthMiddleware
+		api.Group(func(protected chi.Router) {
+			protected.Use(gacsAuthMiddleware(authService))
+
+			protected.Get("/auth/user", gacsHandler.AuthUser)
+			protected.Post("/auth/logout", gacsHandler.AuthLogout)
+			protected.Post("/auth/change-username", gacsHandler.AuthChangeUsername)
+			protected.Post("/auth/change-password", gacsHandler.AuthChangePassword)
+
+			protected.Get("/getdevice", gacsHandler.GetDevices)
+			protected.Get("/getdetaildevice/{id}", gacsHandler.GetDetailedDevice)
+			protected.Post("/summon-device", gacsHandler.SummonDevice)
+			protected.Post("/summon-detaildevice/{id}", gacsHandler.SummonParameters)
+
+			protected.Post("/add-wan-ppp", gacsHandler.AddWanPPP)
+			protected.Post("/add-wan-bridge", gacsHandler.AddWanBridge)
+			protected.Post("/delete-wan", gacsHandler.DeleteWANConnection)
+			protected.Post("/delete-wan/{id}", gacsHandler.DeleteWANConnection)
+			protected.Delete("/delete-wan/{id}", gacsHandler.DeleteWANConnection)
+
+			protected.Post("/reboot-device", gacsHandler.RebootDevice)
+			protected.Delete("/delete-device/{id}", gacsHandler.DeleteDevice)
+
+			protected.Get("/faults", gacsHandler.GetFaults)
+			protected.Delete("/faults/{faultId}", gacsHandler.DeleteFault)
+			protected.Delete("/delete-faults/{deviceId}", gacsHandler.DeleteDeviceFaults)
+
+			// WAN check (GACS compat)
+			protected.Get("/check-wan/{id}", gacsHandler.CheckWAN)
+			protected.Get("/check-gponepon/{id}", gacsHandler.CheckGponEpon)
+
+			// Telegram Bot settings (GACS compat)
+			protected.Get("/telegram-bot/settings", gacsHandler.GetTelegramBotSettings)
+			protected.Post("/telegram-bot/save-settings", gacsHandler.SaveTelegramBotSettings)
+
+			// Portal (GACS compat)
+			protected.Post("/portal/validate-accesscode", gacsHandler.PortalValidateAccessCode)
+
+			// SSID / Config Parameter Tasks
+			protected.Post("/ssid-config/set-parameter", gacsHandler.SetParameter)
+			protected.Post("/ssid-config/set-multiple-parameters", gacsHandler.SetMultipleParameters)
+			protected.Post("/ssid-config/add-instance", gacsHandler.AddSSIDInstance)
+
+			protected.Post("/wan-config/set-parameter", gacsHandler.SetParameter)
+			protected.Post("/wan-config/set-multiple-parameters", gacsHandler.SetMultipleParameters)
+
+			protected.Post("/credential-config/set-parameter", gacsHandler.SetParameter)
+			protected.Post("/credential-config/set-multiple-parameters", gacsHandler.SetMultipleParameters)
+
+			protected.Post("/security-config/set-parameter", gacsHandler.SetParameter)
+			protected.Post("/security-config/set-multiple-parameters", gacsHandler.SetMultipleParameters)
+
+			protected.Post("/wifi-security-config/set-parameter", gacsHandler.SetParameter)
+			protected.Post("/wifi-security-config/set-multiple-parameters", gacsHandler.SetMultipleParameters)
+
+			// Map Settings
+			protected.Get("/map-settings", gacsHandler.GetMapSettings)
+			protected.Put("/map-settings", gacsHandler.UpdateMapSettings)
+			protected.Post("/map-settings/reset", gacsHandler.ResetMapSettings)
+
+			// Mapping Data (Nodes & Edges)
+			protected.Get("/mapping-data/nodes", gacsHandler.GetNodes)
+			protected.Get("/mapping-data/nodes/{nodeId}", gacsHandler.GetNode)
+			protected.Post("/mapping-data/nodes", gacsHandler.CreateNode)
+			protected.Put("/mapping-data/nodes/{nodeId}", gacsHandler.UpdateNode)
+			protected.Delete("/mapping-data/nodes/{nodeId}", gacsHandler.DeleteNode)
+
+			protected.Get("/mapping-data/edges", gacsHandler.GetEdges)
+			protected.Get("/mapping-data/edges/{edgeId}", gacsHandler.GetEdge)
+			protected.Post("/mapping-data/edges", gacsHandler.CreateEdge)
+			protected.Put("/mapping-data/edges/{edgeId}", gacsHandler.UpdateEdge)
+			protected.Delete("/mapping-data/edges/{edgeId}", gacsHandler.DeleteEdge)
+
+			protected.Post("/mapping-data/sync", gacsHandler.SyncMappingData)
+			protected.Delete("/mapping-data/reset", gacsHandler.ResetMappingData)
+
+			// Vendor Management
+			protected.Get("/vendor-management/vendors", gacsHandler.GetVendors)
+			protected.Post("/vendor-management/vendors", gacsHandler.CreateVendor)
+			protected.Put("/vendor-management/vendors/{id}", gacsHandler.UpdateVendor)
+			protected.Delete("/vendor-management/vendors/{id}", gacsHandler.DeleteVendor)
+			protected.Get("/vendor-management/sub-types/{id}", gacsHandler.GetSubTypes)
+			protected.Get("/vendor-management/parameters/{id}", gacsHandler.GetParameters)
+			protected.Get("/vendor-management/wifi-security/{id}", gacsHandler.GetWifiSecurity)
+
+			// Tags
+			protected.Post("/devices/{id}/tags/{tag}", gacsHandler.AddDeviceTag)
+			protected.Delete("/devices/{id}/tags/{tag}", gacsHandler.DeleteDeviceTag)
+
+			// Dashboard
+			protected.Get("/dashboard", gacsHandler.GetDashboardData)
+			protected.Get("/dashboard/metrics", gacsHandler.GetDashboardData)
+			protected.Get("/dashboard/connection-history", gacsHandler.GetDashboardData)
+			protected.Get("/dashboard/connection-types", gacsHandler.GetDashboardData)
+			protected.Get("/dashboard/events", gacsHandler.GetDashboardData)
+			protected.Get("/dashboard/recent-devices", gacsHandler.GetDashboardData)
+			protected.Get("/dashboard/rxpower", gacsHandler.GetDashboardData)
+		})
+	})
+
 	r.Route("/api/v1", func(api chi.Router) {
 		api.Post("/auth/login", authHandler.Login)
 		api.Get("/meta", func(w http.ResponseWriter, r *http.Request) {
@@ -141,6 +254,9 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Put("/settings", settingsHandler.Update)
 				admin.Post("/backups", backupHandler.Create)
 				admin.Get("/backups", backupHandler.List)
+				admin.Post("/odps", odpHandler.Create)
+				admin.Put("/odps/{id}", odpHandler.Update)
+				admin.Delete("/odps/{id}", odpHandler.Delete)
 				admin.Post("/backups/{filename}/verify", backupHandler.Verify)
 				admin.Get("/backups/{filename}/download", backupHandler.Download)
 				admin.Post("/backups/{filename}/restore", backupHandler.SimulateRestore)
@@ -148,6 +264,8 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Get("/integration/check", integrationHandler.Check)
 				admin.Get("/integration/mikrotik/sync-preview", integrationHandler.SyncPreview)
 				admin.Post("/integration/mikrotik/sync-import", integrationHandler.SyncImport)
+				admin.Get("/integration/mikrotik/sync-packages-preview", integrationHandler.SyncPackagesPreview)
+				admin.Post("/integration/mikrotik/sync-packages-import", integrationHandler.SyncPackagesImport)
 				admin.Post("/integration/test-mikrotik", integrationHandler.TestMikrotik)
 				admin.Post("/integration/test-genieacs", integrationHandler.TestGenieACS)
 				admin.Post("/integration/test-discord", integrationHandler.TestDiscord)
@@ -173,6 +291,20 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				staff.Post("/tickets/{id}/messages", ticketHandler.AddMessage)
 				staff.Post("/tickets/{id}/close", ticketHandler.Close)
 				staff.Post("/broadcast", broadcastHandler.Send)
+
+				// GenieACS Extended Endpoints (v1 session-auth variants)
+				staff.Get("/gacs/devices", gacsHandler.GetDevices)
+				staff.Get("/gacs/devices/{id}", gacsHandler.GetDetailedDevice)
+				staff.Post("/gacs/devices/{id}/summon", gacsHandler.SummonParameters)
+				staff.Post("/gacs/devices/{id}/wan", gacsHandler.CreateWANConnection)
+				staff.Delete("/gacs/devices/{id}/wan", gacsHandler.DeleteWANConnection)
+				staff.Get("/gacs/check-wan", gacsHandler.CheckWAN)
+				staff.Get("/gacs/check-wan/{id}", gacsHandler.CheckWAN)
+				staff.Get("/gacs/check-gponepon", gacsHandler.CheckGponEpon)
+				staff.Get("/gacs/check-gponepon/{id}", gacsHandler.CheckGponEpon)
+				staff.Get("/gacs/telegram-bot/settings", gacsHandler.GetTelegramBotSettings)
+				staff.Post("/gacs/telegram-bot/settings", gacsHandler.SaveTelegramBotSettings)
+				staff.Post("/gacs/portal/validate-accesscode", gacsHandler.PortalValidateAccessCode)
 			})
 
 			// All logged in users (Admin, Petugas, Viewer)
@@ -187,6 +319,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				all.Get("/bills/{id}/invoice", billHandler.Invoice)
 				all.Get("/bills/{id}/notifications", notificationHandler.ListByBill)
 				all.Get("/templates", templateHandler.List)
+				all.Get("/odps", odpHandler.List)
 				all.Get("/reports/revenue", reportsHandler.Revenue)
 				all.Get("/reports/aging", reportsHandler.Aging)
 				all.Get("/reports/bills/csv", reportsHandler.ExportBills)

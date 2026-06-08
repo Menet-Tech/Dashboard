@@ -13,6 +13,10 @@ import type {
   TicketItem,
   TicketMessageItem,
   TicketDetailItem,
+  MapSettings,
+  MapNode,
+  MapEdge,
+  TelegramBotSettings,
 } from "../types";
 
 let csrfToken = "";
@@ -517,4 +521,219 @@ export function kickMikrotikSession(id: number) {
   });
 }
 
+// ─── GACS / GenieACS Device Management ─────────────────────────────────────
 
+export type GacsDevice = {
+  _id: string;
+  _deviceId: {
+    _Manufacturer: string;
+    _ProductClass: string;
+    _SerialNumber: string;
+    _OUI: string;
+  };
+  _lastInform?: string;
+  _registered?: string;
+  _tag?: string[];
+  _summary?: {
+    ssid?: string;
+    pppoe_username?: string;
+    rx_power?: string;
+    tx_power?: string;
+    uptime?: string;
+    wan_ip?: string;
+  };
+};
+
+export type GacsDeviceDetail = {
+  success: boolean;
+  data: Record<string, unknown>;
+  vendor?: {
+    name: string;
+    parameter_prefix: string;
+  };
+};
+
+export function fetchGacsDevices(params?: { manufacturer?: string; productClass?: string; tag?: string; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.manufacturer) query.append("manufacturer", params.manufacturer);
+  if (params?.productClass) query.append("productClass", params.productClass);
+  if (params?.tag) query.append("tag", params.tag);
+  if (params?.limit) query.append("limit", String(params.limit));
+  const qs = query.toString();
+  return request<{ success: boolean; data: GacsDevice[]; total?: number }>(`/api/v1/gacs/devices${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchGacsDeviceDetail(id: string) {
+  return request<GacsDeviceDetail>(`/api/v1/gacs/devices/${encodeURIComponent(id)}`);
+}
+
+export function summonGacsDevice(id: string) {
+  return request<{ success: boolean; message?: string }>(`/api/v1/gacs/devices/${encodeURIComponent(id)}/summon`, {
+    method: "POST",
+  });
+}
+
+export function rebootGacsDevice(deviceId: string) {
+  return request<{ success: boolean; message?: string }>(`/api/reboot-device`, {
+    method: "POST",
+    body: JSON.stringify({ deviceId }),
+  });
+}
+
+export function deleteGacsDevice(id: string) {
+  return request<{ success: boolean; message?: string }>(`/api/v1/gacs/devices/${encodeURIComponent(id)}/wan`, {
+    method: "DELETE",
+  });
+}
+
+export function addGacsDeviceTag(id: string, tag: string) {
+  return request<{ success: boolean }>(`/api/v1/gacs/devices/${encodeURIComponent(id)}/wan`, {
+    method: "POST",
+    body: JSON.stringify({ tag }),
+  });
+}
+
+export function fetchGacsFaults(deviceId?: string) {
+  const path = deviceId
+    ? `/api/faults?deviceId=${encodeURIComponent(deviceId)}`
+    : "/api/faults";
+  return request<{ success: boolean; data: GacsFault[]; total?: number }>(path);
+}
+
+export type GacsFault = {
+  _id: string;
+  device_id: string;
+  channel: string;
+  code: string;
+  message: string;
+  detail?: string;
+  timestamp: string;
+  retries?: number;
+};
+
+// Check WAN status
+export function checkWAN(deviceId: string) {
+  return request<{
+    success: boolean;
+    deviceId: string;
+    productClass: string;
+    manufacturer: string;
+    wanIPConnections: string[];
+    wanPPPConnections: string[];
+    availableSlots: Record<string, string[]>;
+  }>(`/api/v1/gacs/check-wan/${encodeURIComponent(deviceId)}`);
+}
+
+// Check GPON / EPON mode
+export function checkGponEpon(deviceId: string) {
+  return request<{
+    success: boolean;
+    deviceId: string;
+    productClass: string;
+    manufacturer: string;
+    mode: "GPON" | "EPON" | "UNKNOWN";
+  }>(`/api/v1/gacs/check-gponepon/${encodeURIComponent(deviceId)}`);
+}
+
+// Map settings CRUD
+export function fetchMapSettings() {
+  return request<MapSettings>("/api/map-settings");
+}
+
+export function updateMapSettings(settings: MapSettings) {
+  return request<{ success: boolean }>("/api/map-settings", {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  });
+}
+
+export function resetMapSettings() {
+  return request<MapSettings>("/api/map-settings/reset", {
+    method: "POST",
+  });
+}
+
+// Map nodes CRUD
+export function fetchNodes() {
+  return request<MapNode[]>("/api/mapping-data/nodes");
+}
+
+export function fetchNode(nodeId: string) {
+  return request<MapNode>(`/api/mapping-data/nodes/${encodeURIComponent(nodeId)}`);
+}
+
+export function createNode(node: MapNode) {
+  return request<MapNode>("/api/mapping-data/nodes", {
+    method: "POST",
+    body: JSON.stringify(node),
+  });
+}
+
+export function updateNode(nodeId: string, node: MapNode) {
+  return request<MapNode>(`/api/mapping-data/nodes/${encodeURIComponent(nodeId)}`, {
+    method: "PUT",
+    body: JSON.stringify(node),
+  });
+}
+
+export function deleteNode(nodeId: string) {
+  return request<{ success: boolean }>(`/api/mapping-data/nodes/${encodeURIComponent(nodeId)}`, {
+    method: "DELETE",
+  });
+}
+
+// Map edges CRUD
+export function fetchEdges() {
+  return request<MapEdge[]>("/api/mapping-data/edges");
+}
+
+export function fetchEdge(edgeId: string) {
+  return request<MapEdge>(`/api/mapping-data/edges/${encodeURIComponent(edgeId)}`);
+}
+
+export function createEdge(edge: MapEdge) {
+  return request<MapEdge>("/api/mapping-data/edges", {
+    method: "POST",
+    body: JSON.stringify(edge),
+  });
+}
+
+export function updateEdge(edgeId: string, edge: MapEdge) {
+  return request<MapEdge>(`/api/mapping-data/edges/${encodeURIComponent(edgeId)}`, {
+    method: "PUT",
+    body: JSON.stringify(edge),
+  });
+}
+
+export function deleteEdge(edgeId: string) {
+  return request<{ success: boolean }>(`/api/mapping-data/edges/${encodeURIComponent(edgeId)}`, {
+    method: "DELETE",
+  });
+}
+
+// Sync mapping data
+export function syncMappingData(data: { nodes: MapNode[]; edges: MapEdge[] }) {
+  return request<{ success: boolean }>("/api/mapping-data/sync", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// Reset mapping data
+export function resetMappingData() {
+  return request<{ success: boolean }>("/api/mapping-data/reset", {
+    method: "DELETE",
+  });
+}
+
+// Telegram Bot Settings API
+export function fetchTelegramBotSettings() {
+  return request<TelegramBotSettings>("/api/v1/gacs/telegram-bot/settings");
+}
+
+export function saveTelegramBotSettings(settings: TelegramBotSettings) {
+  return request<{ success: boolean; message?: string }>("/api/v1/gacs/telegram-bot/settings", {
+    method: "POST",
+    body: JSON.stringify(settings),
+  });
+}
