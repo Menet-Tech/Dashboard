@@ -8,21 +8,26 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"menettech/dashboard/backend/internal/backup"
 	"menettech/dashboard/backend/internal/billing"
 	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/settings"
+	"menettech/dashboard/backend/internal/customers"
+	"menettech/dashboard/backend/internal/acs"
+	"menettech/dashboard/backend/internal/mikrotik"
 )
 
 type Service struct {
-	Logger   *slog.Logger
-	Billing  billing.Service
-	Settings settings.Service
-	WhatsApp notifications.WhatsAppService
-	Discord  notifications.DiscordSender
-	Backup   *backup.Service
+	Logger    *slog.Logger
+	Billing   billing.Service
+	Settings  settings.Service
+	WhatsApp  notifications.WhatsAppService
+	Discord   notifications.DiscordSender
+	Backup    *backup.Service
+	Customers customers.Service
 }
 
 const scheduledBillingLockTTL = 30 * time.Minute
@@ -155,6 +160,11 @@ func (s Service) RunOnce(ctx context.Context) error {
 	// Process trial expiry and auto-generate bills
 	if err := s.Billing.ProcessTrialExpiry(ctx, now); err != nil {
 		s.Logger.Error("trial expiry processing failed", "error", err)
+	}
+
+	// Integration status pooling
+	if err := s.runIntegrationPooling(ctx, now); err != nil {
+		s.Logger.Error("integration status pooling failed", "error", err)
 	}
 
 	if err := s.runScheduledBilling(ctx, now); err != nil {
@@ -467,4 +477,159 @@ func workerOwner() string {
 		host = "unknown-host"
 	}
 	return fmt.Sprintf("%s:%d", host, os.Getpid())
+}
+
+func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error {
+	// Read customers
+	cList, err := s.Customers.List(ctx)
+	if err != nil {
+		return fmt.Errorf("list customers: %w", err)
+	}
+
+	if len(cList) == 0 {
+		return nil
+	}
+
+	// 1. Fetch MikroTik Active Connections
+	activePPPMap := make(map[string]mikrotik.PPPActive)
+	mikrotikHost, _ := s.Settings.GetString(ctx, settings.KeyMikrotikHost)
+	mikrotikUser, _ := s.Settings.GetString(ctx, settings.KeyMikrotikUser)
+	mikrotikPass, _ := s.Settings.GetString(ctx, settings.KeyMikrotikPass)
+	if strings.TrimSpace(mikrotikHost) != "" && strings.TrimSpace(mikrotikUser) != "" {
+		client := mikrotik.NewClient(mikrotikHost, mikrotikUser, mikrotikPass)
+		if err := client.Connect(ctx); err == nil {
+			defer client.Close()
+			activeList, err := client.ListActiveConnections(ctx)
+			if err == nil {
+				for _, act := range activeList {
+					activePPPMap[strings.ToLower(strings.TrimSpace(act.Name))] = act
+				}
+			} else {
+				s.Logger.Error("worker status pooling: failed to list active MikroTik connections", "error", err)
+			}
+		} else {
+			s.Logger.Error("worker status pooling: failed to connect to MikroTik", "error", err)
+		}
+	}
+
+	// 2. Setup GenieACS Client
+	acsURL, err := s.Settings.GetString(ctx, settings.KeyACSURL)
+	if err != nil || acsURL == "" {
+		acsURL = "http://localhost:7557"
+	}
+	acsUser, _ := s.Settings.GetString(ctx, settings.KeyACSUsername)
+	acsPass, _ := s.Settings.GetString(ctx, settings.KeyACSPassword)
+	acsClient := acs.NewClient(acsURL, acsUser, acsPass)
+
+	type checkResult struct {
+		customer customers.Customer
+		modified bool
+	}
+
+	numWorkers := 15
+	if len(cList) < numWorkers {
+		numWorkers = len(cList)
+	}
+
+	tasksChan := make(chan customers.Customer, len(cList))
+	resultsChan := make(chan checkResult, len(cList))
+
+	var wg sync.WaitGroup
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for cust := range tasksChan {
+				modified := false
+
+				// Determine PPPoE Status
+				pppoeUsername := strings.ToLower(strings.TrimSpace(cust.UserPPPoE))
+				if pppoeUsername != "" {
+					if active, ok := activePPPMap[pppoeUsername]; ok {
+						statusVal := "online"
+						if cust.Status == "limit" {
+							statusVal = "limit"
+						}
+						if cust.PppoeStatus != statusVal || cust.PppoeIP != active.Address || cust.PppoeUptime != active.Uptime {
+							cust.PppoeStatus = statusVal
+							cust.PppoeIP = active.Address
+							cust.PppoeUptime = active.Uptime
+							modified = true
+						}
+					} else {
+						// Offline or unconfigured/inactive
+						statusVal := "offline"
+						if cust.PppoeStatus != statusVal || cust.PppoeIP != "" || cust.PppoeUptime != "" {
+							cust.PppoeStatus = statusVal
+							cust.PppoeIP = ""
+							cust.PppoeUptime = ""
+							modified = true
+						}
+					}
+				} else {
+					if cust.PppoeStatus != "" {
+						cust.PppoeStatus = ""
+						cust.PppoeIP = ""
+						cust.PppoeUptime = ""
+						modified = true
+					}
+				}
+
+				// Determine GenieACS Status
+				serialNum := strings.TrimSpace(cust.SNOnt)
+				if serialNum != "" {
+					// Query device status from GenieACS Client
+					status, err := acsClient.GetDeviceStatus(ctx, serialNum)
+					if err == nil {
+						if cust.OntStatus != status.Status || cust.OntIP != status.IPAddress || cust.OntUptime != status.Uptime || cust.OntRxPower != status.RxOpticalPower || cust.OntTxPower != status.TxOpticalPower {
+							cust.OntStatus = status.Status
+							cust.OntIP = status.IPAddress
+							cust.OntUptime = status.Uptime
+							cust.OntRxPower = status.RxOpticalPower
+							cust.OntTxPower = status.TxOpticalPower
+							modified = true
+						}
+					} else {
+						s.Logger.Error("worker status pooling: failed to get device ONT status from GenieACS", "serial", serialNum, "error", err)
+					}
+				} else {
+					if cust.OntStatus != "" {
+						cust.OntStatus = ""
+						cust.OntIP = ""
+						cust.OntUptime = ""
+						cust.OntRxPower = ""
+						cust.OntTxPower = ""
+						modified = true
+					}
+				}
+
+				resultsChan <- checkResult{customer: cust, modified: modified}
+			}
+		}()
+	}
+
+	// Queue all customers
+	for _, customer := range cList {
+		tasksChan <- customer
+	}
+	close(tasksChan)
+
+	// Close results channel when workers are done
+	go func() {
+		wg.Wait()
+		close(resultsChan)
+	}()
+
+	// Collect results and apply database updates sequentially
+	for res := range resultsChan {
+		if res.modified {
+			res.customer.LastSyncAt = now.Format(time.RFC3339)
+			_, err = s.Customers.Update(ctx, res.customer.ID, res.customer)
+			if err != nil {
+				s.Logger.Error("worker status pooling: failed to update customer status in database", "customer_id", res.customer.ID, "error", err)
+			}
+		}
+	}
+
+	return nil
 }

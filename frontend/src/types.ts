@@ -46,6 +46,16 @@ export type CustomerItem = {
   referral_balance: number;
   referral_code?: string;
   referred_by_name?: string;
+  voucher_discount?: number;
+  ont_status?: string;
+  ont_ip?: string;
+  ont_uptime?: string;
+  ont_rx_power?: string;
+  ont_tx_power?: string;
+  pppoe_status?: string;
+  pppoe_ip?: string;
+  pppoe_uptime?: string;
+  last_sync_at?: string;
 };
 
 export type BillItem = {
@@ -123,6 +133,9 @@ export type SettingsState = {
   chatbot_trigger_packages?: string;
   chatbot_trigger_faq?: string;
   chatbot_trigger_admin?: string;
+  acs_url?: string;
+  acs_username?: string;
+  acs_password?: string;
 };
 
 export type AuditLogItem = {
@@ -161,7 +174,8 @@ export type ViewKey =
   | "settings"
   | "tickets"
   | "registration"
-  | "whatsapp";
+  | "whatsapp"
+  | "reports";
 
 export type TicketItem = {
   id: number;

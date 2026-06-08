@@ -60,7 +60,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	customerHandler := handler.NewCustomerHandler(customers.Service{
 		Repository: customers.Repository{DB: db},
 		Settings:   settingsService,
-	})
+	}, auditService)
 
 	discordService := notifications.NewDiscordService(settingsService)
 	reportsHandler := handler.NewReportsHandler(reports.Service{DB: db})
@@ -148,6 +148,10 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Get("/integration/check", integrationHandler.Check)
 				admin.Get("/integration/mikrotik/sync-preview", integrationHandler.SyncPreview)
 				admin.Post("/integration/mikrotik/sync-import", integrationHandler.SyncImport)
+				admin.Post("/integration/test-mikrotik", integrationHandler.TestMikrotik)
+				admin.Post("/integration/test-genieacs", integrationHandler.TestGenieACS)
+				admin.Post("/integration/test-discord", integrationHandler.TestDiscord)
+				admin.Post("/integration/test-whatsapp", integrationHandler.TestWhatsApp)
 			})
 
 			// Admin + Petugas
@@ -155,7 +159,13 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				staff.Use(requireRole("admin", "petugas"))
 				staff.Post("/customers", customerHandler.Create)
 				staff.Put("/customers/{id}", customerHandler.Update)
+				staff.Post("/customers/{id}/ont-reboot", customerHandler.ONTReboot)
+				staff.Post("/customers/{id}/ont-factory-reset", customerHandler.ONTFactoryReset)
+				staff.Post("/customers/{id}/ont-wifi", customerHandler.ONTWifiUpdate)
+				staff.Post("/customers/{id}/mikrotik-kick", customerHandler.MikrotikKick)
 				staff.Patch("/customers/{id}/status", customerHandler.UpdateStatus)
+				staff.Post("/customers/{id}/referral/withdraw", customerHandler.WithdrawReferral)
+				staff.Post("/customers/{id}/referral/convert-voucher", customerHandler.ConvertReferralToVoucher)
 				staff.Post("/bills/generate", billHandler.Generate)
 				staff.Post("/bills/{id}/pay", billHandler.Pay)
 				staff.Post("/bills/{id}/proof", billHandler.UploadProof)
@@ -172,6 +182,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				all.Get("/packages", packageHandler.List)
 				all.Get("/customers", customerHandler.List)
 				all.Get("/customers/{id}", customerHandler.FindByID)
+				all.Get("/customers/{id}/ont-status", customerHandler.ONTStatus)
 				all.Get("/bills", billHandler.List)
 				all.Get("/bills/{id}/invoice", billHandler.Invoice)
 				all.Get("/bills/{id}/notifications", notificationHandler.ListByBill)

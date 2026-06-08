@@ -27,9 +27,12 @@ import {
   LinearScale,
   BarElement,
   ArcElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from "chart.js";
 
 import { toErrorMessage } from "./utils/format";
@@ -50,6 +53,7 @@ import { MonitoringPage } from "./features/monitoring/MonitoringPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { AuditLogsPage } from "./features/audit/AuditLogsPage";
 import { UsersPage } from "./features/users/UsersPage";
+import { ReportsPage } from "./features/reports/ReportsPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
@@ -65,7 +69,18 @@ import { useSettings } from "./hooks/useSettings";
 import { useMonitoring } from "./hooks/useMonitoring";
 import { defaultPackageForm } from "./features/packages/PackagesPage";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 const TicketsPage = lazy(() =>
   import("./features/tickets/TicketsPage").then((module) => ({ default: module.TicketsPage }))
@@ -97,6 +112,7 @@ const navItems: NavItem[] = [
   { key: "whatsapp", label: "WhatsApp Gateway", caption: "Multi-akun & Chatbot" },
   { key: "templates", label: "Template WA", caption: "Draft pesan notif" },
   // === Admin ===
+  { key: "reports", label: "Laporan Keuangan", caption: "Analisis & proyeksi omset" },
   { key: "audit", label: "Audit Log", caption: "Jejak aktivitas tim" },
   { key: "users", label: "Manajemen Tim", caption: "Akses login admin" },
   // === Pengaturan (paling bawah) ===
@@ -219,7 +235,7 @@ export default function App() {
   const visibleNavItems = useMemo(
     () =>
       navItems.filter((item) => {
-        if (["audit", "users", "settings", "packages", "templates"].includes(item.key)) {
+        if (["reports", "audit", "users", "settings", "packages", "templates"].includes(item.key)) {
           return user?.role === "admin";
         }
         return true;
@@ -439,6 +455,9 @@ export default function App() {
             customersHook.handlers.setEditingCustomerId(null);
             customersHook.handlers.setCustomerForm(defaultCustomerForm());
           }}
+          pushSuccess={feedback.pushSuccess}
+          pushError={feedback.pushError}
+          onRefresh={reloadProtectedData}
         />
       ) : null}
 
@@ -539,6 +558,8 @@ export default function App() {
           busyAction={feedback.busyAction}
           onFormChange={settingsHook.handlers.setSettingsForm}
           onSubmit={settingsHook.handlers.handleSettingsSubmit}
+          pushSuccess={feedback.pushSuccess}
+          pushError={feedback.pushError}
         />
       ) : null}
 
@@ -552,6 +573,15 @@ export default function App() {
               setAuditLogs(payload.data);
             });
           }}
+        />
+      ) : null}
+
+      {view === "reports" ? (
+        <ReportsPage
+          customers={customersHook.state.customers}
+          revenue={revenue}
+          aging={aging}
+          submitting={feedback.submitting}
         />
       ) : null}
 

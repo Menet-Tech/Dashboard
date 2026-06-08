@@ -13,6 +13,7 @@ import {
   UserPlus,
   MessageSquare,
   LogOut,
+  BarChart3,
 } from "lucide-react";
 
 export type NavItem = {
@@ -45,6 +46,7 @@ const iconMap: Record<ViewKey, React.ComponentType<{ className?: string }>> = {
   tickets: LifeBuoy,
   registration: UserPlus,
   whatsapp: MessageSquare,
+  reports: BarChart3,
 };
 
 export function Sidebar({

@@ -12,6 +12,7 @@ type AuditLogsPageProps = {
 export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPageProps) {
   const [actionFilter, setActionFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const uniqueActions = useMemo(() => {
     const actions = new Set<string>();
@@ -23,19 +24,33 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
     return auditLogs.filter((log) => {
       const matchAction = !actionFilter || log.action === actionFilter;
       const matchDate = !dateFilter || log.created_at.startsWith(dateFilter);
-      return matchAction && matchDate;
+      const matchSearch = !searchTerm || 
+        (log.username && log.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (log.message && log.message.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (log.action && log.action.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchAction && matchDate && matchSearch;
     });
-  }, [auditLogs, actionFilter, dateFilter]);
+  }, [auditLogs, actionFilter, dateFilter, searchTerm]);
 
   return (
     <section className="grid gap-6">
       <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
+            <label className="block">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Cari Log</span>
+              <input
+                type="text"
+                placeholder="Cari user, aksi, atau detail..."
+                className="bg-white border border-slate-250 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </label>
             <label className="block">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Filter Aksi</span>
               <select
-                className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+                className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
               >
@@ -49,7 +64,7 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Filter Tanggal</span>
               <input
                 type="date"
-                className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+                className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
               />
@@ -58,11 +73,12 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="bg-white border border-slate-200 hover:bg-slate-50 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+              className="bg-white border border-slate-200 hover:bg-slate-50 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50 h-8 flex items-center justify-center"
               disabled={submitting}
               onClick={() => {
                 setActionFilter("");
                 setDateFilter("");
+                setSearchTerm("");
                 onRefresh();
               }}
             >

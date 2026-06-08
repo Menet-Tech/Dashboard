@@ -98,7 +98,29 @@ Copy-Item -Path (Join-Path $scriptDir "*.service") -Destination $deployReleaseDi
 # 6. Buat Archive Zip
 Write-Host "[6/6] Creating final zip package..." -ForegroundColor Cyan
 $zipFile = Join-Path $distDir "menettech-release.zip"
-Compress-Archive -Path (Join-Path $tempReleaseDir "*") -DestinationPath $zipFile -Force
+
+Write-Host "  -> Waiting for file handles to clear..."
+Start-Sleep -Seconds 3
+
+$retryCount = 0
+$success = $false
+while (-not $success -and $retryCount -lt 5) {
+    try {
+        if (Test-Path $zipFile) {
+            Remove-Item -Path $zipFile -Force
+        }
+        Compress-Archive -Path (Join-Path $tempReleaseDir "*") -DestinationPath $zipFile -Force
+        $success = $true
+    } catch {
+        $retryCount++
+        Write-Host "  -> Zip creation failed (sharing violation?), retrying ($retryCount/5) in 3 seconds..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 3
+    }
+}
+
+if (-not $success) {
+    throw "Failed to create release zip package after multiple retries."
+}
 
 # Bersihkan temporary folder
 Remove-Item -Path $tempReleaseDir -Recurse -Force

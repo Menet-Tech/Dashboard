@@ -16,26 +16,36 @@ import (
 var ErrCustomerNotFound = errors.New("customer not found")
 
 type Customer struct {
-	ID             int64   `json:"id"`
-	Name           string  `json:"name"`
-	PackageID      int64   `json:"package_id"`
-	PackageName    string  `json:"package_name,omitempty"`
-	PackagePrice   int     `json:"package_price,omitempty"`
-	UserPPPoE      string  `json:"user_pppoe"`
-	PasswordPPPoE  string  `json:"password_pppoe"`
-	WhatsApp       string  `json:"whatsapp"`
-	SNOnt          string  `json:"sn_ont"`
-	DueDay         int     `json:"due_day"`
-	Status         string  `json:"status"`
-	Address        string  `json:"address"`
-	IsTrial        bool    `json:"is_trial"`
-	TrialStartedAt *string `json:"trial_started_at,omitempty"`
-	TrialDays      int     `json:"trial_days"`
-	Diskon         int     `json:"diskon"`
-	ReferredByID   *int64  `json:"referred_by_id,omitempty"`
+	ID              int64   `json:"id"`
+	Name            string  `json:"name"`
+	PackageID       int64   `json:"package_id"`
+	PackageName     string  `json:"package_name,omitempty"`
+	PackagePrice    int     `json:"package_price,omitempty"`
+	UserPPPoE       string  `json:"user_pppoe"`
+	PasswordPPPoE   string  `json:"password_pppoe"`
+	WhatsApp        string  `json:"whatsapp"`
+	SNOnt           string  `json:"sn_ont"`
+	DueDay          int     `json:"due_day"`
+	Status          string  `json:"status"`
+	Address         string  `json:"address"`
+	IsTrial         bool    `json:"is_trial"`
+	TrialStartedAt  *string `json:"trial_started_at,omitempty"`
+	TrialDays       int     `json:"trial_days"`
+	Diskon          int     `json:"diskon"`
+	ReferredByID    *int64  `json:"referred_by_id,omitempty"`
 	ReferralBalance int     `json:"referral_balance"`
-	ReferralCode   string  `json:"referral_code,omitempty"`
-	ReferredByName string  `json:"referred_by_name,omitempty"`
+	ReferralCode    string  `json:"referral_code,omitempty"`
+	ReferredByName  string  `json:"referred_by_name,omitempty"`
+	VoucherDiscount int     `json:"voucher_discount"`
+	OntStatus       string  `json:"ont_status"`
+	OntIP           string  `json:"ont_ip"`
+	OntUptime       string  `json:"ont_uptime"`
+	OntRxPower      string  `json:"ont_rx_power"`
+	OntTxPower      string  `json:"ont_tx_power"`
+	PppoeStatus     string  `json:"pppoe_status"`
+	PppoeIP         string  `json:"pppoe_ip"`
+	PppoeUptime     string  `json:"pppoe_uptime"`
+	LastSyncAt      string  `json:"last_sync_at"`
 }
 
 type Repository struct {
@@ -199,7 +209,10 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),
 		       COALESCE(c.password_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
 		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days,
-		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, '')
+		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
+		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
+		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
+		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, '')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
@@ -218,6 +231,15 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		var referredByID sql.NullInt64
 		var referralCode sql.NullString
 		var referredByName sql.NullString
+		var ontStatus sql.NullString
+		var ontIP sql.NullString
+		var ontUptime sql.NullString
+		var ontRxPower sql.NullString
+		var ontTxPower sql.NullString
+		var pppoeStatus sql.NullString
+		var pppoeIP sql.NullString
+		var pppoeUptime sql.NullString
+		var lastSyncAt sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.Name,
@@ -239,6 +261,16 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 			&item.ReferralBalance,
 			&referralCode,
 			&referredByName,
+			&item.VoucherDiscount,
+			&ontStatus,
+			&ontIP,
+			&ontUptime,
+			&ontRxPower,
+			&ontTxPower,
+			&pppoeStatus,
+			&pppoeIP,
+			&pppoeUptime,
+			&lastSyncAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
@@ -255,6 +287,15 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		if referredByName.Valid {
 			item.ReferredByName = referredByName.String
 		}
+		item.OntStatus = ontStatus.String
+		item.OntIP = ontIP.String
+		item.OntUptime = ontUptime.String
+		item.OntRxPower = ontRxPower.String
+		item.OntTxPower = ontTxPower.String
+		item.PppoeStatus = pppoeStatus.String
+		item.PppoeIP = pppoeIP.String
+		item.PppoeUptime = pppoeUptime.String
+		item.LastSyncAt = lastSyncAt.String
 		items = append(items, item)
 	}
 
@@ -294,10 +335,12 @@ func (r Repository) Create(ctx context.Context, customer Customer) (Customer, er
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO pelanggan (
 			nama, paket_id, user_pppoe, password_pppoe, nomor_wa, sn_ont, tgl_jatuh_tempo, status, alamat,
-			is_trial, trial_started_at, trial_days, diskon, referred_by_id, referral_balance, referral_code, updated_at
+			is_trial, trial_started_at, trial_days, diskon, referred_by_id, referral_balance, referral_code, voucher_discount,
+			ont_status, ont_ip, ont_uptime, ont_rx_power, ont_tx_power, pppoe_status, pppoe_ip, pppoe_uptime, last_sync_at, updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address, 1, trialDays, customer.Diskon, customer.ReferredByID, customer.ReferralBalance, referralCode)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address, 1, trialDays, customer.Diskon, customer.ReferredByID, customer.ReferralBalance, referralCode, customer.VoucherDiscount,
+		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt)
 	if err != nil {
 		_ = tx.Rollback()
 		return Customer{}, fmt.Errorf("create customer: %w", err)
@@ -344,10 +387,13 @@ func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Cu
 	result, err := r.DB.ExecContext(ctx, `
 		UPDATE pelanggan
 		SET nama = ?, paket_id = ?, user_pppoe = ?, password_pppoe = ?, nomor_wa = ?, sn_ont = ?, tgl_jatuh_tempo = ?, status = ?, alamat = ?,
-		    diskon = ?, referred_by_id = ?, referral_balance = ?, referral_code = ?, updated_at = CURRENT_TIMESTAMP
+		    diskon = ?, referred_by_id = ?, referral_balance = ?, referral_code = ?, voucher_discount = ?,
+		    ont_status = ?, ont_ip = ?, ont_uptime = ?, ont_rx_power = ?, ont_tx_power = ?, pppoe_status = ?, pppoe_ip = ?, pppoe_uptime = ?, last_sync_at = ?,
+		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address,
-		customer.Diskon, customer.ReferredByID, customer.ReferralBalance, customer.ReferralCode, id)
+		customer.Diskon, customer.ReferredByID, customer.ReferralBalance, customer.ReferralCode, customer.VoucherDiscount,
+		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt, id)
 	if err != nil {
 		return Customer{}, fmt.Errorf("update customer: %w", err)
 	}
@@ -406,7 +452,10 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),
 		       COALESCE(c.password_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
 		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days,
-		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, '')
+		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
+		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
+		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
+		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, '')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
@@ -428,6 +477,15 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 		var referredByID sql.NullInt64
 		var referralCode sql.NullString
 		var referredByName sql.NullString
+		var ontStatus sql.NullString
+		var ontIP sql.NullString
+		var ontUptime sql.NullString
+		var ontRxPower sql.NullString
+		var ontTxPower sql.NullString
+		var pppoeStatus sql.NullString
+		var pppoeIP sql.NullString
+		var pppoeUptime sql.NullString
+		var lastSyncAt sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.Name,
@@ -449,6 +507,16 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 			&item.ReferralBalance,
 			&referralCode,
 			&referredByName,
+			&item.VoucherDiscount,
+			&ontStatus,
+			&ontIP,
+			&ontUptime,
+			&ontRxPower,
+			&ontTxPower,
+			&pppoeStatus,
+			&pppoeIP,
+			&pppoeUptime,
+			&lastSyncAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
@@ -465,6 +533,15 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 		if referredByName.Valid {
 			item.ReferredByName = referredByName.String
 		}
+		item.OntStatus = ontStatus.String
+		item.OntIP = ontIP.String
+		item.OntUptime = ontUptime.String
+		item.OntRxPower = ontRxPower.String
+		item.OntTxPower = ontTxPower.String
+		item.PppoeStatus = pppoeStatus.String
+		item.PppoeIP = pppoeIP.String
+		item.PppoeUptime = pppoeUptime.String
+		item.LastSyncAt = lastSyncAt.String
 		items = append(items, item)
 	}
 
@@ -499,7 +576,10 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),
 		       COALESCE(c.password_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
 		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days,
-		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, '')
+		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
+		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
+		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
+		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, '')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
@@ -513,6 +593,15 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 	var referredByID sql.NullInt64
 	var referralCode sql.NullString
 	var referredByName sql.NullString
+	var ontStatus sql.NullString
+	var ontIP sql.NullString
+	var ontUptime sql.NullString
+	var ontRxPower sql.NullString
+	var ontTxPower sql.NullString
+	var pppoeStatus sql.NullString
+	var pppoeIP sql.NullString
+	var pppoeUptime sql.NullString
+	var lastSyncAt sql.NullString
 
 	err := row.Scan(
 		&item.ID,
@@ -535,6 +624,16 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		&item.ReferralBalance,
 		&referralCode,
 		&referredByName,
+		&item.VoucherDiscount,
+		&ontStatus,
+		&ontIP,
+		&ontUptime,
+		&ontRxPower,
+		&ontTxPower,
+		&pppoeStatus,
+		&pppoeIP,
+		&pppoeUptime,
+		&lastSyncAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -556,6 +655,81 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 	if referredByName.Valid {
 		item.ReferredByName = referredByName.String
 	}
+	item.OntStatus = ontStatus.String
+	item.OntIP = ontIP.String
+	item.OntUptime = ontUptime.String
+	item.OntRxPower = ontRxPower.String
+	item.OntTxPower = ontTxPower.String
+	item.PppoeStatus = pppoeStatus.String
+	item.PppoeIP = pppoeIP.String
+	item.PppoeUptime = pppoeUptime.String
+	item.LastSyncAt = lastSyncAt.String
 
 	return item, nil
+}
+
+// WithdrawReferral deducts referral balance points for cash withdrawal.
+func (s Service) WithdrawReferral(ctx context.Context, id int64, amount int) error {
+	if amount <= 0 {
+		return errors.New("amount must be greater than zero")
+	}
+
+	tx, err := s.Repository.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin withdraw tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	var balance int
+	err = tx.QueryRowContext(ctx, "SELECT referral_balance FROM pelanggan WHERE id = ?", id).Scan(&balance)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return ErrCustomerNotFound
+		}
+		return err
+	}
+
+	if balance < amount {
+		return errors.New("insufficient referral balance")
+	}
+
+	_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET referral_balance = referral_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", amount, id)
+	if err != nil {
+		return fmt.Errorf("update referral balance: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+// ConvertReferralToVoucher converts referral balance points to a one-time billing voucher discount.
+func (s Service) ConvertReferralToVoucher(ctx context.Context, id int64, amount int) error {
+	if amount <= 0 {
+		return errors.New("amount must be greater than zero")
+	}
+
+	tx, err := s.Repository.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin convert tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	var balance int
+	err = tx.QueryRowContext(ctx, "SELECT referral_balance FROM pelanggan WHERE id = ?", id).Scan(&balance)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return ErrCustomerNotFound
+		}
+		return err
+	}
+
+	if balance < amount {
+		return errors.New("insufficient referral balance")
+	}
+
+	_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET referral_balance = referral_balance - ?, voucher_discount = voucher_discount + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", amount, amount, id)
+	if err != nil {
+		return fmt.Errorf("update referral and voucher balance: %w", err)
+	}
+
+	return tx.Commit()
 }

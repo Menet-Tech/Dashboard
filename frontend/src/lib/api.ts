@@ -474,3 +474,47 @@ export function sendBroadcast(targetType: string, targetIDs: number[], message: 
   });
 }
 
+export function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return request<T>(path, options);
+}
+
+export function withdrawReferral(id: number, amount: number) {
+  return request<{ message: string }>(`/api/v1/customers/${id}/referral/withdraw`, {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+  });
+}
+
+export function convertReferralToVoucher(id: number, amount: number) {
+  return request<{ message: string }>(`/api/v1/customers/${id}/referral/convert-voucher`, {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+  });
+}
+
+export function rebootONT(id: number) {
+  return request<{ message: string }>(`/api/v1/customers/${id}/ont-reboot`, {
+    method: "POST",
+  });
+}
+
+export function factoryResetONT(id: number) {
+  return request<{ message: string }>(`/api/v1/customers/${id}/ont-factory-reset`, {
+    method: "POST",
+  });
+}
+
+export function updateONTWifi(id: number, ssid: string, wpaKey: string) {
+  return request<{ message: string }>(`/api/v1/customers/${id}/ont-wifi`, {
+    method: "POST",
+    body: JSON.stringify({ ssid, password: wpaKey }),
+  });
+}
+
+export function kickMikrotikSession(id: number) {
+  return request<{ message: string }>(`/api/v1/customers/${id}/mikrotik-kick`, {
+    method: "POST",
+  });
+}
+
+

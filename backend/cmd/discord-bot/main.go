@@ -8,14 +8,19 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	_ "modernc.org/sqlite"
+
+	"menettech/dashboard/backend/internal/audit"
+	"menettech/dashboard/backend/internal/settings"
 )
 
 var (
@@ -27,6 +32,9 @@ var (
 
 	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	db     *sql.DB
+
+	settingsSvc settings.Service
+	auditSvc    audit.Service
 )
 
 func main() {
@@ -35,12 +43,15 @@ func main() {
 	}
 
 	var err error
-	db, err = sql.Open("sqlite", sqlitePath+"?mode=ro&_journal_mode=WAL")
+	db, err = sql.Open("sqlite", sqlitePath+"?_journal_mode=WAL")
 	if err != nil {
 		logger.Error("open db", "error", err)
 		os.Exit(1)
 	}
 	defer db.Close()
+
+	settingsSvc = settings.Service{Repository: settings.Repository{DB: db}}
+	auditSvc = audit.Service{Repository: audit.Repository{DB: db}}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -123,6 +134,44 @@ var slashCommands = []*discordgo.ApplicationCommand{
 			},
 		},
 	},
+	{
+		Name:        "pengaturan",
+		Description: "Kelola pengaturan sistem",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Name:        "lihat",
+				Description: "Lihat daftar pengaturan atau nilai kunci tertentu",
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "kunci",
+						Description: "Nama kunci pengaturan (opsional)",
+						Required:    false,
+					},
+				},
+			},
+			{
+				Name:        "ubah",
+				Description: "Ubah nilai pengaturan",
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "kunci",
+						Description: "Nama kunci pengaturan",
+						Required:    true,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "nilai",
+						Description: "Nilai baru pengaturan",
+						Required:    true,
+					},
+				},
+			},
+		},
+	},
 }
 
 func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -150,6 +199,8 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			name = cmdData.Options[0].StringValue()
 		}
 		responseContent = buildPelangganMessage(name)
+	case "pengaturan":
+		responseContent = handlePengaturanCommand(i, cmdData.Options)
 	default:
 		responseContent = "Unknown command"
 	}
@@ -398,4 +449,132 @@ func envOrDefault(key, def string) string {
 		return def
 	}
 	return v
+}
+
+// ─── Settings subcommand handlers ─────────────────────────────────────────────
+
+func handlePengaturanCommand(i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) string {
+	if len(options) == 0 {
+		return "❌ Subcommand tidak ditemukan."
+	}
+	subCmd := options[0]
+	switch subCmd.Name {
+	case "lihat":
+		var kunci string
+		if len(subCmd.Options) > 0 {
+			kunci = subCmd.Options[0].StringValue()
+		}
+		return buildLihatPengaturanMessage(kunci)
+	case "ubah":
+		var kunci, nilai string
+		for _, opt := range subCmd.Options {
+			switch opt.Name {
+			case "kunci":
+				kunci = opt.StringValue()
+			case "nilai":
+				nilai = opt.StringValue()
+			}
+		}
+		if kunci == "" {
+			return "❌ Kunci tidak boleh kosong."
+		}
+		discordUser := getDiscordUser(i)
+		return buildUbahPengaturanMessage(discordUser, kunci, nilai)
+	default:
+		return "❌ Subcommand tidak dikenal."
+	}
+}
+
+func getDiscordUser(i *discordgo.InteractionCreate) string {
+	if i.User != nil {
+		return i.User.Username
+	}
+	if i.Member != nil && i.Member.User != nil {
+		return i.Member.User.Username
+	}
+	return "unknown"
+}
+
+func buildLihatPengaturanMessage(kunci string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if kunci != "" {
+		kunci = strings.TrimSpace(kunci)
+		if !settings.IsAllowedKey(kunci) {
+			return fmt.Sprintf("❌ Kunci tidak dikenal: `%s`", kunci)
+		}
+		val, err := settingsSvc.GetString(ctx, kunci)
+		if err != nil {
+			return fmt.Sprintf("❌ Gagal mengambil pengaturan: %s", err.Error())
+		}
+		if isSensitiveKey(kunci) && val != "" {
+			val = "••••••••"
+		}
+		return fmt.Sprintf("⚙️ **Pengaturan**\n• `%s`: `%s`", kunci, val)
+	}
+
+	all, err := settingsSvc.GetAll(ctx)
+	if err != nil {
+		return fmt.Sprintf("❌ Gagal mengambil semua pengaturan: %s", err.Error())
+	}
+
+	var sb strings.Builder
+	sb.WriteString("⚙️ **Daftar Pengaturan Sistem**:\n")
+	var keys []string
+	for k := range all {
+		if !strings.HasPrefix(k, "worker_") {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		val := all[k]
+		if isSensitiveKey(k) && val != "" {
+			val = "••••••••"
+		}
+		sb.WriteString(fmt.Sprintf("• `%s`: `%s`\n", k, val))
+	}
+	return sb.String()
+}
+
+func buildUbahPengaturanMessage(discordUser, kunci, nilai string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	kunci = strings.TrimSpace(kunci)
+	nilai = strings.TrimSpace(nilai)
+
+	if !settings.IsAllowedKey(kunci) {
+		return fmt.Sprintf("❌ Kunci tidak dikenal: `%s`", kunci)
+	}
+
+	if (kunci == "wa_gateway_url" || kunci == settings.KeyDiscordWebhookURL || kunci == settings.KeyACSURL) && nilai != "" {
+		if _, err := url.ParseRequestURI(nilai); err != nil {
+			return fmt.Sprintf("❌ URL tidak valid untuk: `%s`", kunci)
+		}
+	}
+
+	err := settingsSvc.Set(ctx, kunci, nilai)
+	if err != nil {
+		return fmt.Sprintf("❌ Gagal mengubah pengaturan: %s", err.Error())
+	}
+
+	logMsg := fmt.Sprintf("Discord user %s updated setting %s to %s", discordUser, kunci, nilai)
+	if isSensitiveKey(kunci) {
+		logMsg = fmt.Sprintf("Discord user %s updated setting %s", discordUser, kunci)
+	}
+	_ = auditSvc.Record(ctx, nil, nil, "settings.update_discord", logMsg)
+
+	displayValue := nilai
+	if isSensitiveKey(kunci) {
+		displayValue = "••••••••"
+	}
+
+	return fmt.Sprintf("✅ Berhasil memperbarui pengaturan `%s` menjadi `%s`", kunci, displayValue)
+}
+
+func isSensitiveKey(k string) bool {
+	k = strings.ToLower(k)
+	return strings.Contains(k, "pass") || strings.Contains(k, "key") || strings.Contains(k, "token") || strings.Contains(k, "secret")
 }
