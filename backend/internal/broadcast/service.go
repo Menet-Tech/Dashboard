@@ -42,6 +42,16 @@ func (s Service) SendBroadcast(ctx context.Context, targetType string, targetIDs
 			args = append(args, id)
 		}
 		query += fmt.Sprintf(" AND id IN (%s)", strings.Join(placeholders, ","))
+	case "odp":
+		if len(targetIDs) == 0 {
+			return 0, nil
+		}
+		placeholders := make([]string, len(targetIDs))
+		for i, id := range targetIDs {
+			placeholders[i] = "?"
+			args = append(args, id)
+		}
+		query += fmt.Sprintf(" AND odp_id IN (%s)", strings.Join(placeholders, ","))
 	case "all":
 		// No additional filters
 	default:

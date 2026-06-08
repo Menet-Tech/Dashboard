@@ -531,3 +531,53 @@ func (c *Client) KickUser(ctx context.Context, username string) error {
 
 	return nil
 }
+
+// PPPoEProfile represents a PPPoE profile from RouterOS /ppp/profile/print.
+type PPPoEProfile struct {
+	Name      string `json:"name"`
+	RateLimit string `json:"rate_limit"`
+}
+
+// ListProfiles retrieves all PPPoE profiles from RouterOS /ppp/profile/print.
+func (c *Client) ListProfiles(ctx context.Context) ([]PPPoEProfile, error) {
+	if c.conn == nil {
+		return nil, fmt.Errorf("not connected to RouterOS")
+	}
+
+	reply, err := c.run(ctx, "/ppp/profile/print")
+	if err != nil {
+		return nil, fmt.Errorf("list ppp profiles: %w", err)
+	}
+	if err := hasError(reply); err != nil {
+		return nil, fmt.Errorf("list ppp profiles error: %w", err)
+	}
+
+	var profiles []PPPoEProfile
+	for _, sentence := range reply {
+		hasRe := false
+		for _, word := range sentence {
+			if word == "!re" {
+				hasRe = true
+				break
+			}
+		}
+		if !hasRe {
+			continue
+		}
+
+		var p PPPoEProfile
+		for _, word := range sentence {
+			if strings.HasPrefix(word, "=name=") {
+				p.Name = strings.TrimPrefix(word, "=name=")
+			} else if strings.HasPrefix(word, "=rate-limit=") {
+				p.RateLimit = strings.TrimPrefix(word, "=rate-limit=")
+			}
+		}
+		if p.Name != "" {
+			profiles = append(profiles, p)
+		}
+	}
+
+	return profiles, nil
+}
+

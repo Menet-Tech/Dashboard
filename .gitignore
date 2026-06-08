@@ -24,3 +24,4 @@ Thumbs.db
 .env
 *.db-wal
 *.db-shm
+GACS-dashboard

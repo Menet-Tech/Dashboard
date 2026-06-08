@@ -472,3 +472,206 @@ func (h IntegrationHandler) TestWhatsApp(w http.ResponseWriter, r *http.Request)
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Koneksi ke WhatsApp Gateway berhasil"})
 }
+
+type packageSyncPreviewItem struct {
+	Name        string `json:"name"`
+	RateLimit   string `json:"rate_limit"`
+	Exists      bool   `json:"exists"`
+	ParsedSpeed int    `json:"parsed_speed"`
+}
+
+func (h IntegrationHandler) SyncPackagesPreview(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+
+	host, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
+	user, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
+	pass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
+
+	if strings.TrimSpace(host) == "" || strings.TrimSpace(user) == "" || strings.TrimSpace(pass) == "" {
+		WriteError(w, http.StatusBadRequest, "konfigurasi MikroTik belum lengkap — isi host, user, dan password terlebih dahulu")
+		return
+	}
+
+	client := mikrotik.NewClient(host, user, pass)
+	if err := client.Connect(ctx); err != nil {
+		WriteError(w, http.StatusBadGateway, fmt.Sprintf("gagal terhubung ke MikroTik: %v", err))
+		return
+	}
+	defer client.Close()
+
+	profiles, err := client.ListProfiles(ctx)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, fmt.Sprintf("gagal membaca PPPoE profiles: %v", err))
+		return
+	}
+
+	existingPackages, err := h.Packages.List(ctx)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "gagal membaca daftar paket")
+		return
+	}
+	existingSet := make(map[string]bool, len(existingPackages))
+	for _, p := range existingPackages {
+		existingSet[strings.ToLower(strings.TrimSpace(p.Name))] = true
+	}
+
+	items := make([]packageSyncPreviewItem, 0, len(profiles))
+	for _, p := range profiles {
+		items = append(items, packageSyncPreviewItem{
+			Name:        p.Name,
+			RateLimit:   p.RateLimit,
+			Exists:      existingSet[strings.ToLower(strings.TrimSpace(p.Name))],
+			ParsedSpeed: parseSpeedMbps(p.RateLimit),
+		})
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"profiles": items,
+		"total":    len(items),
+	})
+}
+
+type syncPackagesImportPayload struct {
+	Names []string `json:"names"`
+}
+
+func (h IntegrationHandler) SyncPackagesImport(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	var payload syncPackagesImportPayload
+	if err := decodeJSON(r, &payload); err != nil || len(payload.Names) == 0 {
+		WriteError(w, http.StatusBadRequest, "payload tidak valid atau names kosong")
+		return
+	}
+
+	host, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
+	user, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
+	pass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
+
+	if strings.TrimSpace(host) == "" {
+		WriteError(w, http.StatusBadRequest, "konfigurasi MikroTik belum lengkap")
+		return
+	}
+
+	client := mikrotik.NewClient(host, user, pass)
+	if err := client.Connect(ctx); err != nil {
+		WriteError(w, http.StatusBadGateway, fmt.Sprintf("gagal terhubung ke MikroTik: %v", err))
+		return
+	}
+	defer client.Close()
+
+	profiles, err := client.ListProfiles(ctx)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, fmt.Sprintf("gagal membaca PPPoE profiles: %v", err))
+		return
+	}
+
+	profileMap := make(map[string]mikrotik.PPPoEProfile, len(profiles))
+	for _, p := range profiles {
+		profileMap[strings.ToLower(strings.TrimSpace(p.Name))] = p
+	}
+
+	existingPackages, err := h.Packages.List(ctx)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "gagal membaca daftar paket")
+		return
+	}
+	existingSet := make(map[string]bool, len(existingPackages))
+	for _, p := range existingPackages {
+		existingSet[strings.ToLower(strings.TrimSpace(p.Name))] = true
+	}
+
+	type importResult struct {
+		Name    string `json:"name"`
+		Status  string `json:"status"` // "imported", "skipped", "error"
+		Message string `json:"message,omitempty"`
+	}
+
+	var results []importResult
+	importedCount := 0
+
+	for _, name := range payload.Names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+
+		key := strings.ToLower(name)
+		if existingSet[key] {
+			results = append(results, importResult{Name: name, Status: "skipped", Message: "sudah ada di dashboard"})
+			continue
+		}
+
+		profile, ok := profileMap[key]
+		if !ok {
+			results = append(results, importResult{Name: name, Status: "skipped", Message: "tidak ditemukan di MikroTik"})
+			continue
+		}
+
+		speed := parseSpeedMbps(profile.RateLimit)
+		price := speed * 15000
+		if price < 100000 {
+			price = 100000
+		}
+
+		newPkg := packages.Package{
+			Name:        profile.Name,
+			SpeedMbps:   speed,
+			Price:       price,
+			Description: "Sinkronisasi dari profil MikroTik " + profile.Name,
+		}
+
+		_, createErr := h.Packages.Create(ctx, newPkg)
+		if createErr != nil {
+			results = append(results, importResult{Name: name, Status: "error", Message: createErr.Error()})
+			continue
+		}
+
+		importedCount++
+		results = append(results, importResult{Name: name, Status: "imported"})
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"imported": importedCount,
+		"results":  results,
+	})
+}
+
+func parseSpeedMbps(rateLimit string) int {
+	if rateLimit == "" {
+		return 10
+	}
+	parts := strings.Split(rateLimit, "/")
+	target := parts[0]
+	if len(parts) > 1 {
+		target = parts[1]
+	}
+	target = strings.TrimSpace(strings.ToUpper(target))
+
+	var multiplier float64 = 1.0
+	numStr := ""
+	for _, char := range target {
+		if (char >= '0' && char <= '9') || char == '.' {
+			numStr += string(char)
+		} else if char == 'M' {
+			multiplier = 1.0
+			break
+		} else if char == 'K' {
+			multiplier = 0.001
+			break
+		} else if char == 'G' {
+			multiplier = 1000.0
+			break
+		}
+	}
+	var val float64
+	_, _ = fmt.Sscanf(numStr, "%f", &val)
+	speed := int(val * multiplier)
+	if speed <= 0 {
+		return 10
+	}
+	return speed
+}
+

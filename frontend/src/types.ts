@@ -56,6 +56,8 @@ export type CustomerItem = {
   pppoe_ip?: string;
   pppoe_uptime?: string;
   last_sync_at?: string;
+  odp_id?: number;
+  odp_name?: string;
 };
 
 export type BillItem = {
@@ -136,6 +138,9 @@ export type SettingsState = {
   acs_url?: string;
   acs_username?: string;
   acs_password?: string;
+  gacs_rx_power_excellent?: string;
+  gacs_rx_power_fair?: string;
+  gacs_portal_api_key?: string;
 };
 
 export type AuditLogItem = {
@@ -166,6 +171,7 @@ export type ViewKey =
   | "dashboard"
   | "packages"
   | "customers"
+  | "discounts"
   | "bills"
   | "templates"
   | "monitoring"
@@ -175,7 +181,64 @@ export type ViewKey =
   | "tickets"
   | "registration"
   | "whatsapp"
-  | "reports";
+  | "reports"
+  | "odp"
+  | "devices"
+  | "network-map";
+
+export type MapSettings = {
+  id?: number;
+  center_lat: string;
+  center_lng: string;
+  max_zoom_in: string;
+  max_zoom_out: string;
+  default_zoom: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type MapNode = {
+  id?: number;
+  node_id: string;
+  type: "server" | "odc" | "odp" | "ont";
+  name: string;
+  latitude: number;
+  longitude: number;
+  capacity?: number;
+  splitter?: string;
+  pppoe?: string;
+  serialnumber?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type MapEdge = {
+  id?: number;
+  edge_id: string;
+  source: string;
+  target: string;
+  fiber_type?: string;
+  distance?: number;
+  waypoints?: [number, number][];
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type TelegramBotSettings = {
+  botToken: string;
+  chatIds: string;
+  enabled: boolean;
+};
+
+export type OdpItem = {
+  id: number;
+  nama: string;
+  lokasi: string;
+  deskripsi: string;
+  customer_count: number;
+};
 
 export type TicketItem = {
   id: number;

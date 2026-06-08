@@ -33,6 +33,7 @@ type BillsPageProps = {
   pushToast: (tone: any, msg: string) => void;
   pushSuccess: (msg: string) => void;
   pushError: (msg: string) => void;
+  onShowCustomerDetails?: (customerId: number) => void;
 };
 
 export function BillsPage({
@@ -62,6 +63,7 @@ export function BillsPage({
   pushToast,
   pushSuccess,
   pushError,
+  onShowCustomerDetails,
 }: BillsPageProps) {
   const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
 
@@ -91,10 +93,10 @@ export function BillsPage({
             <label>
               <span>Periode (YYYY-MM)</span>
               <input
+                type="month"
                 className={inputClassName(billErrors.period)}
                 value={billPeriod}
                 onChange={(e) => onBillPeriodChange(e.target.value)}
-                placeholder="2026-04"
               />
               {renderInlineError(billErrors.period)}
             </label>
@@ -169,7 +171,15 @@ export function BillsPage({
                   <Fragment key={bill.id}>
                     <tr>
                       <td className="px-6 py-4 text-gray-700 font-semibold">{bill.invoice_number}</td>
-                      <td className="px-6 py-4 text-gray-700">{bill.customer_name}</td>
+                      <td className="px-6 py-4 text-gray-700">
+                        <button
+                          type="button"
+                          className="text-indigo-600 hover:text-indigo-700 hover:underline font-semibold text-left transition-colors"
+                          onClick={() => onShowCustomerDetails?.(bill.customer_id)}
+                        >
+                          {bill.customer_name}
+                        </button>
+                      </td>
                       <td className="px-6 py-4 text-gray-700">{bill.period}</td>
                       <td className="px-6 py-4 text-gray-700">{bill.due_date}</td>
                       <td className="px-6 py-4 text-gray-700">{formatCurrency(bill.amount)}</td>

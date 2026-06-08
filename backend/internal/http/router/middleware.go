@@ -1,13 +1,16 @@
 package router
 
 import (
+	"context"
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/golang-jwt/jwt/v5"
 
 	"menettech/dashboard/backend/internal/audit"
 	"menettech/dashboard/backend/internal/auth"
@@ -204,3 +207,78 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 	w.WriteHeader(status)
 	w.Write([]byte(`{"success":false,"error":"` + message + `"}`))
 }
+
+func gacsAuthMiddleware(authService auth.Service) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// 1. Try session cookie authentication first
+			cookie, err := r.Cookie(authService.SessionCookieName)
+			if err == nil && cookie.Value != "" {
+				user, csrfToken, err := authService.Authenticate(r.Context(), cookie.Value)
+				if err == nil {
+					ctx := auth.WithUser(r.Context(), user)
+					ctx = auth.WithSessionToken(ctx, cookie.Value)
+					ctx = auth.WithCSRFToken(ctx, csrfToken)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
+
+			// 2. Try JWT Bearer authentication
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+				claims := &struct {
+					UserID   int64  `json:"userId,omitempty"`
+					Username string `json:"username,omitempty"`
+					Role     string `json:"role,omitempty"`
+					Portal   bool   `json:"portal,omitempty"`
+					APIKey   string `json:"apiKey,omitempty"`
+					jwt.RegisteredClaims
+				}{}
+
+				token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
+					secret := os.Getenv("JWT_SECRET")
+					if secret == "" {
+						secret = "fallback-secret-key-for-development-only"
+					}
+					return []byte(secret), nil
+				})
+
+				if err == nil && token.Valid {
+					if claims.Portal {
+						ctx := context.WithValue(r.Context(), "gacs_portal", true)
+						sysUser := auth.User{
+							ID:       0,
+							Username: "portal_api",
+							Role:     "admin",
+							IsActive: true,
+						}
+						ctx = auth.WithUser(ctx, sysUser)
+						next.ServeHTTP(w, r.WithContext(ctx))
+						return
+					}
+
+					sysUser := auth.User{
+						ID:       claims.UserID,
+						Username: claims.Username,
+						Role:     claims.Role,
+						IsActive: true,
+					}
+					ctx := context.WithValue(r.Context(), "gacs_user", struct {
+						ID   int64
+						Role string
+					}{ID: claims.UserID, Role: claims.Role})
+
+					ctx = auth.WithUser(ctx, sysUser)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
+
+			// 3. Fallback unauthorized
+			writeJSONError(w, http.StatusUnauthorized, "Authentication token required")
+		})
+	}
+}
+

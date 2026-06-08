@@ -52,6 +52,9 @@ const (
 	KeyACSURL                = "acs_url"
 	KeyACSUsername           = "acs_username"
 	KeyACSPassword           = "acs_password"
+	KeyGacsRxPowerExcellent  = "gacs_rx_power_excellent"
+	KeyGacsRxPowerFair       = "gacs_rx_power_fair"
+	KeyGacsPortalAPIKey      = "gacs_portal_api_key"
 )
 
 var defaults = map[string]string{
@@ -96,6 +99,9 @@ var defaults = map[string]string{
 	KeyACSURL:                 "http://localhost:7557",
 	KeyACSUsername:            "",
 	KeyACSPassword:            "",
+	KeyGacsRxPowerExcellent:  "-27",
+	KeyGacsRxPowerFair:       "-25",
+	KeyGacsPortalAPIKey:      "",
 }
 
 func IsAllowedKey(key string) bool {

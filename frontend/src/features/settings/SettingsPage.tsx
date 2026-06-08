@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { inputClassName, renderInlineError } from "../../components/ui";
 import type { FieldErrors } from "../../utils/validation";
-import type { SettingsState, MikrotikSyncSecret, MikrotikImportResult } from "../../types";
+import type { SettingsState, MikrotikSyncSecret, MikrotikImportResult, TelegramBotSettings } from "../../types";
 import { getGatewayAccounts } from "../../lib/gatewayApi";
-import { apiRequest } from "../../lib/api";
+import { apiRequest, fetchTelegramBotSettings, saveTelegramBotSettings } from "../../lib/api";
 import {
   RefreshCw,
   CheckCircle2,
@@ -15,7 +15,8 @@ import {
   Bell,
   Server,
   Wifi,
-  Bot
+  Bot,
+  Save,
 } from "lucide-react";
 
 type SettingsPageProps = {
@@ -45,15 +46,47 @@ export function SettingsPage({
   const apiKey = settingsForm.wa_api_key || "";
   const [accounts, setAccounts] = useState<string[]>([]);
 
-  const [activeTab, setActiveTab] = useState<"whatsapp" | "billing" | "mikrotik" | "genieacs" | "discord">("whatsapp");
+  const [activeTab, setActiveTab] = useState<"whatsapp" | "billing" | "mikrotik" | "genieacs" | "telegram" | "discord">("whatsapp");
 
   const tabs = [
     { id: "whatsapp", label: "WhatsApp & Bot", icon: MessageCircle, desc: "Gateway & Chatbot Triggers" },
     { id: "billing", label: "Billing & Worker", icon: Sliders, desc: "Automation & Backup Rules" },
     { id: "mikrotik", label: "MikroTik Router", icon: Server, desc: "Router Setup & Secret Sync" },
     { id: "genieacs", label: "GenieACS TR-069", icon: Wifi, desc: "TR-069 ONT Management" },
+    { id: "telegram", label: "Telegram Bot", icon: Bot, desc: "Telegram Alert Settings" },
     { id: "discord", label: "Discord Alerts", icon: Bell, desc: "Real-time Event Webhooks" },
   ];
+
+  // Telegram bot state
+  const [telegramForm, setTelegramForm] = useState<TelegramBotSettings>({
+    botToken: "",
+    chatIds: "",
+    enabled: false,
+  });
+  const [loadingTelegram, setLoadingTelegram] = useState(false);
+  const [savingTelegram, setSavingTelegram] = useState(false);
+
+  // Load telegram settings
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      setLoadingTelegram(true);
+      try {
+        const data = await fetchTelegramBotSettings();
+        if (active) {
+          setTelegramForm(data);
+        }
+      } catch (e) {
+        // ignore
+      } finally {
+        if (active) setLoadingTelegram(false);
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Connection test states
   const [testingWa, setTestingWa] = useState(false);
@@ -650,7 +683,7 @@ export function SettingsPage({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Subsection A: Billing Intervals */}
                   <div className="space-y-4 md:border-r md:border-slate-100 md:dark:border-slate-800/80 md:pr-6">
-                    <h4 className="text-xs font-bold text-indigo-650 dark:text-indigo-400 uppercase tracking-wider">Tenggat Waktu Billing</h4>
+                    <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Tenggat Waktu Billing</h4>
                     
                     <label className="flex flex-col gap-1.5">
                       <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Reminder Days</span>
@@ -692,7 +725,7 @@ export function SettingsPage({
 
                   {/* Subsection B: Automation Scheduler */}
                   <div className="space-y-4 md:border-r md:border-slate-100 md:dark:border-slate-800/80 md:px-6">
-                    <h4 className="text-xs font-bold text-indigo-650 dark:text-indigo-400 uppercase tracking-wider">Scheduler Otomatisasi</h4>
+                    <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Scheduler Otomatisasi</h4>
                     
                     <label className="flex flex-col gap-1.5">
                       <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Auto Generate Tagihan</span>
@@ -742,7 +775,7 @@ export function SettingsPage({
 
                   {/* Subsection C: Worker & Auto Backup */}
                   <div className="space-y-4 md:pl-6">
-                    <h4 className="text-xs font-bold text-indigo-650 dark:text-indigo-400 uppercase tracking-wider">Worker & Backup Sistem</h4>
+                    <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Worker & Backup Sistem</h4>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <label className="flex flex-col gap-1.5">
@@ -1099,6 +1132,44 @@ export function SettingsPage({
                     />
                     <span className="text-[10px] text-slate-400 dark:text-slate-500">Password autentikasi API NBI GenieACS.</span>
                   </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Excellent RX Power Threshold (dBm)</span>
+                      <input
+                        className={inputClassName()}
+                        type="text"
+                        value={settingsForm["gacs_rx_power_excellent"] ?? "-27"}
+                        onChange={(e) => onFormChange({ ...settingsForm, gacs_rx_power_excellent: e.target.value })}
+                        placeholder="-27"
+                      />
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">Nilai minimum untuk status sinyal Excellent (biasanya -27 dBm).</span>
+                    </label>
+
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Fair RX Power Threshold (dBm)</span>
+                      <input
+                        className={inputClassName()}
+                        type="text"
+                        value={settingsForm["gacs_rx_power_fair"] ?? "-25"}
+                        onChange={(e) => onFormChange({ ...settingsForm, gacs_rx_power_fair: e.target.value })}
+                        placeholder="-25"
+                      />
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">Nilai minimum untuk status sinyal Cukup/Fair (biasanya -25 dBm).</span>
+                    </label>
+                  </div>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Portal API Key</span>
+                    <input
+                      className={inputClassName()}
+                      type="text"
+                      value={settingsForm["gacs_portal_api_key"] ?? ""}
+                      onChange={(e) => onFormChange({ ...settingsForm, gacs_portal_api_key: e.target.value })}
+                      placeholder="API Key portal"
+                    />
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">API Key untuk mengamankan integrasi captive portal.</span>
+                  </label>
                 </div>
               </div>
 
@@ -1122,6 +1193,96 @@ export function SettingsPage({
                     {testingAcs ? "Menguji..." : "Test Koneksi"}
                   </button>
                 </div>
+              </div>
+            </article>
+          </div>
+        )}
+
+        {/* Tab: Telegram Bot */}
+        {activeTab === "telegram" && (
+          <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-200">
+            <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between gap-5">
+              <div className="space-y-4">
+                <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                    <Bot size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Telegram Alert Bot</h3>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi bot Telegram untuk notifikasi gangguan dan laporan harian.</p>
+                  </div>
+                </div>
+
+                {loadingTelegram ? (
+                  <div className="flex items-center justify-center py-8 text-slate-400 text-xs animate-pulse">
+                    Memuat pengaturan bot Telegram...
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4">
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Status Bot</span>
+                      <select
+                        className={inputClassName()}
+                        value={telegramForm.enabled ? "true" : "false"}
+                        onChange={(e) => setTelegramForm({ ...telegramForm, enabled: e.target.value === "true" })}
+                      >
+                        <option value="true">Aktif</option>
+                        <option value="false">Nonaktif</option>
+                      </select>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">Mengaktifkan/menonaktifkan pengiriman notifikasi via Telegram.</span>
+                    </label>
+
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Telegram Bot Token</span>
+                      <input
+                        className={inputClassName()}
+                        type="text"
+                        value={telegramForm.botToken}
+                        onChange={(e) => setTelegramForm({ ...telegramForm, botToken: e.target.value })}
+                        placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                      />
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">Token bot Telegram yang didapatkan dari @BotFather.</span>
+                    </label>
+
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Telegram Chat IDs</span>
+                      <input
+                        className={inputClassName()}
+                        type="text"
+                        value={telegramForm.chatIds}
+                        onChange={(e) => setTelegramForm({ ...telegramForm, chatIds: e.target.value })}
+                        placeholder="-100123456789, 987654321"
+                      />
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">ID Chat atau Channel Telegram penerima notifikasi (pisahkan dengan koma jika lebih dari satu).</span>
+                    </label>
+
+                    <div className="flex justify-end pt-3">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setSavingTelegram(true);
+                          try {
+                            const res = await saveTelegramBotSettings(telegramForm);
+                            if (res.success) {
+                              pushSuccess(res.message || "Pengaturan bot Telegram berhasil disimpan!");
+                            } else {
+                              pushError(res.message || "Gagal menyimpan pengaturan bot Telegram.");
+                            }
+                          } catch (err: any) {
+                            pushError(err.message || "Terjadi kesalahan.");
+                          } finally {
+                            setSavingTelegram(false);
+                          }
+                        }}
+                        disabled={savingTelegram}
+                        className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50 text-white text-xs font-bold py-2 px-5 rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {savingTelegram ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                        Simpan Pengaturan Bot
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </article>
           </div>

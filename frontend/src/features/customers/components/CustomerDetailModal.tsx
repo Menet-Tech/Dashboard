@@ -1,0 +1,665 @@
+import { useState, useEffect } from "react";
+import { Loader2, AlertCircle, RotateCw } from "lucide-react";
+import { StatusPill } from "../../../components/ui";
+import { formatCurrency } from "../../../utils/format";
+import type { CustomerItem, User, BillItem } from "../../../types";
+import {
+  fetchBills,
+  rebootONT,
+  factoryResetONT,
+  kickMikrotikSession,
+  updateONTWifi,
+} from "../../../lib/api";
+
+type CustomerDetailModalProps = {
+  customer: CustomerItem;
+  onClose: () => void;
+  user: User | null;
+  pushSuccess: (msg: string) => void;
+  pushError: (msg: string) => void;
+  onRefresh?: () => void;
+};
+
+export function CustomerDetailModal({
+  customer,
+  onClose,
+  user,
+  pushSuccess,
+  pushError,
+  onRefresh,
+}: CustomerDetailModalProps) {
+  const [customerBills, setCustomerBills] = useState<BillItem[]>([]);
+  const [loadingBills, setLoadingBills] = useState(false);
+  const [ontStatus, setOntStatus] = useState<any | null>(null);
+  const [loadingOnt, setLoadingOnt] = useState(false);
+  const [rebootingOnt, setRebootingOnt] = useState(false);
+  const [resettingOnt, setResettingOnt] = useState(false);
+  const [kickingMikrotik, setKickingMikrotik] = useState(false);
+  const [updatingWifi, setUpdatingWifi] = useState(false);
+  const [ontError, setOntError] = useState<string | null>(null);
+
+  // Load bills on mount/customer change
+  useEffect(() => {
+    let cancelled = false;
+    async function loadData() {
+      setLoadingBills(true);
+      try {
+        const res = await fetchBills({ customer_id: customer.id, limit: 0 });
+        if (!cancelled) {
+          setCustomerBills(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to load customer bills", err);
+      } finally {
+        if (!cancelled) {
+          setLoadingBills(false);
+        }
+      }
+    }
+    void loadData();
+    return () => {
+      cancelled = true;
+    };
+  }, [customer.id]);
+
+  const handleCheckOntStatus = async () => {
+    setLoadingOnt(true);
+    setOntError(null);
+    setOntStatus(null);
+    try {
+      const res = await fetch(`/api/v1/customers/${customer.id}/ont-status`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Gagal memuat status ONT");
+      setOntStatus(data.data);
+    } catch (err: any) {
+      console.error(err);
+      setOntError(err.message || String(err));
+    } finally {
+      setLoadingOnt(false);
+    }
+  };
+
+  const handleRebootOnt = async () => {
+    if (!window.confirm("Apakah Anda yakin ingin mem-reboot ONT pelanggan ini?")) return;
+    setRebootingOnt(true);
+    try {
+      const res = await rebootONT(customer.id);
+      pushSuccess(res.message || "Perintah reboot berhasil dikirim ke GenieACS.");
+    } catch (err: any) {
+      console.error(err);
+      pushError(err.message || String(err));
+    } finally {
+      setRebootingOnt(false);
+    }
+  };
+
+  const handleFactoryResetOnt = async () => {
+    if (
+      !window.confirm(
+        "PERINGATAN: Apakah Anda yakin ingin mengembalikan ONT ke pengaturan pabrik (Factory Reset)? Ini akan menghapus konfigurasi ONT."
+      )
+    )
+      return;
+    setResettingOnt(true);
+    try {
+      const res = await factoryResetONT(customer.id);
+      pushSuccess(res.message || "Perintah factory reset berhasil dikirim ke GenieACS.");
+    } catch (err: any) {
+      console.error(err);
+      pushError(err.message || String(err));
+    } finally {
+      setResettingOnt(false);
+    }
+  };
+
+  const handleKickMikrotik = async () => {
+    if (
+      !window.confirm(
+        "Apakah Anda yakin ingin memutuskan sesi PPPoE pelanggan ini untuk memaksa koneksi ulang?"
+      )
+    )
+      return;
+    setKickingMikrotik(true);
+    try {
+      const res = await kickMikrotikSession(customer.id);
+      pushSuccess(res.message || "Sesi PPPoE berhasil diputuskan.");
+    } catch (err: any) {
+      console.error(err);
+      pushError(err.message || String(err));
+    } finally {
+      setKickingMikrotik(false);
+    }
+  };
+
+  const handleWifiUpdate = async () => {
+    const ssid = window.prompt("Masukkan nama WiFi (SSID) baru:");
+    if (ssid === null) return;
+    const cleanSsid = ssid.trim();
+    if (!cleanSsid) {
+      alert("SSID tidak boleh kosong.");
+      return;
+    }
+
+    const password = window.prompt("Masukkan password WiFi baru (Minimal 8 karakter):");
+    if (password === null) return;
+    const cleanPassword = password.trim();
+    if (cleanPassword.length < 8) {
+      alert("Password WiFi minimal harus 8 karakter.");
+      return;
+    }
+
+    setUpdatingWifi(true);
+    try {
+      const res = await updateONTWifi(customer.id, cleanSsid, cleanPassword);
+      pushSuccess(res.message || "Konfigurasi WiFi berhasil dikirim ke ONT.");
+    } catch (err: any) {
+      console.error(err);
+      pushError(err.message || String(err));
+    } finally {
+      setUpdatingWifi(false);
+    }
+  };
+
+  const handleWithdrawReferral = async () => {
+    const amountStr = window.prompt(
+      `Masukkan nominal penarikan tunai saldo referral untuk ${
+        customer.name
+      } (Maksimal: Rp ${customer.referral_balance.toLocaleString("id-ID")}):`
+    );
+    if (amountStr === null) return;
+    const amount = parseInt(amountStr.replace(/[^0-9]/g, ""), 10);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Nominal penarikan tidak valid.");
+      return;
+    }
+    if (amount > customer.referral_balance) {
+      alert("Saldo referral tidak mencukupi.");
+      return;
+    }
+
+    try {
+      const { withdrawReferral } = await import("../../../lib/api");
+      const res = await withdrawReferral(customer.id, amount);
+      pushSuccess(res.message || "Penarikan tunai referral berhasil.");
+      if (onRefresh) {
+        onRefresh();
+      }
+      onClose(); // close modal to force refresh
+    } catch (err: any) {
+      console.error(err);
+      pushError(err.message || String(err));
+    }
+  };
+
+  const handleConvertVoucher = async () => {
+    const amountStr = window.prompt(
+      `Masukkan nominal saldo referral yang ingin ditukarkan menjadi voucher diskon untuk ${
+        customer.name
+      } (Maksimal: Rp ${customer.referral_balance.toLocaleString("id-ID")}):`
+    );
+    if (amountStr === null) return;
+    const amount = parseInt(amountStr.replace(/[^0-9]/g, ""), 10);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Nominal penukaran tidak valid.");
+      return;
+    }
+    if (amount > customer.referral_balance) {
+      alert("Saldo referral tidak mencukupi.");
+      return;
+    }
+
+    try {
+      const { convertReferralToVoucher } = await import("../../../lib/api");
+      const res = await convertReferralToVoucher(customer.id, amount);
+      pushSuccess(res.message || "Saldo berhasil ditukarkan menjadi voucher diskon.");
+      if (onRefresh) {
+        onRefresh();
+      }
+      onClose(); // close modal to force refresh
+    } catch (err: any) {
+      console.error(err);
+      pushError(err.message || String(err));
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-slate-150 animate-in fade-in zoom-in-95 duration-200">
+        {/* Modal Header */}
+        <div className="px-6 py-4 border-b border-slate-150 flex items-center justify-between bg-slate-50">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Detail Pelanggan</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Informasi profil operasional & riwayat billing pelanggan.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="text-slate-400 hover:text-slate-650 p-1.5 hover:bg-slate-205 rounded-lg transition-colors"
+            onClick={onClose}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          {/* Profile Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50 p-5 rounded-2xl border border-slate-150">
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Nama Lengkap</span>
+              <strong className="text-slate-800 text-sm mt-0.5 block">{customer.name}</strong>
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Paket Internet</span>
+              <strong className="text-slate-800 text-sm mt-0.5 block">
+                {customer.package_name ?? "-"} ({formatCurrency(customer.package_price ?? 0)})
+              </strong>
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Status Layanan</span>
+              <span className="mt-1 block">
+                <StatusPill
+                  label={customer.status}
+                  tone={customer.status === "active" ? "green" : customer.status === "limit" ? "red" : "slate"}
+                />
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Username PPPoE</span>
+              <code className="text-indigo-600 font-mono text-xs font-semibold mt-0.5 block bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 w-max">
+                {customer.user_pppoe || "-"}
+              </code>
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Password PPPoE</span>
+              <code className="text-indigo-600 font-mono text-xs font-semibold mt-0.5 block bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 w-max">
+                {customer.password_pppoe || "-"}
+              </code>
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">SN ONT</span>
+              <span className="text-slate-700 text-sm mt-0.5 font-mono block">{customer.sn_ont || "-"}</span>
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Nomor WhatsApp</span>
+              <span className="text-slate-750 text-sm mt-0.5 block font-semibold">
+                {customer.whatsapp ? (
+                  <a
+                    href={`https://wa.me/${customer.whatsapp}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-indigo-600 hover:underline"
+                  >
+                    {customer.whatsapp}
+                  </a>
+                ) : (
+                  "-"
+                )}
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Siklus Jatuh Tempo</span>
+              <strong className="text-slate-800 text-sm mt-0.5 block">Tanggal {customer.due_day}</strong>
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">ODP Node</span>
+              <strong className="text-slate-800 text-sm mt-0.5 block">{customer.odp_name || "Belum Terhubung"}</strong>
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Diskon Bulanan</span>
+              <strong className="text-slate-800 text-sm mt-0.5 block">
+                {customer.diskon > 0 ? formatCurrency(customer.diskon) : "-"}
+              </strong>
+            </div>
+            <div className="lg:col-span-3">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Alamat Pemasangan</span>
+              <p className="text-slate-700 text-xs mt-1 leading-relaxed bg-white border border-slate-150 p-3 rounded-xl">
+                {customer.address || "Belum ada informasi alamat."}
+              </p>
+            </div>
+
+            {customer.sn_ont && (
+              <div className="lg:col-span-3 bg-slate-50 border border-slate-200 p-4 rounded-xl">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                      GenieACS TR-069 Monitor
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCheckOntStatus}
+                      disabled={loadingOnt || rebootingOnt}
+                      className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                    >
+                      {loadingOnt ? <Loader2 size={12} className="animate-spin" /> : null}
+                      {loadingOnt ? "Checking..." : "Cek Koneksi ONT"}
+                    </button>
+                    {ontStatus && (
+                      <>
+                        {user?.role !== "viewer" && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleWifiUpdate}
+                              disabled={loadingOnt || rebootingOnt || updatingWifi || resettingOnt}
+                              className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                            >
+                              {updatingWifi ? <Loader2 size={12} className="animate-spin" /> : null}
+                              {updatingWifi ? "Updating..." : "Ubah WiFi"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleFactoryResetOnt}
+                              disabled={loadingOnt || rebootingOnt || updatingWifi || resettingOnt}
+                              className="text-xs font-semibold bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                            >
+                              {resettingOnt ? <Loader2 size={12} className="animate-spin" /> : null}
+                              {resettingOnt ? "Resetting..." : "Reset Pabrik"}
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleRebootOnt}
+                          disabled={loadingOnt || rebootingOnt || updatingWifi || resettingOnt}
+                          className="text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                        >
+                          {rebootingOnt ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
+                          {rebootingOnt ? "Rebooting..." : "Reboot ONT"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {ontError && (
+                  <div className="text-xs text-red-600 bg-red-50 border border-red-150 p-2.5 rounded-lg flex items-center gap-2">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{ontError}</span>
+                  </div>
+                )}
+
+                {ontStatus && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 block">Status ONT</span>
+                      <span className="mt-1 block">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            ontStatus.status === "online"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-red-50 text-red-700 border border-red-200"
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              ontStatus.status === "online" ? "bg-emerald-500" : "bg-red-500"
+                            }`}
+                          ></span>
+                          {ontStatus.status === "online" ? "Online" : "Offline"}
+                        </span>
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 block">Model ONT</span>
+                      <strong className="text-slate-800 text-xs mt-0.5 block">
+                        {ontStatus.model} ({ontStatus.hardware_version})
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 block">IP Address CPE</span>
+                      <code className="text-slate-700 font-mono text-xs mt-0.5 block">{ontStatus.ip_address}</code>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 block">Uptime ONT</span>
+                      <strong className="text-slate-800 text-xs mt-0.5 block">{ontStatus.uptime || "-"}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 block">Rx Optical Power</span>
+                      <span
+                        className={`text-xs font-bold mt-0.5 block ${
+                          parseFloat(ontStatus.rx_optical_power) < -27
+                            ? "text-red-655"
+                            : parseFloat(ontStatus.rx_optical_power) < -25
+                            ? "text-amber-655"
+                            : "text-emerald-655"
+                        }`}
+                      >
+                        {ontStatus.rx_optical_power}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 block">Tx Optical Power</span>
+                      <strong className="text-slate-700 text-xs mt-0.5 block">{ontStatus.tx_optical_power}</strong>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-[10px] font-semibold text-slate-400 block">Last Inform / Connect</span>
+                      <span className="text-slate-650 text-xs mt-0.5 block">
+                        {ontStatus.last_inform_time ? new Date(ontStatus.last_inform_time).toLocaleString("id-ID") : "-"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {customer.is_trial && (
+              <div className="lg:col-span-3 bg-amber-50 border border-amber-100 p-4 rounded-xl flex items-center gap-3">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-amber-600 shrink-0" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                <div className="text-xs text-amber-800">
+                  <strong>Pelanggan dalam Masa Trial Aktif.</strong> Dimulai pada{" "}
+                  {customer.trial_started_at ? new Date(customer.trial_started_at).toLocaleDateString("id-ID") : "-"}{" "}
+                  selama {customer.trial_days ?? 3} hari.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Integration Status Cache */}
+          <div className="bg-slate-50 border border-slate-200 p-5 rounded-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block font-sans">
+                Status Integrasi (Data Terakhir Di-Pool)
+              </span>
+              {customer.last_sync_at && (
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Terakhir Sync: {new Date(customer.last_sync_at).toLocaleString("id-ID")}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* PPPoE Cache Card */}
+              <div className="bg-white p-4 rounded-xl border border-slate-150 space-y-2 shadow-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-700">PPPoE Status</span>
+                  {customer.pppoe_status ? (
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        customer.pppoe_status === "online"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : customer.pppoe_status === "limit"
+                          ? "bg-rose-50 text-rose-700 border border-rose-200"
+                          : "bg-red-50 text-red-700 border border-red-200"
+                      }`}
+                    >
+                      {customer.pppoe_status === "online"
+                        ? "Online"
+                        : customer.pppoe_status === "limit"
+                        ? "Terisolir"
+                        : "Offline"}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">Belum di-pool</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-[9px] text-slate-400 uppercase">IP Address</span>
+                    <p className="font-mono text-slate-700">{customer.pppoe_ip || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 uppercase">Uptime</span>
+                    <p className="font-semibold text-slate-700">{customer.pppoe_uptime || "-"}</p>
+                  </div>
+                </div>
+                {customer.user_pppoe && user?.role !== "viewer" && (
+                  <div className="pt-2 border-t border-slate-100 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleKickMikrotik}
+                      disabled={kickingMikrotik}
+                      className="text-[10px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-60"
+                    >
+                      {kickingMikrotik ? <Loader2 size={10} className="animate-spin" /> : null}
+                      Putus Sesi (Kick)
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* GPON ONT Cache Card */}
+              <div className="bg-white p-4 rounded-xl border border-slate-150 space-y-2 shadow-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-700">GPON ONT Status</span>
+                  {customer.ont_status ? (
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        customer.ont_status === "online"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-red-50 text-red-700 border border-red-200"
+                      }`}
+                    >
+                      {customer.ont_status === "online" ? "Online" : "Offline"}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">Belum di-pool</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-[9px] text-slate-400 uppercase">Optical RX/TX</span>
+                    <p className="font-semibold text-slate-700">
+                      {customer.ont_rx_power ? `${customer.ont_rx_power} / ${customer.ont_tx_power}` : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 uppercase">CPE IP / Uptime</span>
+                    <p className="font-mono text-slate-700 truncate" title={customer.ont_ip}>
+                      {customer.ont_ip ? `${customer.ont_ip}` : "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Referral Management Card */}
+          <div className="bg-white border border-slate-200 p-5 rounded-2xl space-y-4 shadow-sm">
+            <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
+              <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans">
+                Referral Reward & Voucher
+              </h4>
+              <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-mono font-semibold">
+                Kode: {customer.referral_code || "-"}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-150">
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Saldo Referral (Tarik Tunai)</span>
+                <strong className="text-base font-extrabold text-indigo-600 block mt-1">
+                  {formatCurrency(customer.referral_balance)}
+                </strong>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-150">
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Voucher Diskon (Auto Billing)</span>
+                <strong className="text-base font-extrabold text-emerald-600 block mt-1">
+                  {formatCurrency(customer.voucher_discount || 0)}
+                </strong>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-150">
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Diajak Oleh</span>
+                <strong className="text-slate-800 font-bold block mt-1.5 truncate">
+                  {customer.referred_by_name || "-"}
+                </strong>
+              </div>
+            </div>
+            {user?.role !== "viewer" && customer.referral_balance > 0 && (
+              <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  className="bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
+                  onClick={handleConvertVoucher}
+                >
+                  Tukar Jadi Voucher
+                </button>
+                <button
+                  type="button"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
+                  onClick={handleWithdrawReferral}
+                >
+                  Tarik Tunai
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Customer Bills list */}
+          <div className="bg-white border border-slate-200 p-5 rounded-2xl space-y-4 shadow-sm">
+            <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans border-b border-slate-100 pb-2">
+              Riwayat Tagihan
+            </h4>
+            {loadingBills ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="animate-spin text-indigo-600" />
+              </div>
+            ) : customerBills.length === 0 ? (
+              <p className="text-slate-500 text-xs font-medium">Belum ada riwayat tagihan.</p>
+            ) : (
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="compact-table w-full text-xs">
+                  <thead className="bg-slate-100 text-slate-650 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Invoice</th>
+                      <th className="px-4 py-2 text-left">Periode</th>
+                      <th className="px-4 py-2 text-left">Jatuh Tempo</th>
+                      <th className="px-4 py-2 text-left">Nominal</th>
+                      <th className="px-4 py-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {customerBills.map((bill) => (
+                      <tr key={bill.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-2 font-semibold text-slate-700">{bill.invoice_number}</td>
+                        <td className="px-4 py-2 text-slate-600">{bill.period}</td>
+                        <td className="px-4 py-2 text-slate-600">{bill.due_date}</td>
+                        <td className="px-4 py-2 font-medium text-slate-700">{formatCurrency(bill.amount)}</td>
+                        <td className="px-4 py-2">
+                          <StatusPill
+                            label={bill.status === "lunas" ? "LUNAS" : "BELUM BAYAR"}
+                            tone={bill.status === "lunas" ? "green" : "red"}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

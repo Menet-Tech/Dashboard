@@ -14,6 +14,10 @@ import {
   MessageSquare,
   LogOut,
   BarChart3,
+  BadgePercent,
+  Network,
+  Cpu,
+  Map,
 } from "lucide-react";
 
 export type NavItem = {
@@ -38,6 +42,7 @@ const iconMap: Record<ViewKey, React.ComponentType<{ className?: string }>> = {
   bills: ReceiptText,
   customers: Users,
   packages: Wifi,
+  discounts: BadgePercent,
   monitoring: Activity,
   templates: FileText,
   audit: ShieldCheck,
@@ -47,6 +52,9 @@ const iconMap: Record<ViewKey, React.ComponentType<{ className?: string }>> = {
   registration: UserPlus,
   whatsapp: MessageSquare,
   reports: BarChart3,
+  odp: Network,
+  devices: Cpu,
+  "network-map": Map,
 };
 
 export function Sidebar({
@@ -68,7 +76,7 @@ export function Sidebar({
     >
       {/* Sidebar Header */}
       <div className="p-6 border-b border-slate-200 dark:border-slate-800/60">
-        <p className="text-[10px] font-extrabold tracking-widest text-indigo-600 dark:text-indigo-400 uppercase mb-1">go-dev rewrite</p>
+        <p className="text-[10px] font-extrabold tracking-widest text-indigo-600 dark:text-indigo-400 uppercase mb-1">v2.1.0-stable</p>
         <h1 className="text-lg font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-200 dark:via-purple-200 dark:to-pink-200 leading-tight">
           Menet-Tech
           <span className="block text-indigo-600 dark:text-indigo-400 font-medium text-xs mt-0.5 font-sans">Control Panel</span>

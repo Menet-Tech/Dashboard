@@ -173,6 +173,54 @@ const getSettings = async () => {
     }
 };
 
+/**
+ * Hitung jumlah pelanggan yang direferensikan oleh customer ini.
+ * @param {number} customerId
+ * @returns {Promise<number>}
+ */
+const getReferredCount = async (customerId) => {
+    try {
+        const res = await client.get('/api/v1/customers');
+        const customers = res.data?.data || [];
+        return customers.filter(c => c.referred_by_id === customerId).length;
+    } catch (err) {
+        logger.error(`[ISP] getReferredCount failed for customer ${customerId}:`, err.message);
+        return 0;
+    }
+};
+
+/**
+ * Ajukan penarikan tunai saldo referral.
+ * @param {number} customerId
+ * @param {number} amount
+ * @returns {Promise<object>}
+ */
+const withdrawReferral = async (customerId, amount) => {
+    try {
+        const res = await client.post(`/api/v1/customers/${customerId}/referral/withdraw`, { amount });
+        return res.data;
+    } catch (err) {
+        logger.error(`[ISP] withdrawReferral failed for customer ${customerId}:`, err.message);
+        throw new Error(err.response?.data?.error || err.message);
+    }
+};
+
+/**
+ * Tukarkan saldo referral menjadi voucher diskon tagihan.
+ * @param {number} customerId
+ * @param {number} amount
+ * @returns {Promise<object>}
+ */
+const convertReferralToVoucher = async (customerId, amount) => {
+    try {
+        const res = await client.post(`/api/v1/customers/${customerId}/referral/convert-voucher`, { amount });
+        return res.data;
+    } catch (err) {
+        logger.error(`[ISP] convertReferralToVoucher failed for customer ${customerId}:`, err.message);
+        throw new Error(err.response?.data?.error || err.message);
+    }
+};
+
 module.exports = {
     findCustomerByPhone,
     getActiveBill,
@@ -182,4 +230,7 @@ module.exports = {
     createTicket,
     getTemplateByTrigger,
     getSettings,
+    getReferredCount,
+    withdrawReferral,
+    convertReferralToVoucher,
 };
