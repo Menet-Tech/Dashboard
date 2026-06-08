@@ -213,7 +213,7 @@ func (r Repository) Generate(ctx context.Context, period string) (int, error) {
 			afterDiskon = 0
 		}
 
-		diskonReferral := candidate.ReferralBalance
+		diskonReferral := candidate.VoucherDiscount
 		if diskonReferral > afterDiskon {
 			diskonReferral = afterDiskon
 		}
@@ -236,12 +236,12 @@ func (r Repository) Generate(ctx context.Context, period string) (int, error) {
 		if diskonReferral > 0 {
 			_, err = tx.ExecContext(ctx, `
 				UPDATE pelanggan
-				SET referral_balance = referral_balance - ?, updated_at = CURRENT_TIMESTAMP
+				SET voucher_discount = voucher_discount - ?, updated_at = CURRENT_TIMESTAMP
 				WHERE id = ?
 			`, diskonReferral, candidate.CustomerID)
 			if err != nil {
 				_ = tx.Rollback()
-				return 0, fmt.Errorf("deduct referral balance: %w", err)
+				return 0, fmt.Errorf("deduct voucher discount: %w", err)
 			}
 		}
 
@@ -304,7 +304,7 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 		afterDiskon = 0
 	}
 
-	diskonReferral := candidate.ReferralBalance
+	diskonReferral := candidate.VoucherDiscount
 	if diskonReferral > afterDiskon {
 		diskonReferral = afterDiskon
 	}
@@ -334,12 +334,12 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 	if diskonReferral > 0 {
 		_, err = tx.ExecContext(ctx, `
 			UPDATE pelanggan
-			SET referral_balance = referral_balance - ?, updated_at = CURRENT_TIMESTAMP
+			SET voucher_discount = voucher_discount - ?, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ?
 		`, diskonReferral, candidate.CustomerID)
 		if err != nil {
 			_ = tx.Rollback()
-			return Bill{}, false, fmt.Errorf("deduct referral balance: %w", err)
+			return Bill{}, false, fmt.Errorf("deduct voucher discount: %w", err)
 		}
 	}
 
@@ -557,7 +557,7 @@ func (r Repository) UpdateCustomerStatus(ctx context.Context, customerID int64, 
 func (r Repository) findCandidates(ctx context.Context, period string) ([]billCandidate, error) {
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo,
-		       c.diskon, c.referral_balance
+		       c.diskon, c.voucher_discount
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		WHERE c.status IN ('active', 'limit')
@@ -588,7 +588,7 @@ func (r Repository) findCandidates(ctx context.Context, period string) ([]billCa
 			&item.PackagePrice,
 			&item.DueDay,
 			&item.Diskon,
-			&item.ReferralBalance,
+			&item.VoucherDiscount,
 		); err != nil {
 			return nil, fmt.Errorf("scan bill candidate: %w", err)
 		}
@@ -601,7 +601,7 @@ func (r Repository) findCandidates(ctx context.Context, period string) ([]billCa
 func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int64, period string) (billCandidate, bool, error) {
 	row := r.DB.QueryRowContext(ctx, `
 		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo,
-		       c.diskon, c.referral_balance
+		       c.diskon, c.voucher_discount
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		WHERE c.id = ?
@@ -626,7 +626,7 @@ func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int
 		&item.PackagePrice,
 		&item.DueDay,
 		&item.Diskon,
-		&item.ReferralBalance,
+		&item.VoucherDiscount,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return billCandidate{}, false, nil

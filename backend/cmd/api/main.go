@@ -152,12 +152,13 @@ func runWorker(cfg config.Config, logger *slog.Logger, db *sql.DB) {
 	backupService := backup.NewService(db, backupDir)
 
 	service := worker.Service{
-		Logger:   logger,
-		Billing:  billingService,
-		Settings: settingsService,
-		WhatsApp: whatsAppService,
-		Discord:  discordService,
-		Backup:   backupService,
+		Logger:    logger,
+		Billing:   billingService,
+		Settings:  settingsService,
+		WhatsApp:  whatsAppService,
+		Discord:   discordService,
+		Backup:    backupService,
+		Customers: customersService,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

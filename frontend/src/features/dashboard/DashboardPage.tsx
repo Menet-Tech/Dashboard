@@ -1,4 +1,5 @@
-import { Bar, Pie } from "react-chartjs-2";
+import { useMemo } from "react";
+import { Line, Pie } from "react-chartjs-2";
 import { formatDateTime, formatCurrency } from "../../utils/format";
 import { StatusPill, SkeletonCard } from "../../components/ui";
 import type { StatusTone } from "../../utils/status";
@@ -37,6 +38,19 @@ export type DashboardPageProps = {
   onSwitchView: (view: ViewKey) => void;
 };
 
+function formatCurrencyShort(value: number): string {
+  if (value === 0) return "Rp 0k";
+  if (value >= 1000000) {
+    const val = value / 1000000;
+    return `Rp ${Number(val.toFixed(1))}jt`;
+  }
+  if (value >= 1000) {
+    const val = value / 1000;
+    return `Rp ${Number(val.toFixed(0))}k`;
+  }
+  return `Rp ${value}`;
+}
+
 export function DashboardPage({
   pageLoading,
   summary,
@@ -49,6 +63,57 @@ export function DashboardPage({
   backupTone,
   onSwitchView,
 }: DashboardPageProps) {
+  const revenueChartData = useMemo(() => {
+    const sortedRevenue = [...revenue].reverse();
+    return {
+      labels: sortedRevenue.map((r) => r.period),
+      datasets: [
+        {
+          label: "Total Tagihan",
+          data: sortedRevenue.map((r) => r.total_billed),
+          borderColor: "rgba(99, 102, 241, 1)",
+          backgroundColor: (context: any) => {
+            const chart = context.chart;
+            const { ctx, chartArea } = chart;
+            if (!chartArea) return "rgba(99, 102, 241, 0.05)";
+            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            gradient.addColorStop(0, "rgba(99, 102, 241, 0.4)");
+            gradient.addColorStop(1, "rgba(99, 102, 241, 0.01)");
+            return gradient;
+          },
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          pointHitRadius: 12,
+          pointBackgroundColor: "rgba(99, 102, 241, 1)",
+          tension: 0.35,
+          fill: true,
+        },
+        {
+          label: "Total Lunas",
+          data: sortedRevenue.map((r) => r.total_paid),
+          borderColor: "#8b5cf6",
+          backgroundColor: (context: any) => {
+            const chart = context.chart;
+            const { ctx, chartArea } = chart;
+            if (!chartArea) return "rgba(139, 92, 246, 0.1)";
+            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            gradient.addColorStop(0.05, "rgba(139, 92, 246, 0.8)");
+            gradient.addColorStop(0.95, "rgba(139, 92, 246, 0)");
+            return gradient;
+          },
+          borderWidth: 3,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          pointHitRadius: 12,
+          pointBackgroundColor: "#8b5cf6",
+          tension: 0.35,
+          fill: true,
+        },
+      ],
+    };
+  }, [revenue]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2">
@@ -92,33 +157,60 @@ export function DashboardPage({
           <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
             <h3 className="text-base font-semibold text-slate-800 mb-4">Pendapatan Bulanan</h3>
             {revenue.length > 0 ? (
-              <Bar
-                data={{
-                  labels: [...revenue].reverse().map((r) => r.period),
-                  datasets: [
-                    {
-                      label: "Total Tagihan",
-                      data: [...revenue].reverse().map((r) => r.total_billed),
-                      backgroundColor: "rgba(99, 102, 241, 0.5)",
-                      borderColor: "rgba(99, 102, 241, 1)",
-                      borderWidth: 1,
+              <div className="h-72">
+                <Line
+                  data={revenueChartData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: "bottom",
+                        labels: { color: "rgba(100, 116, 139, 1)" },
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains("dark") ? "#1e293b" : "#ffffff",
+                        titleColor: document.documentElement.classList.contains("dark") ? "#f8fafc" : "#1e293b",
+                        bodyColor: document.documentElement.classList.contains("dark") ? "#cbd5e1" : "#475569",
+                        borderColor: document.documentElement.classList.contains("dark") ? "#334155" : "#e2e8f0",
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 12,
+                        displayColors: true,
+                        callbacks: {
+                          label: (context: any) => {
+                            const label = context.dataset.label || "";
+                            const val = context.parsed.y || 0;
+                            return ` ${label}: ${formatCurrency(val)}`;
+                          }
+                        }
+                      }
                     },
-                    {
-                      label: "Total Lunas",
-                      data: [...revenue].reverse().map((r) => r.total_paid),
-                      backgroundColor: "rgba(34, 197, 94, 0.5)",
-                      borderColor: "rgba(34, 197, 94, 1)",
-                      borderWidth: 1,
+                    scales: {
+                      y: {
+                        border: { display: false },
+                        ticks: {
+                          color: "rgba(100, 116, 139, 1)",
+                          callback: (value) => formatCurrencyShort(Number(value)),
+                        },
+                        grid: {
+                          color: () => document.documentElement.classList.contains("dark")
+                            ? "rgba(51, 65, 85, 0.4)"
+                            : "rgba(241, 245, 249, 1)",
+                          borderDash: [3, 3],
+                        } as any,
+                      },
+                      x: {
+                        border: { display: false },
+                        ticks: { color: "rgba(100, 116, 139, 1)" },
+                        grid: { display: false },
+                      },
                     },
-                  ],
-                }}
-                options={{
-                  responsive: true,
-                  plugins: { legend: { position: "bottom" } },
-                }}
-              />
+                  }}
+                />
+              </div>
             ) : (
-              <div className="flex items-center justify-center h-48 border-2 border-dashed border-slate-100 rounded-xl">
+              <div className="flex items-center justify-center h-72 border-2 border-dashed border-slate-100 rounded-xl">
                 <p className="text-slate-400 text-sm">Belum ada data pendapatan.</p>
               </div>
             )}

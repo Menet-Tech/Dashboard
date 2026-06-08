@@ -291,6 +291,57 @@ func hasError(sentences [][]string) error {
 	return nil
 }
 
+type PPPActive struct {
+	Name    string
+	Address string
+	Uptime  string
+}
+
+// ListActiveConnections retrieves all active PPPoE connections from RouterOS /ppp/active/print.
+func (c *Client) ListActiveConnections(ctx context.Context) ([]PPPActive, error) {
+	if c.conn == nil {
+		return nil, fmt.Errorf("not connected to RouterOS")
+	}
+
+	reply, err := c.run(ctx, "/ppp/active/print")
+	if err != nil {
+		return nil, fmt.Errorf("list active ppp: %w", err)
+	}
+	if err := hasError(reply); err != nil {
+		return nil, fmt.Errorf("list active ppp error: %w", err)
+	}
+
+	var active []PPPActive
+	for _, sentence := range reply {
+		hasRe := false
+		for _, word := range sentence {
+			if word == "!re" {
+				hasRe = true
+				break
+			}
+		}
+		if !hasRe {
+			continue
+		}
+
+		var a PPPActive
+		for _, word := range sentence {
+			if strings.HasPrefix(word, "=name=") {
+				a.Name = strings.TrimPrefix(word, "=name=")
+			} else if strings.HasPrefix(word, "=address=") {
+				a.Address = strings.TrimPrefix(word, "=address=")
+			} else if strings.HasPrefix(word, "=uptime=") {
+				a.Uptime = strings.TrimPrefix(word, "=uptime=")
+			}
+		}
+		if a.Name != "" {
+			active = append(active, a)
+		}
+	}
+
+	return active, nil
+}
+
 // ListSecrets retrieves all PPPoE secrets from RouterOS /ppp/secret/print.
 func (c *Client) ListSecrets(ctx context.Context) ([]PPPoESecret, error) {
 	if c.conn == nil {
@@ -437,6 +488,45 @@ func (c *Client) SyncCustomer(ctx context.Context, username, password, profile, 
 				"=.id="+activeID,
 			)
 		}
+	}
+
+	return nil
+}
+
+// KickUser terminates an active PPPoE session for the given username, forcing a reconnect.
+func (c *Client) KickUser(ctx context.Context, username string) error {
+	if c.conn == nil {
+		return fmt.Errorf("not connected to RouterOS")
+	}
+	if username == "" {
+		return fmt.Errorf("username cannot be empty")
+	}
+
+	reply, err := c.run(ctx,
+		"/ppp/active/print",
+		"?name="+username,
+	)
+	if err != nil {
+		return fmt.Errorf("find active ppp %q: %w", username, err)
+	}
+	if err := hasError(reply); err != nil {
+		return fmt.Errorf("find active ppp error for %q: %w", username, err)
+	}
+
+	id := extractField(reply, ".id")
+	if id == "" {
+		return fmt.Errorf("active session for %q not found", username)
+	}
+
+	removeReply, err := c.run(ctx,
+		"/ppp/active/remove",
+		"=.id="+id,
+	)
+	if err != nil {
+		return fmt.Errorf("remove active ppp %q: %w", username, err)
+	}
+	if err := hasError(removeReply); err != nil {
+		return fmt.Errorf("remove active ppp error for %q: %w", username, err)
 	}
 
 	return nil

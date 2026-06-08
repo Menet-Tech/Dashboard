@@ -272,9 +272,11 @@ setup_env_file() {
     cat > "$env_file" << 'EOF'
 APP_NAME="Menet-Tech Dashboard Go"
 APP_ENV=production
+# Ganti HTTP_ADDR ke :8080 atau :80 (tanpa 127.0.0.1) jika tidak menggunakan Nginx
 HTTP_ADDR=127.0.0.1:8080
 SQLITE_PATH=/opt/menettech-go/storage/dashboard.db
 STORAGE_PATH=/opt/menettech-go/storage
+FRONTEND_DIST_PATH=/opt/menettech-go/frontend-dist
 SESSION_COOKIE_NAME=menettech_session
 SESSION_COOKIE_SECURE=true
 SESSION_TTL_HOURS=24

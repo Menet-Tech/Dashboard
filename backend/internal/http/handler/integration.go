@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"menettech/dashboard/backend/internal/acs"
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/mikrotik"
 	"menettech/dashboard/backend/internal/notifications"
@@ -338,4 +340,135 @@ func (h IntegrationHandler) SyncImport(w http.ResponseWriter, r *http.Request) {
 		"imported": importedCount,
 		"results":  results,
 	})
+}
+
+// TestMikrotik tests the connection to a MikroTik router using the provided credentials.
+func (h IntegrationHandler) TestMikrotik(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Host     string `json:"host"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "payload tidak valid")
+		return
+	}
+	if strings.TrimSpace(payload.Host) == "" || strings.TrimSpace(payload.Username) == "" {
+		WriteError(w, http.StatusBadRequest, "host dan username wajib diisi")
+		return
+	}
+	client := mikrotik.NewClient(payload.Host, payload.Username, payload.Password)
+	if err := client.TestConnection(r.Context()); err != nil {
+		WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": err.Error()})
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Koneksi ke MikroTik berhasil"})
+}
+
+// TestGenieACS tests the connection to the GenieACS API.
+func (h IntegrationHandler) TestGenieACS(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		URL      string `json:"url"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "payload tidak valid")
+		return
+	}
+	if strings.TrimSpace(payload.URL) == "" {
+		WriteError(w, http.StatusBadRequest, "URL GenieACS wajib diisi")
+		return
+	}
+	client := acs.NewClient(payload.URL, payload.Username, payload.Password)
+	if err := client.TestConnection(r.Context()); err != nil {
+		WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": err.Error()})
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Koneksi ke GenieACS berhasil"})
+}
+
+// TestDiscord sends a test alert message to the specified Discord Webhook URL.
+func (h IntegrationHandler) TestDiscord(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		WebhookURL string `json:"webhook_url"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "payload tidak valid")
+		return
+	}
+	if strings.TrimSpace(payload.WebhookURL) == "" {
+		WriteError(w, http.StatusBadRequest, "Webhook URL wajib diisi")
+		return
+	}
+	// Simple test message
+	testMsg := map[string]string{"content": "🔔 **Test Koneksi**: Integrasi Webhook Discord Menet-Tech Control Panel berhasil terhubung!"}
+	bodyBytes, err := json.Marshal(testMsg)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, payload.WebhookURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, fmt.Sprintf("URL tidak valid: %v", err))
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := h.HTTPClient.Do(req)
+	if err != nil {
+		WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("Gagal menghubungi Discord: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("Discord merespon dengan status: %d", resp.StatusCode)})
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Koneksi ke Discord Webhook berhasil"})
+}
+
+// TestWhatsApp tests connectivity and WhatsApp status via the gateway bridge status endpoint.
+func (h IntegrationHandler) TestWhatsApp(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		GatewayURL string `json:"gateway_url"`
+		APIKey     string `json:"api_key"`
+		AccountID  string `json:"account_id"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "payload tidak valid")
+		return
+	}
+	if strings.TrimSpace(payload.GatewayURL) == "" || strings.TrimSpace(payload.APIKey) == "" {
+		WriteError(w, http.StatusBadRequest, "Gateway URL dan API Key wajib diisi")
+		return
+	}
+	gatewayURL := strings.TrimRight(payload.GatewayURL, "/")
+	statusURL := fmt.Sprintf("%s/api/v1/status", gatewayURL)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, statusURL, nil)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, fmt.Sprintf("URL tidak valid: %v", err))
+		return
+	}
+	req.Header.Set("X-API-Key", payload.APIKey)
+	if strings.TrimSpace(payload.AccountID) != "" {
+		req.Header.Set("X-Account-Id", payload.AccountID)
+	}
+	resp, err := h.HTTPClient.Do(req)
+	if err != nil {
+		WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("Gagal menghubungi WhatsApp Gateway: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("WhatsApp Gateway merespon dengan status: %d", resp.StatusCode)})
+		return
+	}
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err == nil {
+		if ready, ok := result["whatsapp_ready"].(bool); ok && !ready {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": "Gateway terhubung, namun status WhatsApp tidak aktif/belum scan QR"})
+			return
+		}
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Koneksi ke WhatsApp Gateway berhasil"})
 }

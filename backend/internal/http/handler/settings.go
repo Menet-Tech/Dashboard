@@ -47,7 +47,7 @@ func (h SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, http.StatusBadRequest, "Pengaturan tidak dikenal: "+key)
 			return
 		}
-		if (key == "wa_gateway_url" || key == settings.KeyDiscordWebhookURL) && value != "" {
+		if (key == "wa_gateway_url" || key == settings.KeyDiscordWebhookURL || key == settings.KeyACSURL) && value != "" {
 			if _, err := url.ParseRequestURI(value); err != nil {
 				WriteError(w, http.StatusBadRequest, "URL tidak valid untuk: "+key)
 				return

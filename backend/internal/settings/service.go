@@ -49,6 +49,9 @@ const (
 	KeyChatbotTriggerPackages = "chatbot_trigger_packages"
 	KeyChatbotTriggerFAQ      = "chatbot_trigger_faq"
 	KeyChatbotTriggerAdmin    = "chatbot_trigger_admin"
+	KeyACSURL                = "acs_url"
+	KeyACSUsername           = "acs_username"
+	KeyACSPassword           = "acs_password"
 )
 
 var defaults = map[string]string{
@@ -90,6 +93,9 @@ var defaults = map[string]string{
 	KeyChatbotTriggerPackages: "3",
 	KeyChatbotTriggerFAQ:      "4",
 	KeyChatbotTriggerAdmin:    "5",
+	KeyACSURL:                 "http://localhost:7557",
+	KeyACSUsername:            "",
+	KeyACSPassword:            "",
 }
 
 func IsAllowedKey(key string) bool {

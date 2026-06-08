@@ -16,6 +16,16 @@ const client = axios.create({
     headers: API_KEY ? { 'X-Internal-Key': API_KEY } : {},
 });
 
+// In-memory cache variables (60-second TTL)
+let settingsCache = null;
+let settingsCacheTime = 0;
+
+let templatesCache = null;
+let templatesCacheTime = 0;
+
+let packagesCache = null;
+let packagesCacheTime = 0;
+
 /**
  * Cari pelanggan berdasarkan nomor WA.
  * Nomor yang dikirim WhatsApp biasanya format "6281xxxxxxxx@c.us",
@@ -56,16 +66,22 @@ const getActiveBill = async (customerId) => {
 };
 
 /**
- * Ambil daftar paket internet yang tersedia.
+ * Ambil daftar paket internet yang tersedia (dengan in-memory caching 1 menit).
  * @returns {Array<{name, speed_mbps, price}>}
  */
 const getPackageList = async () => {
+    const now = Date.now();
+    if (packagesCache && (now - packagesCacheTime < 60000)) {
+        return packagesCache;
+    }
     try {
         const res = await client.get('/api/v1/packages', { params: { limit: 20 } });
-        return res.data?.data ?? [];
+        packagesCache = res.data?.data ?? [];
+        packagesCacheTime = now;
+        return packagesCache;
     } catch (err) {
         logger.error('[ISP] getPackageList failed:', err.message);
-        return [];
+        return packagesCache || [];
     }
 };
 
@@ -121,27 +137,39 @@ const createTicket = async (data) => {
 };
 
 const getTemplateByTrigger = async (triggerKey) => {
-    try {
-        const res = await client.get('/api/v1/templates');
-        const data = res.data?.data;
-        if (Array.isArray(data)) {
-            const found = data.find(t => t.trigger_key === triggerKey && t.is_active);
-            return found ?? null;
+    const now = Date.now();
+    if (!templatesCache || (now - templatesCacheTime > 60000)) {
+        try {
+            const res = await client.get('/api/v1/templates');
+            templatesCache = res.data?.data ?? [];
+            templatesCacheTime = now;
+        } catch (err) {
+            logger.error(`[ISP] fetch templates failed:`, err.message);
+            if (!templatesCache) {
+                templatesCache = [];
+            }
         }
-        return null;
-    } catch (err) {
-        logger.error(`[ISP] getTemplateByTrigger failed for ${triggerKey}:`, err.message);
-        return null;
     }
+    if (Array.isArray(templatesCache)) {
+        const found = templatesCache.find(t => t.trigger_key === triggerKey && t.is_active);
+        return found ?? null;
+    }
+    return null;
 };
 
 const getSettings = async () => {
+    const now = Date.now();
+    if (settingsCache && (now - settingsCacheTime < 60000)) {
+        return settingsCache;
+    }
     try {
         const res = await client.get('/api/v1/settings');
-        return res.data?.data ?? {};
+        settingsCache = res.data?.data ?? {};
+        settingsCacheTime = now;
+        return settingsCache;
     } catch (err) {
         logger.error('[ISP] getSettings failed:', err.message);
-        return {};
+        return settingsCache || {};
     }
 };
 

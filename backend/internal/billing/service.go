@@ -455,7 +455,7 @@ type billCandidate struct {
 	PackagePrice    int
 	DueDay          int
 	Diskon          int
-	ReferralBalance int
+	VoucherDiscount int
 }
 
 type automationCandidate struct {
