@@ -393,6 +393,14 @@ func (r Repository) Create(ctx context.Context, customer Customer) (Customer, er
 	return customer, nil
 }
 
+// toNullString converts an empty string to a NULL sql value.
+// This is important for UNIQUE-indexed nullable columns like referral_code:
+// SQLite allows multiple NULL values but NOT multiple empty strings.
+func toNullString(s string) sql.NullString {
+	s = strings.TrimSpace(s)
+	return sql.NullString{String: s, Valid: s != ""}
+}
+
 func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Customer, error) {
 	if err := r.ensurePackageExists(ctx, customer.PackageID); err != nil {
 		return Customer{}, err
@@ -406,7 +414,7 @@ func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Cu
 		    odp_id = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address,
-		customer.Diskon, customer.ReferredByID, customer.ReferralBalance, customer.ReferralCode, customer.VoucherDiscount,
+		customer.Diskon, customer.ReferredByID, customer.ReferralBalance, toNullString(customer.ReferralCode), customer.VoucherDiscount,
 		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt,
 		customer.OdpID, id)
 	if err != nil {
@@ -424,6 +432,23 @@ func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Cu
 
 	customer.ID = id
 	return customer, nil
+}
+
+// UpdateSyncFields updates only the device/connection status fields that the background
+// worker polls. It intentionally skips full validation and MikroTik sync to avoid
+// unnecessary load on every polling cycle.
+func (s Service) UpdateSyncFields(ctx context.Context, id int64, c Customer) error {
+	_, err := s.Repository.DB.ExecContext(ctx, `
+		UPDATE pelanggan
+		SET ont_status = ?, ont_ip = ?, ont_uptime = ?, ont_rx_power = ?, ont_tx_power = ?,
+		    pppoe_status = ?, pppoe_ip = ?, pppoe_uptime = ?, last_sync_at = ?
+		WHERE id = ?
+	`, c.OntStatus, c.OntIP, c.OntUptime, c.OntRxPower, c.OntTxPower,
+		c.PppoeStatus, c.PppoeIP, c.PppoeUptime, c.LastSyncAt, id)
+	if err != nil {
+		return fmt.Errorf("update sync fields: %w", err)
+	}
+	return nil
 }
 
 func (r Repository) UpdateStatus(ctx context.Context, id int64, status string) error {

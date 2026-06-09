@@ -3,11 +3,13 @@ import {
   fetchHealth,
   fetchBackups,
   fetchAuditLogs,
+  checkIntegrations,
   createBackup,
   verifyBackup,
   simulateRestore,
   applyRestore,
   type HealthPayload,
+  type IntegrationCheckPayload,
   type RestoreSimulationResult,
 } from "../lib/api";
 import type { AuditLogItem } from "../types";
@@ -33,6 +35,12 @@ export function useMonitoring({
   async function refreshHealth() {
     const payload = await fetchHealth();
     setHealth(payload);
+  }
+
+  async function checkExternalIntegrations(): Promise<IntegrationCheckPayload> {
+    const result = await checkIntegrations();
+    await refreshHealth();
+    return result;
   }
 
   async function refreshMonitoringData(setLoading?: (v: boolean) => void) {
@@ -105,6 +113,7 @@ export function useMonitoring({
       setHealth,
       setBackups,
       refreshHealth,
+      checkExternalIntegrations,
       refreshMonitoringData,
       handleCreateBackup,
       handleVerifyBackup,

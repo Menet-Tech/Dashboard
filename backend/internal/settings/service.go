@@ -96,7 +96,7 @@ var defaults = map[string]string{
 	KeyChatbotTriggerPackages: "3",
 	KeyChatbotTriggerFAQ:      "4",
 	KeyChatbotTriggerAdmin:    "5",
-	KeyACSURL:                 "http://localhost:7557",
+	KeyACSURL:                 "",
 	KeyACSUsername:            "",
 	KeyACSPassword:            "",
 	KeyGacsRxPowerExcellent:  "-27",

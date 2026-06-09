@@ -118,9 +118,42 @@ func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 3. Check MikroTik RouterOS API
+	mikrotikHost, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
+	mikrotikUser, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
+	mikrotikPass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
+
+	mikrotikStatus := "not_configured"
+	if strings.TrimSpace(mikrotikHost) != "" && strings.TrimSpace(mikrotikUser) != "" {
+		mikrotikStatus = "disconnected"
+		client := mikrotik.NewClient(mikrotikHost, mikrotikUser, mikrotikPass)
+		if err := client.TestConnection(ctx); err == nil {
+			mikrotikStatus = "connected"
+		}
+	}
+
+	// 4. Check GenieACS API
+	acsURL, _ := h.Settings.GetString(ctx, settings.KeyACSURL)
+	acsUsername, _ := h.Settings.GetString(ctx, settings.KeyACSUsername)
+	acsPassword, _ := h.Settings.GetString(ctx, settings.KeyACSPassword)
+
+	// Treat empty or the localhost default as "not configured" — the user must
+	// explicitly save a non-default URL in settings for this to show as configured.
+	acsURLTrimmed := strings.TrimSpace(acsURL)
+	genieACSStatus := "not_configured"
+	if acsURLTrimmed != "" && acsURLTrimmed != "http://localhost:7557" {
+		genieACSStatus = "disconnected"
+		client := acs.NewClient(acsURL, acsUsername, acsPassword)
+		if err := client.TestConnection(ctx); err == nil {
+			genieACSStatus = "connected"
+		}
+	}
+
 	WriteJSON(w, http.StatusOK, map[string]string{
 		"whatsapp": waStatus,
 		"discord":  discordStatus,
+		"mikrotik": mikrotikStatus,
+		"genieacs": genieACSStatus,
 	})
 }
 
@@ -674,4 +707,3 @@ func parseSpeedMbps(rateLimit string) int {
 	}
 	return speed
 }
-
