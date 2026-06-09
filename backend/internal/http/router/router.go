@@ -16,18 +16,18 @@ import (
 	"menettech/dashboard/backend/internal/auth"
 	"menettech/dashboard/backend/internal/backup"
 	"menettech/dashboard/backend/internal/billing"
+	"menettech/dashboard/backend/internal/broadcast"
 	"menettech/dashboard/backend/internal/config"
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/http/handler"
 	"menettech/dashboard/backend/internal/notifications"
+	"menettech/dashboard/backend/internal/odp"
 	"menettech/dashboard/backend/internal/packages"
 	"menettech/dashboard/backend/internal/reports"
 	"menettech/dashboard/backend/internal/settings"
 	"menettech/dashboard/backend/internal/templates"
-	"menettech/dashboard/backend/internal/users"
 	"menettech/dashboard/backend/internal/tickets"
-	"menettech/dashboard/backend/internal/broadcast"
-	"menettech/dashboard/backend/internal/odp"
+	"menettech/dashboard/backend/internal/users"
 )
 
 func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Service) http.Handler {
@@ -270,6 +270,9 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Post("/integration/test-genieacs", integrationHandler.TestGenieACS)
 				admin.Post("/integration/test-discord", integrationHandler.TestDiscord)
 				admin.Post("/integration/test-whatsapp", integrationHandler.TestWhatsApp)
+				admin.Put("/map-settings", gacsHandler.UpdateMapSettings)
+				admin.Post("/map-settings/reset", gacsHandler.ResetMapSettings)
+				admin.Delete("/mapping-data/reset", gacsHandler.ResetMappingData)
 			})
 
 			// Admin + Petugas
@@ -305,6 +308,13 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				staff.Get("/gacs/telegram-bot/settings", gacsHandler.GetTelegramBotSettings)
 				staff.Post("/gacs/telegram-bot/settings", gacsHandler.SaveTelegramBotSettings)
 				staff.Post("/gacs/portal/validate-accesscode", gacsHandler.PortalValidateAccessCode)
+				staff.Post("/mapping-data/nodes", gacsHandler.CreateNode)
+				staff.Put("/mapping-data/nodes/{nodeId}", gacsHandler.UpdateNode)
+				staff.Delete("/mapping-data/nodes/{nodeId}", gacsHandler.DeleteNode)
+				staff.Post("/mapping-data/edges", gacsHandler.CreateEdge)
+				staff.Put("/mapping-data/edges/{edgeId}", gacsHandler.UpdateEdge)
+				staff.Delete("/mapping-data/edges/{edgeId}", gacsHandler.DeleteEdge)
+				staff.Post("/mapping-data/sync", gacsHandler.SyncMappingData)
 			})
 
 			// All logged in users (Admin, Petugas, Viewer)
@@ -327,6 +337,11 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				all.Post("/tickets", ticketHandler.CreateInternal)
 				all.Get("/tickets", ticketHandler.List)
 				all.Get("/tickets/{id}", ticketHandler.FindByID)
+				all.Get("/map-settings", gacsHandler.GetMapSettings)
+				all.Get("/mapping-data/nodes", gacsHandler.GetNodes)
+				all.Get("/mapping-data/nodes/{nodeId}", gacsHandler.GetNode)
+				all.Get("/mapping-data/edges", gacsHandler.GetEdges)
+				all.Get("/mapping-data/edges/{edgeId}", gacsHandler.GetEdge)
 			})
 		})
 	})

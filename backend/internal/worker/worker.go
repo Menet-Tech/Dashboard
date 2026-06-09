@@ -624,8 +624,7 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 	for res := range resultsChan {
 		if res.modified {
 			res.customer.LastSyncAt = now.Format(time.RFC3339)
-			_, err = s.Customers.Update(ctx, res.customer.ID, res.customer)
-			if err != nil {
+			if err := s.Customers.UpdateSyncFields(ctx, res.customer.ID, res.customer); err != nil {
 				s.Logger.Error("worker status pooling: failed to update customer status in database", "customer_id", res.customer.ID, "error", err)
 			}
 		}

@@ -229,10 +229,10 @@ func getMockStatus(serialNumber string) DeviceStatus {
 
 	models := []string{"ZTE F609", "ZTE F660", "Huawei HG8245H", "FiberHome HG6243C"}
 	model := models[sum%len(models)]
-	
+
 	status := "online"
 	rxPower := -15.0 - float64(sum%12) - (float64(sum%10) / 10.0) // range -15.0 to -27.0 dBm
-	txPower := 1.5 + (float64(sum%20) / 10.0) // range 1.5 to 3.5 dBm
+	txPower := 1.5 + (float64(sum%20) / 10.0)                     // range 1.5 to 3.5 dBm
 
 	rxStr := fmt.Sprintf("%.1f dBm", rxPower)
 	txStr := fmt.Sprintf("%.1f dBm", txPower)
@@ -357,7 +357,6 @@ func (c *Client) RebootDeviceByID(ctx context.Context, deviceID string) error {
 
 	return nil
 }
-
 
 // TestConnection verifies that the GenieACS API is reachable and credentials are correct.
 func (c *Client) TestConnection(ctx context.Context) error {
@@ -562,8 +561,8 @@ type ConnectionInfo struct {
 }
 
 type WANConnections struct {
-	WanIPConnections   []WANConnectionParsed `json:"wanIPConnections"`
-	WanPPPConnections  []WANConnectionParsed `json:"wanPPPConnections"`
+	WanIPConnections    []WANConnectionParsed `json:"wanIPConnections"`
+	WanPPPConnections   []WANConnectionParsed `json:"wanPPPConnections"`
 	TotalConnections    int                   `json:"totalConnections"`
 	TotalIPConnections  int                   `json:"totalIPConnections"`
 	TotalPPPConnections int                   `json:"totalPPPConnections"`
@@ -1121,8 +1120,8 @@ func (c *Client) GetDetailedDevice(ctx context.Context, db *sql.DB, deviceID str
 	}
 
 	return &DetailedDevice{
-		ID:   deviceID,
-		Tags: tags,
+		ID:     deviceID,
+		Tags:   tags,
 		Vendor: vendorName,
 		DeviceInfo: DetailedDeviceInfo{
 			ProductClass:    productClass,
@@ -1140,14 +1139,14 @@ func (c *Client) GetDetailedDevice(ctx context.Context, db *sql.DB, deviceID str
 			Registered: getStringFromMap(item, "_registered"),
 		},
 		WanConnections: WANConnections{
-			WanIPConnections:   parsedIPs,
-			WanPPPConnections:  parsedPPPs,
+			WanIPConnections:    parsedIPs,
+			WanPPPConnections:   parsedPPPs,
 			TotalConnections:    len(parsedIPs) + len(parsedPPPs),
 			TotalIPConnections:  len(parsedIPs),
 			TotalPPPConnections: len(parsedPPPs),
 		},
-		WifiInfo:          wifiInfo,
-		WifiClients:       wifiClients,
+		WifiInfo:    wifiInfo,
+		WifiClients: wifiClients,
 		VirtualParameters: map[string]VPValue{
 			"pppoeUsername": getVP(vpPppoeUsername),
 			"wanBridge":     getVP(vpWanBridge),
@@ -1459,8 +1458,8 @@ func parseLanBindingField(conn map[string]any, connDevice map[string]any, basePa
 	if lanBindMap, ok := conn[paramPath].(map[string]any); ok {
 		getBool := func(k string) bool {
 			if child, ok := lanBindMap[k].(map[string]any); ok {
-				val := fmt.Sprintf("%v", child["_value"])
-				return val == "1" || val == "true" || val == "true"
+				val := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", child["_value"])))
+				return val == "1" || val == "true"
 			}
 			return false
 		}
@@ -1890,4 +1889,3 @@ func (c *Client) DeleteDevice(ctx context.Context, deviceID string) error {
 	}
 	return nil
 }
-

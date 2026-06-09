@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -77,7 +78,12 @@ func authMiddleware(authService auth.Service) func(http.Handler) http.Handler {
 
 			user, csrfToken, err := authService.Authenticate(r.Context(), cookie.Value)
 			if err != nil {
-				handler.WriteUnauthorized(w)
+				if errors.Is(err, auth.ErrUnauthorized) {
+					handler.WriteUnauthorized(w)
+					return
+				}
+				slog.Error("auth middleware database or system error", "error", err)
+				handler.WriteError(w, http.StatusInternalServerError, "internal server error")
 				return
 			}
 

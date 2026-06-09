@@ -89,6 +89,8 @@ export type HealthPayload = {
     discord_online: boolean;
     mikrotik_configured: boolean;
     mikrotik_online: boolean;
+    genieacs_configured?: boolean;
+    genieacs_online?: boolean;
   };
   alerts: string[];
   timestamp: string;
@@ -416,6 +418,17 @@ export function applyRestore() {
   });
 }
 
+export type IntegrationCheckPayload = {
+  whatsapp: string;
+  discord: string;
+  mikrotik: string;
+  genieacs: string;
+};
+
+export function checkIntegrations() {
+  return request<IntegrationCheckPayload>("/api/v1/integration/check");
+}
+
 export function getBackupDownloadUrl(filename: string) {
   return `/api/v1/backups/${encodeURIComponent(filename)}/download`;
 }
@@ -637,83 +650,83 @@ export function checkGponEpon(deviceId: string) {
 
 // Map settings CRUD
 export function fetchMapSettings() {
-  return request<MapSettings>("/api/map-settings");
+  return request<MapSettings>("/api/v1/map-settings");
 }
 
 export function updateMapSettings(settings: MapSettings) {
-  return request<{ success: boolean }>("/api/map-settings", {
+  return request<{ success: boolean }>("/api/v1/map-settings", {
     method: "PUT",
     body: JSON.stringify(settings),
   });
 }
 
 export function resetMapSettings() {
-  return request<MapSettings>("/api/map-settings/reset", {
+  return request<MapSettings>("/api/v1/map-settings/reset", {
     method: "POST",
   });
 }
 
 // Map nodes CRUD
 export function fetchNodes() {
-  return request<MapNode[]>("/api/mapping-data/nodes");
+  return request<MapNode[]>("/api/v1/mapping-data/nodes");
 }
 
 export function fetchNode(nodeId: string) {
-  return request<MapNode>(`/api/mapping-data/nodes/${encodeURIComponent(nodeId)}`);
+  return request<MapNode>(`/api/v1/mapping-data/nodes/${encodeURIComponent(nodeId)}`);
 }
 
 export function createNode(node: MapNode) {
-  return request<MapNode>("/api/mapping-data/nodes", {
+  return request<MapNode>("/api/v1/mapping-data/nodes", {
     method: "POST",
     body: JSON.stringify(node),
   });
 }
 
 export function updateNode(nodeId: string, node: MapNode) {
-  return request<MapNode>(`/api/mapping-data/nodes/${encodeURIComponent(nodeId)}`, {
+  return request<MapNode>(`/api/v1/mapping-data/nodes/${encodeURIComponent(nodeId)}`, {
     method: "PUT",
     body: JSON.stringify(node),
   });
 }
 
 export function deleteNode(nodeId: string) {
-  return request<{ success: boolean }>(`/api/mapping-data/nodes/${encodeURIComponent(nodeId)}`, {
+  return request<{ success: boolean }>(`/api/v1/mapping-data/nodes/${encodeURIComponent(nodeId)}`, {
     method: "DELETE",
   });
 }
 
 // Map edges CRUD
 export function fetchEdges() {
-  return request<MapEdge[]>("/api/mapping-data/edges");
+  return request<MapEdge[]>("/api/v1/mapping-data/edges");
 }
 
 export function fetchEdge(edgeId: string) {
-  return request<MapEdge>(`/api/mapping-data/edges/${encodeURIComponent(edgeId)}`);
+  return request<MapEdge>(`/api/v1/mapping-data/edges/${encodeURIComponent(edgeId)}`);
 }
 
 export function createEdge(edge: MapEdge) {
-  return request<MapEdge>("/api/mapping-data/edges", {
+  return request<MapEdge>("/api/v1/mapping-data/edges", {
     method: "POST",
     body: JSON.stringify(edge),
   });
 }
 
 export function updateEdge(edgeId: string, edge: MapEdge) {
-  return request<MapEdge>(`/api/mapping-data/edges/${encodeURIComponent(edgeId)}`, {
+  return request<MapEdge>(`/api/v1/mapping-data/edges/${encodeURIComponent(edgeId)}`, {
     method: "PUT",
     body: JSON.stringify(edge),
   });
 }
 
 export function deleteEdge(edgeId: string) {
-  return request<{ success: boolean }>(`/api/mapping-data/edges/${encodeURIComponent(edgeId)}`, {
+  return request<{ success: boolean }>(`/api/v1/mapping-data/edges/${encodeURIComponent(edgeId)}`, {
     method: "DELETE",
   });
 }
 
 // Sync mapping data
 export function syncMappingData(data: { nodes: MapNode[]; edges: MapEdge[] }) {
-  return request<{ success: boolean }>("/api/mapping-data/sync", {
+  return request<{ success: boolean }>("/api/v1/mapping-data/sync", {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -721,7 +734,7 @@ export function syncMappingData(data: { nodes: MapNode[]; edges: MapEdge[] }) {
 
 // Reset mapping data
 export function resetMappingData() {
-  return request<{ success: boolean }>("/api/mapping-data/reset", {
+  return request<{ success: boolean }>("/api/v1/mapping-data/reset", {
     method: "DELETE",
   });
 }

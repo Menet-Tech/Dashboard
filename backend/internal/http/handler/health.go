@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"menettech/dashboard/backend/internal/acs"
 	"menettech/dashboard/backend/internal/config"
 	"menettech/dashboard/backend/internal/settings"
 )
@@ -84,6 +85,9 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	mikrotikHost, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
 	mikrotikUser, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
 	mikrotikPass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
+	acsURL, _ := h.Settings.GetString(ctx, settings.KeyACSURL)
+	acsUsername, _ := h.Settings.GetString(ctx, settings.KeyACSUsername)
+	acsPassword, _ := h.Settings.GetString(ctx, settings.KeyACSPassword)
 	billingAutoEnabled := strings.TrimSpace(billingAutoEnabledValue) != "0"
 
 	dbQuickCheck := "unknown"
@@ -136,6 +140,7 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	mikrotikConfigured := strings.TrimSpace(mikrotikHost) != "" &&
 		strings.TrimSpace(mikrotikUser) != "" &&
 		strings.TrimSpace(mikrotikPass) != ""
+	genieACSConfigured := strings.TrimSpace(acsURL) != ""
 
 	// Real-time online checks
 	waOnline := false
@@ -151,6 +156,11 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	mikrotikOnline := false
 	if mikrotikConfigured {
 		mikrotikOnline = checkMikrotikOnline(mikrotikHost)
+	}
+
+	genieACSOnline := false
+	if genieACSConfigured {
+		genieACSOnline = checkGenieACSOnline(ctx, acsURL, acsUsername, acsPassword)
 	}
 
 	if !waConfigured {
@@ -169,6 +179,12 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 		alerts = append(alerts, "konfigurasi MikroTik belum lengkap")
 	} else if !mikrotikOnline {
 		alerts = append(alerts, "koneksi router MikroTik terputus (offline)")
+	}
+
+	if !genieACSConfigured {
+		alerts = append(alerts, "konfigurasi GenieACS belum lengkap")
+	} else if !genieACSOnline {
+		alerts = append(alerts, "koneksi GenieACS bermasalah (offline)")
 	}
 
 	if billingAutoEnabled && strings.TrimSpace(billingLastError) != "" {
@@ -230,6 +246,8 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 			"discord_online":      discordOnline,
 			"mikrotik_configured": mikrotikConfigured,
 			"mikrotik_online":     mikrotikOnline,
+			"genieacs_configured": genieACSConfigured,
+			"genieacs_online":     genieACSOnline,
 		},
 		"alerts":    alerts,
 		"timestamp": time.Now().Format(time.RFC3339),
@@ -365,10 +383,19 @@ func checkMikrotikOnline(host string) bool {
 	if !strings.Contains(host, ":") {
 		address = host + ":8728"
 	}
-	conn, err := net.DialTimeout("tcp", address, 1500 * time.Millisecond)
+	conn, err := net.DialTimeout("tcp", address, 1500*time.Millisecond)
 	if err != nil {
 		return false
 	}
 	conn.Close()
 	return true
+}
+
+func checkGenieACSOnline(ctx context.Context, acsURL, username, password string) bool {
+	if strings.TrimSpace(acsURL) == "" {
+		return false
+	}
+	client := acs.NewClient(acsURL, username, password)
+	client.Client.Timeout = 1500 * time.Millisecond
+	return client.TestConnection(ctx) == nil
 }

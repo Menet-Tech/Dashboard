@@ -1,6 +1,5 @@
 import { StatusPill } from "../../components/ui";
 import { formatDateTime } from "../../utils/format";
-import { integrationSummary } from "../../utils/status";
 import { getBackupDownloadUrl, type HealthPayload, type RestoreSimulationResult } from "../../lib/api";
 
 export type BackupItem = {
@@ -57,7 +56,7 @@ export function MonitoringPage({
   const handleCheckIntegrations = async () => {
     try {
       await onCheckIntegrations();
-      pushSuccess("Semua sistem eksternal (WA/Discord) terhubung dengan baik.");
+      pushSuccess("Check integrasi selesai. Status WA, Discord, MikroTik, dan GenieACS sudah diperbarui.");
     } catch (err) {
       pushError("Beberapa integrasi mungkin bermasalah. Cek konfigurasi.");
     }
@@ -174,9 +173,19 @@ export function MonitoringPage({
                     />
                   </div>
                 )}
+                {health?.integrations.genieacs_configured && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">GenieACS</span>
+                    <StatusPill
+                      label={health.integrations.genieacs_online ? "siap" : "error"}
+                      tone={health.integrations.genieacs_online ? "green" : "red"}
+                    />
+                  </div>
+                )}
                 {(!health || (!health.integrations.whatsapp_configured &&
                   !health.integrations.discord_configured &&
-                  !health.integrations.mikrotik_configured)) && (
+                  !health.integrations.mikrotik_configured &&
+                  !health.integrations.genieacs_configured)) && (
                   <span className="text-sm font-semibold text-slate-400">Belum dikonfigurasi</span>
                 )}
               </div>

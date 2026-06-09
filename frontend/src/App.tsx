@@ -604,7 +604,9 @@ export default function App() {
           onApplyRestore={() => void monitoringHook.handlers.handleApplyRestore()}
           onCancelRestore={monitoringHook.handlers.cancelRestore}
           onCheckIntegrations={async () => {
-            await feedback.withFeedback(monitoringHook.handlers.refreshHealth, "check-integrations");
+            await feedback.withFeedback(async () => {
+              await monitoringHook.handlers.checkExternalIntegrations();
+            }, "check-integrations");
           }}
           pushSuccess={feedback.pushSuccess}
           pushError={feedback.pushError}

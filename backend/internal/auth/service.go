@@ -179,7 +179,7 @@ func (s Service) Authenticate(ctx context.Context, token string) (User, string, 
 		return User{}, "", ErrUnauthorized
 	}
 
-	user, csrfToken, expiresAt, err := s.Repository.FindUserBySessionToken(ctx, token)
+	user, csrfToken, expiresAt, lastSeenAt, err := s.Repository.FindUserBySessionToken(ctx, token)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return User{}, "", ErrUnauthorized
@@ -192,8 +192,12 @@ func (s Service) Authenticate(ctx context.Context, token string) (User, string, 
 		return User{}, "", ErrUnauthorized
 	}
 
-	if err := s.Repository.TouchSession(ctx, token); err != nil {
-		return User{}, "", err
+	// Throttle Touching the session in the database to at most once per 60 seconds.
+	// This dramatically reduces write locks and prevents writer deadlocks on concurrent requests.
+	if time.Now().UTC().Sub(lastSeenAt) > 60*time.Second {
+		if err := s.Repository.TouchSession(ctx, token); err != nil {
+			return User{}, "", err
+		}
 	}
 
 	return user, csrfToken, nil
@@ -275,9 +279,9 @@ func (r Repository) CreateSession(ctx context.Context, session Session) error {
 	return nil
 }
 
-func (r Repository) FindUserBySessionToken(ctx context.Context, token string) (User, string, time.Time, error) {
+func (r Repository) FindUserBySessionToken(ctx context.Context, token string) (User, string, time.Time, time.Time, error) {
 	row := r.DB.QueryRowContext(ctx, `
-		SELECT u.id, u.username, u.role, u.is_active, s.expires_at, COALESCE(s.csrf_token, '')
+		SELECT u.id, u.username, u.role, u.is_active, s.expires_at, COALESCE(s.csrf_token, ''), s.last_seen_at
 		FROM sessions s
 		INNER JOIN users u ON u.id = s.user_id
 		WHERE s.token = ?
@@ -288,20 +292,28 @@ func (r Repository) FindUserBySessionToken(ctx context.Context, token string) (U
 	var isActive int
 	var expiresAtRaw string
 	var csrfToken string
-	if err := row.Scan(&user.ID, &user.Username, &user.Role, &isActive, &expiresAtRaw, &csrfToken); err != nil {
-		return User{}, "", time.Time{}, err
+	var lastSeenAtRaw string
+	if err := row.Scan(&user.ID, &user.Username, &user.Role, &isActive, &expiresAtRaw, &csrfToken, &lastSeenAtRaw); err != nil {
+		return User{}, "", time.Time{}, time.Time{}, err
 	}
 	user.IsActive = isActive == 1
 
 	expiresAt, err := time.Parse(time.RFC3339, expiresAtRaw)
 	if err != nil {
-		return User{}, "", time.Time{}, fmt.Errorf("parse session expiry: %w", err)
-	}
-	if !user.IsActive {
-		return User{}, "", time.Time{}, ErrUnauthorized
+		return User{}, "", time.Time{}, time.Time{}, fmt.Errorf("parse session expiry: %w", err)
 	}
 
-	return user, csrfToken, expiresAt, nil
+	lastSeenAt, err := time.Parse(time.RFC3339, lastSeenAtRaw)
+	if err != nil {
+		// Fallback to zero time if parsing fails, so it will trigger a TouchSession
+		lastSeenAt = time.Time{}
+	}
+
+	if !user.IsActive {
+		return User{}, "", time.Time{}, time.Time{}, ErrUnauthorized
+	}
+
+	return user, csrfToken, expiresAt, lastSeenAt, nil
 }
 
 func (r Repository) TouchSession(ctx context.Context, token string) error {

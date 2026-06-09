@@ -35,6 +35,43 @@ import {
 } from "../../lib/api";
 import type { MapNode, MapEdge, MapSettings } from "../../types";
 
+const DEFAULT_MAP_CENTER: [number, number] = [-6.2088, 106.8456];
+const DEFAULT_MAP_ZOOM = 13;
+const DEFAULT_MIN_ZOOM = 5;
+const DEFAULT_MAX_ZOOM = 18;
+
+const parseFiniteNumber = (value: unknown, fallback: number) => {
+  const parsed = typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const clampNumber = (value: number, min: number, max: number) => {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(value, min), max);
+};
+
+const parseLatitude = (value: unknown, fallback = DEFAULT_MAP_CENTER[0]) =>
+  clampNumber(parseFiniteNumber(value, fallback), -90, 90);
+
+const parseLongitude = (value: unknown, fallback = DEFAULT_MAP_CENTER[1]) =>
+  clampNumber(parseFiniteNumber(value, fallback), -180, 180);
+
+const parseZoom = (value: unknown, fallback = DEFAULT_MAP_ZOOM) => {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeMapZoomRange = (settings: MapSettings | null) => {
+  let minZoom = parseZoom(settings?.max_zoom_out, DEFAULT_MIN_ZOOM);
+  let maxZoom = parseZoom(settings?.max_zoom_in, DEFAULT_MAX_ZOOM);
+  minZoom = clampNumber(minZoom, 0, 22);
+  maxZoom = clampNumber(maxZoom, 0, 22);
+  if (minZoom > maxZoom) {
+    [minZoom, maxZoom] = [maxZoom, minZoom];
+  }
+  return { minZoom, maxZoom };
+};
+
 // Helper to compute distance in meters between two lat/lng coordinates (Haversine formula)
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371e3; // meters
@@ -53,6 +90,9 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
   useEffect(() => {
+    if (!Number.isFinite(center[0]) || !Number.isFinite(center[1]) || !Number.isFinite(zoom)) {
+      return;
+    }
     map.setView(center, zoom);
   }, [center, zoom, map]);
   return null;
@@ -130,8 +170,17 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         fetchEdges(),
         fetchMapSettings(),
       ]);
-      setNodes(nodesRes || []);
-      setEdges(edgesRes || []);
+      // Normalize API responses: some endpoints return { data: [...] },
+      // while others return the array directly. Ensure we always store arrays.
+      const normalizeArray = <T,>(val: any): T[] => {
+        if (!val) return [];
+        if (Array.isArray(val)) return val as T[];
+        if (typeof val === "object" && Array.isArray((val as any).data)) return (val as any).data as T[];
+        return [];
+      };
+
+      setNodes(normalizeArray<MapNode>(nodesRes));
+      setEdges(normalizeArray<MapEdge>(edgesRes));
       setSettings(settingsRes);
 
       // Pre-fill map settings inputs
@@ -193,10 +242,10 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         );
         // Compute distance automatically
         const dist = calculateDistance(
-          firstNodeForEdge.latitude,
-          firstNodeForEdge.longitude,
-          node.latitude,
-          node.longitude
+          parseLatitude(firstNodeForEdge.latitude),
+          parseLongitude(firstNodeForEdge.longitude),
+          parseLatitude(node.latitude),
+          parseLongitude(node.longitude)
         );
         setEdgeDistanceInput(String(dist));
         setEdgeNotesInput("");
@@ -466,8 +515,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     const tgtNode = nodes.find((n) => n.node_id === edge.target);
     if (!srcNode || !tgtNode) return [];
     return [
-      [srcNode.latitude, srcNode.longitude],
-      [tgtNode.latitude, tgtNode.longitude],
+      [parseLatitude(srcNode.latitude), parseLongitude(srcNode.longitude)],
+      [parseLatitude(tgtNode.latitude), parseLongitude(tgtNode.longitude)],
     ];
   };
 
@@ -487,17 +536,16 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
   // Map settings memoized for the Leaflet component
   const mapCenter = useMemo<[number, number]>(() => {
-    if (!settings) return [-6.2088, 106.8456];
-    const lat = parseFloat(settings.center_lat);
-    const lng = parseFloat(settings.center_lng);
-    return [isNaN(lat) ? -6.2088 : lat, isNaN(lng) ? 106.8456 : lng];
+    if (!settings) return DEFAULT_MAP_CENTER;
+    return [parseLatitude(settings.center_lat), parseLongitude(settings.center_lng)];
   }, [settings]);
 
+  const mapZoomRange = useMemo(() => normalizeMapZoomRange(settings), [settings]);
+
   const mapZoom = useMemo<number>(() => {
-    if (!settings) return 13;
-    const z = parseInt(settings.default_zoom, 10);
-    return isNaN(z) ? 13 : z;
-  }, [settings]);
+    const rawZoom = settings ? parseZoom(settings.default_zoom, DEFAULT_MAP_ZOOM) : DEFAULT_MAP_ZOOM;
+    return clampNumber(rawZoom, mapZoomRange.minZoom, mapZoomRange.maxZoom);
+  }, [settings, mapZoomRange]);
 
   if (loading && !settings) {
     return (
@@ -666,8 +714,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         <MapContainer
           center={mapCenter}
           zoom={mapZoom}
-          maxZoom={settings ? parseInt(settings.max_zoom_in, 10) : 18}
-          minZoom={settings ? parseInt(settings.max_zoom_out, 10) : 5}
+          maxZoom={mapZoomRange.maxZoom}
+          minZoom={mapZoomRange.minZoom}
           className="w-full h-full min-h-[550px]"
           doubleClickZoom={false}
         >
@@ -736,7 +784,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
           {nodes.map((node) => (
             <Marker
               key={node.node_id}
-              position={[node.latitude, node.longitude]}
+              position={[parseLatitude(node.latitude), parseLongitude(node.longitude)]}
               icon={createCustomIcon(node.type, node.name)}
               draggable={activeTool === "select"}
               eventHandlers={{
