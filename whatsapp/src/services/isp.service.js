@@ -221,6 +221,75 @@ const convertReferralToVoucher = async (customerId, amount) => {
     }
 };
 
+const getActiveTicket = async (phone) => {
+    try {
+        const res = await client.get('/api/v1/tickets');
+        const tickets = res.data?.data || [];
+        const cleanPhone = phone.replace(/@c\.us$/, '').replace(/^0/, '62');
+        return tickets.find(t => {
+            const tPhone = t.no_hp.replace(/@c\.us$/, '').replace(/^0/, '62');
+            return tPhone === cleanPhone && (t.status === 'open' || t.status === 'pending');
+        }) || null;
+    } catch (err) {
+        logger.error(`[ISP] getActiveTicket failed for ${phone}:`, err.message);
+        return null;
+    }
+};
+
+const replyToTicket = async (ticketId, senderType, message) => {
+    try {
+        const res = await client.post(`/api/v1/tickets/${ticketId}/messages`, {
+            message,
+            sender_type: senderType
+        });
+        return res.data?.data ?? null;
+    } catch (err) {
+        logger.error(`[ISP] replyToTicket failed for ticket ${ticketId}:`, err.message);
+        throw new Error(err.response?.data?.error || err.message);
+    }
+};
+
+const updateCustomerWifi = async (customerId, ssid, password) => {
+    try {
+        const res = await client.post(`/api/v1/customers/${customerId}/ont-wifi`, { ssid, password });
+        return res.data;
+    } catch (err) {
+        logger.error(`[ISP] updateCustomerWifi failed for customer ${customerId}:`, err.message);
+        throw new Error(err.response?.data?.error || err.message);
+    }
+};
+
+const claimVoucher = async (customerId, code) => {
+    try {
+        const res = await client.post(`/api/v1/customers/${customerId}/vouchers/claim`, { code });
+        return res.data;
+    } catch (err) {
+        logger.error(`[ISP] claimVoucher failed for customer ${customerId}:`, err.message);
+        throw new Error(err.response?.data?.error || err.message);
+    }
+};
+
+const toggleAutoApplyVoucher = async (customerId, autoApply) => {
+    try {
+        const res = await client.post(`/api/v1/customers/${customerId}/vouchers/toggle-auto-apply`, { auto_apply: autoApply });
+        return res.data;
+    } catch (err) {
+        logger.error(`[ISP] toggleAutoApplyVoucher failed for customer ${customerId}:`, err.message);
+        throw new Error(err.response?.data?.error || err.message);
+    }
+};
+
+const getCustomerVouchers = async (customerId) => {
+    try {
+        const res = await client.get('/api/v1/vouchers/customer-vouchers');
+        const list = res.data?.data || [];
+        return list.filter(cv => cv.pelanggan_id === customerId && cv.status === 'active');
+    } catch (err) {
+        logger.error(`[ISP] getCustomerVouchers failed:`, err.message);
+        return [];
+    }
+};
+
 module.exports = {
     findCustomerByPhone,
     getActiveBill,
@@ -233,4 +302,10 @@ module.exports = {
     getReferredCount,
     withdrawReferral,
     convertReferralToVoucher,
+    getActiveTicket,
+    replyToTicket,
+    updateCustomerWifi,
+    claimVoucher,
+    toggleAutoApplyVoucher,
+    getCustomerVouchers,
 };

@@ -906,7 +906,7 @@ func (c *Client) GetDetailedDevice(ctx context.Context, db *sql.DB, deviceID str
 	var parsedIPs []WANConnectionParsed
 	var parsedPPPs []WANConnectionParsed
 
-	if wanDevices != nil {
+	{
 		for wanDeviceIndex, wanDeviceRaw := range wanDevices {
 			wanDevice, ok := wanDeviceRaw.(map[string]any)
 			if !ok {
@@ -1068,7 +1068,7 @@ func (c *Client) GetDetailedDevice(ctx context.Context, db *sql.DB, deviceID str
 	// Hosts
 	var wifiClients []WiFiClient
 	hosts := getNestedMap(lan1, "Hosts", "Host")
-	if hosts != nil {
+	{
 		for idx, hostRaw := range hosts {
 			host, ok := hostRaw.(map[string]any)
 			if !ok {
@@ -1376,7 +1376,7 @@ func (c *Client) SummonParameters(ctx context.Context, db *sql.DB, deviceID stri
 // HELPER INTERNAL UTILS
 // -------------------------------------------------------------
 
-func parseLanBindingField(conn map[string]any, connDevice map[string]any, basePath string, vendorObj *Vendor) *LanBindingParsed {
+func parseLanBindingField(conn map[string]any, _ map[string]any, basePath string, vendorObj *Vendor) *LanBindingParsed {
 	if vendorObj == nil || vendorObj.LanBindingPath == "" {
 		return nil
 	}

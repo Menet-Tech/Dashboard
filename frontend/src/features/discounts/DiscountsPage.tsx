@@ -1,8 +1,19 @@
-import { useState } from "react";
-import type { CustomerItem, User } from "../../types";
-import { updateCustomer, withdrawReferral, convertReferralToVoucher } from "../../lib/api";
+import { useState, useEffect } from "react";
+import type { CustomerItem, User, VoucherItem, CustomerVoucherItem, VoucherUsageLogItem } from "../../types";
+import {
+  updateCustomer,
+  withdrawReferral,
+  convertReferralToVoucher,
+  fetchVouchers,
+  createVoucher,
+  deleteVoucher,
+  fetchVoucherUsageLogs,
+  fetchCustomerVouchers,
+  claimCustomerVoucher,
+  toggleCustomerVoucherAutoApply
+} from "../../lib/api";
 import { formatCurrency } from "../../utils/format";
-import { Info, ArrowUpRight, ArrowDownLeft, Gift, Percent, Search, Trash2, Edit3, Plus, X } from "lucide-react";
+import { Info, ArrowUpRight, ArrowDownLeft, Gift, Percent, Search, Trash2, Edit3, Plus, X, Ticket, Settings, Clock } from "lucide-react";
 
 type DiscountsPageProps = {
   user: User | null;
@@ -12,6 +23,19 @@ type DiscountsPageProps = {
   onRefresh: () => Promise<void>;
 };
 
+const formatNumberWithDots = (val: string | number) => {
+  if (val === "" || val === 0 || val === "0") return "";
+  const num = typeof val === "number" ? val : parseInt(val.replace(/\D/g, ""), 10);
+  if (isNaN(num)) return "";
+  return num.toLocaleString("id-ID");
+};
+
+const parseFormattedNumber = (val: string) => {
+  const clean = val.replace(/\D/g, "");
+  const num = parseInt(clean, 10);
+  return isNaN(num) ? 0 : num;
+};
+
 export function DiscountsPage({
   user,
   customers,
@@ -19,13 +43,56 @@ export function DiscountsPage({
   pushError,
   onRefresh,
 }: DiscountsPageProps) {
-  const [activeTab, setActiveTab] = useState<"discounts" | "referrals">("discounts");
+  const [activeTab, setActiveTab] = useState<"discounts" | "referrals" | "vouchers">("discounts");
   const [searchQuery, setSearchQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Vouchers state
+  const [vouchersList, setVouchersList] = useState<VoucherItem[]>([]);
+  const [customerVouchersList, setCustomerVouchersList] = useState<CustomerVoucherItem[]>([]);
+  const [usageLogsList, setUsageLogsList] = useState<VoucherUsageLogItem[]>([]);
+  const [loadingVouchers, setLoadingVouchers] = useState(false);
+
+  // Modal State - Voucher Templates
+  const [isCreateVoucherOpen, setIsCreateVoucherOpen] = useState(false);
+  const [newVoucherCode, setNewVoucherCode] = useState("");
+  const [newVoucherAmount, setNewVoucherAmount] = useState<string>("");
+  const [newVoucherType, setNewVoucherType] = useState<"one-time" | "multi-use" | "permanent">("one-time");
+  const [newVoucherCycles, setNewVoucherCycles] = useState<number>(1);
+  const [newVoucherDesc, setNewVoucherDesc] = useState("");
+
+  // Modal State - Assign Voucher
+  const [isAssignVoucherOpen, setIsAssignVoucherOpen] = useState(false);
+  const [selectedCustomerForVoucher, setSelectedCustomerForVoucher] = useState<number>(0);
+  const [selectedVoucherTemplate, setSelectedVoucherTemplate] = useState<number>(0);
+
+  const loadVouchersData = async () => {
+    setLoadingVouchers(true);
+    try {
+      const [vRes, cvRes, logsRes] = await Promise.all([
+        fetchVouchers(),
+        fetchCustomerVouchers(),
+        fetchVoucherUsageLogs(),
+      ]);
+      setVouchersList(vRes.data || []);
+      setCustomerVouchersList(cvRes.data || []);
+      setUsageLogsList(logsRes.data || []);
+    } catch (err: any) {
+      pushError(err.message || "Gagal memuat data voucher.");
+    } finally {
+      setLoadingVouchers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "vouchers") {
+      void loadVouchersData();
+    }
+  }, [activeTab]);
+
   // Modal State - Discounts
   const [editingDiscountCustomer, setEditingDiscountCustomer] = useState<CustomerItem | null>(null);
-  const [discountValue, setDiscountValue] = useState<number>(0);
+  const [discountValueInput, setDiscountValueInput] = useState<string>("");
   const [isCreateDiscountOpen, setIsCreateDiscountOpen] = useState(false);
   const [selectedCustomerForNewDiscount, setSelectedCustomerForNewDiscount] = useState<number>(0);
 
@@ -57,7 +124,7 @@ export function DiscountsPage({
   // === DISCOUNT CRUD HANDLERS ===
   const handleOpenEditDiscount = (customer: CustomerItem) => {
     setEditingDiscountCustomer(customer);
-    setDiscountValue(customer.diskon || 0);
+    setDiscountValueInput(customer.diskon ? formatNumberWithDots(customer.diskon) : "");
   };
 
   const handleSaveDiscount = async (e: React.FormEvent, targetCustomer: CustomerItem, val: number) => {
@@ -82,6 +149,7 @@ export function DiscountsPage({
       await updateCustomer(targetCustomer.id, payload);
       pushSuccess(`Diskon khusus untuk ${targetCustomer.name} berhasil diperbarui.`);
       setEditingDiscountCustomer(null);
+      setDiscountValueInput("");
       setIsCreateDiscountOpen(false);
       setSelectedCustomerForNewDiscount(0);
       await onRefresh();
@@ -247,6 +315,92 @@ export function DiscountsPage({
     }
   };
 
+  const handleCreateVoucher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVoucherCode.trim()) return;
+    const amt = parseFormattedNumber(newVoucherAmount);
+    if (amt <= 0) {
+      alert("Nominal diskon harus lebih dari 0.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createVoucher({
+        code: newVoucherCode.trim().toUpperCase(),
+        amount: amt,
+        type: newVoucherType,
+        total_cycles: newVoucherType === "multi-use" ? newVoucherCycles : newVoucherType === "one-time" ? 1 : 0,
+        description: newVoucherDesc,
+      });
+      pushSuccess("Voucher baru berhasil dibuat.");
+      setIsCreateVoucherOpen(false);
+      setNewVoucherCode("");
+      setNewVoucherAmount("");
+      setNewVoucherType("one-time");
+      setNewVoucherCycles(1);
+      setNewVoucherDesc("");
+      void loadVouchersData();
+    } catch (err: any) {
+      pushError(err.message || "Gagal membuat voucher.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteVoucher = async (id: number, code: string) => {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus voucher template ${code}? Pelanggan yang sudah mengklaim voucher ini tidak akan terpengaruh, namun kode tidak bisa diklaim lagi.`)) {
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await deleteVoucher(id);
+      pushSuccess("Template voucher berhasil dihapus.");
+      void loadVouchersData();
+    } catch (err: any) {
+      pushError(err.message || "Gagal menghapus template voucher.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAssignVoucher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedCustomerForVoucher <= 0 || selectedVoucherTemplate <= 0) {
+      alert("Pilih pelanggan dan voucher template terlebih dahulu.");
+      return;
+    }
+    const code = vouchersList.find(v => v.id === selectedVoucherTemplate)?.code;
+    if (!code) return;
+    setSubmitting(true);
+    try {
+      await claimCustomerVoucher(selectedCustomerForVoucher, code);
+      pushSuccess("Voucher berhasil diberikan kepada pelanggan.");
+      setIsAssignVoucherOpen(false);
+      setSelectedCustomerForVoucher(0);
+      setSelectedVoucherTemplate(0);
+      void loadVouchersData();
+      await onRefresh();
+    } catch (err: any) {
+      pushError(err.message || "Gagal memberikan voucher kepada pelanggan. Pastikan pelanggan belum memiliki voucher aktif.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleAutoApply = async (customer: CustomerItem, currentSetting: number) => {
+    const nextSetting = currentSetting === 1 ? false : true;
+    try {
+      await toggleCustomerVoucherAutoApply(customer.id, nextSetting);
+      pushSuccess(`Auto-apply voucher untuk ${customer.name} berhasil diubah.`);
+      await onRefresh();
+      if (activeTab === "vouchers") {
+        void loadVouchersData();
+      }
+    } catch (err: any) {
+      pushError(err.message || "Gagal mengubah pengaturan auto-apply.");
+    }
+  };
+
   const isViewer = user?.role === "viewer";
 
   return (
@@ -292,6 +446,20 @@ export function DiscountsPage({
             <Gift size={14} />
             Referral MGM ({referralCustomers.length})
           </button>
+          <button
+            onClick={() => {
+              setActiveTab("vouchers");
+              setSearchQuery("");
+            }}
+            className={`px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+              activeTab === "vouchers"
+                ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
+          >
+            <Ticket size={14} />
+            Voucher & Promosi
+          </button>
         </div>
       </div>
 
@@ -304,9 +472,13 @@ export function DiscountsPage({
             <p>
               Diskon khusus digunakan untuk pelanggan tertentu (misal: rumahnya dipasangi tiang ODP wifi atau kerjasama lahan). Diskon ini bersifat permanen dan akan otomatis memotong tagihan bulanan pelanggan tersebut setiap periode generate tagihan.
             </p>
-          ) : (
+          ) : activeTab === "referrals" ? (
             <p>
               Program Member-Get-Member memberikan saldo reward sebesar Rp 50.000 kepada pengajak ketika mengajak orang baru memasang internet. Saldo ini dapat dicairkan tunai atau ditukarkan menjadi voucher diskon tagihan via Dashboard ini maupun via WhatsApp Chatbot.
+            </p>
+          ) : (
+            <p>
+              Sistem Voucher & Promosi digunakan untuk membuat kode voucher diskon dengan batas pemakaian bulanan (Sekali pakai, multi-periode, atau permanen). Admin dapat membuat voucher promosi baru, membagikannya ke pelanggan, atau memantau log penggunaannya.
             </p>
           )}
         </div>
@@ -321,7 +493,9 @@ export function DiscountsPage({
             placeholder={
               activeTab === "discounts"
                 ? "Cari nama pelanggan..."
-                : "Cari nama atau kode referral..."
+                : activeTab === "referrals"
+                ? "Cari nama atau kode referral..."
+                : "Cari data voucher..."
             }
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 transition-all"
             value={searchQuery}
@@ -330,7 +504,7 @@ export function DiscountsPage({
         </div>
 
         {!isViewer && (
-          <div>
+          <div className="flex gap-2">
             {activeTab === "discounts" ? (
               <button
                 onClick={() => setIsCreateDiscountOpen(true)}
@@ -339,7 +513,7 @@ export function DiscountsPage({
                 <Plus size={14} />
                 Beri Diskon Baru
               </button>
-            ) : (
+            ) : activeTab === "referrals" ? (
               <button
                 onClick={() => {
                   // Find first customer with no code to edit referral
@@ -357,6 +531,23 @@ export function DiscountsPage({
                 <Plus size={14} />
                 Atur Referral Baru
               </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => setIsCreateVoucherOpen(true)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-2xl transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
+                >
+                  <Plus size={14} />
+                  Buat Voucher Baru
+                </button>
+                <button
+                  onClick={() => setIsAssignVoucherOpen(true)}
+                  className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-750 dark:hover:bg-slate-700 text-white font-semibold text-xs px-4 py-2.5 rounded-2xl transition-all shadow-md flex items-center gap-1.5 shrink-0"
+                >
+                  <Gift size={14} />
+                  Beri Voucher ke Pelanggan
+                </button>
+              </>
             )}
           </div>
         )}
@@ -435,7 +626,7 @@ export function DiscountsPage({
               </tbody>
             </table>
           </div>
-        ) : (
+        ) : activeTab === "referrals" ? (
           // === TAB REFERRAL MGM ===
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
@@ -499,7 +690,7 @@ export function DiscountsPage({
                                   disabled={customer.referral_balance <= 0}
                                   className={`text-[10px] px-2.5 py-1 rounded-lg border font-bold flex items-center gap-0.5 transition-all ${
                                     customer.referral_balance > 0
-                                      ? "bg-slate-50 hover:bg-slate-105 border-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-800 text-slate-700 dark:text-slate-300"
+                                      ? "bg-slate-50 hover:bg-slate-105 border-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-800 text-slate-700 dark:text-slate-355"
                                       : "bg-slate-50/50 border-slate-100 text-slate-300 dark:bg-slate-950/20 dark:border-slate-900 dark:text-slate-600 cursor-not-allowed"
                                   }`}
                                   title="Cairkan saldo referral menjadi uang tunai langsung ke pelanggan"
@@ -551,6 +742,207 @@ export function DiscountsPage({
               </tbody>
             </table>
           </div>
+        ) : (
+          // === TAB SYSTEM VOUCHER & PROMOSI ===
+          <div className="p-6 space-y-8">
+            {/* 1. Voucher Templates Grid */}
+            <div>
+              <h4 className="text-sm font-bold text-slate-850 dark:text-slate-200 mb-4 flex items-center gap-2">
+                <Ticket size={16} className="text-indigo-600" />
+                Template Voucher Tersedia
+              </h4>
+              {loadingVouchers ? (
+                <div className="py-8 text-center text-slate-400 text-xs">Memuat data...</div>
+              ) : vouchersList.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                  Belum ada template voucher. Klik "Buat Voucher Baru" untuk memulainya.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {vouchersList.map((voucher) => {
+                    const isOneTime = voucher.type === "one-time";
+                    const isPerm = voucher.type === "permanent";
+                    const colorClass = isPerm 
+                      ? "from-emerald-500 to-teal-600" 
+                      : isOneTime 
+                      ? "from-blue-500 to-indigo-600" 
+                      : "from-amber-500 to-orange-600";
+                    return (
+                      <div 
+                        key={voucher.id} 
+                        className="bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm flex"
+                      >
+                        {/* HSL Gradient Tag side */}
+                        <div className={`w-24 bg-gradient-to-br ${colorClass} text-white flex flex-col items-center justify-center p-3 text-center shrink-0`}>
+                          <Ticket size={24} className="mb-1 opacity-80" />
+                          <span className="text-[10px] uppercase tracking-wider font-extrabold opacity-90">
+                            {isPerm ? "Permanen" : isOneTime ? "Sekali" : `${voucher.total_cycles} Bulan`}
+                          </span>
+                        </div>
+                        {/* Details side */}
+                        <div className="p-4 flex-1 flex flex-col justify-between">
+                          <div>
+                            <div className="flex justify-between items-start">
+                              <span className="text-sm font-mono font-bold text-slate-850 dark:text-slate-100 bg-slate-200/60 dark:bg-slate-800 px-2 py-0.5 rounded-lg">
+                                {voucher.code}
+                              </span>
+                              {!isViewer && (
+                                <button
+                                  onClick={() => handleDeleteVoucher(voucher.id, voucher.code)}
+                                  className="text-red-600 hover:text-red-750 dark:text-red-400 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
+                                  title="Hapus template"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                            <div className="text-lg font-extrabold text-slate-850 dark:text-slate-200 mt-2">
+                              {formatCurrency(voucher.amount)}
+                            </div>
+                            <div className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+                              {voucher.description || "Tidak ada deskripsi."}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 2. Customer Vouchers Table */}
+            <div>
+              <h4 className="text-sm font-bold text-slate-850 dark:text-slate-200 mb-4 flex items-center gap-2">
+                <Settings size={16} className="text-indigo-600" />
+                Voucher Aktif Pelanggan
+              </h4>
+              <div className="overflow-x-auto border border-slate-150 dark:border-slate-800 rounded-2xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+                    <tr>
+                      <th className="px-5 py-3 font-semibold">Nama Pelanggan</th>
+                      <th className="px-5 py-3 font-semibold">Kode Voucher</th>
+                      <th className="px-5 py-3 font-semibold">Potongan Bulanan</th>
+                      <th className="px-5 py-3 font-semibold">Sisa Periode</th>
+                      <th className="px-5 py-3 font-semibold">Status</th>
+                      <th className="px-5 py-3 font-semibold">Auto-Apply</th>
+                      <th className="px-5 py-3 font-semibold">Dibuat Pada</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
+                    {customerVouchersList.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-5 py-6 text-center text-slate-400">
+                          Tidak ada data voucher pelanggan aktif.
+                        </td>
+                      </tr>
+                    ) : (
+                      customerVouchersList.map((cv) => {
+                        const cust = customers.find(c => c.id === cv.pelanggan_id);
+                        const isAuto = cust ? cust.voucher_auto_apply === 1 : true;
+                        return (
+                          <tr key={cv.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
+                            <td className="px-5 py-3 font-semibold text-slate-850 dark:text-slate-200">{cv.customer_name}</td>
+                            <td className="px-5 py-3 font-mono font-bold text-slate-800 dark:text-slate-300">{cv.voucher_code}</td>
+                            <td className="px-5 py-3 font-mono text-xs">{formatCurrency(cv.voucher_amount || 0)}</td>
+                            <td className="px-5 py-3 font-medium">
+                              {cv.remaining_cycles === 0 ? "Permanen" : `${cv.remaining_cycles} Bulan`}
+                            </td>
+                            <td className="px-5 py-3">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                cv.status === "active" 
+                                  ? "bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-400" 
+                                  : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                              }`}>
+                                {cv.status === "active" ? "Aktif" : "Selesai"}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3">
+                              {!isViewer && cv.status === "active" ? (
+                                <button
+                                  onClick={() => cust && handleToggleAutoApply(cust, cust.voucher_auto_apply ?? 1)}
+                                  className={`px-3 py-1 rounded-xl text-[10px] font-bold transition-all shadow-sm ${
+                                    isAuto
+                                      ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/10"
+                                      : "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-350 dark:hover:bg-slate-700"
+                                  }`}
+                                  title="Klik untuk mengubah preferensi penggunaan"
+                                >
+                                  {isAuto ? "ON" : "OFF"}
+                                </button>
+                              ) : (
+                                <span className="text-slate-400">{isAuto ? "ON" : "OFF"}</span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3 text-slate-400 font-mono text-[10px]">
+                              {new Date(cv.created_at).toLocaleString("id-ID", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 3. Usage Logs Table */}
+            <div>
+              <h4 className="text-sm font-bold text-slate-850 dark:text-slate-200 mb-4 flex items-center gap-2">
+                <Clock size={16} className="text-indigo-600" />
+                Riwayat Penggunaan Voucher (Logs)
+              </h4>
+              <div className="overflow-x-auto border border-slate-150 dark:border-slate-800 rounded-2xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+                    <tr>
+                      <th className="px-5 py-3 font-semibold">Invoice Tagihan</th>
+                      <th className="px-5 py-3 font-semibold">Nama Pelanggan</th>
+                      <th className="px-5 py-3 font-semibold">Voucher Digunakan</th>
+                      <th className="px-5 py-3 font-semibold">Nominal Potongan</th>
+                      <th className="px-5 py-3 font-semibold">Siklus Penggunaan Ke-</th>
+                      <th className="px-5 py-3 font-semibold">Tanggal Digunakan</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
+                    {usageLogsList.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-5 py-6 text-center text-slate-400">
+                          Belum ada riwayat pemakaian voucher tagihan.
+                        </td>
+                      </tr>
+                    ) : (
+                      usageLogsList.map((log) => (
+                        <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
+                          <td className="px-5 py-3 font-semibold text-slate-850 dark:text-slate-200">{log.invoice_number}</td>
+                          <td className="px-5 py-3 font-medium text-slate-750 dark:text-slate-300">{log.customer_name}</td>
+                          <td className="px-5 py-3 font-mono font-bold text-slate-850 dark:text-slate-250">{log.voucher_code}</td>
+                          <td className="px-5 py-3 font-mono font-bold text-red-600 dark:text-red-400">- {formatCurrency(log.amount_applied)}</td>
+                          <td className="px-5 py-3 text-slate-800 dark:text-slate-200">Siklus #{log.cycle_number}</td>
+                          <td className="px-5 py-3 text-slate-400 font-mono text-[10px]">
+                            {new Date(log.created_at).toLocaleString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -562,7 +954,7 @@ export function DiscountsPage({
               onClick={() => {
                 setIsCreateDiscountOpen(false);
                 setSelectedCustomerForNewDiscount(0);
-                setDiscountValue(0);
+                setDiscountValueInput("");
               }}
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
@@ -581,7 +973,7 @@ export function DiscountsPage({
               onSubmit={(e) => {
                 const targetCust = customers.find((c) => c.id === selectedCustomerForNewDiscount);
                 if (targetCust) {
-                  void handleSaveDiscount(e, targetCust, discountValue);
+                  void handleSaveDiscount(e, targetCust, parseFormattedNumber(discountValueInput));
                 } else {
                   e.preventDefault();
                   alert("Pilih pelanggan terlebih dahulu.");
@@ -601,7 +993,7 @@ export function DiscountsPage({
                     const cid = Number(e.target.value) || 0;
                     setSelectedCustomerForNewDiscount(cid);
                     const selected = customers.find((c) => c.id === cid);
-                    setDiscountValue(selected ? selected.diskon : 0);
+                    setDiscountValueInput(selected && selected.diskon ? formatNumberWithDots(selected.diskon) : "");
                   }}
                 >
                   <option value={0}>-- Pilih Pelanggan --</option>
@@ -619,16 +1011,18 @@ export function DiscountsPage({
                     Nominal Diskon Bulanan (Rp)
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     required
-                    min={1}
-                    max={
-                      (customers.find((c) => c.id === selectedCustomerForNewDiscount)?.package_price) || 999999
-                    }
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
-                    value={discountValue}
-                    onChange={(e) => setDiscountValue(Number(e.target.value) || 0)}
-                    placeholder="Masukkan nominal diskon..."
+                    value={discountValueInput}
+                    onChange={(e) => {
+                      const rawVal = e.target.value.replace(/\D/g, "");
+                      const valNum = rawVal ? parseInt(rawVal, 10) : 0;
+                      const maxVal = (customers.find((c) => c.id === selectedCustomerForNewDiscount)?.package_price) || 999999;
+                      const clampedVal = Math.min(valNum, maxVal);
+                      setDiscountValueInput(clampedVal > 0 ? formatNumberWithDots(clampedVal) : "");
+                    }}
+                    placeholder="Masukkan nominal diskon (Contoh: 10.000)..."
                   />
                   <span className="text-[10px] text-slate-400 mt-1 block">
                     *Nominal diskon tidak boleh melebihi harga asli paket.
@@ -636,14 +1030,14 @@ export function DiscountsPage({
                 </div>
               )}
 
-              {selectedCustomerForNewDiscount > 0 && discountValue > 0 && (
+              {selectedCustomerForNewDiscount > 0 && parseFormattedNumber(discountValueInput) > 0 && (
                 <div className="bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/40 p-3 rounded-2xl text-xs text-green-700 dark:text-green-300 font-semibold">
                   Harga Akhir Tagihan:{" "}
                   {formatCurrency(
                     Math.max(
                       0,
                       ((customers.find((c) => c.id === selectedCustomerForNewDiscount)?.package_price) || 0) -
-                        discountValue
+                        parseFormattedNumber(discountValueInput)
                     )
                   )}
                 </div>
@@ -655,7 +1049,7 @@ export function DiscountsPage({
                   onClick={() => {
                     setIsCreateDiscountOpen(false);
                     setSelectedCustomerForNewDiscount(0);
-                    setDiscountValue(0);
+                    setDiscountValueInput("");
                   }}
                   disabled={submitting}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
@@ -693,7 +1087,7 @@ export function DiscountsPage({
               Mengatur nominal diskon tetap bulanan untuk pelanggan <strong>{editingDiscountCustomer.name}</strong>.
             </p>
 
-            <form onSubmit={(e) => handleSaveDiscount(e, editingDiscountCustomer, discountValue)} className="space-y-4">
+            <form onSubmit={(e) => handleSaveDiscount(e, editingDiscountCustomer, parseFormattedNumber(discountValueInput))} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
                   Paket & Harga Aktif
@@ -708,23 +1102,27 @@ export function DiscountsPage({
                   Nominal Diskon Bulanan (Rp)
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   required
-                  min={0}
-                  max={editingDiscountCustomer.package_price || 0}
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
-                  value={discountValue}
-                  onChange={(e) => setDiscountValue(Number(e.target.value) || 0)}
-                  placeholder="Contoh: 20000"
+                  value={discountValueInput}
+                  onChange={(e) => {
+                    const rawVal = e.target.value.replace(/\D/g, "");
+                    const valNum = rawVal ? parseInt(rawVal, 10) : 0;
+                    const maxVal = editingDiscountCustomer.package_price || 0;
+                    const clampedVal = Math.min(valNum, maxVal);
+                    setDiscountValueInput(clampedVal > 0 ? formatNumberWithDots(clampedVal) : "");
+                  }}
+                  placeholder="Contoh: 20.000"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">
                   *Nominal diskon tidak boleh melebihi harga asli paket.
                 </span>
               </div>
 
-              {discountValue > 0 && (
+              {parseFormattedNumber(discountValueInput) > 0 && (
                 <div className="bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/40 p-3 rounded-2xl text-xs text-green-700 dark:text-green-300 font-semibold">
-                  Harga Akhir Tagihan: {formatCurrency(Math.max(0, (editingDiscountCustomer.package_price || 0) - discountValue))}
+                  Harga Akhir Tagihan: {formatCurrency(Math.max(0, (editingDiscountCustomer.package_price || 0) - parseFormattedNumber(discountValueInput)))}
                 </div>
               )}
 
@@ -750,7 +1148,232 @@ export function DiscountsPage({
         </div>
       )}
 
-      {/* MODAL 3: Create / Edit Referral MGM Info */}
+      {/* MODAL 4: Buat Voucher Baru */}
+      {isCreateVoucherOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
+            <button
+              onClick={() => {
+                setIsCreateVoucherOpen(false);
+                setNewVoucherCode("");
+                setNewVoucherAmount("");
+                setNewVoucherType("one-time");
+                setNewVoucherCycles(1);
+                setNewVoucherDesc("");
+              }}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-1.5">
+              <Ticket size={18} className="text-indigo-600" />
+              Buat Voucher Baru
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">
+              Definisikan parameter kode voucher baru untuk promosi / diskon pelanggan.
+            </p>
+
+            <form onSubmit={handleCreateVoucher} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                  Kode Voucher (Unik & Huruf Besar)
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 font-mono"
+                  value={newVoucherCode}
+                  onChange={(e) => setNewVoucherCode(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+                  placeholder="Contoh: PROMO100K"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                  Nominal Diskon Bulanan (Rp)
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  value={newVoucherAmount}
+                  onChange={(e) => {
+                    const rawVal = e.target.value.replace(/\D/g, "");
+                    const valNum = rawVal ? parseInt(rawVal, 10) : 0;
+                    setNewVoucherAmount(valNum > 0 ? formatNumberWithDots(valNum) : "");
+                  }}
+                  placeholder="Contoh: 50.000"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                  Tipe Batas Periode
+                </label>
+                <select
+                  required
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  value={newVoucherType}
+                  onChange={(e) => {
+                    const type = e.target.value as "one-time" | "multi-use" | "permanent";
+                    setNewVoucherType(type);
+                    if (type === "one-time") setNewVoucherCycles(1);
+                    else if (type === "permanent") setNewVoucherCycles(0);
+                  }}
+                >
+                  <option value="one-time">Sekali Pakai (One-time)</option>
+                  <option value="multi-use">Multi Periode (Misal: 3 Bulan)</option>
+                  <option value="permanent">Permanen (Seterusnya)</option>
+                </select>
+              </div>
+
+              {newVoucherType === "multi-use" && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                    Jumlah Bulan (Siklus Tagihan)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    max={120}
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 font-mono"
+                    value={newVoucherCycles}
+                    onChange={(e) => setNewVoucherCycles(Math.max(1, Number(e.target.value) || 1))}
+                    placeholder="Contoh: 3"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                  Deskripsi Voucher
+                </label>
+                <textarea
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 min-h-[60px]"
+                  value={newVoucherDesc}
+                  onChange={(e) => setNewVoucherDesc(e.target.value)}
+                  placeholder="Keterangan promosi..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreateVoucherOpen(false);
+                    setNewVoucherCode("");
+                    setNewVoucherAmount("");
+                    setNewVoucherType("one-time");
+                    setNewVoucherCycles(1);
+                    setNewVoucherDesc("");
+                  }}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || !newVoucherCode}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20"
+                >
+                  {submitting ? "Menyimpan..." : "Buat Voucher"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: Beri Voucher ke Pelanggan */}
+      {isAssignVoucherOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
+            <button
+              onClick={() => {
+                setIsAssignVoucherOpen(false);
+                setSelectedCustomerForVoucher(0);
+                setSelectedVoucherTemplate(0);
+              }}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            <h3 className="text-lg font-bold text-slate-850 dark:text-slate-100 mb-2 flex items-center gap-1.5">
+              <Gift size={18} className="text-indigo-600" />
+              Beri Voucher ke Pelanggan
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">
+              Pilih salah satu pelanggan dan kaitkan voucher aktif ke akun mereka.
+            </p>
+
+            <form onSubmit={handleAssignVoucher} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                  Pilih Pelanggan
+                </label>
+                <select
+                  required
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  value={selectedCustomerForVoucher}
+                  onChange={(e) => setSelectedCustomerForVoucher(Number(e.target.value) || 0)}
+                >
+                  <option value={0}>-- Pilih Pelanggan --</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                  Pilih Voucher Promosi
+                </label>
+                <select
+                  required
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  value={selectedVoucherTemplate}
+                  onChange={(e) => setSelectedVoucherTemplate(Number(e.target.value) || 0)}
+                >
+                  <option value={0}>-- Pilih Voucher --</option>
+                  {vouchersList.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.code} ({formatCurrency(v.amount)} - {v.type === "permanent" ? "Permanen" : v.type === "one-time" ? "Sekali Pakai" : `${v.total_cycles} Siklus`})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAssignVoucherOpen(false);
+                    setSelectedCustomerForVoucher(0);
+                    setSelectedVoucherTemplate(0);
+                  }}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || selectedCustomerForVoucher === 0 || selectedVoucherTemplate === 0}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50"
+                >
+                  {submitting ? "Mengaitkan..." : "Kaitkan Voucher"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {editingReferralCustomer && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">

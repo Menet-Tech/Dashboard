@@ -27,6 +27,7 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
       const matchSearch = !searchTerm || 
         (log.username && log.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (log.message && log.message.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (log.ip_address && log.ip_address.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (log.action && log.action.toLowerCase().includes(searchTerm.toLowerCase()));
       return matchAction && matchDate && matchSearch;
     });
@@ -41,7 +42,7 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Cari Log</span>
               <input
                 type="text"
-                placeholder="Cari user, aksi, atau detail..."
+                placeholder="Cari user, IP, aksi, atau detail..."
                 className="bg-white border border-slate-250 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

@@ -28,6 +28,7 @@ import (
 	"menettech/dashboard/backend/internal/templates"
 	"menettech/dashboard/backend/internal/tickets"
 	"menettech/dashboard/backend/internal/users"
+	"menettech/dashboard/backend/internal/vouchers"
 )
 
 func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Service) http.Handler {
@@ -108,6 +109,11 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 		WhatsApp: whatsAppService,
 	}
 	broadcastHandler := handler.NewBroadcastHandler(broadcastService)
+
+	voucherService := vouchers.Service{
+		Repository: vouchers.Repository{DB: db},
+	}
+	voucherHandler := handler.NewVoucherHandler(voucherService)
 
 	r.Get("/health", healthHandler.Show)
 	r.Get("/livez", healthHandler.Live)
@@ -273,6 +279,11 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Put("/map-settings", gacsHandler.UpdateMapSettings)
 				admin.Post("/map-settings/reset", gacsHandler.ResetMapSettings)
 				admin.Delete("/mapping-data/reset", gacsHandler.ResetMappingData)
+				admin.Get("/vouchers", voucherHandler.List)
+				admin.Post("/vouchers", voucherHandler.Create)
+				admin.Delete("/vouchers/{id}", voucherHandler.Delete)
+				admin.Get("/vouchers/usage-logs", voucherHandler.ListUsageLogs)
+				admin.Get("/vouchers/customer-vouchers", voucherHandler.ListCustomerVouchers)
 			})
 
 			// Admin + Petugas
@@ -287,6 +298,8 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				staff.Patch("/customers/{id}/status", customerHandler.UpdateStatus)
 				staff.Post("/customers/{id}/referral/withdraw", customerHandler.WithdrawReferral)
 				staff.Post("/customers/{id}/referral/convert-voucher", customerHandler.ConvertReferralToVoucher)
+				staff.Post("/customers/{id}/vouchers/claim", voucherHandler.Claim)
+				staff.Post("/customers/{id}/vouchers/toggle-auto-apply", voucherHandler.ToggleAutoApply)
 				staff.Post("/bills/generate", billHandler.Generate)
 				staff.Post("/bills/{id}/pay", billHandler.Pay)
 				staff.Post("/bills/{id}/proof", billHandler.UploadProof)

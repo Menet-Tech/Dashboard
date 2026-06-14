@@ -47,6 +47,7 @@ export type CustomerItem = {
   referral_code?: string;
   referred_by_name?: string;
   voucher_discount?: number;
+  voucher_auto_apply?: number;
   ont_status?: string;
   ont_ip?: string;
   ont_uptime?: string;
@@ -258,6 +259,8 @@ export type TicketMessageItem = {
   sender_type: "admin" | "customer";
   message: string;
   created_at: string;
+  is_read: number;
+  read_at?: string;
 };
 
 export type TicketDetailItem = TicketItem & {
@@ -284,3 +287,40 @@ export type MikrotikImportResult = {
   status: "imported" | "skipped" | "error";
   message?: string;
 };
+
+// Voucher System types
+export type VoucherItem = {
+  id: number;
+  code: string;
+  amount: number;
+  type: "one-time" | "multi-use" | "permanent";
+  total_cycles: number;
+  description: string;
+  created_at?: string;
+};
+
+export type CustomerVoucherItem = {
+  id: number;
+  pelanggan_id: number;
+  customer_name?: string;
+  voucher_id: number;
+  voucher_code?: string;
+  voucher_amount?: number;
+  remaining_cycles: number;
+  status: "active" | "completed";
+  created_at: string;
+};
+
+export type VoucherUsageLogItem = {
+  id: number;
+  pelanggan_id: number;
+  customer_name: string;
+  voucher_id: number;
+  voucher_code: string;
+  tagihan_id: number;
+  invoice_number: string;
+  amount_applied: number;
+  cycle_number: number;
+  created_at: string;
+};
+
