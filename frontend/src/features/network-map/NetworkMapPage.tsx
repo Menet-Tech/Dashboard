@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -100,9 +100,14 @@ function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }
 
 // Map events handler to detect clicks on the map (for adding nodes)
 function MapEventsHandler({ onMapClick }: { onMapClick: (e: L.LeafletMouseEvent) => void }) {
+  const onMapClickRef = useRef(onMapClick);
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  }, [onMapClick]);
+
   useMapEvents({
     click: (e) => {
-      onMapClick(e);
+      onMapClickRef.current(e);
     },
   });
   return null;

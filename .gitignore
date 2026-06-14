@@ -25,3 +25,5 @@ Thumbs.db
 *.db-wal
 *.db-shm
 GACS-dashboard
+.agents
+graphify-out

@@ -26,11 +26,13 @@ type Ticket struct {
 }
 
 type TicketMessage struct {
-	ID         int64  `json:"id"`
-	TicketID   int64  `json:"ticket_id"`
-	SenderType string `json:"sender_type"` // 'admin' or 'customer'
-	Message    string `json:"message"`
-	CreatedAt  string `json:"created_at"`
+	ID         int64   `json:"id"`
+	TicketID   int64   `json:"ticket_id"`
+	SenderType string  `json:"sender_type"` // 'admin' or 'customer'
+	Message    string  `json:"message"`
+	CreatedAt  string  `json:"created_at"`
+	IsRead     int     `json:"is_read"`
+	ReadAt     *string `json:"read_at,omitempty"`
 }
 
 type TicketDetail struct {
@@ -53,6 +55,13 @@ func (s Service) ListTickets(ctx context.Context, status string) ([]Ticket, erro
 }
 
 func (s Service) GetTicketDetail(ctx context.Context, id int64) (TicketDetail, error) {
+	// Mark messages from customer as read when admin fetches detail
+	_, _ = s.Repository.DB.ExecContext(ctx, `
+		UPDATE ticket_messages 
+		SET is_read = 1, read_at = CURRENT_TIMESTAMP 
+		WHERE ticket_id = ? AND sender_type = 'customer' AND is_read = 0`,
+		id,
+	)
 	return s.Repository.FindByID(ctx, id)
 }
 
@@ -211,7 +220,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (TicketDetail, error
 
 	// Fetch messages
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT id, ticket_id, sender_type, message, created_at
+		SELECT id, ticket_id, sender_type, message, created_at, is_read, COALESCE(read_at, '')
 		FROM ticket_messages
 		WHERE ticket_id = ?
 		ORDER BY id ASC
@@ -224,14 +233,20 @@ func (r Repository) FindByID(ctx context.Context, id int64) (TicketDetail, error
 	detail.Messages = []TicketMessage{}
 	for rows.Next() {
 		var msg TicketMessage
+		var readAtVal sql.NullString
 		if err := rows.Scan(
 			&msg.ID,
 			&msg.TicketID,
 			&msg.SenderType,
 			&msg.Message,
 			&msg.CreatedAt,
+			&msg.IsRead,
+			&readAtVal,
 		); err != nil {
 			return TicketDetail{}, fmt.Errorf("scan ticket message: %w", err)
+		}
+		if readAtVal.Valid && readAtVal.String != "" {
+			msg.ReadAt = &readAtVal.String
 		}
 		detail.Messages = append(detail.Messages, msg)
 	}
@@ -272,8 +287,8 @@ func (r Repository) AddMessage(ctx context.Context, ticketID int64, senderType, 
 	}
 
 	result, err := tx.ExecContext(ctx, `
-		INSERT INTO ticket_messages (ticket_id, sender_type, message, created_at)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		INSERT INTO ticket_messages (ticket_id, sender_type, message, created_at, is_read)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)
 	`, ticketID, senderType, message)
 	if err != nil {
 		_ = tx.Rollback()
@@ -297,6 +312,34 @@ func (r Repository) AddMessage(ctx context.Context, ticketID int64, senderType, 
 		return TicketMessage{}, fmt.Errorf("update ticket updated_at: %w", err)
 	}
 
+	// If the message is from customer, mark all previous admin messages for this ticket as read!
+	if senderType == "customer" {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE ticket_messages 
+			SET is_read = 1, read_at = CURRENT_TIMESTAMP 
+			WHERE ticket_id = ? AND sender_type = 'admin' AND is_read = 0`,
+			ticketID,
+		)
+		if err != nil {
+			_ = tx.Rollback()
+			return TicketMessage{}, fmt.Errorf("mark admin messages read: %w", err)
+		}
+	}
+
+	// If the message is from admin, mark all previous customer messages for this ticket as read!
+	if senderType == "admin" {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE ticket_messages 
+			SET is_read = 1, read_at = CURRENT_TIMESTAMP 
+			WHERE ticket_id = ? AND sender_type = 'customer' AND is_read = 0`,
+			ticketID,
+		)
+		if err != nil {
+			_ = tx.Rollback()
+			return TicketMessage{}, fmt.Errorf("mark customer messages read: %w", err)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return TicketMessage{}, fmt.Errorf("commit add message tx: %w", err)
 	}
@@ -307,6 +350,7 @@ func (r Repository) AddMessage(ctx context.Context, ticketID int64, senderType, 
 		SenderType: senderType,
 		Message:    message,
 		CreatedAt:  time.Now().Format(time.RFC3339),
+		IsRead:     0,
 	}, nil
 }
 

@@ -17,6 +17,9 @@ import type {
   MapNode,
   MapEdge,
   TelegramBotSettings,
+  VoucherItem,
+  CustomerVoucherItem,
+  VoucherUsageLogItem,
 } from "../types";
 
 let csrfToken = "";
@@ -750,3 +753,44 @@ export function saveTelegramBotSettings(settings: TelegramBotSettings) {
     body: JSON.stringify(settings),
   });
 }
+
+// Vouchers API
+export function fetchVouchers() {
+  return request<{ data: VoucherItem[] }>("/api/v1/vouchers");
+}
+
+export function createVoucher(input: Omit<VoucherItem, "id" | "created_at">) {
+  return request<{ data: VoucherItem }>("/api/v1/vouchers", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteVoucher(id: number) {
+  return request<{ message: string }>(`/api/v1/vouchers/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchVoucherUsageLogs() {
+  return request<{ data: VoucherUsageLogItem[] }>("/api/v1/vouchers/usage-logs");
+}
+
+export function fetchCustomerVouchers() {
+  return request<{ data: CustomerVoucherItem[] }>("/api/v1/vouchers/customer-vouchers");
+}
+
+export function claimCustomerVoucher(customerId: number, code: string) {
+  return request<{ message: string; data: CustomerVoucherItem }>(`/api/v1/customers/${customerId}/vouchers/claim`, {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
+export function toggleCustomerVoucherAutoApply(customerId: number, autoApply: boolean) {
+  return request<{ message: string }>(`/api/v1/customers/${customerId}/vouchers/toggle-auto-apply`, {
+    method: "POST",
+    body: JSON.stringify({ auto_apply: autoApply }),
+  });
+}
+

@@ -213,7 +213,38 @@ func (r Repository) Generate(ctx context.Context, period string) (int, error) {
 			afterDiskon = 0
 		}
 
-		diskonReferral := candidate.VoucherDiscount
+		// Check for active voucher
+		var cvID int64
+		var voucherID int64
+		var vAmount int
+		var vType string
+		var remainingCycles int
+		var totalCycles int
+
+		err = tx.QueryRowContext(ctx, `
+			SELECT cv.id, cv.voucher_id, v.amount, v.type, cv.remaining_cycles, v.total_cycles
+			FROM customer_vouchers cv
+			INNER JOIN vouchers v ON v.id = cv.voucher_id
+			INNER JOIN pelanggan c ON c.id = cv.pelanggan_id
+			WHERE cv.pelanggan_id = ?
+			  AND cv.status = 'active'
+			  AND c.voucher_auto_apply = 1
+			LIMIT 1
+		`, candidate.CustomerID).Scan(&cvID, &voucherID, &vAmount, &vType, &remainingCycles, &totalCycles)
+
+		hasVoucher := err == nil
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			_ = tx.Rollback()
+			return 0, fmt.Errorf("check active voucher: %w", err)
+		}
+
+		diskonReferral := 0
+		if hasVoucher {
+			diskonReferral = vAmount
+		} else {
+			diskonReferral = candidate.VoucherDiscount
+		}
+
 		if diskonReferral > afterDiskon {
 			diskonReferral = afterDiskon
 		}
@@ -223,17 +254,54 @@ func (r Repository) Generate(ctx context.Context, period string) (int, error) {
 
 		finalAmount := afterDiskon - diskonReferral
 
-		if _, err := tx.ExecContext(ctx, `
+		result, err := tx.ExecContext(ctx, `
 			INSERT INTO tagihan (
 				pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status, diskon, diskon_referral, updated_at
 			)
 			VALUES (?, ?, ?, ?, ?, ?, 'belum_bayar', ?, ?, CURRENT_TIMESTAMP)
-		`, candidate.CustomerID, candidate.PackageID, period, invoiceNumber, finalAmount, dueDate.Format("2006-01-02"), diskon, diskonReferral); err != nil {
+		`, candidate.CustomerID, candidate.PackageID, period, invoiceNumber, finalAmount, dueDate.Format("2006-01-02"), diskon, diskonReferral)
+		if err != nil {
 			_ = tx.Rollback()
 			return 0, fmt.Errorf("insert generated bill: %w", err)
 		}
 
-		if diskonReferral > 0 {
+		billID, err := result.LastInsertId()
+		if err != nil {
+			_ = tx.Rollback()
+			return 0, fmt.Errorf("get generated bill ID: %w", err)
+		}
+
+		if hasVoucher {
+			if vType != "permanent" {
+				newRemaining := remainingCycles - 1
+				status := "active"
+				if newRemaining <= 0 {
+					status = "completed"
+				}
+				_, err = tx.ExecContext(ctx, `
+					UPDATE customer_vouchers
+					SET remaining_cycles = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+					WHERE id = ?
+				`, newRemaining, status, cvID)
+				if err != nil {
+					_ = tx.Rollback()
+					return 0, fmt.Errorf("update customer voucher cycles: %w", err)
+				}
+			}
+
+			cycleNumber := 1
+			if vType != "permanent" {
+				cycleNumber = totalCycles - remainingCycles + 1
+			}
+			_, err = tx.ExecContext(ctx, `
+				INSERT INTO voucher_usage_logs (pelanggan_id, voucher_id, tagihan_id, amount_applied, cycle_number, created_at)
+				VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+			`, candidate.CustomerID, voucherID, billID, diskonReferral, cycleNumber)
+			if err != nil {
+				_ = tx.Rollback()
+				return 0, fmt.Errorf("insert voucher usage log: %w", err)
+			}
+		} else if diskonReferral > 0 {
 			_, err = tx.ExecContext(ctx, `
 				UPDATE pelanggan
 				SET voucher_discount = voucher_discount - ?, updated_at = CURRENT_TIMESTAMP
@@ -304,7 +372,38 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 		afterDiskon = 0
 	}
 
-	diskonReferral := candidate.VoucherDiscount
+	// Check for active voucher
+	var cvID int64
+	var voucherID int64
+	var vAmount int
+	var vType string
+	var remainingCycles int
+	var totalCycles int
+
+	err = tx.QueryRowContext(ctx, `
+		SELECT cv.id, cv.voucher_id, v.amount, v.type, cv.remaining_cycles, v.total_cycles
+		FROM customer_vouchers cv
+		INNER JOIN vouchers v ON v.id = cv.voucher_id
+		INNER JOIN pelanggan c ON c.id = cv.pelanggan_id
+		WHERE cv.pelanggan_id = ?
+		  AND cv.status = 'active'
+		  AND c.voucher_auto_apply = 1
+		LIMIT 1
+	`, candidate.CustomerID).Scan(&cvID, &voucherID, &vAmount, &vType, &remainingCycles, &totalCycles)
+
+	hasVoucher := err == nil
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		_ = tx.Rollback()
+		return Bill{}, false, fmt.Errorf("check active voucher: %w", err)
+	}
+
+	diskonReferral := 0
+	if hasVoucher {
+		diskonReferral = vAmount
+	} else {
+		diskonReferral = candidate.VoucherDiscount
+	}
+
 	if diskonReferral > afterDiskon {
 		diskonReferral = afterDiskon
 	}
@@ -331,7 +430,37 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 		return Bill{}, false, fmt.Errorf("single generated bill id: %w", err)
 	}
 
-	if diskonReferral > 0 {
+	if hasVoucher {
+		if vType != "permanent" {
+			newRemaining := remainingCycles - 1
+			status := "active"
+			if newRemaining <= 0 {
+				status = "completed"
+			}
+			_, err = tx.ExecContext(ctx, `
+				UPDATE customer_vouchers
+				SET remaining_cycles = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+				WHERE id = ?
+			`, newRemaining, status, cvID)
+			if err != nil {
+				_ = tx.Rollback()
+				return Bill{}, false, fmt.Errorf("update customer voucher cycles: %w", err)
+			}
+		}
+
+		cycleNumber := 1
+		if vType != "permanent" {
+			cycleNumber = totalCycles - remainingCycles + 1
+		}
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO voucher_usage_logs (pelanggan_id, voucher_id, tagihan_id, amount_applied, cycle_number, created_at)
+			VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		`, candidate.CustomerID, voucherID, billID, diskonReferral, cycleNumber)
+		if err != nil {
+			_ = tx.Rollback()
+			return Bill{}, false, fmt.Errorf("insert voucher usage log: %w", err)
+		}
+	} else if diskonReferral > 0 {
 		_, err = tx.ExecContext(ctx, `
 			UPDATE pelanggan
 			SET voucher_discount = voucher_discount - ?, updated_at = CURRENT_TIMESTAMP

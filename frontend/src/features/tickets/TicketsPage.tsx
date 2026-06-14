@@ -221,10 +221,16 @@ export function TicketsPage() {
               ) : (
                 detail.messages.map((m) => {
                   const isAdmin = m.sender_type === "admin";
+                  const isRead = m.is_read === 1;
                   const time = new Date(m.created_at).toLocaleTimeString("id-ID", {
                     hour: "2-digit",
                     minute: "2-digit",
                   });
+                  const readTime = m.read_at ? new Date(m.read_at).toLocaleTimeString("id-ID", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }) : "";
+
                   return (
                     <div
                       key={m.id}
@@ -239,7 +245,19 @@ export function TicketsPage() {
                       >
                         {m.message}
                       </div>
-                      <span className="text-[9px] text-slate-400 mt-1 px-1">{time}</span>
+                      <div className="flex items-center gap-1.5 mt-1 px-1 text-[9px] text-slate-400 select-none">
+                        <span>{time}</span>
+                        {isAdmin && (
+                          <span className={isRead ? "text-green-600 font-semibold" : "text-slate-400"}>
+                            • {isRead ? `Dibaca ${readTime}` : "Terkirim"}
+                          </span>
+                        )}
+                        {!isAdmin && isRead && (
+                          <span className="text-slate-500 font-medium">
+                            • Dibaca Admin
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })

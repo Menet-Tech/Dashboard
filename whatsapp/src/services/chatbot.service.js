@@ -13,7 +13,7 @@
 
 const logger = require('../utils/logger');
 const { getSession, upsertSession, deleteSession, saveContactForm } = require('../utils/database');
-const { findCustomerByPhone, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket, getTemplateByTrigger, getSettings, getReferredCount, withdrawReferral, convertReferralToVoucher } = require('./isp.service');
+const { findCustomerByPhone, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket, getTemplateByTrigger, getSettings, getReferredCount, withdrawReferral, convertReferralToVoucher, getActiveTicket, replyToTicket, updateCustomerWifi, claimVoucher, toggleAutoApplyVoucher, getCustomerVouchers } = require('./isp.service');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -96,6 +96,9 @@ const getMenuReg = async (nama, triggerBilling, triggerSupport, triggerPackages,
 
     if (!baseText.toLowerCase().includes('referral') && !baseText.toLowerCase().includes('reward') && !baseText.toLowerCase().includes('klaim')) {
         baseText += `\nkirim 6 atau referral untuk cek & klaim reward referal`;
+    }
+    if (!baseText.toLowerCase().includes('ssid') && !baseText.toLowerCase().includes('password') && !baseText.toLowerCase().includes('wifi') && !baseText.includes('7')) {
+        baseText += `\nkirim 7 atau wifi untuk ganti nama/password wifi`;
     }
     return baseText;
 };
@@ -229,6 +232,14 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
         } else if (matchTrigger(text, '6') || matchTrigger(text, 'referral') || matchTrigger(text, 'reward') || matchTrigger(text, 'mgm')) {
             upsertSession(rawFrom, accountId, 'REG_REFERRAL_MENU', { ...formData });
             await sendReferralMenu(customerId, customerName, accountId, rawFrom, sendFn);
+        } else if (matchTrigger(text, '7') || matchTrigger(text, 'wifi') || matchTrigger(text, 'ganti wifi')) {
+            const customer = await findCustomerByPhone(rawFrom);
+            if (!customer || !customer.sn_ont || customer.sn_ont.trim() === "") {
+                await sendFn(accountId, rawFrom, "❌ Maaf, Serial Number ONT Anda belum dikonfigurasi di dashboard oleh admin. Fitur ubah WiFi mandiri tidak tersedia sementara.");
+                return;
+            }
+            upsertSession(rawFrom, accountId, 'REG_WIFI_FORM_SSID', { ...formData, snOnt: customer.sn_ont });
+            await sendFn(accountId, rawFrom, "SSID dan Password apa yang ingin Anda gunakan?\n\nSilakan masukkan Nama WiFi (SSID) baru Anda:\n_(Ketik 'batal' untuk membatalkan)_");
         } else {
             const mRegText = await getMenuReg(customerName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
             await sendFn(accountId, rawFrom, `Hm, aku kurang ngerti 😅\n\n${mRegText}`);
@@ -247,6 +258,8 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
 
         const matchTarik = text.match(/^(tarik|cairkan|cair)\s+(\d+)$/i);
         const matchVoucher = text.match(/^(voucher|tukar|tukar_voucher)\s+(\d+)$/i);
+        const matchKlaim = text.match(/^(klaim|claim)\s+(.+)$/i);
+        const matchAuto = text.match(/^auto\s+(on|off)$/i);
 
         if (matchTarik) {
             const amount = parseInt(matchTarik[2], 10);
@@ -293,9 +306,73 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
             } catch (err) {
                 await sendFn(accountId, rawFrom, `❌ Gagal memproses penukaran voucher: ${err.message}`);
             }
+        } else if (matchKlaim) {
+            const code = matchKlaim[2].trim().toUpperCase();
+            try {
+                await claimVoucher(customer.id, code);
+                await sendFn(accountId, rawFrom, `✅ *Klaim Voucher Berhasil!*\n\nVoucher *${code}* telah berhasil diklaim dan dikaitkan ke akun Anda.\n\nKetik *menu* untuk kembali.`);
+                upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            } catch (err) {
+                await sendFn(accountId, rawFrom, `❌ Gagal mengklaim voucher: ${err.message || 'Kode voucher tidak valid atau Anda sudah memiliki voucher aktif'}.`);
+            }
+        } else if (matchAuto) {
+            const autoSetting = matchAuto[1].toLowerCase() === 'on';
+            try {
+                await toggleAutoApplyVoucher(customer.id, autoSetting);
+                await sendFn(accountId, rawFrom, `✅ *Pengaturan Berhasil Diubah!*\n\nAuto-apply voucher Anda sekarang: *${autoSetting ? 'ON' : 'OFF'}*.\n\nKetik *menu* untuk kembali.`);
+                upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            } catch (err) {
+                await sendFn(accountId, rawFrom, `❌ Gagal mengubah pengaturan auto-apply: ${err.message}`);
+            }
         } else {
             // Jika input tidak dikenali, kirim ulang menu referral
             await sendReferralMenu(customerId, customerName, accountId, rawFrom, sendFn);
+        }
+        return;
+    }
+
+    // ── REG_WIFI_FORM_SSID ──────────────────────────────────────────────────
+    if (state === 'REG_WIFI_FORM_SSID') {
+        if (lower === 'batal') {
+            const { customerId, customerName } = formData;
+            upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            const mRegText = await getMenuReg(customerName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+            await sendFn(accountId, rawFrom, `❌ Penggantian WiFi dibatalkan.\n\n${mRegText}`);
+            return;
+        }
+
+        const newSsid = text;
+        upsertSession(rawFrom, accountId, 'REG_WIFI_FORM_PWD', { ...formData, newSsid });
+        await sendFn(accountId, rawFrom, `Nama WiFi (SSID) diset ke: *${newSsid}*\n\nSekarang masukkan Password WiFi baru Anda (minimal 8 karakter):\n_(Ketik 'batal' untuk membatalkan)_`);
+        return;
+    }
+
+    // ── REG_WIFI_FORM_PWD ───────────────────────────────────────────────────
+    if (state === 'REG_WIFI_FORM_PWD') {
+        const { customerId, customerName, newSsid } = formData;
+        if (lower === 'batal') {
+            upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            const mRegText = await getMenuReg(customerName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+            await sendFn(accountId, rawFrom, `❌ Penggantian WiFi dibatalkan.\n\n${mRegText}`);
+            return;
+        }
+
+        const newPwd = text;
+        if (newPwd.length < 8) {
+            await sendFn(accountId, rawFrom, `❌ Password WiFi minimal harus 8 karakter.\n\nSilakan masukkan kembali password WiFi baru Anda:\n_(Ketik 'batal' untuk membatalkan)_`);
+            return;
+        }
+
+        await sendFn(accountId, rawFrom, `🔄 Sedang memproses penggantian WiFi di ONT Anda via GenieACS. Mohon tunggu sebentar...`);
+
+        try {
+            await updateCustomerWifi(customerId, newSsid, newPwd);
+            upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            await sendFn(accountId, rawFrom, `✅ *Konfirmasi:* Nama SSID & Password WiFi Anda berhasil diubah!\n\nSSID baru: *${newSsid}*\nPassword baru: *${newPwd}*\n\nRouter Anda sedang memproses perubahan ini. Silakan hubungkan kembali perangkat Anda ke WiFi baru tersebut.\n\nKetik *menu* untuk kembali.`);
+        } catch (err) {
+            logger.error('[Chatbot] Failed to update WiFi ONT via GenieACS:', err.message);
+            upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            await sendFn(accountId, rawFrom, `❌ *Gagal mengubah WiFi:* ${err.message || 'Koneksi ke GenieACS bermasalah'}.\n\nSilakan hubungi admin atau ketik *menu* untuk kembali.`);
         }
         return;
     }
@@ -348,17 +425,18 @@ Nomor WA: wa.me/+${linkNumber}`;
         } else {
             // Form selesai
             const isRegistered = !!formData.customerId;
-            upsertSession(rawFrom, accountId, isRegistered ? 'REG_MENU' : 'UNREG_MENU', formData);
             saveContactForm('support', rawFrom, accountId, updatedForm);
 
             // POST support ticket to Go backend
-            await createTicket({
+            const ticket = await createTicket({
                 pelanggan_id: formData.customerId || null,
                 nama: updatedForm.nama,
                 no_hp: rawFrom,
                 alamat: updatedForm.alamat,
                 kendala: updatedForm.kendala
             });
+
+            upsertSession(rawFrom, accountId, 'WAITING_ADMIN', { ...formData, activeTicketId: ticket ? ticket.id : null });
 
             // Notif admin with detailed support info
             const cleanPhone = rawFrom.replace(/@c\.us$/, '').replace(/^\+/, '');
@@ -389,9 +467,40 @@ Nomor WA: wa.me/+${linkNumber}`;
 
     // ── WAITING_ADMIN ────────────────────────────────────────────────────────
     if (state === 'WAITING_ADMIN') {
-        await sendFn(accountId, rawFrom,
-            `Pesanmu sudah kami sampaikan ke admin ya 😊\nAdmin akan segera membalasmu.\n\nKetik *menu* untuk kembali ke menu utama.`
-        );
+        const { activeTicketId } = formData;
+        if (activeTicketId) {
+            try {
+                await replyToTicket(activeTicketId, 'customer', text);
+                await sendFn(accountId, rawFrom,
+                    `💬 *Laporan Terkirim:* "${text}"\nPesan Anda telah diteruskan ke teknisi.\n\n_(Ketik *menu* atau *0* untuk kembali ke menu utama)_`
+                );
+            } catch (err) {
+                logger.error('[Chatbot] Failed to forward message to ticket:', err.message);
+                await sendFn(accountId, rawFrom,
+                    `Pesanmu sudah kami sampaikan ke admin ya 😊\nAdmin akan segera membalasmu.\n\nKetik *menu* untuk kembali ke menu utama.`
+                );
+            }
+        } else {
+            const activeTicket = await getActiveTicket(rawFrom);
+            if (activeTicket) {
+                try {
+                    await replyToTicket(activeTicket.id, 'customer', text);
+                    upsertSession(rawFrom, accountId, 'WAITING_ADMIN', { ...formData, activeTicketId: activeTicket.id });
+                    await sendFn(accountId, rawFrom,
+                        `💬 *Laporan Terkirim:* "${text}"\nPesan Anda telah diteruskan ke teknisi.\n\n_(Ketik *menu* atau *0* untuk kembali ke menu utama)_`
+                    );
+                } catch (err) {
+                    logger.error('[Chatbot] Failed to forward message to active ticket:', err.message);
+                    await sendFn(accountId, rawFrom,
+                        `Pesanmu sudah kami sampaikan ke admin ya 😊\nAdmin akan segera membalasmu.\n\nKetik *menu* untuk kembali ke menu utama.`
+                    );
+                }
+            } else {
+                await sendFn(accountId, rawFrom,
+                    `Pesanmu sudah kami sampaikan ke admin ya 😊\nAdmin akan segera membalasmu.\n\nKetik *menu* untuk kembali ke menu utama.`
+                );
+            }
+        }
         return;
     }
 
@@ -483,15 +592,27 @@ const sendReferralMenu = async (customerId, customerName, accountId, to, sendFn)
     const voucher = customer.voucher_discount || 0;
     const code = customer.referral_code || '-';
 
+    const activeVouchers = await getCustomerVouchers(customer.id);
+    let voucherStatusText = "Tidak ada";
+    if (activeVouchers.length > 0) {
+        voucherStatusText = activeVouchers.map(cv => {
+            const cycleText = cv.remaining_cycles > 0 ? `Sisa ${cv.remaining_cycles} bulan` : 'Permanen';
+            return `${cv.voucher_code} (${formatRp(cv.voucher_amount)}, ${cycleText})`;
+        }).join(', ');
+    }
+    const autoApplyText = customer.voucher_auto_apply === 1 ? 'ON (Otomatis digunakan)' : 'OFF (Manual)';
+
     const msg = `Halo *${customerName}*!
-Berikut adalah informasi program Referral (Member-get-Member) Anda:
+Berikut adalah informasi program Referral (Member-get-Member) & Voucher Anda:
 
 👉 *Kode Referral Anda:* ${code}
 👥 *Jumlah Teman yang Diajak:* ${count} orang
 💰 *Saldo Referral (bisa dicairkan):* ${formatRp(balance)}
-🎟️ *Voucher Diskon Aktif:* ${formatRp(voucher)}
+🎟️ *Voucher Referral Aktif:* ${formatRp(voucher)}
+🎫 *Voucher Promosi Aktif:* ${voucherStatusText}
+⚙️ *Auto-Apply Voucher:* ${autoApplyText}
 
-*PILIHAN KLAIM REWARD REFERRAL:*
+*PILIHAN KLAIM REWARD REFERRAL & VOUCHER:*
 
 💵 *A. Cairkan Saldo jadi Uang Tunai*
    Ketik: *TARIK [nominal]*
@@ -500,6 +621,13 @@ Berikut adalah informasi program Referral (Member-get-Member) Anda:
 🎫 *B. Tukar Saldo jadi Voucher Diskon Tagihan*
    Ketik: *VOUCHER [nominal]*
    (Contoh: *VOUCHER 50000*)
+
+🎁 *C. Klaim Kode Voucher Promosi*
+   Ketik: *KLAIM [kode_voucher]*
+   (Contoh: *KLAIM DISKON10K*)
+
+⚙️ *D. Atur Auto-Apply Voucher*
+   Ketik: *AUTO ON* atau *AUTO OFF*
 
 _Ketik *menu* atau *0* untuk membatalkan dan kembali ke menu utama._`;
 

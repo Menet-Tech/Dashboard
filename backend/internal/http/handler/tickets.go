@@ -72,7 +72,8 @@ func (h TicketHandler) CreateInternal(w http.ResponseWriter, r *http.Request) {
 }
 
 type addMessagePayload struct {
-	Message string `json:"message"`
+	Message    string `json:"message"`
+	SenderType string `json:"sender_type,omitempty"`
 }
 
 func (h TicketHandler) AddMessage(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +89,12 @@ func (h TicketHandler) AddMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg, err := h.Service.AddTicketMessage(r.Context(), id, "admin", payload.Message)
+	senderType := "admin"
+	if payload.SenderType == "customer" {
+		senderType = "customer"
+	}
+
+	msg, err := h.Service.AddTicketMessage(r.Context(), id, senderType, payload.Message)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
 		return

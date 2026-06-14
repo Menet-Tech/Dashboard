@@ -1,3 +1,13 @@
-tambahin fitur diskon
-tambahin fitur member-get-member (referal), setiap mereka ngajak 1 pelanggan, dapet 50 ribu rupiah, yang bisa mereka ubah jadi voucher diskon untuk billing mereka, atau mereka tarik tunai, ntar admin bisa liat point refereal mereka
-tambahin pooling data dari gcs, jadi nanti data client lengkap, dari integrasi miktorik dan GenieACS
+BUG : masih ada bug, seperti tidak bisa menambah node di peta jaringan
+
+QoL : saat kita nambahin diskon di input "Nominal Diskon Bulanan (Rp)" kalau kita kita ntar 0 placeholder nya ilang, terus nomernya otomatis ada titik nya, kayak 1.000, saat ini masih 1000
+
+feat : data odp sama maps di bikin sinkron, jadi waktu kita nambah di maps, di data odp juga ada
+
+QoL : tambahin cari berdasarkan ip di audit log
+
+Feat : diskon bisa berapa kali di pake, ada yang permanen ada yang 1 kali pake, ada yang 2 kali pake, gitu gitu, hasil itu bisa dapetin duit (NOTE, tagihan hanya bisa menggunakan 1 voucher), user bisa menggunakan diskonnya secara manual lewat wa (Chatbot) sebelum invoice di buat, atau di aktifikan oleh admin, dan pastikan ada log voucher yang sudah terpakai, jadi ada lognya, dan tanyakan pelanggan, jika ada mereka ada voucher, mau automatis pake atau tidka untuk next billing
+
+Feat: pelanggan bisa mengganti ssid dan password lewat chat wa yang akan langsung integrasi ke genieACS, dengan workflow, Pelanggan mengirim nomer 7 untuk mengganti password -> chatbot memberikan balasan dengan ssid dan password apa -> user memasukan ssid dan password -> aplikasi akan membaca ssid dan password ya -> aplikasi akan menggunakan api dari genieACS buat mengganti password client -> genieACS memberikan respons -> system akan mengkonfirmasi kalo sudah berubah -> chatbot ngirim konfirmasi ke client
+
+feat : buat sistem ticket buat pelanggan, jadi pelanggan bisa bikin ticket lewat wa, entar bisa di lihat sama admin, dan bisa di status status, jadi ada statusnya, open, closed, pending, dan lain lain, workflow nya, pelanggan bikin ticket -> admin bisa lihat ticket -> admin bisa ngasih balasan -> customer bisa ngasih balasan, bisa seen by, time sent, time read, by admin, dan lain lain, di dalam system dibuat juga 

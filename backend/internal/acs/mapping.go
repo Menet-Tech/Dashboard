@@ -429,6 +429,26 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 		if err != nil {
 			return err
 		}
+
+		if n.Type == "odp" {
+			loc := fmt.Sprintf("%f, %f", n.Latitude, n.Longitude)
+			desc := ""
+			if n.Notes != nil {
+				desc = *n.Notes
+			}
+			_, err = tx.ExecContext(ctx, `
+				INSERT INTO odp (nama, lokasi, deskripsi, updated_at)
+				VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+				ON CONFLICT(nama) DO UPDATE SET
+					lokasi = ?,
+					deskripsi = ?,
+					updated_at = CURRENT_TIMESTAMP`,
+				n.Name, loc, desc, loc, desc,
+			)
+			if err != nil {
+				return fmt.Errorf("sync odp node '%s' to odp table: %w", n.Name, err)
+			}
+		}
 	}
 
 	// Insert edges
@@ -450,6 +470,67 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 		_, err = edgeStmt.ExecContext(ctx, e.EdgeID, e.Source, e.Target, e.FiberType, e.Distance, waypointsStr, e.Notes)
 		if err != nil {
 			return err
+		}
+	}
+
+	// Sync Customer ODP references
+	// 1. Build a map of node_id -> Name for ODP nodes to resolve ODP name on the map
+	odpNodeNames := make(map[string]string)
+	for _, n := range nodes {
+		if n.Type == "odp" {
+			odpNodeNames[n.NodeID] = n.Name
+		}
+	}
+
+	// 2. Query all ODPs from the database to map their Name to their ID
+	rows, err := tx.QueryContext(ctx, "SELECT id, nama FROM odp")
+	if err != nil {
+		return fmt.Errorf("query odp table: %w", err)
+	}
+	defer rows.Close()
+
+	odpNameToID := make(map[string]int64)
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return fmt.Errorf("scan odp name/id: %w", err)
+		}
+		odpNameToID[name] = id
+	}
+
+	// 3. Find edges and build mapping of Target (ONT) -> Source (ODP) or vice versa
+	ontToOdpNodeID := make(map[string]string)
+	for _, e := range edges {
+		if _, isOdp := odpNodeNames[e.Source]; isOdp {
+			ontToOdpNodeID[e.Target] = e.Source
+		} else if _, isOdp := odpNodeNames[e.Target]; isOdp {
+			ontToOdpNodeID[e.Source] = e.Target
+		}
+	}
+
+	// 4. Update each customer's odp_id based on their ONT node's connected ODP
+	for _, n := range nodes {
+		if n.Type == "ont" && n.Pppoe != nil && *n.Pppoe != "" {
+			var odpID *int64
+			if connectedOdpNodeID, exists := ontToOdpNodeID[n.NodeID]; exists {
+				if odpName, ok := odpNodeNames[connectedOdpNodeID]; ok {
+					if id, ok := odpNameToID[odpName]; ok {
+						val := id
+						odpID = &val
+					}
+				}
+			}
+
+			// Update customer in database
+			if odpID != nil {
+				_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET odp_id = ?, updated_at = CURRENT_TIMESTAMP WHERE user_pppoe = ?", *odpID, *n.Pppoe)
+			} else {
+				_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET odp_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE user_pppoe = ?", *n.Pppoe)
+			}
+			if err != nil {
+				return fmt.Errorf("update customer odp_id for pppoe '%s': %w", *n.Pppoe, err)
+			}
 		}
 	}
 

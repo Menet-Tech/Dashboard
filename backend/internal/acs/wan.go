@@ -802,29 +802,27 @@ func (c *Client) scanWANConnectionDevices_FiberHome(ctx context.Context, deviceI
 	if cleanedWanDevices, ok := cleanedWanDevicesRaw.(map[string]any); ok {
 		if wanDevice1, ok := cleanedWanDevices["1"].(map[string]any); ok {
 			wanConnDevs := getNestedMap(wanDevice1, "WANConnectionDevice")
-			if wanConnDevs != nil {
-				for numStr, containerRaw := range wanConnDevs {
-					num, _ := strconv.Atoi(numStr)
-					container, ok := containerRaw.(map[string]any)
-					if !ok {
-						continue
-					}
+			for numStr, containerRaw := range wanConnDevs {
+				num, _ := strconv.Atoi(numStr)
+				container, ok := containerRaw.(map[string]any)
+				if !ok {
+					continue
+				}
 
-					hasIP := false
-					if ip := getNestedMap(container, "WANIPConnection"); ip != nil && len(ip) > 0 {
-						hasIP = true
-					}
-					hasPPP := false
-					if ppp := getNestedMap(container, "WANPPPConnection"); ppp != nil && len(ppp) > 0 {
-						hasPPP = true
-					}
+				hasIP := false
+				if ip := getNestedMap(container, "WANIPConnection"); len(ip) > 0 {
+					hasIP = true
+				}
+				hasPPP := false
+				if ppp := getNestedMap(container, "WANPPPConnection"); len(ppp) > 0 {
+					hasPPP = true
+				}
 
-					foundNumbers = append(foundNumbers, num)
-					if hasIP || hasPPP {
-						usedContainers = append(usedContainers, num)
-					} else if num >= 2 {
-						emptyContainers = append(emptyContainers, num)
-					}
+				foundNumbers = append(foundNumbers, num)
+				if hasIP || hasPPP {
+					usedContainers = append(usedContainers, num)
+				} else if num >= 2 {
+					emptyContainers = append(emptyContainers, num)
 				}
 			}
 		}
@@ -891,11 +889,9 @@ func (c *Client) scanWANConnectionDevices_ZTECOM(ctx context.Context, deviceID s
 	if cleanedWanDevices, ok := cleanedWanDevicesRaw.(map[string]any); ok {
 		if wanDevice1, ok := cleanedWanDevices["1"].(map[string]any); ok {
 			wanConnDevs := getNestedMap(wanDevice1, "WANConnectionDevice")
-			if wanConnDevs != nil {
-				for numStr := range wanConnDevs {
-					num, _ := strconv.Atoi(numStr)
-					foundNumbers = append(foundNumbers, num)
-				}
+			for numStr := range wanConnDevs {
+				num, _ := strconv.Atoi(numStr)
+				foundNumbers = append(foundNumbers, num)
 			}
 		}
 	}
