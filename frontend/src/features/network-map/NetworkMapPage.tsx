@@ -32,6 +32,8 @@ import {
   resetMapSettings,
   syncMappingData,
   resetMappingData,
+  fetchGacsDevices,
+  type GacsDevice,
 } from "../../lib/api";
 import type { MapNode, MapEdge, MapSettings } from "../../types";
 
@@ -100,16 +102,13 @@ function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }
 
 // Map events handler to detect clicks on the map (for adding nodes)
 function MapEventsHandler({ onMapClick }: { onMapClick: (e: L.LeafletMouseEvent) => void }) {
-  const onMapClickRef = useRef(onMapClick);
+  const map = useMap();
   useEffect(() => {
-    onMapClickRef.current = onMapClick;
-  }, [onMapClick]);
-
-  useMapEvents({
-    click: (e) => {
-      onMapClickRef.current(e);
-    },
-  });
+    map.on("click", onMapClick);
+    return () => {
+      map.off("click", onMapClick);
+    };
+  }, [map, onMapClick]);
   return null;
 }
 
@@ -166,14 +165,56 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   const [maxZoomInInput, setMaxZoomInInput] = useState("18");
   const [maxZoomOutInput, setMaxZoomOutInput] = useState("5");
 
+  // GACS-style state variables
+  const [gacsDevices, setGacsDevices] = useState<GacsDevice[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [identifierType, setIdentifierType] = useState<"pppoe" | "serialnumber">("pppoe");
+  const [manualCoords, setManualCoords] = useState(false);
+  const [mapLayer, setMapLayer] = useState(() => localStorage.getItem("map-layer-preference") || "satellite");
+
+  useEffect(() => {
+    localStorage.setItem("map-layer-preference", mapLayer);
+  }, [mapLayer]);
+
+  useEffect(() => {
+    if (!document.getElementById("polyline-animation-style")) {
+      const style = document.createElement("style");
+      style.id = "polyline-animation-style";
+      style.innerHTML = `
+        @keyframes dash-flow {
+          to {
+            stroke-dashoffset: -25;
+          }
+        }
+        @keyframes blink-opacity {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        .animated-polyline {
+          animation: dash-flow 0.6s linear infinite;
+        }
+        .blink-red {
+          animation: blink-opacity 0.3s ease-in-out infinite !important;
+          stroke-dashoffset: 0 !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
+
   // Load all map data
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [nodesRes, edgesRes, settingsRes] = await Promise.all([
+      const [nodesRes, edgesRes, settingsRes, gacsRes] = await Promise.all([
         fetchNodes(),
         fetchEdges(),
         fetchMapSettings(),
+        fetchGacsDevices({ limit: 1000 }).catch((e) => {
+          console.warn("GACS integration not configured or offline:", e);
+          return { success: false, data: [] };
+        })
       ]);
       // Normalize API responses: some endpoints return { data: [...] },
       // while others return the array directly. Ensure we always store arrays.
@@ -186,14 +227,24 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
       setNodes(normalizeArray<MapNode>(nodesRes));
       setEdges(normalizeArray<MapEdge>(edgesRes));
-      setSettings(settingsRes);
+
+      // Extract settings data if wrapped in a "data" key
+      const settingsData = settingsRes && (settingsRes as any).data ? (settingsRes as any).data : settingsRes;
+      setSettings(settingsData);
 
       // Pre-fill map settings inputs
-      setCenterLatInput(settingsRes.center_lat);
-      setCenterLngInput(settingsRes.center_lng);
-      setDefaultZoomInput(settingsRes.default_zoom);
-      setMaxZoomInInput(settingsRes.max_zoom_in);
-      setMaxZoomOutInput(settingsRes.max_zoom_out);
+      setCenterLatInput(settingsData?.center_lat || "-6.2088");
+      setCenterLngInput(settingsData?.center_lng || "106.8456");
+      setDefaultZoomInput(settingsData?.default_zoom || "13");
+      setMaxZoomInInput(settingsData?.max_zoom_in || "18");
+      setMaxZoomOutInput(settingsData?.max_zoom_out || "5");
+
+      // Set GACS devices
+      if (gacsRes && Array.isArray(gacsRes.data)) {
+        setGacsDevices(gacsRes.data);
+      } else if (gacsRes && typeof gacsRes === "object" && Array.isArray((gacsRes as any).data?.data)) {
+        setGacsDevices((gacsRes as any).data.data);
+      }
 
       setIsDirty(false);
     } catch {
@@ -207,8 +258,63 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     void loadData();
   }, [loadData]);
 
+  // Check online status of node
+  const isNodeOffline = useCallback((node: MapNode) => {
+    if (node.type !== "ont") return false;
+    if (!node.pppoe && !node.serialnumber) return false;
+    
+    const device = gacsDevices.find(d => 
+      (node.pppoe && d._summary?.pppoe_username === node.pppoe) ||
+      (node.serialnumber && d._deviceId?._SerialNumber === node.serialnumber)
+    );
+    
+    if (!device) return false; // Default to online
+    
+    if (!device._lastInform) return true;
+    try {
+      const lastInformTime = new Date(device._lastInform).getTime();
+      const now = new Date().getTime();
+      const diff = now - lastInformTime;
+      return diff > 5 * 60 * 1000; // 5 minutes threshold
+    } catch {
+      return false;
+    }
+  }, [gacsDevices]);
+
+  // Local filter for GACS devices
+  const filteredDevices = useMemo(() => {
+    if (!searchQuery) return [];
+    const q = searchQuery.toLowerCase();
+    return gacsDevices.filter((d) => {
+      if (identifierType === "pppoe") {
+        return d._summary?.pppoe_username?.toLowerCase().includes(q) || false;
+      } else {
+        return d._deviceId?._SerialNumber?.toLowerCase().includes(q) || false;
+      }
+    });
+  }, [gacsDevices, searchQuery, identifierType]);
+
+  // Select device from GACS list
+  const handleSelectDevice = (device: GacsDevice) => {
+    const pppoe = device._summary?.pppoe_username || "";
+    const sn = device._deviceId?._SerialNumber || "";
+    
+    if (identifierType === "pppoe") {
+      setNodePppoeInput(pppoe);
+      setNodeNameInput(pppoe || "ONT Customer");
+      setNodeSnInput(sn);
+      setSearchQuery(pppoe);
+    } else {
+      setNodeSnInput(sn);
+      setNodeNameInput(sn || "ONT Customer");
+      setNodePppoeInput(pppoe);
+      setSearchQuery(sn);
+    }
+    setShowSearchDropdown(false);
+  };
+
   // Handle map click when "add-node" tool is active
-  const handleMapClick = (e: L.LeafletMouseEvent) => {
+  const handleMapClick = useCallback((e: L.LeafletMouseEvent) => {
     if (activeTool !== "add-node") return;
 
     setEditingNode(null);
@@ -222,9 +328,13 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     setNodePppoeInput("");
     setNodeSnInput("");
     setNodeNotesInput("");
+    
+    setSearchQuery("");
+    setIdentifierType("pppoe");
+    setManualCoords(false);
 
     setIsNodeModalOpen(true);
-  };
+  }, [activeTool]);
 
   // Click on a node marker
   const handleNodeClick = (node: MapNode) => {
@@ -260,19 +370,32 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     }
   };
 
+  // Helper to autosave map data to backend
+  const syncData = useCallback(async (newNodes: MapNode[], newEdges: MapEdge[]) => {
+    setSaving(true);
+    try {
+      await syncMappingData({ nodes: newNodes, edges: newEdges });
+      setIsDirty(false);
+    } catch {
+      pushError("Gagal menyinkronkan data peta jaringan ke server.");
+    } finally {
+      setSaving(false);
+    }
+  }, [pushError]);
+
   // Node marker dragged
   const handleNodeDragEnd = (nodeId: string, event: L.DragEndEvent) => {
     const marker = event.target as L.Marker;
     const position = marker.getLatLng();
 
-    setNodes((prev) =>
-      prev.map((n) =>
-        n.node_id === nodeId
-          ? { ...n, latitude: position.lat, longitude: position.lng }
-          : n
-      )
+    const updatedNodes = nodes.map((n) =>
+      n.node_id === nodeId
+        ? { ...n, latitude: position.lat, longitude: position.lng }
+        : n
     );
+    setNodes(updatedNodes);
     setIsDirty(true);
+    void syncData(updatedNodes, edges);
   };
 
   // Save Node modal submission
@@ -283,42 +406,54 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
       return;
     }
 
-    const capacityNum = nodeCapacityInput ? parseInt(nodeCapacityInput, 10) : undefined;
+    // Parse capacity
+    let capacityNum: number | undefined = undefined;
+    if (nodeTypeInput === "server" || nodeTypeInput === "odc" || nodeTypeInput === "odp") {
+      const parsed = parseInt(nodeCapacityInput, 10);
+      if (Number.isFinite(parsed)) {
+        capacityNum = parsed;
+      } else {
+        capacityNum = nodeTypeInput === "server" ? 48 : nodeTypeInput === "odc" ? 96 : 8;
+      }
+    }
+
+    let updatedNodes = [...nodes];
+    let updatedEdges = [...edges];
+
+    const pppoeVal = nodeTypeInput === "ont" ? (nodePppoeInput.trim() || undefined) : undefined;
+    const snVal = nodeTypeInput === "ont" ? (nodeSnInput.trim() || undefined) : undefined;
+    const splitterVal = (nodeTypeInput === "odc" || nodeTypeInput === "odp") ? (nodeSplitterInput.trim() || undefined) : undefined;
 
     if (editingNode) {
       // Edit mode
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.node_id === editingNode.node_id
-            ? {
-                ...n,
-                node_id: nodeIdInput.trim(),
-                name: nodeNameInput.trim(),
-                type: nodeTypeInput,
-                latitude: nodeLatInput,
-                longitude: nodeLngInput,
-                capacity: capacityNum,
-                splitter: nodeSplitterInput.trim() || undefined,
-                pppoe: nodePppoeInput.trim() || undefined,
-                serialnumber: nodeSnInput.trim() || undefined,
-                notes: nodeNotesInput.trim() || undefined,
-              }
-            : n
-        )
+      updatedNodes = nodes.map((n) =>
+        n.node_id === editingNode.node_id
+          ? {
+              ...n,
+              node_id: nodeIdInput.trim(),
+              name: nodeNameInput.trim(),
+              type: nodeTypeInput,
+              latitude: nodeLatInput,
+              longitude: nodeLngInput,
+              capacity: capacityNum,
+              splitter: splitterVal,
+              pppoe: pppoeVal,
+              serialnumber: snVal,
+              notes: nodeNotesInput.trim() || undefined,
+            }
+          : n
       );
       // Update referencing edges if the node_id changed
       if (editingNode.node_id !== nodeIdInput.trim()) {
-        setEdges((prev) =>
-          prev.map((edge) => {
-            let src = edge.source;
-            let tgt = edge.target;
-            if (edge.source === editingNode.node_id) src = nodeIdInput.trim();
-            if (edge.target === editingNode.node_id) tgt = nodeIdInput.trim();
-            return { ...edge, source: src, target: tgt };
-          })
-        );
+        updatedEdges = edges.map((edge) => {
+          let src = edge.source;
+          let tgt = edge.target;
+          if (edge.source === editingNode.node_id) src = nodeIdInput.trim();
+          if (edge.target === editingNode.node_id) tgt = nodeIdInput.trim();
+          return { ...edge, source: src, target: tgt };
+        });
       }
-      pushSuccess("Node berhasil diperbarui (Draft).");
+      pushSuccess("Node berhasil diperbarui.");
     } else {
       // Create mode
       if (nodes.some((n) => n.node_id === nodeIdInput.trim())) {
@@ -332,18 +467,21 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         latitude: nodeLatInput,
         longitude: nodeLngInput,
         capacity: capacityNum,
-        splitter: nodeSplitterInput.trim() || undefined,
-        pppoe: nodePppoeInput.trim() || undefined,
-        serialnumber: nodeSnInput.trim() || undefined,
+        splitter: splitterVal,
+        pppoe: pppoeVal,
+        serialnumber: snVal,
         notes: nodeNotesInput.trim() || undefined,
       };
-      setNodes((prev) => [...prev, newNode]);
-      pushSuccess("Node baru berhasil ditambahkan (Draft).");
+      updatedNodes = [...nodes, newNode];
+      pushSuccess("Node baru berhasil ditambahkan.");
     }
 
+    setNodes(updatedNodes);
+    setEdges(updatedEdges);
     setIsNodeModalOpen(false);
     setIsDirty(true);
     setActiveTool("select");
+    void syncData(updatedNodes, updatedEdges);
   };
 
   // Save Edge modal submission
@@ -355,24 +493,23 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     }
 
     const distNum = edgeDistanceInput ? parseFloat(edgeDistanceInput) : undefined;
+    let updatedEdges = [...edges];
 
     if (editingEdge) {
-      setEdges((prev) =>
-        prev.map((edge) =>
-          edge.edge_id === editingEdge.edge_id
-            ? {
-                ...edge,
-                edge_id: edgeIdInput.trim(),
-                source: edgeSourceInput,
-                target: edgeTargetInput,
-                fiber_type: edgeFiberTypeInput,
-                distance: distNum,
-                notes: edgeNotesInput.trim() || undefined,
-              }
-            : edge
-        )
+      updatedEdges = edges.map((edge) =>
+        edge.edge_id === editingEdge.edge_id
+          ? {
+              ...edge,
+              edge_id: edgeIdInput.trim(),
+              source: edgeSourceInput,
+              target: edgeTargetInput,
+              fiber_type: edgeFiberTypeInput,
+              distance: distNum,
+              notes: edgeNotesInput.trim() || undefined,
+            }
+          : edge
       );
-      pushSuccess("Kabel berhasil diperbarui (Draft).");
+      pushSuccess("Kabel berhasil diperbarui.");
     } else {
       if (edges.some((edge) => edge.edge_id === edgeIdInput.trim())) {
         pushError("ID Kabel sudah digunakan.");
@@ -386,47 +523,47 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         distance: distNum,
         notes: edgeNotesInput.trim() || undefined,
       };
-      setEdges((prev) => [...prev, newEdge]);
-      pushSuccess("Kabel baru berhasil ditambahkan (Draft).");
+      updatedEdges = [...edges, newEdge];
+      pushSuccess("Kabel baru berhasil ditambahkan.");
     }
 
+    setEdges(updatedEdges);
     setIsEdgeModalOpen(false);
     setIsDirty(true);
     setFirstNodeForEdge(null);
     setActiveTool("select");
+    void syncData(nodes, updatedEdges);
   };
 
   // Delete node
   const handleDeleteNode = (nodeId: string) => {
     if (!confirm(`Hapus node "${nodeId}"? Semua kabel yang terhubung juga akan dihapus.`)) return;
 
-    setNodes((prev) => prev.filter((n) => n.node_id !== nodeId));
-    setEdges((prev) => prev.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    const updatedNodes = nodes.filter((n) => n.node_id !== nodeId);
+    const updatedEdges = edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+
+    setNodes(updatedNodes);
+    setEdges(updatedEdges);
     setIsDirty(true);
-    pushSuccess("Node dihapus (Draft).");
+    pushSuccess("Node dihapus.");
+    void syncData(updatedNodes, updatedEdges);
   };
 
   // Delete edge
   const handleDeleteEdge = (edgeId: string) => {
     if (!confirm(`Hapus kabel "${edgeId}"?`)) return;
 
-    setEdges((prev) => prev.filter((edge) => edge.edge_id !== edgeId));
+    const updatedEdges = edges.filter((edge) => edge.edge_id !== edgeId);
+    setEdges(updatedEdges);
     setIsDirty(true);
-    pushSuccess("Kabel dihapus (Draft).");
+    pushSuccess("Kabel dihapus.");
+    void syncData(nodes, updatedEdges);
   };
 
   // Sync data to DB
   const handleSync = async () => {
-    setSaving(true);
-    try {
-      await syncMappingData({ nodes, edges });
-      pushSuccess("Peta jaringan berhasil disinkronisasi ke server!");
-      setIsDirty(false);
-    } catch {
-      pushError("Gagal menyinkronkan data peta jaringan.");
-    } finally {
-      setSaving(false);
-    }
+    await syncData(nodes, edges);
+    pushSuccess("Peta jaringan berhasil disinkronisasi ke server!");
   };
 
   // Reset all mapping data on database
@@ -470,12 +607,13 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     if (!confirm("Reset pengaturan peta ke default Jakarta?")) return;
     try {
       const res = await resetMapSettings();
-      setSettings(res);
-      setCenterLatInput(res.center_lat);
-      setCenterLngInput(res.center_lng);
-      setDefaultZoomInput(res.default_zoom);
-      setMaxZoomInInput(res.max_zoom_in);
-      setMaxZoomOutInput(res.max_zoom_out);
+      const settingsData = res && (res as any).data ? (res as any).data : res;
+      setSettings(settingsData);
+      setCenterLatInput(settingsData?.center_lat || "-6.2088");
+      setCenterLngInput(settingsData?.center_lng || "106.8456");
+      setDefaultZoomInput(settingsData?.default_zoom || "13");
+      setMaxZoomInInput(settingsData?.max_zoom_in || "18");
+      setMaxZoomOutInput(settingsData?.max_zoom_out || "5");
       pushSuccess("Pengaturan peta direset ke default.");
       setIsSettingsModalOpen(false);
     } catch {
@@ -483,34 +621,57 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     }
   };
 
-  // Custom marker icon creation with DivIcon for modern visual styling
-  const createCustomIcon = (type: "server" | "odc" | "odp" | "ont", name: string) => {
-    const bgColors = {
-      server: "bg-indigo-600 ring-4 ring-indigo-200 text-white",
-      odc: "bg-amber-500 ring-4 ring-amber-200 text-white",
-      odp: "bg-emerald-500 ring-4 ring-emerald-200 text-white",
-      ont: "bg-sky-500 ring-4 ring-sky-200 text-white",
+  // Custom marker icon creation with GACS SVG Leaflet Icons
+  const createCustomIcon = (type: "server" | "odc" | "odp" | "ont", name: string, isOffline = false) => {
+    const colors = {
+      server: "#9333ea",
+      odc: "#2563eb",
+      odp: "#06b6d4",
+      ont: isOffline ? "#9ca3af" : "#ea580c",
     };
-    const emojis = {
-      server: "🖥️",
-      odc: "📦",
-      odp: "🔌",
-      ont: "📡",
+    const svgs = {
+      server: `<path d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+      odc: `<path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+      odp: `<path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+      ont: `<path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
     };
+
     return L.divIcon({
+      className: "custom-marker leaflet-zoom-hide",
       html: `
         <div class="flex flex-col items-center select-none">
-          <div class="w-8 h-8 rounded-full ${bgColors[type]} flex items-center justify-center shadow-lg transform transition hover:scale-110 duration-200">
-            <span class="text-sm">${emojis[type]}</span>
+          <div style="
+            background-color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <div style="
+              width: 22px;
+              height: 22px;
+              background-color: ${colors[type]};
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            ">
+              <svg width="12" height="12" fill="white" viewBox="0 0 24 24">
+                ${svgs[type]}
+              </svg>
+            </div>
           </div>
           <div class="mt-1 px-1.5 py-0.5 bg-white border border-slate-200 dark:border-slate-800 text-[9px] font-bold rounded shadow text-slate-800 dark:text-slate-200 max-w-[80px] truncate text-center">
             ${name}
           </div>
         </div>
       `,
-      className: "custom-map-icon",
       iconSize: [80, 52],
-      iconAnchor: [40, 24],
+      iconAnchor: [40, 15],
+      popupAnchor: [0, -15],
     });
   };
 
@@ -525,17 +686,21 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     ];
   };
 
-  // Resolve fiber line color
+  // Resolve fiber line color (GACS colors)
   const getFiberColor = (type?: string) => {
     switch (type) {
       case "feeder":
-        return "#ef4444"; // Red
+      case "odc_to_odc":
+      case "odc_to_odc_ratio":
+        return "#c084fc"; // Purple
       case "distribution":
-        return "#3b82f6"; // Blue
+      case "odp_to_odp":
+        return "#60a5fa"; // Blue
       case "drop":
-        return "#10b981"; // Emerald
+      case "odp_to_odp_ratio":
+        return "#4ade80"; // Green
       default:
-        return "#f97316"; // Orange
+        return "#9ca3af"; // Grey
     }
   };
 
@@ -727,34 +892,80 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
           <ChangeView center={mapCenter} zoom={mapZoom} />
           <MapEventsHandler onMapClick={handleMapClick} />
 
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          {mapLayer === "satellite" ? (
+            <TileLayer
+              key="satellite"
+              attribution="© Google Maps"
+              url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+              maxZoom={mapZoomRange.maxZoom}
+            />
+          ) : mapLayer === "satellite-plain" ? (
+            <TileLayer
+              key="satellite-plain"
+              attribution="© Google Maps"
+              url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+              maxZoom={mapZoomRange.maxZoom}
+            />
+          ) : (
+            <TileLayer
+              key="street"
+              attribution="© Google Maps"
+              url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+              maxZoom={mapZoomRange.maxZoom}
+            />
+          )}
 
           {/* Render Cable Lines (Edges) */}
           {edges.map((edge) => {
             const positions = resolveEdgePositions(edge);
             if (positions.length < 2) return null;
 
+            const sourceNode = nodes.find(n => n.node_id === edge.source);
+            const targetNode = nodes.find(n => n.node_id === edge.target);
+            const isSourceOffline = sourceNode ? isNodeOffline(sourceNode) : false;
+            const isTargetOffline = targetNode ? isNodeOffline(targetNode) : false;
+            const isOffline = isSourceOffline || isTargetOffline;
+
             return (
               <Polyline
                 key={edge.edge_id}
                 positions={positions}
-                color={getFiberColor(edge.fiber_type)}
-                weight={3}
-                opacity={0.8}
+                color={isOffline ? "#EF4444" : getFiberColor(edge.fiber_type)}
+                weight={6}
+                opacity={0.9}
+                dashArray="10, 15"
+                className={isOffline ? "blink-red" : "animated-polyline"}
               >
                 <Popup>
-                  <div className="p-1 text-slate-800">
-                    <p className="font-bold text-xs border-b pb-1 mb-1">🔌 Kabel Fiber: {edge.edge_id}</p>
-                    <p className="text-[11px] mb-0.5"><strong>Asal:</strong> {edge.source}</p>
-                    <p className="text-[11px] mb-0.5"><strong>Tujuan:</strong> {edge.target}</p>
-                    <p className="text-[11px] mb-0.5"><strong>Tipe:</strong> <span className="uppercase font-semibold text-indigo-600">{edge.fiber_type}</span></p>
-                    <p className="text-[11px] mb-2"><strong>Jarak:</strong> {edge.distance ? `${edge.distance} m` : "—"}</p>
-                    {edge.notes && <p className="text-[10px] italic bg-slate-50 p-1 border rounded text-slate-500 mb-2">{edge.notes}</p>}
+                  <div className="p-1 text-slate-800 min-w-[200px] dark:text-slate-200">
+                    <p className="font-bold text-sm border-b pb-1 mb-2 text-slate-900 dark:text-white flex items-center gap-1.5">
+                      🔌 Kabel Fiber: {edge.edge_id}
+                    </p>
+                    <div className="space-y-1 text-xs mb-3">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Asal:</span>
+                        <span className="font-semibold">{edge.source}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Tujuan:</span>
+                        <span className="font-semibold">{edge.target}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Tipe:</span>
+                        <span className="font-semibold capitalize text-indigo-600 dark:text-indigo-400">{edge.fiber_type}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Jarak:</span>
+                        <span className="font-semibold">{edge.distance ? `${edge.distance >= 1000 ? (edge.distance / 1000).toFixed(2) + " km" : edge.distance.toFixed(1) + " m"}` : "—"}</span>
+                      </div>
+                    </div>
+                    {edge.notes && (
+                      <p className="text-[10px] italic bg-slate-50 dark:bg-slate-800 p-1.5 border dark:border-slate-700 rounded text-slate-500 dark:text-slate-400 mb-3">
+                        {edge.notes}
+                      </p>
+                    )}
 
-                    <div className="flex gap-2.5">
+                    <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => {
@@ -767,16 +978,16 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                           setEdgeNotesInput(edge.notes || "");
                           setIsEdgeModalOpen(true);
                         }}
-                        className="text-[10px] text-indigo-600 hover:underline font-semibold flex items-center gap-0.5"
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition"
                       >
-                        <Edit className="w-2.5 h-2.5" /> Edit
+                        <Edit className="w-3 h-3" /> Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteEdge(edge.edge_id)}
-                        className="text-[10px] text-red-600 hover:underline font-semibold flex items-center gap-0.5"
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition shadow"
                       >
-                        <Trash2 className="w-2.5 h-2.5" /> Hapus
+                        <Trash2 className="w-3 h-3" /> Hapus
                       </button>
                     </div>
                   </div>
@@ -786,74 +997,159 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
           })}
 
           {/* Render Infrastructure Markers (Nodes) */}
-          {nodes.map((node) => (
-            <Marker
-              key={node.node_id}
-              position={[parseLatitude(node.latitude), parseLongitude(node.longitude)]}
-              icon={createCustomIcon(node.type, node.name)}
-              draggable={activeTool === "select"}
-              eventHandlers={{
-                click: () => handleNodeClick(node),
-                dragend: (e) => handleNodeDragEnd(node.node_id, e),
-              }}
-            >
-              <Popup>
-                <div className="p-1 text-slate-800 min-w-[150px]">
-                  <p className="font-bold text-xs border-b pb-1 mb-1.5 flex items-center gap-1.5 capitalize">
-                    {node.type === "server" ? "🖥️" : node.type === "odc" ? "📦" : node.type === "odp" ? "🔌" : "📡"}{" "}
-                    {node.type}: {node.name}
-                  </p>
-                  <p className="text-[11px] mb-0.5"><strong>Node ID:</strong> {node.node_id}</p>
-                  {node.capacity !== undefined && (
-                    <p className="text-[11px] mb-0.5"><strong>Kapasitas Port:</strong> {node.capacity}</p>
-                  )}
-                  {node.splitter && (
-                    <p className="text-[11px] mb-0.5"><strong>Splitter Rasio:</strong> {node.splitter}</p>
-                  )}
-                  {node.pppoe && (
-                    <p className="text-[11px] mb-0.5"><strong>PPPoE Username:</strong> {node.pppoe}</p>
-                  )}
-                  {node.serialnumber && (
-                    <p className="text-[11px] mb-0.5"><strong>Serial Number:</strong> {node.serialnumber}</p>
-                  )}
-                  {node.notes && (
-                    <p className="text-[10px] italic bg-slate-50 p-1 border rounded text-slate-500 mb-2 mt-1">{node.notes}</p>
-                  )}
+          {nodes.map((node) => {
+            const isOffline = isNodeOffline(node);
+            return (
+              <Marker
+                key={node.node_id}
+                position={[parseLatitude(node.latitude), parseLongitude(node.longitude)]}
+                icon={createCustomIcon(node.type, node.name, isOffline)}
+                draggable={activeTool === "select"}
+                eventHandlers={{
+                  click: () => handleNodeClick(node),
+                  dragend: (e) => handleNodeDragEnd(node.node_id, e),
+                }}
+              >
+                <Popup>
+                  <div className="p-1 text-slate-800 min-w-[200px] dark:text-slate-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${
+                        node.type === "server"
+                          ? "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+                          : node.type === "odc"
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                          : node.type === "odp"
+                          ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300"
+                          : "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300"
+                      }`}>
+                        {node.type === "server" ? "🖥️ Server" : node.type === "odc" ? "📦 ODC" : node.type === "odp" ? "🔌 ODP" : "📡 ONT"}
+                      </span>
+                      {node.type === "ont" && (
+                        <span className={`w-2.5 h-2.5 rounded-full ${isOffline ? "bg-red-500 animate-pulse" : "bg-emerald-500"}`} title={isOffline ? "Offline" : "Online"} />
+                      )}
+                    </div>
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-2">{node.name}</h3>
+                    
+                    <div className="space-y-1 text-xs mb-3 border-t pt-1.5 border-slate-100 dark:border-slate-800">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Node ID:</span>
+                        <span className="font-semibold font-mono">{node.node_id}</span>
+                      </div>
+                      {node.capacity !== undefined && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">Kapasitas:</span>
+                          <span className="font-semibold">{node.capacity} Port</span>
+                        </div>
+                      )}
+                      {node.splitter && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">Splitter:</span>
+                          <span className="font-semibold">{node.splitter}</span>
+                        </div>
+                      )}
+                      {node.pppoe && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">PPPoE:</span>
+                          <span className="font-semibold">{node.pppoe}</span>
+                        </div>
+                      )}
+                      {node.serialnumber && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">SN:</span>
+                          <span className="font-semibold font-mono">{node.serialnumber}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {node.notes && (
+                      <p className="text-[10px] italic bg-slate-50 dark:bg-slate-800 p-1.5 border dark:border-slate-700 rounded text-slate-500 dark:text-slate-400 mb-3">
+                        {node.notes}
+                      </p>
+                    )}
 
-                  <div className="flex gap-2.5 mt-2 border-t pt-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingNode(node);
-                        setNodeIdInput(node.node_id);
-                        setNodeNameInput(node.name);
-                        setNodeTypeInput(node.type);
-                        setNodeLatInput(node.latitude);
-                        setNodeLngInput(node.longitude);
-                        setNodeCapacityInput(node.capacity ? String(node.capacity) : "");
-                        setNodeSplitterInput(node.splitter || "");
-                        setNodePppoeInput(node.pppoe || "");
-                        setNodeSnInput(node.serialnumber || "");
-                        setNodeNotesInput(node.notes || "");
-                        setIsNodeModalOpen(true);
-                      }}
-                      className="text-[10px] text-indigo-600 hover:underline font-semibold flex items-center gap-0.5"
-                    >
-                      <Edit className="w-2.5 h-2.5" /> Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteNode(node.node_id)}
-                      className="text-[10px] text-red-600 hover:underline font-semibold flex items-center gap-0.5"
-                    >
-                      <Trash2 className="w-2.5 h-2.5" /> Hapus
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingNode(node);
+                          setNodeIdInput(node.node_id);
+                          setNodeNameInput(node.name);
+                          setNodeTypeInput(node.type);
+                          setNodeLatInput(node.latitude);
+                          setNodeLngInput(node.longitude);
+                          setNodeCapacityInput(node.capacity ? String(node.capacity) : "");
+                          setNodeSplitterInput(node.splitter || "");
+                          setNodePppoeInput(node.pppoe || "");
+                          setNodeSnInput(node.serialnumber || "");
+                          setNodeNotesInput(node.notes || "");
+                          
+                          setSearchQuery(node.pppoe || node.serialnumber || "");
+                          setIdentifierType(node.pppoe ? "pppoe" : "serialnumber");
+                          setManualCoords(false);
+                          
+                          setIsNodeModalOpen(true);
+                        }}
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition"
+                      >
+                        <Edit className="w-3 h-3" /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteNode(node.node_id)}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition shadow"
+                      >
+                        <Trash2 className="w-3 h-3" /> Hapus
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+                </Popup>
+              </Marker>
+            );
+          })}
         </MapContainer>
+
+        {/* Map Layer Toggle Button */}
+        <div className="absolute bottom-4 right-4 z-[999]">
+          <button
+            type="button"
+            onClick={() => {
+              setMapLayer(prev => 
+                prev === "street" ? "satellite" : prev === "satellite" ? "satellite-plain" : "street"
+              );
+            }}
+            className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl shadow-lg p-2.5 transition-colors flex flex-col items-center gap-1 min-w-[70px] border border-slate-200 dark:border-slate-700"
+            title={
+              mapLayer === "street"
+                ? "Switch to Satellite"
+                : mapLayer === "satellite"
+                ? "Switch to Satellite Plain"
+                : "Switch to Street Map"
+            }
+          >
+            {mapLayer === "street" ? (
+              <>
+                <svg className="h-5 w-5 text-slate-700 dark:text-slate-300 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">Satellite</span>
+              </>
+            ) : mapLayer === "satellite" ? (
+              <>
+                <svg className="h-5 w-5 text-slate-700 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">Sat Plain</span>
+              </>
+            ) : (
+              <>
+                <svg className="h-5 w-5 text-slate-700 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">Street</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* --- ADD / EDIT NODE MODAL --- */}
@@ -876,13 +1172,13 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               </button>
             </div>
 
-            <div className="grid gap-3.5 max-h-[400px] overflow-y-auto pr-1">
+            <div className="grid gap-3.5 max-h-[450px] overflow-y-auto pr-1">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">ID NODE (KODE)</label>
                 <input
                   type="text"
                   required
-                  className="w-full text-sm px-3 py-2 border rounded-xl"
+                  className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                   value={nodeIdInput}
                   onChange={(e) => setNodeIdInput(e.target.value)}
                   placeholder="Contoh: ODP-MERDEKA-1"
@@ -893,9 +1189,25 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">TIPE INFRASTRUKTUR</label>
                   <select
-                    className="w-full text-sm px-3 py-2 border rounded-xl"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                     value={nodeTypeInput}
-                    onChange={(e) => setNodeTypeInput(e.target.value as any)}
+                    onChange={(e) => {
+                      const val = e.target.value as "server" | "odc" | "odp" | "ont";
+                      setNodeTypeInput(val);
+                      if (val === "server") {
+                        setNodeCapacityInput("48");
+                        setNodeSplitterInput("");
+                      } else if (val === "odc") {
+                        setNodeCapacityInput("96");
+                        setNodeSplitterInput("1:8");
+                      } else if (val === "odp") {
+                        setNodeCapacityInput("8");
+                        setNodeSplitterInput("1:8");
+                      } else {
+                        setNodeCapacityInput("");
+                        setNodeSplitterInput("");
+                      }
+                    }}
                   >
                     <option value="server">🖥️ Server (Headend)</option>
                     <option value="odc">📦 ODC (Cabinet)</option>
@@ -908,7 +1220,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   <input
                     type="text"
                     required
-                    className="w-full text-sm px-3 py-2 border rounded-xl"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     value={nodeNameInput}
                     onChange={(e) => setNodeNameInput(e.target.value)}
                     placeholder="Contoh: ODP Sudirman 03"
@@ -916,37 +1228,157 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">LATITUDE</label>
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    className="w-full text-sm px-3 py-2 border rounded-xl"
-                    value={nodeLatInput}
-                    onChange={(e) => setNodeLatInput(parseFloat(e.target.value))}
-                  />
+              {nodeTypeInput === "ont" && (
+                <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/20 grid gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">TIPE IDENTIFIER</label>
+                    <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIdentifierType("pppoe");
+                          setSearchQuery("");
+                        }}
+                        className={`flex-1 px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                          identifierType === "pppoe" ? "bg-orange-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        PPPoE Username
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIdentifierType("serialnumber");
+                          setSearchQuery("");
+                        }}
+                        className={`flex-1 px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                          identifierType === "serialnumber" ? "bg-orange-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        Serial Number
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <label className="block text-xs font-bold text-slate-500 mb-1">
+                      CARI PERANGKAT GENIEACS
+                    </label>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setShowSearchDropdown(true);
+                      }}
+                      onFocus={() => setShowSearchDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
+                      placeholder={`Ketik untuk mencari ${identifierType === "pppoe" ? "username PPPoE" : "Serial Number"}...`}
+                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                      autoComplete="off"
+                    />
+
+                    {showSearchDropdown && searchQuery && (
+                      <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                        {filteredDevices.length === 0 ? (
+                          <div className="px-3 py-2 text-xs text-slate-400 italic">
+                            Tidak ditemukan hasil yang cocok
+                          </div>
+                        ) : (
+                          filteredDevices.map((dev) => {
+                            const pppoe = dev._summary?.pppoe_username || "";
+                            const sn = dev._deviceId?._SerialNumber || "";
+                            const val = identifierType === "pppoe" ? pppoe : sn;
+                            const sub = identifierType === "pppoe" ? `SN: ${sn}` : `PPPoE: ${pppoe}`;
+                            return (
+                              <button
+                                key={dev._id}
+                                type="button"
+                                onClick={() => handleSelectDevice(dev)}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700 border-b dark:border-slate-700 last:border-0 flex flex-col"
+                              >
+                                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
+                                <span className="text-[10px] text-slate-400">{sub}</span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">PPPOE USERNAME</label>
+                      <input
+                        type="text"
+                        className="w-full text-xs px-3 py-2 border rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500"
+                        value={nodePppoeInput}
+                        onChange={(e) => setNodePppoeInput(e.target.value)}
+                        placeholder="user_pppoe"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">SERIAL NUMBER</label>
+                      <input
+                        type="text"
+                        className="w-full text-xs px-3 py-2 border rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500"
+                        value={nodeSnInput}
+                        onChange={(e) => setNodeSnInput(e.target.value)}
+                        placeholder="ZTEGC12345"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">LONGITUDE</label>
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    className="w-full text-sm px-3 py-2 border rounded-xl"
-                    value={nodeLngInput}
-                    onChange={(e) => setNodeLngInput(parseFloat(e.target.value))}
-                  />
+              )}
+
+              {(nodeTypeInput === "odc" || nodeTypeInput === "odp") && (
+                <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/20 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">SPLITTER RASIO</label>
+                    <select
+                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                      value={nodeSplitterInput || "1:8"}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNodeSplitterInput(val);
+                        const ports = val.split(":")[1];
+                        if (ports) {
+                          setNodeCapacityInput(ports);
+                        }
+                      }}
+                    >
+                      <option value="1:2">1:2</option>
+                      <option value="1:4">1:4</option>
+                      <option value="1:8">1:8</option>
+                      <option value="1:16">1:16</option>
+                      <option value="1:32">1:32</option>
+                      <option value="1:64">1:64</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">KAPASITAS PORT</label>
+                    <input
+                      type="number"
+                      required
+                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                      value={nodeCapacityInput}
+                      onChange={(e) => setNodeCapacityInput(e.target.value)}
+                      placeholder="Contoh: 8 atau 16"
+                    />
+                  </div>
+                  <div className="col-span-2 text-[10px] text-slate-500 flex items-center gap-1 leading-snug">
+                    💡 Mengubah splitter rasio akan memperbarui kapasitas menjadi {nodeSplitterInput.split(":")[1] || "8"} port.
+                  </div>
                 </div>
-              </div>
+              )}
 
               {nodeTypeInput === "server" && (
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">KAPASITAS CORES / PORT</label>
                   <input
                     type="number"
-                    className="w-full text-sm px-3 py-2 border rounded-xl"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     value={nodeCapacityInput}
                     onChange={(e) => setNodeCapacityInput(e.target.value)}
                     placeholder="Contoh: 96"
@@ -954,85 +1386,60 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 </div>
               )}
 
-              {nodeTypeInput === "odc" && (
+              <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/20 grid gap-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="manualCoords"
+                    checked={manualCoords}
+                    onChange={(e) => setManualCoords(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500"
+                  />
+                  <label htmlFor="manualCoords" className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    Masukkan Koordinat Secara Manual
+                  </label>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">KAPASITAS (IN/OUT)</label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">LATITUDE</label>
                     <input
                       type="number"
-                      className="w-full text-sm px-3 py-2 border rounded-xl"
-                      value={nodeCapacityInput}
-                      onChange={(e) => setNodeCapacityInput(e.target.value)}
-                      placeholder="Contoh: 288"
+                      step="any"
+                      required
+                      readOnly={!manualCoords}
+                      className={`w-full text-xs px-3 py-2 border rounded-xl font-mono ${
+                        manualCoords ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+                      }`}
+                      value={nodeLatInput}
+                      onChange={(e) => setNodeLatInput(parseFloat(e.target.value) || 0)}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">SPLITTER RASIO</label>
-                    <input
-                      type="text"
-                      className="w-full text-sm px-3 py-2 border rounded-xl"
-                      value={nodeSplitterInput}
-                      onChange={(e) => setNodeSplitterInput(e.target.value)}
-                      placeholder="Contoh: 1:4"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {nodeTypeInput === "odp" && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">KAPASITAS PORT</label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">LONGITUDE</label>
                     <input
                       type="number"
-                      className="w-full text-sm px-3 py-2 border rounded-xl"
-                      value={nodeCapacityInput}
-                      onChange={(e) => setNodeCapacityInput(e.target.value)}
-                      placeholder="Contoh: 8 atau 16"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">SPLITTER RASIO</label>
-                    <input
-                      type="text"
-                      className="w-full text-sm px-3 py-2 border rounded-xl"
-                      value={nodeSplitterInput}
-                      onChange={(e) => setNodeSplitterInput(e.target.value)}
-                      placeholder="Contoh: 1:8"
+                      step="any"
+                      required
+                      readOnly={!manualCoords}
+                      className={`w-full text-xs px-3 py-2 border rounded-xl font-mono ${
+                        manualCoords ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+                      }`}
+                      value={nodeLngInput}
+                      onChange={(e) => setNodeLngInput(parseFloat(e.target.value) || 0)}
                     />
                   </div>
                 </div>
-              )}
-
-              {nodeTypeInput === "ont" && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">PPPoE USERNAME</label>
-                    <input
-                      type="text"
-                      className="w-full text-sm px-3 py-2 border rounded-xl"
-                      value={nodePppoeInput}
-                      onChange={(e) => setNodePppoeInput(e.target.value)}
-                      placeholder="Contoh: user_pppoe"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">SERIAL NUMBER (ONT)</label>
-                    <input
-                      type="text"
-                      className="w-full text-sm px-3 py-2 border rounded-xl"
-                      value={nodeSnInput}
-                      onChange={(e) => setNodeSnInput(e.target.value)}
-                      placeholder="Contoh: ZTEGC12345"
-                    />
-                  </div>
+                <div className="text-[10px] text-indigo-600 dark:text-indigo-400 leading-normal">
+                  {manualCoords
+                    ? "⚠️ Anda dapat memasukkan koordinat latitude/longitude secara manual."
+                    : "ℹ️ Koordinat diisi otomatis sesuai letak marker pada peta."}
                 </div>
-              )}
+              </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">CATATAN / INFORMASI TAMBAHAN</label>
                 <textarea
-                  className="w-full text-sm px-3 py-2 border rounded-xl"
+                  className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                   rows={2}
                   value={nodeNotesInput}
                   onChange={(e) => setNodeNotesInput(e.target.value)}
@@ -1045,7 +1452,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               <button
                 type="button"
                 onClick={() => setIsNodeModalOpen(false)}
-                className="text-slate-600 hover:bg-slate-100 text-sm font-semibold py-2 px-4 rounded-xl transition"
+                className="text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold py-2 px-4 rounded-xl transition"
               >
                 Batal
               </button>
