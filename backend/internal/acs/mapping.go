@@ -487,17 +487,18 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 	if err != nil {
 		return fmt.Errorf("query odp table: %w", err)
 	}
-	defer rows.Close()
 
 	odpNameToID := make(map[string]int64)
 	for rows.Next() {
 		var id int64
 		var name string
 		if err := rows.Scan(&id, &name); err != nil {
+			rows.Close()
 			return fmt.Errorf("scan odp name/id: %w", err)
 		}
 		odpNameToID[name] = id
 	}
+	rows.Close()
 
 	// 3. Find edges and build mapping of Target (ONT) -> Source (ODP) or vice versa
 	ontToOdpNodeID := make(map[string]string)
