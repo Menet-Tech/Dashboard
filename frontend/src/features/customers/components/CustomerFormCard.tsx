@@ -156,26 +156,55 @@ export function CustomerFormCard({
       </label>
 
       {/* ODP Node selector */}
-      <label className="col-span-full flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Titik Distribusi ODP</span>
-        <select
-          className={inputClassName()}
-          value={customerForm.odp_id || 0}
-          onChange={(e) =>
-            onFormChange((curr) => ({
-              ...curr,
-              odp_id: Number(e.target.value) || 0,
-            }))
-          }
-        >
-          <option value={0}>Pilih ODP (Jika ada)</option>
-          {odps.map((odp) => (
-            <option key={odp.id} value={odp.id}>
-              {odp.nama} - {odp.lokasi}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Titik Distribusi ODP</span>
+          <select
+            className={inputClassName()}
+            value={customerForm.odp_id || 0}
+            onChange={(e) => {
+              const nextOdpId = Number(e.target.value) || 0;
+              onFormChange((curr) => ({
+                ...curr,
+                odp_id: nextOdpId,
+                odp_port: nextOdpId > 0 ? 1 : undefined,
+              }));
+            }}
+          >
+            <option value={0}>Pilih ODP (Jika ada)</option>
+            {odps.map((odp) => (
+              <option key={odp.id} value={odp.id}>
+                {odp.nama} - {odp.lokasi}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {(customerForm.odp_id || 0) > 0 && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Port ODP</span>
+            <select
+              className={inputClassName()}
+              value={customerForm.odp_port || 1}
+              onChange={(e) =>
+                onFormChange((curr) => ({
+                  ...curr,
+                  odp_port: Number(e.target.value),
+                }))
+              }
+            >
+              {Array.from(
+                { length: odps.find((o) => o.id === customerForm.odp_id)?.ports || 8 },
+                (_, i) => i + 1
+              ).map((portNum) => (
+                <option key={portNum} value={portNum}>
+                  Port {portNum}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
 
       <label className="col-span-full flex flex-col gap-1">
         <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Direkomendasikan Oleh (Referral)</span>

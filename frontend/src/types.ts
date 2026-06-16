@@ -59,6 +59,7 @@ export type CustomerItem = {
   last_sync_at?: string;
   odp_id?: number;
   odp_name?: string;
+  odp_port?: number;
 };
 
 export type BillItem = {
@@ -238,6 +239,7 @@ export type OdpItem = {
   nama: string;
   lokasi: string;
   deskripsi: string;
+  ports: number;
   customer_count: number;
 };
 

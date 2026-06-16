@@ -39,6 +39,7 @@ const (
 	KeyDiscordNotifyPayment  = "discord_notify_payment"
 	KeyDiscordNotifyGenerate = "discord_notify_generate"
 	KeyDiscordNotifyWorker   = "discord_notify_worker"
+	KeyDiscordNotifyGacsOffline = "discord_notify_gacs_offline"
 	KeyMikrotikHost          = "mikrotik_host"
 	KeyMikrotikUser          = "mikrotik_user"
 	KeyMikrotikPass          = "mikrotik_pass"
@@ -86,6 +87,7 @@ var defaults = map[string]string{
 	KeyDiscordNotifyPayment:  "1",
 	KeyDiscordNotifyGenerate: "1",
 	KeyDiscordNotifyWorker:   "1",
+	KeyDiscordNotifyGacsOffline:  "1",
 	KeyMikrotikHost:          "",
 	KeyMikrotikUser:          "",
 	KeyMikrotikPass:          "",

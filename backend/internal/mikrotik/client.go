@@ -3,6 +3,7 @@ package mikrotik
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"time"
@@ -195,7 +196,7 @@ func readSentence(conn net.Conn) ([]string, error) {
 			break
 		}
 		word := make([]byte, length)
-		if _, err := conn.Read(word); err != nil {
+		if _, err := io.ReadFull(conn, word); err != nil {
 			return words, err
 		}
 		words = append(words, string(word))
@@ -221,7 +222,7 @@ func encodeLength(n int) []byte {
 
 func decodeLength(conn net.Conn) (int, error) {
 	b := make([]byte, 1)
-	if _, err := conn.Read(b); err != nil {
+	if _, err := io.ReadFull(conn, b); err != nil {
 		return 0, err
 	}
 	c := int(b[0])
@@ -230,19 +231,19 @@ func decodeLength(conn net.Conn) (int, error) {
 		return c, nil
 	case c&0xC0 == 0x80:
 		extra := make([]byte, 1)
-		if _, err := conn.Read(extra); err != nil {
+		if _, err := io.ReadFull(conn, extra); err != nil {
 			return 0, err
 		}
 		return ((c & 0x3F) << 8) | int(extra[0]), nil
 	case c&0xE0 == 0xC0:
 		extra := make([]byte, 2)
-		if _, err := conn.Read(extra); err != nil {
+		if _, err := io.ReadFull(conn, extra); err != nil {
 			return 0, err
 		}
 		return ((c & 0x1F) << 16) | (int(extra[0]) << 8) | int(extra[1]), nil
 	default:
 		extra := make([]byte, 3)
-		if _, err := conn.Read(extra); err != nil {
+		if _, err := io.ReadFull(conn, extra); err != nil {
 			return 0, err
 		}
 		return ((c & 0x0F) << 24) | (int(extra[0]) << 16) | (int(extra[1]) << 8) | int(extra[2]), nil

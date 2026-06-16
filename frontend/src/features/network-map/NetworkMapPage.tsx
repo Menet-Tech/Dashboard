@@ -33,9 +33,10 @@ import {
   syncMappingData,
   resetMappingData,
   fetchGacsDevices,
+  updateCustomer,
   type GacsDevice,
 } from "../../lib/api";
-import type { MapNode, MapEdge, MapSettings } from "../../types";
+import type { MapNode, MapEdge, MapSettings, CustomerItem } from "../../types";
 
 const DEFAULT_MAP_CENTER: [number, number] = [-6.2088, 106.8456];
 const DEFAULT_MAP_ZOOM = 13;
@@ -173,6 +174,10 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   const [manualCoords, setManualCoords] = useState(false);
   const [mapLayer, setMapLayer] = useState(() => localStorage.getItem("map-layer-preference") || "satellite");
 
+  // Customer linkages states
+  const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+
   useEffect(() => {
     localStorage.setItem("map-layer-preference", mapLayer);
   }, [mapLayer]);
@@ -207,14 +212,15 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [nodesRes, edgesRes, settingsRes, gacsRes] = await Promise.all([
+      const [nodesRes, edgesRes, settingsRes, gacsRes, customersRes] = await Promise.all([
         fetchNodes(),
         fetchEdges(),
         fetchMapSettings(),
         fetchGacsDevices({ limit: 1000 }).catch((e) => {
           console.warn("GACS integration not configured or offline:", e);
           return { success: false, data: [] };
-        })
+        }),
+        fetch("/api/v1/customers", { credentials: "include" }).then(r => r.json()).catch(() => ({ data: [] }))
       ]);
       // Normalize API responses: some endpoints return { data: [...] },
       // while others return the array directly. Ensure we always store arrays.
@@ -244,6 +250,11 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         setGacsDevices(gacsRes.data);
       } else if (gacsRes && typeof gacsRes === "object" && Array.isArray((gacsRes as any).data?.data)) {
         setGacsDevices((gacsRes as any).data.data);
+      }
+
+      // Set Customers
+      if (customersRes && Array.isArray(customersRes.data)) {
+        setCustomers(customersRes.data);
       }
 
       setIsDirty(false);
@@ -332,6 +343,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     setSearchQuery("");
     setIdentifierType("pppoe");
     setManualCoords(false);
+    setSelectedCustomerId(null);
 
     setIsNodeModalOpen(true);
   }, [activeTool]);
@@ -399,7 +411,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   };
 
   // Save Node modal submission
-  const handleSaveNode = (e: React.FormEvent) => {
+  const handleSaveNode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nodeIdInput.trim() || !nodeNameInput.trim()) {
       pushError("ID Node dan Nama wajib diisi.");
@@ -423,6 +435,30 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     const pppoeVal = nodeTypeInput === "ont" ? (nodePppoeInput.trim() || undefined) : undefined;
     const snVal = nodeTypeInput === "ont" ? (nodeSnInput.trim() || undefined) : undefined;
     const splitterVal = (nodeTypeInput === "odc" || nodeTypeInput === "odp") ? (nodeSplitterInput.trim() || undefined) : undefined;
+
+    if (nodeTypeInput === "ont" && selectedCustomerId) {
+      const matchedCust = customers.find((c) => c.id === selectedCustomerId);
+      if (matchedCust) {
+        try {
+          const updatedCust = {
+            ...matchedCust,
+            sn_ont: snVal || "",
+            user_pppoe: pppoeVal || "",
+          };
+          await updateCustomer(selectedCustomerId, updatedCust);
+          pushSuccess("Pelanggan berhasil ditautkan ke ONT & sync ke GenieACS.");
+          // Refresh customer list locally to stay in sync
+          const customersRes = await fetch("/api/v1/customers", { credentials: "include" }).then((r) => r.json());
+          if (customersRes && Array.isArray(customersRes.data)) {
+            setCustomers(customersRes.data);
+          }
+        } catch (err: any) {
+          console.error("Gagal menautkan pelanggan", err);
+          pushError(`Gagal menautkan pelanggan: ${err.message}`);
+          return;
+        }
+      }
+    }
 
     if (editingNode) {
       // Edit mode
@@ -1086,6 +1122,17 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                           setSearchQuery(node.pppoe || node.serialnumber || "");
                           setIdentifierType(node.pppoe ? "pppoe" : "serialnumber");
                           setManualCoords(false);
+
+                          if (node.type === "ont") {
+                            const matched = customers.find(
+                              (c) =>
+                                (node.pppoe && c.user_pppoe === node.pppoe) ||
+                                (node.serialnumber && c.sn_ont === node.serialnumber)
+                            );
+                            setSelectedCustomerId(matched ? matched.id : null);
+                          } else {
+                            setSelectedCustomerId(null);
+                          }
                           
                           setIsNodeModalOpen(true);
                         }}
@@ -1230,6 +1277,31 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
               {nodeTypeInput === "ont" && (
                 <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/20 grid gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">TAUTKAN DENGAN PELANGGAN</label>
+                    <select
+                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                      value={selectedCustomerId || ""}
+                      onChange={(e) => {
+                        const cid = Number(e.target.value) || 0;
+                        setSelectedCustomerId(cid || null);
+                        const matchedCust = customers.find(c => c.id === cid);
+                        if (matchedCust) {
+                          setNodeNameInput(matchedCust.name);
+                          setNodePppoeInput(matchedCust.user_pppoe || "");
+                          setNodeSnInput(matchedCust.sn_ont || "");
+                          setSearchQuery(matchedCust.user_pppoe || matchedCust.sn_ont || "");
+                        }
+                      }}
+                    >
+                      <option value="">-- Pilih Pelanggan (Jika ada) --</option>
+                      {customers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.user_pppoe ? `(PPPoE: ${c.user_pppoe})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">TIPE IDENTIFIER</label>
                     <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5">
