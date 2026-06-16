@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Loader2, Plus, Edit3, Trash2, ShieldAlert, Send } from "lucide-react";
 import { StatusPill, EmptyTableRow } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
-import type { OdpItem, User } from "../../types";
+import type { OdpItem, User, CustomerItem } from "../../types";
+import { CustomerDetailModal } from "../customers/components/CustomerDetailModal";
 
 type OdpPageProps = {
   user: User | null;
@@ -21,6 +22,12 @@ export function OdpPage({ user, pushSuccess, pushError }: OdpPageProps) {
   const [formName, setFormName] = useState("");
   const [formLocation, setFormLocation] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formPorts, setFormPorts] = useState(8);
+
+  // Detail Modal & Linkages
+  const [selectedOdpForDetail, setSelectedOdpForDetail] = useState<OdpItem | null>(null);
+  const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [detailedCustomer, setDetailedCustomer] = useState<CustomerItem | null>(null);
 
   // Broadcast Modal
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
@@ -41,8 +48,19 @@ export function OdpPage({ user, pushSuccess, pushError }: OdpPageProps) {
     }
   };
 
+  const fetchCustomersList = async () => {
+    try {
+      const res = await fetch("/api/v1/customers", { credentials: "include" });
+      const data = await res.json();
+      setCustomers(data.data || []);
+    } catch (err) {
+      console.error("Failed to load customers", err);
+    }
+  };
+
   useEffect(() => {
     void fetchOdps();
+    void fetchCustomersList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -51,6 +69,7 @@ export function OdpPage({ user, pushSuccess, pushError }: OdpPageProps) {
     setFormName("");
     setFormLocation("");
     setFormDescription("");
+    setFormPorts(8);
     setIsFormModalOpen(true);
   };
 
@@ -59,6 +78,7 @@ export function OdpPage({ user, pushSuccess, pushError }: OdpPageProps) {
     setFormName(item.nama);
     setFormLocation(item.lokasi);
     setFormDescription(item.deskripsi);
+    setFormPorts(item.ports || 8);
     setIsFormModalOpen(true);
   };
 
@@ -74,6 +94,7 @@ export function OdpPage({ user, pushSuccess, pushError }: OdpPageProps) {
       nama: formName,
       lokasi: formLocation,
       deskripsi: formDescription,
+      ports: formPorts,
     };
 
     try {
@@ -201,7 +222,7 @@ export function OdpPage({ user, pushSuccess, pushError }: OdpPageProps) {
                 <th className="px-6 py-4 font-semibold">Nama Node ODP</th>
                 <th className="px-6 py-4 font-semibold">Lokasi Koordinat/Area</th>
                 <th className="px-6 py-4 font-semibold">Deskripsi</th>
-                <th className="px-6 py-4 font-semibold text-center">Jumlah Pelanggan</th>
+                <th className="px-6 py-4 font-semibold text-center">Port Terpakai / Total</th>
                 <th className="px-6 py-4 font-semibold text-center">Aksi</th>
               </tr>
             </thead>
@@ -224,11 +245,18 @@ export function OdpPage({ user, pushSuccess, pushError }: OdpPageProps) {
                     </td>
                     <td className="px-6 py-4 text-slate-800 dark:text-slate-200 font-bold text-center">
                       <span className="bg-slate-100 px-2.5 py-1 rounded-full text-xs font-semibold">
-                        {item.customer_count} Pelanggan
+                        {item.customer_count} / {item.ports || 8} Port
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-700">
                       <div className="flex gap-2 justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOdpForDetail(item)}
+                          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1"
+                        >
+                          Detail Port
+                        </button>
                         {!isViewer && item.customer_count > 0 && (
                           <button
                             type="button"
@@ -320,6 +348,19 @@ export function OdpPage({ user, pushSuccess, pushError }: OdpPageProps) {
               />
             </label>
             <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-bold text-slate-750">Jumlah Port ODP</span>
+              <input
+                type="number"
+                min={1}
+                max={64}
+                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                value={formPorts}
+                onChange={(e) => setFormPorts(Number(e.target.value) || 8)}
+                placeholder="8"
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
               <span className="text-xs font-bold text-slate-750">Deskripsi / Catatan</span>
               <textarea
                 className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -379,6 +420,108 @@ export function OdpPage({ user, pushSuccess, pushError }: OdpPageProps) {
             </label>
           </form>
         </Modal>
+      )}
+
+      {/* ODP Port Detail Modal */}
+      {selectedOdpForDetail && (
+        <Modal
+          title={`Detail Port ODP: ${selectedOdpForDetail.nama}`}
+          onClose={() => setSelectedOdpForDetail(null)}
+          actions={
+            <button
+              type="button"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+              onClick={() => setSelectedOdpForDetail(null)}
+            >
+              Tutup
+            </button>
+          }
+        >
+          <div className="flex flex-col gap-4">
+            <div className="text-xs text-slate-500 bg-slate-50 border border-slate-150 p-3.5 rounded-xl leading-relaxed">
+              <p><strong>Lokasi:</strong> {selectedOdpForDetail.lokasi}</p>
+              <p className="mt-1"><strong>Deskripsi:</strong> {selectedOdpForDetail.deskripsi || "-"}</p>
+              <p className="mt-1"><strong>Kapasitas:</strong> {selectedOdpForDetail.ports || 8} Port</p>
+            </div>
+
+            <div className="overflow-hidden border border-gray-200 rounded-xl bg-white shadow-sm">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold">
+                  <tr>
+                    <th className="px-4 py-3 text-center w-16">Port</th>
+                    <th className="px-4 py-3">Pelanggan</th>
+                    <th className="px-4 py-3">User PPPoE</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {Array.from({ length: selectedOdpForDetail.ports || 8 }, (_, i) => i + 1).map((portNum) => {
+                    const matchedCustomer = customers.find(
+                      (c) => c.odp_id === selectedOdpForDetail.id && c.odp_port === portNum
+                    );
+
+                    return (
+                      <tr key={portNum} className="hover:bg-slate-50/50">
+                        <td className="px-4 py-3 font-bold text-slate-700 text-center">#{portNum}</td>
+                        {matchedCustomer ? (
+                          <>
+                            <td className="px-4 py-3 font-bold text-slate-900">{matchedCustomer.name}</td>
+                            <td className="px-4 py-3 font-mono text-slate-600">{matchedCustomer.user_pppoe || "-"}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span
+                                className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  matchedCustomer.status === "active"
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                    : matchedCustomer.status === "limit"
+                                    ? "bg-amber-50 text-amber-700 border border-amber-100"
+                                    : "bg-red-50 text-red-700 border border-red-100"
+                                }`}
+                              >
+                                {matchedCustomer.status.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setDetailedCustomer(matchedCustomer)}
+                                className="text-indigo-600 hover:text-indigo-850 font-bold hover:underline"
+                              >
+                                Lihat Profil
+                              </button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-4 py-3 text-slate-400 italic" colSpan={3}>
+                              Kosong (Belum terpakai)
+                            </td>
+                            <td className="px-4 py-3 text-center text-slate-350">-</td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Customer Detail Modal inside ODP detail view */}
+      {detailedCustomer && (
+        <CustomerDetailModal
+          customer={detailedCustomer}
+          onClose={() => setDetailedCustomer(null)}
+          user={user}
+          pushSuccess={pushSuccess}
+          pushError={pushError}
+          onRefresh={() => {
+            void fetchOdps();
+            void fetchCustomersList();
+          }}
+        />
       )}
     </section>
   );

@@ -48,6 +48,7 @@ type Customer struct {
 	LastSyncAt      string  `json:"last_sync_at"`
 	OdpID            *int64  `json:"odp_id,omitempty"`
 	OdpName          string  `json:"odp_name,omitempty"`
+	OdpPort          *int    `json:"odp_port,omitempty"`
 	VoucherAutoApply int     `json:"voucher_auto_apply"`
 }
 
@@ -216,7 +217,7 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
 		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
-		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply
+		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
@@ -247,6 +248,7 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		var lastSyncAt sql.NullString
 		var odpID sql.NullInt64
 		var odpName sql.NullString
+		var odpPort sql.NullInt64
 		if err := rows.Scan(
 			&item.ID,
 			&item.Name,
@@ -281,6 +283,7 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 			&odpID,
 			&odpName,
 			&item.VoucherAutoApply,
+			&odpPort,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
@@ -311,6 +314,10 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		}
 		if odpName.Valid {
 			item.OdpName = odpName.String
+		}
+		if odpPort.Valid {
+			val := int(odpPort.Int64)
+			item.OdpPort = &val
 		}
 		items = append(items, item)
 	}
@@ -352,11 +359,11 @@ func (r Repository) Create(ctx context.Context, customer Customer) (Customer, er
 		INSERT INTO pelanggan (
 			nama, paket_id, user_pppoe, password_pppoe, nomor_wa, sn_ont, tgl_jatuh_tempo, status, alamat,
 			is_trial, trial_started_at, trial_days, diskon, referred_by_id, referral_balance, referral_code, voucher_discount,
-			ont_status, ont_ip, ont_uptime, ont_rx_power, ont_tx_power, pppoe_status, pppoe_ip, pppoe_uptime, last_sync_at, odp_id, updated_at
+			ont_status, ont_ip, ont_uptime, ont_rx_power, ont_tx_power, pppoe_status, pppoe_ip, pppoe_uptime, last_sync_at, odp_id, odp_port, updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address, 1, trialDays, customer.Diskon, customer.ReferredByID, customer.ReferralBalance, referralCode, customer.VoucherDiscount,
-		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt, customer.OdpID)
+		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt, customer.OdpID, customer.OdpPort)
 	if err != nil {
 		_ = tx.Rollback()
 		return Customer{}, fmt.Errorf("create customer: %w", err)
@@ -413,12 +420,12 @@ func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Cu
 		SET nama = ?, paket_id = ?, user_pppoe = ?, password_pppoe = ?, nomor_wa = ?, sn_ont = ?, tgl_jatuh_tempo = ?, status = ?, alamat = ?,
 		    diskon = ?, referred_by_id = ?, referral_balance = ?, referral_code = ?, voucher_discount = ?,
 		    ont_status = ?, ont_ip = ?, ont_uptime = ?, ont_rx_power = ?, ont_tx_power = ?, pppoe_status = ?, pppoe_ip = ?, pppoe_uptime = ?, last_sync_at = ?,
-		    odp_id = ?, voucher_auto_apply = ?, updated_at = CURRENT_TIMESTAMP
+		    odp_id = ?, odp_port = ?, voucher_auto_apply = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address,
 		customer.Diskon, customer.ReferredByID, customer.ReferralBalance, toNullString(customer.ReferralCode), customer.VoucherDiscount,
 		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt,
-		customer.OdpID, customer.VoucherAutoApply, id)
+		customer.OdpID, customer.OdpPort, customer.VoucherAutoApply, id)
 	if err != nil {
 		return Customer{}, fmt.Errorf("update customer: %w", err)
 	}
@@ -635,7 +642,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
 		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
-		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply
+		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
@@ -661,6 +668,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 	var lastSyncAt sql.NullString
 	var odpID sql.NullInt64
 	var odpName sql.NullString
+	var odpPort sql.NullInt64
 
 	err := row.Scan(
 		&item.ID,
@@ -696,6 +704,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		&odpID,
 		&odpName,
 		&item.VoucherAutoApply,
+		&odpPort,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -731,6 +740,10 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 	}
 	if odpName.Valid {
 		item.OdpName = odpName.String
+	}
+	if odpPort.Valid {
+		val := int(odpPort.Int64)
+		item.OdpPort = &val
 	}
 
 	return item, nil

@@ -16,6 +16,7 @@ type Odp struct {
 	Nama          string `json:"nama"`
 	Lokasi        string `json:"lokasi"`
 	Deskripsi     string `json:"deskripsi"`
+	Ports         int    `json:"ports"`
 	CustomerCount int    `json:"customer_count"`
 }
 
@@ -44,6 +45,9 @@ func (s Service) Create(ctx context.Context, o Odp) (Odp, error) {
 	if o.Lokasi == "" {
 		return Odp{}, errors.New("odp location is required")
 	}
+	if o.Ports <= 0 {
+		o.Ports = 8
+	}
 	return s.Repository.Create(ctx, o)
 }
 
@@ -56,6 +60,9 @@ func (s Service) Update(ctx context.Context, id int64, o Odp) (Odp, error) {
 	if o.Lokasi == "" {
 		return Odp{}, errors.New("odp location is required")
 	}
+	if o.Ports <= 0 {
+		o.Ports = 8
+	}
 	return s.Repository.Update(ctx, id, o)
 }
 
@@ -65,10 +72,10 @@ func (s Service) Delete(ctx context.Context, id int64) error {
 
 func (r Repository) List(ctx context.Context) ([]Odp, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), COUNT(c.id)
+		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), o.ports, COUNT(c.id)
 		FROM odp o
 		LEFT JOIN pelanggan c ON c.odp_id = o.id
-		GROUP BY o.id, o.nama, o.lokasi, o.deskripsi
+		GROUP BY o.id, o.nama, o.lokasi, o.deskripsi, o.ports
 		ORDER BY o.id DESC
 	`)
 	if err != nil {
@@ -79,7 +86,7 @@ func (r Repository) List(ctx context.Context) ([]Odp, error) {
 	items := []Odp{}
 	for rows.Next() {
 		var item Odp
-		if err := rows.Scan(&item.ID, &item.Nama, &item.Lokasi, &item.Deskripsi, &item.CustomerCount); err != nil {
+		if err := rows.Scan(&item.ID, &item.Nama, &item.Lokasi, &item.Deskripsi, &item.Ports, &item.CustomerCount); err != nil {
 			return nil, fmt.Errorf("scan odp: %w", err)
 		}
 		items = append(items, item)
@@ -90,12 +97,12 @@ func (r Repository) List(ctx context.Context) ([]Odp, error) {
 func (r Repository) FindByID(ctx context.Context, id int64) (Odp, error) {
 	var item Odp
 	err := r.DB.QueryRowContext(ctx, `
-		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), COUNT(c.id)
+		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), o.ports, COUNT(c.id)
 		FROM odp o
 		LEFT JOIN pelanggan c ON c.odp_id = o.id
 		WHERE o.id = ?
-		GROUP BY o.id, o.nama, o.lokasi, o.deskripsi
-	`, id).Scan(&item.ID, &item.Nama, &item.Lokasi, &item.Deskripsi, &item.CustomerCount)
+		GROUP BY o.id, o.nama, o.lokasi, o.deskripsi, o.ports
+	`, id).Scan(&item.ID, &item.Nama, &item.Lokasi, &item.Deskripsi, &item.Ports, &item.CustomerCount)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Odp{}, ErrOdpNotFound
@@ -107,9 +114,9 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Odp, error) {
 
 func (r Repository) Create(ctx context.Context, o Odp) (Odp, error) {
 	result, err := r.DB.ExecContext(ctx, `
-		INSERT INTO odp (nama, lokasi, deskripsi, updated_at)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-	`, o.Nama, o.Lokasi, strings.TrimSpace(o.Deskripsi))
+		INSERT INTO odp (nama, lokasi, deskripsi, ports, updated_at)
+		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`, o.Nama, o.Lokasi, strings.TrimSpace(o.Deskripsi), o.Ports)
 	if err != nil {
 		return Odp{}, fmt.Errorf("create odp: %w", err)
 	}
@@ -126,9 +133,9 @@ func (r Repository) Create(ctx context.Context, o Odp) (Odp, error) {
 func (r Repository) Update(ctx context.Context, id int64, o Odp) (Odp, error) {
 	result, err := r.DB.ExecContext(ctx, `
 		UPDATE odp
-		SET nama = ?, lokasi = ?, deskripsi = ?, updated_at = CURRENT_TIMESTAMP
+		SET nama = ?, lokasi = ?, deskripsi = ?, ports = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, o.Nama, o.Lokasi, strings.TrimSpace(o.Deskripsi), id)
+	`, o.Nama, o.Lokasi, strings.TrimSpace(o.Deskripsi), o.Ports, id)
 	if err != nil {
 		return Odp{}, fmt.Errorf("update odp: %w", err)
 	}

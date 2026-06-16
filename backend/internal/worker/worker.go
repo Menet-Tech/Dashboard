@@ -581,6 +581,24 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 					// Query device status from GenieACS Client
 					status, err := acsClient.GetDeviceStatus(ctx, serialNum)
 					if err == nil {
+						if cust.OntStatus == "online" && status.Status == "offline" {
+							if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_gacs_offline") {
+								matiKapan := time.Now().Format("2006-01-02 15:04:05")
+								alertMsg := fmt.Sprintf("🚨 **ONT CLIENT OFFLINE DETECTED** 🚨\n"+
+									"• **Nama Pelanggan**: %s\n"+
+									"• **User PPPoE**: %s\n"+
+									"• **Serial Number (SN)**: %s\n"+
+									"• **Waktu Mati**: %s\n"+
+									"• **Redaman Terakhir**: %s (Tx: %s)\n"+
+									"• **IP Address**: %s\n"+
+									"• **Status**: OFFLINE 🔴",
+									cust.Name, cust.UserPPPoE, serialNum, matiKapan, status.RxOpticalPower, status.TxOpticalPower, status.IPAddress)
+								go func(msg string) {
+									_ = s.Discord.SendAlert(context.Background(), msg)
+								}(alertMsg)
+							}
+						}
+
 						if cust.OntStatus != status.Status || cust.OntIP != status.IPAddress || cust.OntUptime != status.Uptime || cust.OntRxPower != status.RxOpticalPower || cust.OntTxPower != status.TxOpticalPower {
 							cust.OntStatus = status.Status
 							cust.OntIP = status.IPAddress

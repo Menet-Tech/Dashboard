@@ -308,8 +308,12 @@ export function CustomerDetailModal({
               <strong className="text-slate-800 text-sm mt-0.5 block">Tanggal {customer.due_day}</strong>
             </div>
             <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">ODP Node</span>
-              <strong className="text-slate-800 text-sm mt-0.5 block">{customer.odp_name || "Belum Terhubung"}</strong>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">ODP Node / Port</span>
+              <strong className="text-slate-800 text-sm mt-0.5 block">
+                {customer.odp_name
+                  ? `${customer.odp_name} ${customer.odp_port ? `(Port ${customer.odp_port})` : ""}`
+                  : "Belum Terhubung"}
+              </strong>
             </div>
             <div>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Diskon Bulanan</span>

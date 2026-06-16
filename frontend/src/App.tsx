@@ -477,6 +477,7 @@ export default function App() {
               referred_by_id: customer.referred_by_id ?? 0,
               referral_balance: customer.referral_balance ?? 0,
               odp_id: customer.odp_id ?? 0,
+              odp_port: customer.odp_port ?? undefined,
             });
           }}
           onCancelEdit={() => {
