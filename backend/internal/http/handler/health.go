@@ -77,9 +77,6 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	billingRetryCount, _ := h.Settings.GetString(ctx, "worker_billing_retry_count")
 	billingNextRun, _ := h.Settings.GetString(ctx, "worker_billing_next_run")
 	waGatewayURL, _ := h.Settings.GetString(ctx, settings.KeyWAGatewayURL)
-	if strings.TrimSpace(waGatewayURL) == "" {
-		waGatewayURL = "http://localhost:3001"
-	}
 	waAPIKey, _ := h.Settings.GetString(ctx, settings.KeyWAAPIKey)
 	discordWebhookURL, _ := h.Settings.GetString(ctx, settings.KeyDiscordWebhookURL)
 	mikrotikHost, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
@@ -89,6 +86,24 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	acsUsername, _ := h.Settings.GetString(ctx, settings.KeyACSUsername)
 	acsPassword, _ := h.Settings.GetString(ctx, settings.KeyACSPassword)
 	billingAutoEnabled := strings.TrimSpace(billingAutoEnabledValue) != "0"
+
+	// Treat empty URL or the bare localhost default as "not configured" — the user
+	// must explicitly save a real URL+API-key in settings for WhatsApp to be active.
+	waURLTrimmed := strings.TrimSpace(waGatewayURL)
+	waConfigured := waURLTrimmed != "" &&
+		waURLTrimmed != "http://localhost:3001" &&
+		strings.TrimSpace(waAPIKey) != ""
+
+	// Apply localhost fallback only for the actual HTTP reachability check.
+	if waURLTrimmed == "" {
+		waGatewayURL = "http://localhost:3001"
+	}
+
+	discordConfigured := strings.TrimSpace(discordWebhookURL) != ""
+	mikrotikConfigured := strings.TrimSpace(mikrotikHost) != "" &&
+		strings.TrimSpace(mikrotikUser) != "" &&
+		strings.TrimSpace(mikrotikPass) != ""
+	genieACSConfigured := strings.TrimSpace(acsURL) != ""
 
 	dbQuickCheck := "unknown"
 	dbQuickCheckMessage := "belum diperiksa"
@@ -135,12 +150,8 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 		alerts = append(alerts, "backup hari ini belum berjalan")
 	}
 
-	waConfigured := strings.TrimSpace(waGatewayURL) != "" && strings.TrimSpace(waAPIKey) != ""
-	discordConfigured := strings.TrimSpace(discordWebhookURL) != ""
-	mikrotikConfigured := strings.TrimSpace(mikrotikHost) != "" &&
-		strings.TrimSpace(mikrotikUser) != "" &&
-		strings.TrimSpace(mikrotikPass) != ""
-	genieACSConfigured := strings.TrimSpace(acsURL) != ""
+
+
 
 	// Real-time online checks
 	waOnline := false

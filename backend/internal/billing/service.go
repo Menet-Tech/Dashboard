@@ -12,6 +12,7 @@ import (
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/settings"
+	"menettech/dashboard/backend/internal/templates"
 )
 
 var ErrBillNotFound = errors.New("bill not found")
@@ -86,6 +87,7 @@ type Service struct {
 	WhatsApp      WhatsAppSender
 	Discord       notifications.DiscordSender
 	Notifications notifications.NotificationLogRepository
+	Templates     templates.Service
 }
 
 type FilterOptions struct {
@@ -162,31 +164,33 @@ func (s Service) MarkPaid(ctx context.Context, billID int64, method string, user
 		}
 	}
 
-	if s.WhatsApp != nil {
-		go func() {
-			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			detail, err := s.FindByID(bgCtx, billID)
-			if err != nil {
-				return
-			}
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		detail, err := s.FindByID(bgCtx, billID)
+		if err != nil {
+			return
+		}
+		templateData := map[string]string{
+			"nama":              detail.CustomerName,
+			"periode":           detail.Period,
+			"jatuh_tempo":       formatDateLabel(detail.DueDate),
+			"invoice_number":    detail.InvoiceNumber,
+			"nominal":           formatIDRCurrency(detail.Amount),
+			"status_pembayaran": "lunas",
+			"paket":             detail.PackageName,
+			"kecepatan_paket":   strconv.Itoa(detail.PackageSpeed),
+		}
+		if s.WhatsApp != nil {
 			_ = s.WhatsApp.SendTemplate(bgCtx, notifications.BillMessagePayload{
 				BillID:      billID,
 				TriggerKey:  "lunas",
 				PhoneNumber: detail.CustomerPhone,
-				MessageData: map[string]string{
-					"nama":              detail.CustomerName,
-					"periode":           detail.Period,
-					"jatuh_tempo":       formatDateLabel(detail.DueDate),
-					"invoice_number":    detail.InvoiceNumber,
-					"nominal":           formatIDRCurrency(detail.Amount),
-					"status_pembayaran": "lunas",
-					"paket":             detail.PackageName,
-					"kecepatan_paket":   strconv.Itoa(detail.PackageSpeed),
-				},
+				MessageData: templateData,
 			})
-		}()
-	}
+		}
+		s.QueueEmailForTrigger(bgCtx, billID, "lunas", templateData)
+	}()
 
 	if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_payment") {
 		go func() {
@@ -227,31 +231,111 @@ func (s Service) SendManualNotification(ctx context.Context, billID int64, trigg
 		return err
 	}
 
-	if s.WhatsApp == nil {
-		return errors.New("whatsapp sender is not configured")
+	templateData := map[string]string{
+		"nama":              detail.CustomerName,
+		"periode":           detail.Period,
+		"jatuh_tempo":       formatDateLabel(detail.DueDate),
+		"invoice_number":    detail.InvoiceNumber,
+		"nominal":           formatIDRCurrency(detail.Amount),
+		"status_pembayaran": detail.Status,
+		"paket":             detail.PackageName,
+		"kecepatan_paket":   strconv.Itoa(detail.PackageSpeed),
 	}
 
-	err = s.WhatsApp.SendTemplate(ctx, notifications.BillMessagePayload{
-		BillID:      billID,
-		TriggerKey:  triggerKey,
-		PhoneNumber: detail.CustomerPhone,
-		Force:       true,
-		MessageData: map[string]string{
-			"nama":              detail.CustomerName,
-			"periode":           detail.Period,
-			"jatuh_tempo":       formatDateLabel(detail.DueDate),
-			"invoice_number":    detail.InvoiceNumber,
-			"nominal":           formatIDRCurrency(detail.Amount),
-			"status_pembayaran": detail.Status,
-			"paket":             detail.PackageName,
-			"kecepatan_paket":   strconv.Itoa(detail.PackageSpeed),
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to send manual notification: %w", err)
+	if s.WhatsApp != nil {
+		_ = s.WhatsApp.SendTemplate(ctx, notifications.BillMessagePayload{
+			BillID:      billID,
+			TriggerKey:  triggerKey,
+			PhoneNumber: detail.CustomerPhone,
+			Force:       true,
+			MessageData: templateData,
+		})
 	}
+
+	s.QueueEmailForTrigger(ctx, billID, triggerKey, templateData)
 
 	return nil
+}
+
+func (s Service) QueueEmailForTrigger(ctx context.Context, billID int64, triggerKey string, templateData map[string]string) {
+	if s.Repository.DB == nil {
+		return
+	}
+	var email string
+	err := s.Repository.DB.QueryRowContext(ctx, `
+		SELECT COALESCE(c.email, '')
+		FROM tagihan t
+		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
+		WHERE t.id = ?
+	`, billID).Scan(&email)
+	email = strings.TrimSpace(email)
+	if err != nil || email == "" {
+		return
+	}
+
+	subject := ""
+	body := ""
+
+	// Try loading custom template
+	customTpl, err := s.Templates.FindActiveEmailTemplateByTrigger(ctx, triggerKey)
+	if err == nil && customTpl.IsActive {
+		subject = templates.Render(customTpl.Subject, templateData)
+		body = templates.Render(customTpl.Content, templateData)
+	} else {
+		// Fallback to hardcoded defaults
+		switch triggerKey {
+		case "reminder_custom":
+			subject = fmt.Sprintf("Pengingat Tagihan Internet %s", templateData["invoice_number"])
+			body = fmt.Sprintf("Yth. %s,\n\n"+
+				"Ini adalah pengingat bahwa tagihan internet Anda periode %s dengan nomor invoice %s sebesar %s akan jatuh tempo pada tanggal %s.\n\n"+
+				"Mohon lakukan pembayaran sebelum jatuh tempo untuk menghindari pembatasan layanan.\n\n"+
+				"Terima kasih,\nLayanan Billing",
+				templateData["nama"], templateData["periode"], templateData["invoice_number"], templateData["nominal"], templateData["jatuh_tempo"])
+		case "jatuh_tempo":
+			subject = fmt.Sprintf("Tagihan Internet Jatuh Hari Ini - %s", templateData["invoice_number"])
+			body = fmt.Sprintf("Yth. %s,\n\n"+
+				"Hari ini adalah tanggal jatuh tempo pembayaran internet Anda periode %s dengan nomor invoice %s sebesar %s.\n\n"+
+				"Mohon segera melakukan pembayaran agar layanan Anda tidak terputus.\n\n"+
+				"Terima kasih,\nLayanan Billing",
+				templateData["nama"], templateData["periode"], templateData["invoice_number"], templateData["nominal"])
+		case "limit_5hari":
+			subject = fmt.Sprintf("Pemberitahuan Layanan Terisolir - %s", templateData["invoice_number"])
+			body = fmt.Sprintf("Yth. %s,\n\n"+
+				"Layanan internet Anda untuk nomor invoice %s periode %s telah diisolir sementara karena pembayaran melewati batas jatuh tempo (menunggak %s hari).\n\n"+
+				"Layanan akan otomatis aktif kembali setelah pembayaran dikonfirmasi.\n\n"+
+				"Terima kasih,\nLayanan Billing",
+				templateData["nama"], templateData["invoice_number"], templateData["periode"], templateData["hari_limit"])
+		case "lunas":
+			subject = fmt.Sprintf("Pembayaran Berhasil - %s", templateData["invoice_number"])
+			body = fmt.Sprintf("Yth. %s,\n\n"+
+				"Terima kasih, pembayaran Anda untuk invoice %s periode %s sebesar %s telah kami terima dan berstatus Lunas.\n\n"+
+				"Terima kasih telah menggunakan layanan kami.\n\n"+
+				"Terima kasih,\nLayanan Billing",
+				templateData["nama"], templateData["invoice_number"], templateData["periode"], templateData["nominal"])
+		default:
+			subject = fmt.Sprintf("Notifikasi Tagihan Internet - %s", templateData["invoice_number"])
+			body = fmt.Sprintf("Yth. %s,\n\n"+
+				"Ini adalah notifikasi mengenai tagihan internet Anda:\n"+
+				"- No. Invoice: %s\n"+
+				"- Paket: %s (%s Mbps)\n"+
+				"- Periode: %s\n"+
+				"- Nominal: %s\n"+
+				"- Jatuh Tempo: %s\n\n"+
+				"Mohon lakukan pembayaran sebelum tanggal jatuh tempo untuk menghindari pembatasan layanan (isolir).\n\n"+
+				"Terima kasih,\nLayanan Billing",
+				templateData["nama"], templateData["invoice_number"], templateData["paket"], templateData["kecepatan_paket"], templateData["periode"], templateData["nominal"], templateData["jatuh_tempo"])
+		}
+	}
+
+	_, err = s.Repository.DB.ExecContext(ctx, `
+		INSERT INTO email_queue (to_email, subject, body, status, attempts)
+		VALUES (?, ?, ?, 'pending', 0)
+	`, email, subject, body)
+	if err != nil {
+		slog.Error("failed to queue email notification", "trigger", triggerKey, "error", err)
+	} else {
+		slog.Info("queued email notification", "trigger", triggerKey, "to", email)
+	}
 }
 
 func (s Service) AttachProof(ctx context.Context, billID int64, proofPath string) error {

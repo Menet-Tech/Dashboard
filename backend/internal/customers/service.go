@@ -24,6 +24,7 @@ type Customer struct {
 	UserPPPoE       string  `json:"user_pppoe"`
 	PasswordPPPoE   string  `json:"password_pppoe"`
 	WhatsApp        string  `json:"whatsapp"`
+	Email           string  `json:"email"`
 	SNOnt           string  `json:"sn_ont"`
 	DueDay          int     `json:"due_day"`
 	Status          string  `json:"status"`
@@ -116,9 +117,22 @@ func (s Service) UpdateStatus(ctx context.Context, id int64, status string) erro
 	return nil
 }
 
-// SyncToMikrotik loads the router configuration, connects, and synchronizes the customer secret state.
-func (s Service) SyncToMikrotik(ctx context.Context, customer Customer) error {
-	if s.Settings.Repository.DB == nil {
+func (s Service) Delete(ctx context.Context, id int64) error {
+	customer, err := s.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Delete from Mikrotik first (or try to, log warning if fails)
+	_ = s.DeleteFromMikrotik(ctx, customer)
+
+	// Delete from local database
+	return s.Repository.Delete(ctx, id)
+}
+
+// DeleteFromMikrotik connects to all active RouterOS units and deletes the customer's PPPoE secret.
+func (s Service) DeleteFromMikrotik(ctx context.Context, customer Customer) error {
+	if s.Repository.DB == nil {
 		return nil
 	}
 
@@ -127,12 +141,64 @@ func (s Service) SyncToMikrotik(ctx context.Context, customer Customer) error {
 		return nil
 	}
 
-	host, _ := s.Settings.GetString(ctx, settings.KeyMikrotikHost)
-	user, _ := s.Settings.GetString(ctx, settings.KeyMikrotikUser)
-	pass, _ := s.Settings.GetString(ctx, settings.KeyMikrotikPass)
+	// Fetch active routers from mikrotik_routers table
+	routerSvc := mikrotik.NewRouterService(s.Repository.DB)
+	routers, err := routerSvc.ListActive(ctx)
 
-	if strings.TrimSpace(host) == "" || strings.TrimSpace(user) == "" || strings.TrimSpace(pass) == "" {
-		return nil // MikroTik not configured, skip silently
+	// Fallback to legacy single router if list is empty
+	if err != nil || len(routers) == 0 {
+		host, _ := s.Settings.GetString(ctx, settings.KeyMikrotikHost)
+		user, _ := s.Settings.GetString(ctx, settings.KeyMikrotikUser)
+		pass, _ := s.Settings.GetString(ctx, settings.KeyMikrotikPass)
+
+		if strings.TrimSpace(host) != "" && strings.TrimSpace(user) != "" {
+			routers = append(routers, mikrotik.Router{
+				Name:     "Router Legacy",
+				Host:     host,
+				Username: user,
+				Password: pass,
+				IsActive: true,
+			})
+		}
+	}
+
+	if len(routers) == 0 {
+		return nil // No routers configured
+	}
+
+	var lastErr error
+	for _, r := range routers {
+		client := mikrotik.NewClient(r.Host, r.Username, r.Password)
+		if err := client.Connect(ctx); err != nil {
+			slog.Error("failed to connect to MikroTik during delete", "router", r.Name, "customer", customer.Name, "error", err)
+			lastErr = err
+			continue
+		}
+
+		err = client.DeleteSecret(ctx, username)
+		client.Close()
+
+		if err != nil {
+			slog.Error("failed to delete customer secret from MikroTik", "router", r.Name, "customer", customer.Name, "error", err)
+			lastErr = err
+		} else {
+			slog.Info("successfully deleted customer secret from MikroTik", "router", r.Name, "customer", customer.Name)
+		}
+	}
+
+	return lastErr
+}
+
+
+// SyncToMikrotik loads the router configuration, connects, and synchronizes the customer secret state.
+func (s Service) SyncToMikrotik(ctx context.Context, customer Customer) error {
+	if s.Repository.DB == nil {
+		return nil
+	}
+
+	username := strings.TrimSpace(customer.UserPPPoE)
+	if username == "" {
+		return nil
 	}
 
 	// Fetch the package name to use as the profile
@@ -142,20 +208,61 @@ func (s Service) SyncToMikrotik(ctx context.Context, customer Customer) error {
 		profileName = "default"
 	}
 
-	client := mikrotik.NewClient(host, user, pass)
-	if err := client.Connect(ctx); err != nil {
-		slog.Error("failed to connect to MikroTik during sync", "customer", customer.Name, "error", err)
-		return err
-	}
-	defer client.Close()
-
-	if err := client.SyncCustomer(ctx, username, customer.PasswordPPPoE, profileName, customer.Status); err != nil {
-		slog.Error("failed to sync customer secret to MikroTik", "customer", customer.Name, "error", err)
-		return err
+	if customer.Status == "limit" {
+		isolirProfile, err := s.Settings.GetString(ctx, settings.KeyMikrotikIsolirProfile)
+		if err == nil && strings.TrimSpace(isolirProfile) != "" {
+			profileName = strings.TrimSpace(isolirProfile)
+		} else {
+			profileName = "isolir"
+		}
 	}
 
-	slog.Info("successfully synced customer secret to MikroTik", "customer", customer.Name, "status", customer.Status)
-	return nil
+	// Fetch active routers from mikrotik_routers table
+	routerSvc := mikrotik.NewRouterService(s.Repository.DB)
+	routers, err := routerSvc.ListActive(ctx)
+
+	// Fallback to legacy single router if list is empty
+	if err != nil || len(routers) == 0 {
+		host, _ := s.Settings.GetString(ctx, settings.KeyMikrotikHost)
+		user, _ := s.Settings.GetString(ctx, settings.KeyMikrotikUser)
+		pass, _ := s.Settings.GetString(ctx, settings.KeyMikrotikPass)
+
+		if strings.TrimSpace(host) != "" && strings.TrimSpace(user) != "" {
+			routers = append(routers, mikrotik.Router{
+				Name:     "Router Legacy",
+				Host:     host,
+				Username: user,
+				Password: pass,
+				IsActive: true,
+			})
+		}
+	}
+
+	if len(routers) == 0 {
+		return nil // No routers configured
+	}
+
+	var lastErr error
+	for _, r := range routers {
+		client := mikrotik.NewClient(r.Host, r.Username, r.Password)
+		if err := client.Connect(ctx); err != nil {
+			slog.Error("failed to connect to MikroTik during sync", "router", r.Name, "customer", customer.Name, "error", err)
+			lastErr = err
+			continue
+		}
+
+		err = client.SyncCustomer(ctx, username, customer.PasswordPPPoE, profileName, customer.Status)
+		client.Close()
+
+		if err != nil {
+			slog.Error("failed to sync customer secret to MikroTik", "router", r.Name, "customer", customer.Name, "error", err)
+			lastErr = err
+		} else {
+			slog.Info("successfully synced customer secret to MikroTik", "router", r.Name, "customer", customer.Name, "status", customer.Status)
+		}
+	}
+
+	return lastErr
 }
 
 // ListTrialExpired returns all customers whose trial period has expired
@@ -173,9 +280,25 @@ func normalizeCustomer(customer Customer) Customer {
 	customer.UserPPPoE = strings.TrimSpace(customer.UserPPPoE)
 	customer.PasswordPPPoE = strings.TrimSpace(customer.PasswordPPPoE)
 	customer.WhatsApp = strings.TrimSpace(customer.WhatsApp)
+	customer.Email = strings.TrimSpace(customer.Email)
 	customer.SNOnt = strings.TrimSpace(customer.SNOnt)
 	customer.Address = strings.TrimSpace(customer.Address)
 	customer.Status = strings.TrimSpace(customer.Status)
+
+	if customer.OdpID != nil && *customer.OdpID > 0 {
+		if customer.OdpPort == nil || *customer.OdpPort <= 0 {
+			defaultPort := 1
+			customer.OdpPort = &defaultPort
+		}
+	} else {
+		customer.OdpID = nil
+		customer.OdpPort = nil
+	}
+
+	if customer.ReferredByID != nil && *customer.ReferredByID <= 0 {
+		customer.ReferredByID = nil
+	}
+
 	return customer
 }
 
@@ -217,7 +340,7 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
 		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
-		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port
+		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port, COALESCE(c.email, '')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
@@ -249,6 +372,7 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		var odpID sql.NullInt64
 		var odpName sql.NullString
 		var odpPort sql.NullInt64
+		var email sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.Name,
@@ -284,6 +408,7 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 			&odpName,
 			&item.VoucherAutoApply,
 			&odpPort,
+			&email,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
@@ -300,6 +425,7 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		if referredByName.Valid {
 			item.ReferredByName = referredByName.String
 		}
+		item.Email = email.String
 		item.OntStatus = ontStatus.String
 		item.OntIP = ontIP.String
 		item.OntUptime = ontUptime.String
@@ -359,11 +485,11 @@ func (r Repository) Create(ctx context.Context, customer Customer) (Customer, er
 		INSERT INTO pelanggan (
 			nama, paket_id, user_pppoe, password_pppoe, nomor_wa, sn_ont, tgl_jatuh_tempo, status, alamat,
 			is_trial, trial_started_at, trial_days, diskon, referred_by_id, referral_balance, referral_code, voucher_discount,
-			ont_status, ont_ip, ont_uptime, ont_rx_power, ont_tx_power, pppoe_status, pppoe_ip, pppoe_uptime, last_sync_at, odp_id, odp_port, updated_at
+			ont_status, ont_ip, ont_uptime, ont_rx_power, ont_tx_power, pppoe_status, pppoe_ip, pppoe_uptime, last_sync_at, odp_id, odp_port, email, updated_at
 		)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address, 1, trialDays, customer.Diskon, customer.ReferredByID, customer.ReferralBalance, referralCode, customer.VoucherDiscount,
-		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt, customer.OdpID, customer.OdpPort)
+		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt, customer.OdpID, customer.OdpPort, customer.Email)
 	if err != nil {
 		_ = tx.Rollback()
 		return Customer{}, fmt.Errorf("create customer: %w", err)
@@ -420,12 +546,12 @@ func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Cu
 		SET nama = ?, paket_id = ?, user_pppoe = ?, password_pppoe = ?, nomor_wa = ?, sn_ont = ?, tgl_jatuh_tempo = ?, status = ?, alamat = ?,
 		    diskon = ?, referred_by_id = ?, referral_balance = ?, referral_code = ?, voucher_discount = ?,
 		    ont_status = ?, ont_ip = ?, ont_uptime = ?, ont_rx_power = ?, ont_tx_power = ?, pppoe_status = ?, pppoe_ip = ?, pppoe_uptime = ?, last_sync_at = ?,
-		    odp_id = ?, odp_port = ?, voucher_auto_apply = ?, updated_at = CURRENT_TIMESTAMP
+		    odp_id = ?, odp_port = ?, voucher_auto_apply = ?, email = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address,
 		customer.Diskon, customer.ReferredByID, customer.ReferralBalance, toNullString(customer.ReferralCode), customer.VoucherDiscount,
 		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt,
-		customer.OdpID, customer.OdpPort, customer.VoucherAutoApply, id)
+		customer.OdpID, customer.OdpPort, customer.VoucherAutoApply, customer.Email, id)
 	if err != nil {
 		return Customer{}, fmt.Errorf("update customer: %w", err)
 	}
@@ -482,6 +608,25 @@ func (r Repository) UpdateStatus(ctx context.Context, id int64, status string) e
 	return nil
 }
 
+func (r Repository) Delete(ctx context.Context, id int64) error {
+	result, err := r.DB.ExecContext(ctx, "DELETE FROM pelanggan WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("delete customer: %w", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete customer rows affected: %w", err)
+	}
+
+	if affected == 0 {
+		return ErrCustomerNotFound
+	}
+
+	return nil
+}
+
+
 func (r Repository) ensurePackageExists(ctx context.Context, packageID int64) error {
 	var count int
 	if err := r.DB.QueryRowContext(ctx, `SELECT COUNT(1) FROM paket WHERE id = ?`, packageID).Scan(&count); err != nil {
@@ -505,7 +650,7 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
 		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
-		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply
+		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, COALESCE(c.email, '')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
@@ -539,6 +684,7 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 		var lastSyncAt sql.NullString
 		var odpID sql.NullInt64
 		var odpName sql.NullString
+		var email sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.Name,
@@ -573,6 +719,7 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 			&odpID,
 			&odpName,
 			&item.VoucherAutoApply,
+			&email,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
@@ -589,6 +736,7 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 		if referredByName.Valid {
 			item.ReferredByName = referredByName.String
 		}
+		item.Email = email.String
 		item.OntStatus = ontStatus.String
 		item.OntIP = ontIP.String
 		item.OntUptime = ontUptime.String
@@ -642,7 +790,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
 		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
-		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port
+		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port, COALESCE(c.email, '')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
@@ -669,6 +817,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 	var odpID sql.NullInt64
 	var odpName sql.NullString
 	var odpPort sql.NullInt64
+	var email sql.NullString
 
 	err := row.Scan(
 		&item.ID,
@@ -705,6 +854,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		&odpName,
 		&item.VoucherAutoApply,
 		&odpPort,
+		&email,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -717,6 +867,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 	if trialStartedAt != "" {
 		item.TrialStartedAt = &trialStartedAt
 	}
+	item.Email = email.String
 	if referredByID.Valid {
 		item.ReferredByID = &referredByID.Int64
 	}

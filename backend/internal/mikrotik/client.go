@@ -427,7 +427,10 @@ func (c *Client) SyncCustomer(ctx context.Context, username, password, profile, 
 		}
 		disabled = "no"
 	case "limit":
-		targetProfile = "isolir" // default isolir profile name
+		targetProfile = profile
+		if targetProfile == "" {
+			targetProfile = "isolir"
+		}
 		disabled = "no"
 	case "inactive":
 		targetProfile = profile
@@ -451,6 +454,7 @@ func (c *Client) SyncCustomer(ctx context.Context, username, password, profile, 
 			"=password="+password,
 			"=profile="+targetProfile,
 			"=disabled="+disabled,
+			"=service=pppoe",
 		)
 		if err != nil {
 			return fmt.Errorf("update ppp secret %q: %w", username, err)
@@ -477,6 +481,60 @@ func (c *Client) SyncCustomer(ctx context.Context, username, password, profile, 
 	}
 
 	// 2. Kick active session if one exists to apply profile/disabled changes instantly
+	activeReply, err := c.run(ctx,
+		"/ppp/active/print",
+		"?name="+username,
+	)
+	if err == nil && len(activeReply) > 0 && hasError(activeReply) == nil {
+		activeID := extractField(activeReply, ".id")
+		if activeID != "" {
+			_, _ = c.run(ctx,
+				"/ppp/active/remove",
+				"=.id="+activeID,
+			)
+		}
+	}
+
+	return nil
+}
+
+// DeleteSecret removes a PPPoE secret in MikroTik, and kicks any active session for that user.
+func (c *Client) DeleteSecret(ctx context.Context, username string) error {
+	if c.conn == nil {
+		return fmt.Errorf("not connected to RouterOS")
+	}
+	if username == "" {
+		return nil
+	}
+
+	// 1. Find the secret ID
+	reply, err := c.run(ctx,
+		"/ppp/secret/print",
+		"?name="+username,
+	)
+	if err != nil {
+		return fmt.Errorf("find ppp secret %q for delete: %w", username, err)
+	}
+	if err := hasError(reply); err != nil {
+		return fmt.Errorf("find ppp secret error for delete %q: %w", username, err)
+	}
+
+	id := extractField(reply, ".id")
+	if id != "" {
+		// Remove existing secret
+		removeReply, err := c.run(ctx,
+			"/ppp/secret/remove",
+			"=.id="+id,
+		)
+		if err != nil {
+			return fmt.Errorf("remove ppp secret %q: %w", username, err)
+		}
+		if err := hasError(removeReply); err != nil {
+			return fmt.Errorf("remove ppp secret error for %q: %w", username, err)
+		}
+	}
+
+	// 2. Kick active session if one exists
 	activeReply, err := c.run(ctx,
 		"/ppp/active/print",
 		"?name="+username,
@@ -580,5 +638,174 @@ func (c *Client) ListProfiles(ctx context.Context) ([]PPPoEProfile, error) {
 	}
 
 	return profiles, nil
+}
+
+type IPPool struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Ranges string `json:"ranges"`
+}
+
+// ListIPPools retrieves all IP pools from RouterOS /ip/pool/print.
+func (c *Client) ListIPPools(ctx context.Context) ([]IPPool, error) {
+	if c.conn == nil {
+		return nil, fmt.Errorf("not connected to RouterOS")
+	}
+
+	reply, err := c.run(ctx, "/ip/pool/print")
+	if err != nil {
+		return nil, fmt.Errorf("list ip pools: %w", err)
+	}
+	if err := hasError(reply); err != nil {
+		return nil, fmt.Errorf("list ip pools error: %w", err)
+	}
+
+	var pools []IPPool
+	for _, sentence := range reply {
+		hasRe := false
+		for _, word := range sentence {
+			if word == "!re" {
+				hasRe = true
+				break
+			}
+		}
+		if !hasRe {
+			continue
+		}
+
+		var p IPPool
+		for _, word := range sentence {
+			if strings.HasPrefix(word, "=.id=") {
+				p.ID = strings.TrimPrefix(word, "=.id=")
+			} else if strings.HasPrefix(word, "=name=") {
+				p.Name = strings.TrimPrefix(word, "=name=")
+			} else if strings.HasPrefix(word, "=ranges=") {
+				p.Ranges = strings.TrimPrefix(word, "=ranges=")
+			}
+		}
+		if p.Name != "" {
+			pools = append(pools, p)
+		}
+	}
+
+	return pools, nil
+}
+
+// AddIPPool adds or updates an IP pool in RouterOS /ip/pool/add or /ip/pool/set.
+func (c *Client) AddIPPool(ctx context.Context, name, ranges string) error {
+	if c.conn == nil {
+		return fmt.Errorf("not connected to RouterOS")
+	}
+
+	// Check if already exists
+	reply, err := c.run(ctx, "/ip/pool/print", "?name="+name)
+	if err == nil && len(reply) > 0 && hasDone(reply) {
+		id := extractField(reply, ".id")
+		if id != "" {
+			setReply, err := c.run(ctx, "/ip/pool/set", "=.id="+id, "=ranges="+ranges)
+			if err != nil {
+				return err
+			}
+			return hasError(setReply)
+		}
+	}
+
+	addReply, err := c.run(ctx,
+		"/ip/pool/add",
+		"=name="+name,
+		"=ranges="+ranges,
+	)
+	if err != nil {
+		return err
+	}
+	return hasError(addReply)
+}
+
+// SyncPPPProfile creates or updates a PPP profile in RouterOS.
+func (c *Client) SyncPPPProfile(ctx context.Context, name, localAddr, remoteAddr, rateLimit string) error {
+	if c.conn == nil {
+		return fmt.Errorf("not connected to RouterOS")
+	}
+
+	reply, err := c.run(ctx, "/ppp/profile/print", "?name="+name)
+	if err != nil {
+		return err
+	}
+	if err := hasError(reply); err != nil {
+		return err
+	}
+
+	id := extractField(reply, ".id")
+
+	if id != "" {
+		setReply, err := c.run(ctx,
+			"/ppp/profile/set",
+			"=.id="+id,
+			"=local-address="+localAddr,
+			"=remote-address="+remoteAddr,
+			"=rate-limit="+rateLimit,
+		)
+		if err != nil {
+			return err
+		}
+		return hasError(setReply)
+	}
+
+	addReply, err := c.run(ctx,
+		"/ppp/profile/add",
+		"=name="+name,
+		"=local-address="+localAddr,
+		"=remote-address="+remoteAddr,
+		"=rate-limit="+rateLimit,
+	)
+	if err != nil {
+		return err
+	}
+	return hasError(addReply)
+}
+
+// DeletePPPProfile deletes a PPP profile by name if it exists.
+func (c *Client) DeletePPPProfile(ctx context.Context, name string) error {
+	if c.conn == nil {
+		return fmt.Errorf("not connected to RouterOS")
+	}
+	reply, err := c.run(ctx, "/ppp/profile/print", "?name="+name)
+	if err != nil {
+		return err
+	}
+	id := extractField(reply, ".id")
+	if id != "" {
+		removeReply, err := c.run(ctx, "/ppp/profile/remove", "=.id="+id)
+		if err != nil {
+			return err
+		}
+		return hasError(removeReply)
+	}
+	return nil
+}
+
+// DeleteIPPool deletes an IP pool by name if it exists.
+func (c *Client) DeleteIPPool(ctx context.Context, name string) error {
+	if c.conn == nil {
+		return fmt.Errorf("not connected to RouterOS")
+	}
+	reply, err := c.run(ctx, "/ip/pool/print", "?name="+name)
+	if err != nil {
+		return err
+	}
+	id := extractField(reply, ".id")
+	if id != "" {
+		removeReply, err := c.run(ctx, "/ip/pool/remove", "=.id="+id)
+		if err != nil {
+			return err
+		}
+		return hasError(removeReply)
+	}
+	return nil
+}
+
+type TrafficStats struct {
+	TxRate int64 `json:"tx_rate"` // bps
+	RxRate int64 `json:"rx_rate"` // bps
 }
 

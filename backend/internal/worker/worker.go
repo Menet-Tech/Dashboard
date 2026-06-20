@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+
 
 	"menettech/dashboard/backend/internal/backup"
 	"menettech/dashboard/backend/internal/billing"
@@ -28,6 +30,8 @@ type Service struct {
 	Discord   notifications.DiscordSender
 	Backup    *backup.Service
 	Customers customers.Service
+	Email     *notifications.EmailService
+	DB        *sql.DB
 }
 
 const scheduledBillingLockTTL = 30 * time.Minute
@@ -43,8 +47,9 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 		lockTTLSeconds = int(interval.Seconds())*3 + 60
 	}
 
-	// Start queue processor in background
+	// Start queue processors in background
 	go s.startQueueProcessor(ctx)
+	go s.startEmailQueueProcessor(ctx)
 
 	acquiredLease, err := s.acquireWorkerLease(ctx, owner, lockTTLSeconds)
 	if err != nil {
@@ -94,6 +99,34 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 				if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
 					_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Worker Run Error**: %v", err))
 				}
+			}
+		}
+	}
+}
+
+func (s Service) startEmailQueueProcessor(ctx context.Context) {
+	if s.Email == nil {
+		s.Logger.Warn("email queue processor: service is nil, skipping")
+		return
+	}
+	s.Logger.Info("email queue processor started")
+	for {
+		select {
+		case <-ctx.Done():
+			s.Logger.Info("email queue processor stopped")
+			return
+		default:
+			processed, err := s.Email.ProcessQueue(ctx)
+			if err != nil {
+				s.Logger.Error("email queue processing encountered error", "error", err)
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			if processed {
+				time.Sleep(1 * time.Second) // 1s throttle between mails
+			} else {
+				time.Sleep(500 * time.Millisecond)
 			}
 		}
 	}
@@ -194,12 +227,15 @@ func (s Service) RunOnce(ctx context.Context) error {
 		LimitDays:      limitDays,
 		TrialGraceDays: trialGraceDays,
 		SendWhatsApp: func(ctx context.Context, payload billing.AutomationMessage) error {
-			return s.WhatsApp.SendTemplate(ctx, notifications.BillMessagePayload{
+			waErr := s.WhatsApp.SendTemplate(ctx, notifications.BillMessagePayload{
 				BillID:      payload.BillID,
 				TriggerKey:  payload.TriggerKey,
 				PhoneNumber: payload.PhoneNumber,
 				MessageData: payload.TemplateData,
 			})
+
+			s.Billing.QueueEmailForTrigger(ctx, payload.BillID, payload.TriggerKey, payload.TemplateData)
+			return waErr
 		},
 		SendDiscord: func(ctx context.Context, message string) error {
 			if s.Discord == nil || !s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
@@ -490,25 +526,47 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 		return nil
 	}
 
-	// 1. Fetch MikroTik Active Connections
+	// 1. Fetch MikroTik Active Connections from all active routers, with legacy fallback
 	activePPPMap := make(map[string]mikrotik.PPPActive)
-	mikrotikHost, _ := s.Settings.GetString(ctx, settings.KeyMikrotikHost)
-	mikrotikUser, _ := s.Settings.GetString(ctx, settings.KeyMikrotikUser)
-	mikrotikPass, _ := s.Settings.GetString(ctx, settings.KeyMikrotikPass)
-	if strings.TrimSpace(mikrotikHost) != "" && strings.TrimSpace(mikrotikUser) != "" {
-		client := mikrotik.NewClient(mikrotikHost, mikrotikUser, mikrotikPass)
-		if err := client.Connect(ctx); err == nil {
-			defer client.Close()
-			activeList, err := client.ListActiveConnections(ctx)
-			if err == nil {
-				for _, act := range activeList {
-					activePPPMap[strings.ToLower(strings.TrimSpace(act.Name))] = act
+	if s.DB != nil {
+		routerSvc := mikrotik.NewRouterService(s.DB)
+		if routers, err := routerSvc.ListActive(ctx); err == nil && len(routers) > 0 {
+			for _, r := range routers {
+				client := mikrotik.NewClient(r.Host, r.Username, r.Password)
+				if err := client.Connect(ctx); err == nil {
+					if activeList, err := client.ListActiveConnections(ctx); err == nil {
+						for _, act := range activeList {
+							activePPPMap[strings.ToLower(strings.TrimSpace(act.Name))] = act
+						}
+					}
+					client.Close()
+				} else {
+					s.Logger.Error("worker status pooling: failed to connect to router", "router", r.Name, "host", r.Host, "error", err)
+				}
+			}
+		}
+	}
+
+	// Fallback to legacy single router if activePPPMap is empty
+	if len(activePPPMap) == 0 {
+		mikrotikHost, _ := s.Settings.GetString(ctx, settings.KeyMikrotikHost)
+		mikrotikUser, _ := s.Settings.GetString(ctx, settings.KeyMikrotikUser)
+		mikrotikPass, _ := s.Settings.GetString(ctx, settings.KeyMikrotikPass)
+		if strings.TrimSpace(mikrotikHost) != "" && strings.TrimSpace(mikrotikUser) != "" {
+			client := mikrotik.NewClient(mikrotikHost, mikrotikUser, mikrotikPass)
+			if err := client.Connect(ctx); err == nil {
+				defer client.Close()
+				activeList, err := client.ListActiveConnections(ctx)
+				if err == nil {
+					for _, act := range activeList {
+						activePPPMap[strings.ToLower(strings.TrimSpace(act.Name))] = act
+					}
+				} else {
+					s.Logger.Error("worker status pooling legacy fallback: failed to list active connections", "error", err)
 				}
 			} else {
-				s.Logger.Error("worker status pooling: failed to list active MikroTik connections", "error", err)
+				s.Logger.Error("worker status pooling legacy fallback: failed to connect to legacy MikroTik", "error", err)
 			}
-		} else {
-			s.Logger.Error("worker status pooling: failed to connect to MikroTik", "error", err)
 		}
 	}
 

@@ -132,6 +132,7 @@ func runWorker(cfg config.Config, logger *slog.Logger, db *sql.DB) {
 		Settings:      settingsService,
 		Customers:     customersService,
 		Notifications: notifications.NotificationLogRepository{DB: db},
+		Templates:     templateService,
 	}
 	whatsAppService := notifications.WhatsAppService{
 		Settings:  settingsService,
@@ -149,7 +150,8 @@ func runWorker(cfg config.Config, logger *slog.Logger, db *sql.DB) {
 	discordService := notifications.NewDiscordService(settingsService)
 	billingService.Discord = discordService
 	backupDir := filepath.Join(cfg.StoragePath, "backups")
-	backupService := backup.NewService(db, backupDir)
+	backupService := backup.NewService(db, backupDir, cfg.SQLitePath)
+	emailService := notifications.NewEmailService(settingsService, db)
 
 	service := worker.Service{
 		Logger:    logger,
@@ -159,6 +161,8 @@ func runWorker(cfg config.Config, logger *slog.Logger, db *sql.DB) {
 		Discord:   discordService,
 		Backup:    backupService,
 		Customers: customersService,
+		Email:     emailService,
+		DB:        db,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

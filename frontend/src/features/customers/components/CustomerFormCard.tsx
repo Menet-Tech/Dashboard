@@ -100,13 +100,29 @@ export function CustomerFormCard({
         <input
           className={inputClassName()}
           value={customerForm.whatsapp}
+          onChange={(e) => {
+            const formatted = formatWhatsAppNumber(e.target.value);
+            onFormChange((curr) => ({
+              ...curr,
+              whatsapp: formatted,
+            }));
+          }}
+          placeholder="contoh: 0812-3456-7890 atau +62 812-3456-7890"
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Email Pelanggan</span>
+        <input
+          type="email"
+          className={inputClassName()}
+          value={customerForm.email}
           onChange={(e) =>
             onFormChange((curr) => ({
               ...curr,
-              whatsapp: e.target.value,
+              email: e.target.value,
             }))
           }
-          placeholder="contoh: 62812345678"
+          placeholder="contoh: pelanggan@gmail.com"
         />
       </label>
       <label className="flex flex-col gap-1">
@@ -242,4 +258,46 @@ export function CustomerFormCard({
       </label>
     </form>
   );
+}
+
+function formatWhatsAppNumber(val: string): string {
+  let clean = val.replace(/[^\d+]/g, "");
+  
+  if (clean.startsWith("+62")) {
+    clean = "62" + clean.slice(3);
+  }
+  
+  if (/^[89]/.test(clean)) {
+    clean = "0" + clean;
+  }
+
+  if (clean.startsWith("62")) {
+    const rest = clean.slice(2).replace(/\D/g, "");
+    let formatted = "+62";
+    if (rest.length > 0) {
+      formatted += " ";
+      if (rest.length <= 3) {
+        formatted += rest;
+      } else if (rest.length <= 7) {
+        formatted += `${rest.slice(0, 3)}-${rest.slice(3)}`;
+      } else {
+        formatted += `${rest.slice(0, 3)}-${rest.slice(3, 7)}-${rest.slice(7, 12)}`;
+      }
+    }
+    return formatted;
+  } else if (clean.startsWith("0")) {
+    const rest = clean.slice(1).replace(/\D/g, "");
+    let formatted = "0";
+    if (rest.length > 0) {
+      if (rest.length <= 3) {
+        formatted += rest;
+      } else if (rest.length <= 7) {
+        formatted += `${rest.slice(0, 3)}-${rest.slice(3)}`;
+      } else {
+        formatted += `${rest.slice(0, 3)}-${rest.slice(3, 7)}-${rest.slice(7, 12)}`;
+      }
+    }
+    return formatted;
+  }
+  return clean;
 }

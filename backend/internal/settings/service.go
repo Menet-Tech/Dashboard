@@ -40,6 +40,9 @@ const (
 	KeyDiscordNotifyGenerate = "discord_notify_generate"
 	KeyDiscordNotifyWorker   = "discord_notify_worker"
 	KeyDiscordNotifyGacsOffline = "discord_notify_gacs_offline"
+	KeyDiscordBotToken         = "discord_bot_token"
+	KeyDiscordBotApplicationID = "discord_bot_application_id"
+	KeyDiscordBotGuildID       = "discord_bot_guild_id"
 	KeyMikrotikHost          = "mikrotik_host"
 	KeyMikrotikUser          = "mikrotik_user"
 	KeyMikrotikPass          = "mikrotik_pass"
@@ -56,6 +59,14 @@ const (
 	KeyGacsRxPowerExcellent  = "gacs_rx_power_excellent"
 	KeyGacsRxPowerFair       = "gacs_rx_power_fair"
 	KeyGacsPortalAPIKey      = "gacs_portal_api_key"
+	KeySMTPHost              = "smtp_host"
+	KeySMTPPort              = "smtp_port"
+	KeySMTPUsername          = "smtp_username"
+	KeySMTPPassword          = "smtp_password"
+	KeySMTPFromEmail         = "smtp_from_email"
+	KeySMTPEncryption        = "smtp_encryption"
+	KeySMTPEnabled           = "smtp_enabled"
+	KeyMikrotikIsolirProfile = "mikrotik_isolir_profile"
 )
 
 var defaults = map[string]string{
@@ -88,10 +99,14 @@ var defaults = map[string]string{
 	KeyDiscordNotifyGenerate: "1",
 	KeyDiscordNotifyWorker:   "1",
 	KeyDiscordNotifyGacsOffline:  "1",
+	KeyDiscordBotToken:         "",
+	KeyDiscordBotApplicationID: "",
+	KeyDiscordBotGuildID:       "",
 	KeyMikrotikHost:          "",
 	KeyMikrotikUser:          "",
 	KeyMikrotikPass:          "",
 	KeyMikrotikTestUsername:  "test-user",
+	KeyMikrotikIsolirProfile: "isolir",
 	KeyChatbotTriggerBilling:  "1",
 	KeyChatbotTriggerRegister: "1",
 	KeyChatbotTriggerSupport:  "2",
@@ -104,6 +119,13 @@ var defaults = map[string]string{
 	KeyGacsRxPowerExcellent:  "-27",
 	KeyGacsRxPowerFair:       "-25",
 	KeyGacsPortalAPIKey:      "",
+	KeySMTPHost:              "",
+	KeySMTPPort:              "587",
+	KeySMTPUsername:          "",
+	KeySMTPPassword:          "",
+	KeySMTPFromEmail:         "",
+	KeySMTPEncryption:        "tls",
+	KeySMTPEnabled:           "0",
 }
 
 func IsAllowedKey(key string) bool {

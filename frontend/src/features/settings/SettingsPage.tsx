@@ -1,9 +1,18 @@
 import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { inputClassName, renderInlineError } from "../../components/ui";
 import type { FieldErrors } from "../../utils/validation";
-import type { SettingsState, MikrotikSyncSecret, MikrotikImportResult, TelegramBotSettings } from "../../types";
+import type { SettingsState, MikrotikSyncSecret, MikrotikImportResult } from "../../types";
 import { getGatewayAccounts } from "../../lib/gatewayApi";
-import { apiRequest, fetchTelegramBotSettings, saveTelegramBotSettings } from "../../lib/api";
+import {
+  apiRequest,
+  fetchMikrotikRouters,
+  createMikrotikRouter,
+  updateMikrotikRouter,
+  deleteMikrotikRouter,
+  testRouterConnection,
+  testSMTP,
+  type MikrotikRouterItem,
+} from "../../lib/api";
 import {
   RefreshCw,
   CheckCircle2,
@@ -17,6 +26,8 @@ import {
   Wifi,
   Bot,
   Save,
+  Mail,
+  Settings,
 } from "lucide-react";
 
 type SettingsPageProps = {
@@ -46,47 +57,16 @@ export function SettingsPage({
   const apiKey = settingsForm.wa_api_key || "";
   const [accounts, setAccounts] = useState<string[]>([]);
 
-  const [activeTab, setActiveTab] = useState<"whatsapp" | "billing" | "mikrotik" | "genieacs" | "telegram" | "discord">("whatsapp");
+  const [activeTab, setActiveTab] = useState<"whatsapp" | "billing" | "mikrotik" | "genieacs" | "discord" | "smtp">("whatsapp");
 
   const tabs = [
     { id: "whatsapp", label: "WhatsApp & Bot", icon: MessageCircle, desc: "Gateway & Chatbot Triggers" },
     { id: "billing", label: "Billing & Worker", icon: Sliders, desc: "Automation & Backup Rules" },
     { id: "mikrotik", label: "MikroTik Router", icon: Server, desc: "Router Setup & Secret Sync" },
     { id: "genieacs", label: "GenieACS TR-069", icon: Wifi, desc: "TR-069 ONT Management" },
-    { id: "telegram", label: "Telegram Bot", icon: Bot, desc: "Telegram Alert Settings" },
     { id: "discord", label: "Discord Alerts", icon: Bell, desc: "Real-time Event Webhooks" },
+    { id: "smtp", label: "SMTP Email", icon: Mail, desc: "Email Server Configuration" },
   ];
-
-  // Telegram bot state
-  const [telegramForm, setTelegramForm] = useState<TelegramBotSettings>({
-    botToken: "",
-    chatIds: "",
-    enabled: false,
-  });
-  const [loadingTelegram, setLoadingTelegram] = useState(false);
-  const [savingTelegram, setSavingTelegram] = useState(false);
-
-  // Load telegram settings
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      setLoadingTelegram(true);
-      try {
-        const data = await fetchTelegramBotSettings();
-        if (active) {
-          setTelegramForm(data);
-        }
-      } catch (e) {
-        // ignore
-      } finally {
-        if (active) setLoadingTelegram(false);
-      }
-    }
-    void load();
-    return () => {
-      active = false;
-    };
-  }, []);
 
   // Connection test states
   const [testingWa, setTestingWa] = useState(false);
@@ -100,6 +80,71 @@ export function SettingsPage({
 
   const [testingAcs, setTestingAcs] = useState(false);
   const [acsResult, setAcsResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // MikroTik multi-router states
+  const [routers, setRouters] = useState<MikrotikRouterItem[]>([]);
+  const [loadingRouters, setLoadingRouters] = useState(false);
+  const [editingRouterId, setEditingRouterId] = useState<number | null>(null);
+  const [newRouterName, setNewRouterName] = useState("");
+  const [newRouterHost, setNewRouterHost] = useState("");
+  const [newRouterUser, setNewRouterUser] = useState("");
+  const [newRouterPass, setNewRouterPass] = useState("");
+  const [routerTestStatus, setRouterTestStatus] = useState<Record<number, { success: boolean; message: string }>>({});
+  const [testingRouterId, setTestingRouterId] = useState<number | null>(null);
+
+  // SMTP states
+  const [testEmailReceiver, setTestEmailReceiver] = useState("");
+  const [testingSMTP, setTestingSMTP] = useState(false);
+  const [smtpResult, setSmtpResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const loadRouters = useCallback(async () => {
+    setLoadingRouters(true);
+    try {
+      const res = await fetchMikrotikRouters();
+      setRouters(res.data || []);
+    } catch (err: any) {
+      pushError(err.message || "Gagal memuat daftar router MikroTik");
+    } finally {
+      setLoadingRouters(false);
+    }
+  }, [pushError]);
+
+  useEffect(() => {
+    if (activeTab === "mikrotik") {
+      void loadRouters();
+    }
+  }, [activeTab, loadRouters]);
+
+  const handleTestSMTP = async () => {
+    if (!testEmailReceiver) {
+      pushError("Email tujuan test wajib diisi.");
+      return;
+    }
+    setTestingSMTP(true);
+    setSmtpResult(null);
+    try {
+      const data = await testSMTP({
+        host: settingsForm.smtp_host || "",
+        port: settingsForm.smtp_port || "",
+        username: settingsForm.smtp_username || "",
+        password: settingsForm.smtp_password || "",
+        from_email: settingsForm.smtp_from_email || "",
+        encryption: settingsForm.smtp_encryption || "TLS",
+        to_email: testEmailReceiver,
+      });
+      setSmtpResult({ success: data.success, message: data.message });
+      if (data.success) {
+        pushSuccess("Test email SMTP berhasil!");
+      } else {
+        pushError(data.message || "Gagal mengirim email test.");
+      }
+    } catch (e: any) {
+      setSmtpResult({ success: false, message: e.message || String(e) });
+      pushError(e.message || String(e));
+    } finally {
+      setTestingSMTP(false);
+    }
+  };
 
   const handleTestWhatsApp = async () => {
     setTestingWa(true);
@@ -874,98 +919,291 @@ export function SettingsPage({
 
         {/* Tab 3: MikroTik Router */}
         {activeTab === "mikrotik" && (
-          <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-200">
-            {/* Card 4: MikroTik Router Integration */}
-            <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between gap-5">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 animate-in fade-in duration-200">
+            {/* Left: Router List Table */}
+            <article className="xl:col-span-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between gap-5">
               <div className="space-y-4">
-                <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center gap-2.5">
-                  <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
-                    <Server size={18} />
+                <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                      <Server size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">MikroTik Router Accounts</h3>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500">Kelola dan hubungkan beberapa router MikroTik secara sinkron.</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">MikroTik Integration</h3>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Integrasi router MikroTik via API untuk isolir PPPoE otomatis.</p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void loadRouters()}
+                    className="p-1.5 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                    title="Refresh List"
+                  >
+                    <RefreshCw size={14} className={loadingRouters ? "animate-spin" : ""} />
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="flex flex-col gap-1.5 col-span-full">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Host Router</span>
-                    <input
-                      className={inputClassName()}
-                      type="text"
-                      value={settingsForm["mikrotik_host"] ?? ""}
-                      onChange={(e) => onFormChange({ ...settingsForm, mikrotik_host: e.target.value })}
-                      placeholder="192.168.88.1"
-                    />
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500">Alamat IP / Domain router MikroTik (dilengkapi port API jika tidak standar).</span>
-                  </label>
+                {loadingRouters ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="animate-spin text-indigo-650" />
+                  </div>
+                ) : routers.length === 0 ? (
+                  <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                    <p className="text-xs text-slate-400 dark:text-slate-500">Belum ada router MikroTik terdaftar. Silakan tambahkan akun router pertama Anda di sebelah kanan.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {routers.map((router) => (
+                      <div
+                        key={router.id}
+                        className="border border-slate-200 dark:border-slate-850 rounded-2xl p-5 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between hover:border-slate-350 dark:hover:border-slate-755 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h4 className="font-bold text-slate-950 dark:text-slate-50 text-sm">{router.name}</h4>
+                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-mono">{router.host}</p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">User: {router.username}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            {!router.is_active ? (
+                              <span className="flex items-center gap-1 text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-955/20 dark:text-rose-400 border border-rose-200 dark:border-rose-900 px-2 py-0.5 rounded-full">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                Offline
+                              </span>
+                            ) : (router.status === "failed_auth" || (routerTestStatus[router.id] && !routerTestStatus[router.id].success)) ? (
+                              <span className="flex items-center gap-1 text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-955/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900 px-2 py-0.5 rounded-full">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                Failed Auth
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-955/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 px-2 py-0.5 rounded-full">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                Aktif
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Username Router</span>
-                    <input
-                      className={inputClassName()}
-                      type="text"
-                      value={settingsForm["mikrotik_user"] ?? ""}
-                      onChange={(e) => onFormChange({ ...settingsForm, mikrotik_user: e.target.value })}
-                      placeholder="admin"
-                    />
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500">Kredensial dengan hak akses write API.</span>
-                  </label>
-
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Password Router</span>
-                    <input
-                      className={inputClassName()}
-                      type="password"
-                      value={settingsForm["mikrotik_pass"] ?? ""}
-                      onChange={(e) => onFormChange({ ...settingsForm, mikrotik_pass: e.target.value })}
-                      placeholder="••••••••"
-                    />
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500">Password untuk akun API MikroTik.</span>
-                  </label>
-
-                  <label className="flex flex-col gap-1.5 col-span-full">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Username PPPoE Test</span>
-                    <input
-                      className={inputClassName()}
-                      type="text"
-                      value={settingsForm["mikrotik_test_username"] ?? ""}
-                      onChange={(e) =>
-                        onFormChange({ ...settingsForm, mikrotik_test_username: e.target.value })
-                      }
-                      placeholder="test-user"
-                    />
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500">Nama PPPoE secret yang digunakan saat tombol test diklik.</span>
-                  </label>
-                </div>
+                        <div className="flex gap-2 mt-4 pt-3 border-t border-slate-50 dark:border-slate-800/65 justify-end">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setTestingRouterId(router.id);
+                              try {
+                                const res = await testRouterConnection(router.id);
+                                setRouterTestStatus((prev) => ({ ...prev, [router.id]: { success: res.success, message: res.message } }));
+                                setRouters((prev) =>
+                                  prev.map((r) =>
+                                    r.id === router.id
+                                      ? { ...r, status: res.success ? "online" : "failed_auth" }
+                                      : r
+                                  )
+                                );
+                                if (res.success) {
+                                  pushSuccess(`Koneksi ${router.name} berhasil!`);
+                                } else {
+                                  pushError(`Koneksi ${router.name} gagal: ${res.message}`);
+                                }
+                              } catch (err: any) {
+                                setRouterTestStatus((prev) => ({ ...prev, [router.id]: { success: false, message: err.message || String(err) } }));
+                                setRouters((prev) =>
+                                  prev.map((r) =>
+                                    r.id === router.id
+                                      ? { ...r, status: "failed_auth" }
+                                      : r
+                                  )
+                                );
+                                pushError(err.message || String(err));
+                              } finally {
+                                setTestingRouterId(null);
+                              }
+                            }}
+                            disabled={testingRouterId !== null}
+                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          >
+                            {testingRouterId === router.id ? <Loader2 size={10} className="animate-spin" /> : null}
+                            Test Koneksi
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingRouterId(router.id);
+                              setNewRouterName(router.name);
+                              setNewRouterHost(router.host);
+                              setNewRouterUser(router.username);
+                              setNewRouterPass(""); // blank means no change unless typed
+                            }}
+                            className="text-[10px] font-bold text-slate-700 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!window.confirm(`Hapus router ${router.name}?`)) return;
+                              try {
+                                await deleteMikrotikRouter(router.id);
+                                pushSuccess("Router berhasil dihapus.");
+                                void loadRouters();
+                              } catch (err: any) {
+                                pushError(err.message || "Gagal menghapus router");
+                              }
+                            }}
+                            className="text-[10px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 p-1.5 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+            </article>
 
-              <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-805 rounded-2xl p-4 mt-auto">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Uji kredensial/koneksi router MikroTik.</span>
-                <div className="flex items-center gap-2">
-                  {mikrotikResult && (
-                    <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-                      mikrotikResult.success ? "bg-emerald-50 text-emerald-700 border-emerald-250 dark:bg-emerald-950/20 dark:text-emerald-455 dark:border-emerald-900/60" : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-455 dark:border-rose-900/60"
-                    }`}>
-                      {mikrotikResult.success ? "Sukses" : "Gagal"}
-                    </span>
+            {/* Right: Add/Edit Account Router Form */}
+            <div className="bg-slate-50 dark:bg-slate-900/40 p-5 rounded-3xl border border-slate-200 dark:border-slate-850 h-fit space-y-4">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                {editingRouterId ? "Edit Akun Router" : "Tambah Router Baru"}
+              </h3>
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Nama Router / Identitas</span>
+                  <input
+                    type="text"
+                    required
+                    value={newRouterName}
+                    onChange={(e) => setNewRouterName(e.target.value)}
+                    placeholder="Contoh: Router Utama, Router Backup"
+                    className={inputClassName()}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Host IP / Domain</span>
+                  <input
+                    type="text"
+                    required
+                    value={newRouterHost}
+                    onChange={(e) => setNewRouterHost(e.target.value)}
+                    placeholder="192.168.88.1:8728"
+                    className={inputClassName()}
+                  />
+                  <span className="text-[9px] text-slate-400 block mt-1">Gunakan port API MikroTik (default: 8728 atau 8729 untuk SSL).</span>
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Username Admin Router</span>
+                  <input
+                    type="text"
+                    required
+                    value={newRouterUser}
+                    onChange={(e) => setNewRouterUser(e.target.value)}
+                    placeholder="admin"
+                    className={inputClassName()}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
+                    Password Admin {editingRouterId && "(Kosongkan jika tidak diubah)"}
+                  </span>
+                  <input
+                    type="password"
+                    value={newRouterPass}
+                    onChange={(e) => setNewRouterPass(e.target.value)}
+                    placeholder="••••••••"
+                    className={inputClassName()}
+                  />
+                </label>
+
+                <div className="flex gap-2 pt-2">
+                  {editingRouterId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingRouterId(null);
+                        setNewRouterName("");
+                        setNewRouterHost("");
+                        setNewRouterUser("");
+                        setNewRouterPass("");
+                      }}
+                      className="flex-1 bg-white border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 font-bold py-2 px-4 rounded-xl text-xs shadow-sm hover:bg-slate-50 transition-all cursor-pointer"
+                    >
+                      Batal
+                    </button>
                   )}
                   <button
                     type="button"
-                    onClick={handleTestMikrotik}
-                    disabled={testingMikrotik}
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    onClick={async () => {
+                      if (!newRouterName.trim() || !newRouterHost.trim() || !newRouterUser.trim()) {
+                        pushError("Harap lengkapi semua field wajib.");
+                        return;
+                      }
+                      try {
+                        if (editingRouterId) {
+                          await updateMikrotikRouter(editingRouterId, {
+                            name: newRouterName,
+                            host: newRouterHost,
+                            username: newRouterUser,
+                            ...(newRouterPass ? { password: newRouterPass } : {}),
+                          });
+                          pushSuccess("Router berhasil diperbarui.");
+                        } else {
+                          await createMikrotikRouter({
+                            name: newRouterName,
+                            host: newRouterHost,
+                            username: newRouterUser,
+                            password: newRouterPass,
+                            is_active: true,
+                          });
+                          pushSuccess("Router baru berhasil didaftarkan.");
+                        }
+                        setEditingRouterId(null);
+                        setNewRouterName("");
+                        setNewRouterHost("");
+                        setNewRouterUser("");
+                        setNewRouterPass("");
+                        void loadRouters();
+                      } catch (err: any) {
+                        pushError(err.message || "Gagal menyimpan konfigurasi router");
+                      }
+                    }}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-md transition-all cursor-pointer text-center"
                   >
-                    {testingMikrotik ? <Loader2 size={12} className="animate-spin" /> : null}
-                    {testingMikrotik ? "Menguji..." : "Test Koneksi"}
+                    {editingRouterId ? "Simpan Perubahan" : "Daftarkan Router"}
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Global MikroTik Settings (Full Width) */}
+            <article className="col-span-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
+              <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                  <Settings size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Pengaturan Global MikroTik</h3>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi profile bandwidth default untuk status isolir.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <label className="flex flex-col gap-1.5 font-sans">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Nama PPPoE Profile Limit (Isolir)</span>
+                  <input
+                    className={inputClassName()}
+                    type="text"
+                    value={settingsForm["mikrotik_isolir_profile"] ?? "isolir"}
+                    onChange={(e) =>
+                      onFormChange({ ...settingsForm, mikrotik_isolir_profile: e.target.value })
+                    }
+                    placeholder="isolir"
+                  />
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500">PPPoE Profile di MikroTik yang digunakan ketika pelanggan berstatus Limit/Isolir.</span>
+                </label>
               </div>
             </article>
 
             {/* MikroTik Sync Panel (Full Width) */}
-            <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
+            <article className="col-span-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
               <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
@@ -1041,7 +1279,7 @@ export function SettingsPage({
                           max={31}
                           value={importDueDay}
                           onChange={(e) => setImportDueDay(Number(e.target.value))}
-                          className="w-16 text-center text-xs border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
+                          className="w-16 text-center text-xs border border-slate-300 dark:border-slate-850 bg-white dark:bg-slate-900 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 font-mono"
                         />
                       </div>
                       <button
@@ -1062,8 +1300,8 @@ export function SettingsPage({
                       <div className="max-h-40 overflow-y-auto space-y-1">
                         {importResults.map((r) => (
                           <div key={r.name} className={`flex items-center gap-2 text-xs rounded-lg px-3 py-1.5 ${
-                            r.status === "imported" ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400" :
-                            r.status === "error" ? "bg-rose-50 dark:bg-rose-955/20 text-rose-700 dark:text-rose-400" :
+                            r.status === "imported" ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-455" :
+                            r.status === "error" ? "bg-rose-50 dark:bg-rose-955/20 text-rose-700 dark:text-rose-455" :
                             "bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-450"
                           }`}>
                             {r.status === "imported" ? <CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> : <AlertCircle size={12} className="text-rose-500 shrink-0" />}
@@ -1076,6 +1314,143 @@ export function SettingsPage({
                   )}
                 </div>
               )}
+            </article>
+          </div>
+        )}
+
+        {/* Tab: SMTP Email */}
+        {activeTab === "smtp" && (
+          <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-200">
+            <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between gap-5">
+              <div className="space-y-4">
+                <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                    <Mail size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">SMTP Email Notification</h3>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi server SMTP untuk notifikasi tagihan dan kuitansi via email.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="flex flex-col gap-1.5 col-span-full">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Status Layanan Email</span>
+                    <select
+                      className={inputClassName()}
+                      value={settingsForm["smtp_enabled"] ?? "0"}
+                      onChange={(e) => onFormChange({ ...settingsForm, smtp_enabled: e.target.value })}
+                    >
+                      <option value="1">Aktif</option>
+                      <option value="0">Nonaktif</option>
+                    </select>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">Mengaktifkan/menonaktifkan pengiriman email ke pelanggan.</span>
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">SMTP Host</span>
+                    <input
+                      className={inputClassName()}
+                      type="text"
+                      value={settingsForm["smtp_host"] ?? ""}
+                      onChange={(e) => onFormChange({ ...settingsForm, smtp_host: e.target.value })}
+                      placeholder="smtp.gmail.com"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">SMTP Port</span>
+                    <input
+                      className={inputClassName()}
+                      type="text"
+                      value={settingsForm["smtp_port"] ?? ""}
+                      onChange={(e) => onFormChange({ ...settingsForm, smtp_port: e.target.value })}
+                      placeholder="587"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">SMTP Username</span>
+                    <input
+                      className={inputClassName()}
+                      type="text"
+                      value={settingsForm["smtp_username"] ?? ""}
+                      onChange={(e) => onFormChange({ ...settingsForm, smtp_username: e.target.value })}
+                      placeholder="billing@domain.com"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">SMTP Password</span>
+                    <input
+                      className={inputClassName()}
+                      type="password"
+                      value={settingsForm["smtp_password"] ?? ""}
+                      onChange={(e) => onFormChange({ ...settingsForm, smtp_password: e.target.value })}
+                      placeholder="••••••••"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Sender Email (From)</span>
+                    <input
+                      className={inputClassName()}
+                      type="email"
+                      value={settingsForm["smtp_from_email"] ?? ""}
+                      onChange={(e) => onFormChange({ ...settingsForm, smtp_from_email: e.target.value })}
+                      placeholder="billing@domain.com"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Metode Enkripsi</span>
+                    <select
+                      className={inputClassName()}
+                      value={settingsForm["smtp_encryption"] ?? "TLS"}
+                      onChange={(e) => onFormChange({ ...settingsForm, smtp_encryption: e.target.value })}
+                    >
+                      <option value="None">None (Unencrypted)</option>
+                      <option value="SSL">SSL (Port 465)</option>
+                      <option value="TLS">TLS (Port 587)</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 dark:border-slate-805 pt-5 space-y-4">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Uji Pengiriman Email</h4>
+                <div className="flex flex-col sm:flex-row gap-3 items-end">
+                  <label className="flex-1 flex flex-col gap-1.5 font-sans">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Email Tujuan Test</span>
+                    <input
+                      className={inputClassName()}
+                      type="email"
+                      value={testEmailReceiver}
+                      onChange={(e) => setTestEmailReceiver(e.target.value)}
+                      placeholder="tujuan@gmail.com"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleTestSMTP}
+                    disabled={testingSMTP}
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer h-[42px]"
+                  >
+                    {testingSMTP ? <Loader2 size={14} className="animate-spin" /> : null}
+                    {testingSMTP ? "Menguji..." : "Kirim Email Test"}
+                  </button>
+                </div>
+                {smtpResult && (
+                  <div className={`flex items-start gap-2 border text-xs rounded-xl px-4 py-3 ${
+                    smtpResult.success 
+                      ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-250 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-455" 
+                      : "bg-rose-50 dark:bg-rose-955/20 border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-455"
+                  }`}>
+                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                    <span>{smtpResult.message}</span>
+                  </div>
+                )}
+              </div>
             </article>
           </div>
         )}
@@ -1198,95 +1573,7 @@ export function SettingsPage({
           </div>
         )}
 
-        {/* Tab: Telegram Bot */}
-        {activeTab === "telegram" && (
-          <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-200">
-            <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between gap-5">
-              <div className="space-y-4">
-                <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center gap-2.5">
-                  <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
-                    <Bot size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Telegram Alert Bot</h3>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi bot Telegram untuk notifikasi gangguan dan laporan harian.</p>
-                  </div>
-                </div>
-
-                {loadingTelegram ? (
-                  <div className="flex items-center justify-center py-8 text-slate-400 text-xs animate-pulse">
-                    Memuat pengaturan bot Telegram...
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-4">
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Status Bot</span>
-                      <select
-                        className={inputClassName()}
-                        value={telegramForm.enabled ? "true" : "false"}
-                        onChange={(e) => setTelegramForm({ ...telegramForm, enabled: e.target.value === "true" })}
-                      >
-                        <option value="true">Aktif</option>
-                        <option value="false">Nonaktif</option>
-                      </select>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500">Mengaktifkan/menonaktifkan pengiriman notifikasi via Telegram.</span>
-                    </label>
-
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Telegram Bot Token</span>
-                      <input
-                        className={inputClassName()}
-                        type="text"
-                        value={telegramForm.botToken}
-                        onChange={(e) => setTelegramForm({ ...telegramForm, botToken: e.target.value })}
-                        placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-                      />
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500">Token bot Telegram yang didapatkan dari @BotFather.</span>
-                    </label>
-
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Telegram Chat IDs</span>
-                      <input
-                        className={inputClassName()}
-                        type="text"
-                        value={telegramForm.chatIds}
-                        onChange={(e) => setTelegramForm({ ...telegramForm, chatIds: e.target.value })}
-                        placeholder="-100123456789, 987654321"
-                      />
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500">ID Chat atau Channel Telegram penerima notifikasi (pisahkan dengan koma jika lebih dari satu).</span>
-                    </label>
-
-                    <div className="flex justify-end pt-3">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setSavingTelegram(true);
-                          try {
-                            const res = await saveTelegramBotSettings(telegramForm);
-                            if (res.success) {
-                              pushSuccess(res.message || "Pengaturan bot Telegram berhasil disimpan!");
-                            } else {
-                              pushError(res.message || "Gagal menyimpan pengaturan bot Telegram.");
-                            }
-                          } catch (err: any) {
-                            pushError(err.message || "Terjadi kesalahan.");
-                          } finally {
-                            setSavingTelegram(false);
-                          }
-                        }}
-                        disabled={savingTelegram}
-                        className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50 text-white text-xs font-bold py-2 px-5 rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer"
-                      >
-                        {savingTelegram ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                        Simpan Pengaturan Bot
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </article>
-          </div>
-        )}
+        {/* Telegram bot settings tab removed */}
 
         {/* Tab 5: Discord Alerts */}
         {activeTab === "discord" && (
@@ -1385,6 +1672,65 @@ export function SettingsPage({
                     {testingDiscord ? <Loader2 size={12} className="animate-spin" /> : null}
                     {testingDiscord ? "Menguji..." : "Test Webhook"}
                   </button>
+                </div>
+              </div>
+            </article>
+
+            {/* Card: Discord Bot Settings */}
+            <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between gap-5 animate-in fade-in duration-200">
+              <div className="space-y-4">
+                <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                    <Bot size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Discord Bot Settings</h3>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi kredensial Discord Bot untuk menerima perintah interaktif slash commands.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Bot Token</span>
+                    <input
+                      className={inputClassName()}
+                      type="password"
+                      value={settingsForm["discord_bot_token"] ?? ""}
+                      onChange={(e) =>
+                        onFormChange({ ...settingsForm, discord_bot_token: e.target.value })
+                      }
+                      placeholder="MTAx..."
+                    />
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">Token bot Discord Anda (didapatkan dari Discord Developer Portal).</span>
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Application ID</span>
+                    <input
+                      className={inputClassName()}
+                      type="text"
+                      value={settingsForm["discord_bot_application_id"] ?? ""}
+                      onChange={(e) =>
+                        onFormChange({ ...settingsForm, discord_bot_application_id: e.target.value })
+                      }
+                      placeholder="Application ID"
+                    />
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">ID Aplikasi/Klien bot Discord Anda.</span>
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Guild ID (Opsional)</span>
+                    <input
+                      className={inputClassName()}
+                      type="text"
+                      value={settingsForm["discord_bot_guild_id"] ?? ""}
+                      onChange={(e) =>
+                        onFormChange({ ...settingsForm, discord_bot_guild_id: e.target.value })
+                      }
+                      placeholder="Guild (Server) ID"
+                    />
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">ID Server Discord untuk pendaftaran slash commands instan (opsional).</span>
+                  </label>
                 </div>
               </div>
             </article>

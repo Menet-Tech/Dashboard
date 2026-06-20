@@ -8,6 +8,7 @@ import { startOfDay, addDays, daysDiff } from "../utils/date";
 import { formatDateId } from "../utils/format";
 
 export type CustomerLifecycleKey =
+  | "exclude_inactive"
   | "all"
   | "trial"
   | "tertagih"
@@ -200,7 +201,7 @@ export function buildCustomerLifecycleMap(
 }
 
 export function readCustomerLifecycleFilter(): CustomerLifecycleKey {
-  if (typeof window === "undefined") return "all";
+  if (typeof window === "undefined") return "exclude_inactive";
   const stored = window.localStorage.getItem("customers.lifecycleFilter");
   if (
     stored === "trial" ||
@@ -208,9 +209,10 @@ export function readCustomerLifecycleFilter(): CustomerLifecycleKey {
     stored === "jatuh_tempo" ||
     stored === "menunggak" ||
     stored === "lunas" ||
-    stored === "all"
+    stored === "all" ||
+    stored === "exclude_inactive"
   ) {
     return stored;
   }
-  return "all";
+  return "exclude_inactive";
 }

@@ -2572,70 +2572,8 @@ func (h GacsHandler) CheckGponEpon(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ─── Telegram Bot Settings ───────────────────────────────────────────────────
+// Telegram bot settings removed
 
-type TelegramBotSettings struct {
-	BotToken string `json:"botToken"`
-	ChatIDs  string `json:"chatIds"`
-	Enabled  bool   `json:"enabled"`
-}
-
-// GetTelegramBotSettings reads Telegram bot config from the settings table.
-func (h GacsHandler) GetTelegramBotSettings(w http.ResponseWriter, r *http.Request) {
-	keys := []string{"telegramBotToken", "telegramChatIds", "telegramBotEnabled"}
-	rows, err := h.DB.QueryContext(r.Context(), "SELECT key, value FROM pengaturan WHERE key IN (?, ?, ?)", keys[0], keys[1], keys[2])
-	if err != nil {
-		WriteError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	defer rows.Close()
-
-	result := TelegramBotSettings{}
-	for rows.Next() {
-		var k, v string
-		if err := rows.Scan(&k, &v); err != nil {
-			continue
-		}
-		switch k {
-		case "telegramBotToken":
-			result.BotToken = v
-		case "telegramChatIds":
-			result.ChatIDs = v
-		case "telegramBotEnabled":
-			result.Enabled = v == "true"
-		}
-	}
-	WriteJSON(w, http.StatusOK, result)
-}
-
-// SaveTelegramBotSettings upserts Telegram bot config to the settings table.
-func (h GacsHandler) SaveTelegramBotSettings(w http.ResponseWriter, r *http.Request) {
-	var req TelegramBotSettings
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid JSON")
-		return
-	}
-
-	enabledStr := "false"
-	if req.Enabled {
-		enabledStr = "true"
-	}
-
-	if err := h.setSetting(r.Context(), "telegramBotToken", req.BotToken); err != nil {
-		WriteError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := h.setSetting(r.Context(), "telegramChatIds", req.ChatIDs); err != nil {
-		WriteError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := h.setSetting(r.Context(), "telegramBotEnabled", enabledStr); err != nil {
-		WriteError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Telegram bot settings saved"})
-}
 
 // ─── Portal ──────────────────────────────────────────────────────────────────
 

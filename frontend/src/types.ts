@@ -23,6 +23,9 @@ export type PackageItem = {
   price: number;
   description: string;
   customer_count: number;
+  ip_pool?: string;
+  local_address?: string;
+  ip_pool_range?: string;
 };
 
 export type CustomerItem = {
@@ -34,6 +37,7 @@ export type CustomerItem = {
   user_pppoe: string;
   password_pppoe: string;
   whatsapp: string;
+  email?: string;
   sn_ont: string;
   due_day: number;
   status: "active" | "limit" | "inactive";
@@ -114,6 +118,9 @@ export type SettingsState = {
   discord_notify_payment?: string;
   discord_notify_generate?: string;
   discord_notify_worker?: string;
+  discord_bot_token?: string;
+  discord_bot_application_id?: string;
+  discord_bot_guild_id?: string;
   billing_reminder_days?: string;
   billing_limit_days?: string;
   billing_menunggak_days?: string;
@@ -130,6 +137,7 @@ export type SettingsState = {
   mikrotik_user?: string;
   mikrotik_pass?: string;
   mikrotik_test_username?: string;
+  mikrotik_isolir_profile?: string;
   trial_overdue_grace_days?: string;
   chatbot_trigger_billing?: string;
   chatbot_trigger_register?: string;
@@ -143,6 +151,13 @@ export type SettingsState = {
   gacs_rx_power_excellent?: string;
   gacs_rx_power_fair?: string;
   gacs_portal_api_key?: string;
+  smtp_enabled?: string;
+  smtp_host?: string;
+  smtp_port?: string;
+  smtp_username?: string;
+  smtp_password?: string;
+  smtp_from_email?: string;
+  smtp_encryption?: string;
 };
 
 export type AuditLogItem = {
@@ -176,6 +191,7 @@ export type ViewKey =
   | "discounts"
   | "bills"
   | "templates"
+  | "email-templates"
   | "monitoring"
   | "audit"
   | "users"
@@ -186,7 +202,8 @@ export type ViewKey =
   | "reports"
   | "odp"
   | "devices"
-  | "network-map";
+  | "network-map"
+  | "traffic";
 
 export type MapSettings = {
   id?: number;
@@ -228,10 +245,13 @@ export type MapEdge = {
   updated_at?: string;
 };
 
-export type TelegramBotSettings = {
-  botToken: string;
-  chatIds: string;
-  enabled: boolean;
+export type EmailTemplateItem = {
+  id: number;
+  name: string;
+  trigger_key: string;
+  subject: string;
+  content: string;
+  is_active: boolean;
 };
 
 export type OdpItem = {

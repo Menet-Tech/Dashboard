@@ -132,6 +132,59 @@ func TestServiceUpdateStatus(t *testing.T) {
 	}
 }
 
+func TestCustomerEmailSaveAndRetrieve(t *testing.T) {
+	db := customerTestDB(t)
+	service := Service{Repository: Repository{DB: db}}
+
+	_, err := db.Exec(`INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
+	if err != nil {
+		t.Fatalf("insert package: %v", err)
+	}
+
+	// Create with Email
+	cust, err := service.Create(context.Background(), Customer{
+		Name:      "Email Cust",
+		PackageID: 1,
+		DueDay:    15,
+		Status:    "active",
+		Email:     "cust@gmail.com",
+	})
+	if err != nil {
+		t.Fatalf("create customer: %v", err)
+	}
+
+	if cust.Email != "cust@gmail.com" {
+		t.Errorf("expected email to be cust@gmail.com, got %q", cust.Email)
+	}
+
+	// Retrieve list and check email
+	list, err := service.List(context.Background())
+	if err != nil {
+		t.Fatalf("list customers: %v", err)
+	}
+	if len(list) != 1 || list[0].Email != "cust@gmail.com" {
+		t.Errorf("expected retrieved email to be cust@gmail.com, got %q", list[0].Email)
+	}
+
+	// Update email
+	_, err = service.Update(context.Background(), cust.ID, Customer{
+		Name:      "Email Cust",
+		PackageID: 1,
+		DueDay:    15,
+		Status:    "active",
+		Email:     "newemail@gmail.com",
+	})
+	if err != nil {
+		t.Fatalf("update customer: %v", err)
+	}
+
+	// Retrieve again and verify update
+	list2, _ := service.List(context.Background())
+	if list2[0].Email != "newemail@gmail.com" {
+		t.Errorf("expected updated email to be newemail@gmail.com, got %q", list2[0].Email)
+	}
+}
+
 func customerTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 

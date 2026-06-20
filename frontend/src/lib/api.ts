@@ -16,7 +16,7 @@ import type {
   MapSettings,
   MapNode,
   MapEdge,
-  TelegramBotSettings,
+  EmailTemplateItem,
   VoucherItem,
   CustomerVoucherItem,
   VoucherUsageLogItem,
@@ -230,8 +230,9 @@ export function updatePackage(
   });
 }
 
-export function deletePackage(id: number) {
-  return request<{ message: string }>(`/api/v1/packages/${id}`, {
+export function deletePackage(id: number, deletePool?: boolean) {
+  const query = deletePool ? "?delete_pool=true" : "";
+  return request<{ message: string }>(`/api/v1/packages/${id}${query}`, {
     method: "DELETE",
   });
 }
@@ -263,6 +264,36 @@ export function updateCustomerStatus(id: number, status: CustomerItem["status"])
   return request<{ message: string }>(`/api/v1/customers/${id}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
+  });
+}export function deleteCustomer(id: number) {
+  return request<{ message: string }>(`/api/v1/customers/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function bulkUpdateCustomerStatus(
+  ids: number[],
+  status?: CustomerItem["status"],
+  odp_id?: number | null,
+  paket_id?: number,
+  referred_by_id?: number | null
+) {
+  return request<{ message: string; success_count: number; errors?: string[] }>("/api/v1/customers/bulk-status", {
+    method: "POST",
+    body: JSON.stringify({
+      ids,
+      status,
+      odp_id,
+      paket_id,
+      referred_by_id,
+    }),
+  });
+}
+
+export function bulkDeleteCustomers(ids: number[]) {
+  return request<{ message: string; success_count: number; errors?: string[] }>("/api/v1/customers/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
   });
 }
 
@@ -742,15 +773,28 @@ export function resetMappingData() {
   });
 }
 
-// Telegram Bot Settings API
-export function fetchTelegramBotSettings() {
-  return request<TelegramBotSettings>("/api/v1/gacs/telegram-bot/settings");
+// Email Templates API
+export function fetchEmailTemplates() {
+  return request<{ data: EmailTemplateItem[] }>("/api/v1/email-templates");
 }
 
-export function saveTelegramBotSettings(settings: TelegramBotSettings) {
-  return request<{ success: boolean; message?: string }>("/api/v1/gacs/telegram-bot/settings", {
+export function createEmailTemplate(input: Omit<EmailTemplateItem, "id">) {
+  return request<{ data: EmailTemplateItem }>("/api/v1/email-templates", {
     method: "POST",
-    body: JSON.stringify(settings),
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateEmailTemplate(id: number, input: Omit<EmailTemplateItem, "id">) {
+  return request<{ data: EmailTemplateItem }>(`/api/v1/email-templates/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteEmailTemplate(id: number) {
+  return request<{ message: string }>(`/api/v1/email-templates/${id}`, {
+    method: "DELETE",
   });
 }
 
@@ -793,4 +837,83 @@ export function toggleCustomerVoucherAutoApply(customerId: number, autoApply: bo
     body: JSON.stringify({ auto_apply: autoApply }),
   });
 }
+
+// ─── MikroTik Multi-Router & IP Pools & Traffic Stats & SMTP Test ──────────
+
+export type MikrotikRouterItem = {
+  id: number;
+  name: string;
+  host: string;
+  username: string;
+  password?: string;
+  is_active: boolean;
+  status?: "online" | "failed_auth" | "offline";
+};
+
+export function fetchMikrotikRouters() {
+  return request<{ data: MikrotikRouterItem[] }>("/api/v1/mikrotik/routers");
+}
+
+export function createMikrotikRouter(input: Omit<MikrotikRouterItem, "id">) {
+  return request<{ data: MikrotikRouterItem }>("/api/v1/mikrotik/routers", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateMikrotikRouter(id: number, input: Partial<MikrotikRouterItem>) {
+  return request<{ data: MikrotikRouterItem }>(`/api/v1/mikrotik/routers/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteMikrotikRouter(id: number) {
+  return request<{ message: string }>(`/api/v1/mikrotik/routers/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function testRouterConnection(id: number) {
+  return request<{ success: boolean; message: string }>(`/api/v1/mikrotik/routers/${id}/test`, {
+    method: "POST",
+  });
+}
+
+export type MikrotikIPPoolItem = {
+  id: string;
+  name: string;
+  ranges: string;
+};
+
+export function fetchMikrotikIPPools() {
+  return request<{ data: MikrotikIPPoolItem[] }>("/api/v1/mikrotik/ip-pools");
+}
+
+export type TrafficStats = {
+  tx_rate: number;
+  rx_rate: number;
+};
+
+export function fetchTrafficStats() {
+  return request<{ data: Record<string, TrafficStats> }>("/api/v1/monitoring/traffic");
+}
+
+export type SMTPTestPayload = {
+  host: string;
+  port: string;
+  username: string;
+  password?: string;
+  from_email: string;
+  encryption: string;
+  to_email: string;
+};
+
+export function testSMTP(payload: SMTPTestPayload) {
+  return request<{ success: boolean; message: string }>("/api/v1/integration/test-smtp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 

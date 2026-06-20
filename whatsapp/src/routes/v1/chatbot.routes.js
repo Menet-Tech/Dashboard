@@ -1,6 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const { getAllSessions, deleteSession, getForms, getGatewaySettings, setGatewaySetting } = require('../../utils/database');
+const { getAllSessions, deleteSession, getForms, updateFormStatus, deleteForm, getGatewaySettings, setGatewaySetting } = require('../../utils/database');
 
 /**
  * GET /api/v1/chatbot/sessions
@@ -52,6 +52,33 @@ router.put('/settings', (req, res) => {
         }
     }
     res.json({ status: 'success', message: 'Pengaturan chatbot diperbarui', data: result });
+});
+
+/**
+ * PATCH /api/v1/chatbot/forms/:id
+ * Update status contact form (misal status = resolved)
+ */
+router.patch('/forms/:id', (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!status) {
+        return res.status(400).json({ status: 'error', message: 'Status is required' });
+    }
+    const updated = updateFormStatus(id, status);
+    if (!updated) {
+        return res.status(404).json({ status: 'error', message: 'Form not found' });
+    }
+    res.json({ status: 'success', message: 'Status form diperbarui', data: updated });
+});
+
+/**
+ * DELETE /api/v1/chatbot/forms/:id
+ * Hapus data contact form pendaftaran/support
+ */
+router.delete('/forms/:id', (req, res) => {
+    const { id } = req.params;
+    deleteForm(id);
+    res.json({ status: 'success', message: 'Data form berhasil dihapus' });
 });
 
 module.exports = router;

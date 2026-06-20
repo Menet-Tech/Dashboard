@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from "react";
-import { fetchCustomers, createCustomer, updateCustomer, updateCustomerStatus } from "../lib/api";
+import { fetchCustomers, createCustomer, updateCustomer, updateCustomerStatus, deleteCustomer, bulkDeleteCustomers } from "../lib/api";
 import { validateCustomer, type FieldErrors } from "../utils/validation";
 import { readCustomerLifecycleFilter } from "../lib/lifecycle";
 import type { CustomerItem } from "../types";
@@ -7,6 +7,7 @@ import { defaultCustomerForm, type CustomerFormState } from "../features/custome
 import type { HookDeps } from "./types";
 
 export type CustomerLifecycleFilter =
+  | "exclude_inactive"
   | "all"
   | "trial"
   | "tertagih"
@@ -59,6 +60,24 @@ export function useCustomers({ withFeedback, onSuccess }: Pick<HookDeps, "withFe
     });
   }
 
+  async function handleCustomerDelete(id: number) {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus pelanggan ini? (PPP secret di MikroTik juga akan dihapus)")) return;
+    await withFeedback(async () => {
+      await deleteCustomer(id);
+      onSuccess("Pelanggan berhasil dihapus.");
+      await refreshCustomers();
+    }, "delete-customer");
+  }
+
+  async function handleBulkDelete(ids: number[]) {
+    await withFeedback(async () => {
+      await bulkDeleteCustomers(ids);
+      onSuccess(`Berhasil menghapus ${ids.length} pelanggan secara massal.`);
+      await refreshCustomers();
+    }, "bulk-delete-customers");
+  }
+
+
   return {
     state: { customers, customerForm, editingCustomerId, customerErrors, customerLifecycleFilter },
     handlers: {
@@ -69,6 +88,8 @@ export function useCustomers({ withFeedback, onSuccess }: Pick<HookDeps, "withFe
       refreshCustomers,
       handleCustomerSubmit,
       handleStatusChange,
+      handleCustomerDelete,
+      handleBulkDelete,
     },
   };
 }
