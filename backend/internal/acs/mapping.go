@@ -525,9 +525,9 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 
 			// Update customer in database
 			if odpID != nil {
-				_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET odp_id = ?, updated_at = CURRENT_TIMESTAMP WHERE user_pppoe = ?", *odpID, *n.Pppoe)
+				_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET odp_id = ?, odp_port = COALESCE(odp_port, 1), updated_at = CURRENT_TIMESTAMP WHERE user_pppoe = ?", *odpID, *n.Pppoe)
 			} else {
-				_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET odp_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE user_pppoe = ?", *n.Pppoe)
+				_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET odp_id = NULL, odp_port = NULL, updated_at = CURRENT_TIMESTAMP WHERE user_pppoe = ?", *n.Pppoe)
 			}
 			if err != nil {
 				return fmt.Errorf("update customer odp_id for pppoe '%s': %w", *n.Pppoe, err)

@@ -221,3 +221,29 @@ export function updateChatbotSettings(url: string, apiKey: string, payload: Chat
     body: JSON.stringify(payload),
   });
 }
+
+export function updateChatbotForm(
+  url: string,
+  apiKey: string,
+  id: string,
+  status: "pending" | "resolved"
+) {
+  return gatewayRequest<{ data: ContactForm }>(
+    url,
+    apiKey,
+    `/api/v1/chatbot/forms/${id}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }
+  );
+}
+
+export function deleteChatbotForm(url: string, apiKey: string, id: string) {
+  return gatewayRequest<{ message: string }>(
+    url,
+    apiKey,
+    `/api/v1/chatbot/forms/${id}`,
+    { method: "DELETE" }
+  );
+}

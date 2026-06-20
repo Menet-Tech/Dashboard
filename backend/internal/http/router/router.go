@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"menettech/dashboard/backend/internal/config"
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/http/handler"
+	"menettech/dashboard/backend/internal/mikrotik"
 	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/odp"
 	"menettech/dashboard/backend/internal/packages"
@@ -52,6 +54,12 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	authHandler := handler.NewAuthHandler(authService, auditService)
 	healthHandler := handler.NewHealthHandler(cfg, logger, db, settingsService)
 	dashboardHandler := handler.NewDashboardHandler(db)
+
+	routerSvc := mikrotik.NewRouterService(db)
+	poller := mikrotik.NewTrafficPoller(routerSvc)
+	go poller.Start(context.Background(), 3*time.Second)
+	mikrotikHandler := handler.NewMikrotikHandler(routerSvc, poller)
+
 	auditHandler := handler.NewAuditHandler(auditService)
 	packageHandler := handler.NewPackageHandler(packages.Service{
 		Repository: packages.Repository{DB: db},
@@ -83,12 +91,14 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 		WhatsApp:      whatsAppService,
 		Discord:       discordService,
 		Notifications: notifications.NotificationLogRepository{DB: db},
+		Templates:     templateService,
 	}, cfg.AppName, cfg.StoragePath)
 	templateHandler := handler.NewTemplateHandler(templateService)
+	emailTemplateHandler := handler.NewEmailTemplateHandler(templateService)
 	settingsHandler := handler.NewSettingsHandler(settingsService)
 	notificationHandler := handler.NewNotificationHandler(notifications.NotificationLogRepository{DB: db})
 	backupDir := filepath.Join(cfg.StoragePath, "backups")
-	backupHandler := &handler.BackupHandler{Service: backup.NewService(db, backupDir)}
+	backupHandler := &handler.BackupHandler{Service: backup.NewService(db, backupDir, cfg.SQLitePath)}
 	integrationHandler := handler.NewIntegrationHandler(settingsService, whatsAppService, discordService)
 	integrationHandler.Customers = customers.Service{
 		Repository: customers.Repository{DB: db},
@@ -97,6 +107,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	integrationHandler.Packages = packages.Service{
 		Repository: packages.Repository{DB: db},
 	}
+	integrationHandler.Routers = routerSvc
 
 	ticketsService := tickets.Service{
 		Repository: tickets.Repository{DB: db},
@@ -159,9 +170,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 			protected.Get("/check-wan/{id}", gacsHandler.CheckWAN)
 			protected.Get("/check-gponepon/{id}", gacsHandler.CheckGponEpon)
 
-			// Telegram Bot settings (GACS compat)
-			protected.Get("/telegram-bot/settings", gacsHandler.GetTelegramBotSettings)
-			protected.Post("/telegram-bot/save-settings", gacsHandler.SaveTelegramBotSettings)
+			// Telegram Bot settings removed
 
 			// Portal (GACS compat)
 			protected.Post("/portal/validate-accesscode", gacsHandler.PortalValidateAccessCode)
@@ -256,6 +265,9 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Post("/templates", templateHandler.Create)
 				admin.Put("/templates/{id}", templateHandler.Update)
 				admin.Delete("/templates/{id}", templateHandler.Delete)
+				admin.Post("/email-templates", emailTemplateHandler.Create)
+				admin.Put("/email-templates/{id}", emailTemplateHandler.Update)
+				admin.Delete("/email-templates/{id}", emailTemplateHandler.Delete)
 				admin.Get("/settings", settingsHandler.Get)
 				admin.Put("/settings", settingsHandler.Update)
 				admin.Post("/backups", backupHandler.Create)
@@ -276,6 +288,13 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Post("/integration/test-genieacs", integrationHandler.TestGenieACS)
 				admin.Post("/integration/test-discord", integrationHandler.TestDiscord)
 				admin.Post("/integration/test-whatsapp", integrationHandler.TestWhatsApp)
+				admin.Get("/mikrotik/routers", mikrotikHandler.ListRouters)
+				admin.Post("/mikrotik/routers", mikrotikHandler.CreateRouter)
+				admin.Put("/mikrotik/routers/{id}", mikrotikHandler.UpdateRouter)
+				admin.Delete("/mikrotik/routers/{id}", mikrotikHandler.DeleteRouter)
+				admin.Post("/mikrotik/routers/{id}/test", mikrotikHandler.TestRouterConnection)
+				admin.Get("/mikrotik/ip-pools", mikrotikHandler.ListIPPools)
+				admin.Post("/integration/test-smtp", integrationHandler.TestSMTP)
 				admin.Put("/map-settings", gacsHandler.UpdateMapSettings)
 				admin.Post("/map-settings/reset", gacsHandler.ResetMapSettings)
 				admin.Delete("/mapping-data/reset", gacsHandler.ResetMappingData)
@@ -289,8 +308,11 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 			// Admin + Petugas
 			protected.Group(func(staff chi.Router) {
 				staff.Use(requireRole("admin", "petugas"))
+				staff.Post("/customers/bulk-status", customerHandler.BulkUpdateStatus)
+				staff.Post("/customers/bulk-delete", customerHandler.BulkDelete)
 				staff.Post("/customers", customerHandler.Create)
 				staff.Put("/customers/{id}", customerHandler.Update)
+				staff.Delete("/customers/{id}", customerHandler.Delete)
 				staff.Post("/customers/{id}/ont-reboot", customerHandler.ONTReboot)
 				staff.Post("/customers/{id}/ont-factory-reset", customerHandler.ONTFactoryReset)
 				staff.Post("/customers/{id}/ont-wifi", customerHandler.ONTWifiUpdate)
@@ -318,8 +340,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				staff.Get("/gacs/check-wan/{id}", gacsHandler.CheckWAN)
 				staff.Get("/gacs/check-gponepon", gacsHandler.CheckGponEpon)
 				staff.Get("/gacs/check-gponepon/{id}", gacsHandler.CheckGponEpon)
-				staff.Get("/gacs/telegram-bot/settings", gacsHandler.GetTelegramBotSettings)
-				staff.Post("/gacs/telegram-bot/settings", gacsHandler.SaveTelegramBotSettings)
+				// Telegram Bot settings removed
 				staff.Post("/gacs/portal/validate-accesscode", gacsHandler.PortalValidateAccessCode)
 				staff.Post("/mapping-data/nodes", gacsHandler.CreateNode)
 				staff.Put("/mapping-data/nodes/{nodeId}", gacsHandler.UpdateNode)
@@ -342,6 +363,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				all.Get("/bills/{id}/invoice", billHandler.Invoice)
 				all.Get("/bills/{id}/notifications", notificationHandler.ListByBill)
 				all.Get("/templates", templateHandler.List)
+				all.Get("/email-templates", emailTemplateHandler.List)
 				all.Get("/odps", odpHandler.List)
 				all.Get("/reports/revenue", reportsHandler.Revenue)
 				all.Get("/reports/aging", reportsHandler.Aging)
@@ -355,6 +377,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				all.Get("/mapping-data/nodes/{nodeId}", gacsHandler.GetNode)
 				all.Get("/mapping-data/edges", gacsHandler.GetEdges)
 				all.Get("/mapping-data/edges/{edgeId}", gacsHandler.GetEdge)
+				all.Get("/monitoring/traffic", mikrotikHandler.GetTrafficStats)
 			})
 		})
 	})

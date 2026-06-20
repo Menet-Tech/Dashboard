@@ -33,7 +33,7 @@ func TestServiceDeleteRejectsPackageInUse(t *testing.T) {
 	mustPackageExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
 	mustPackageExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (1, 'Budi', 1, 8, 'active')`)
 
-	err := service.Delete(context.Background(), 1)
+	err := service.Delete(context.Background(), 1, false)
 	if !errors.Is(err, ErrPackageInUse) {
 		t.Fatalf("expected package in use error, got %v", err)
 	}
@@ -87,6 +87,44 @@ func TestServiceUpdateAndFind(t *testing.T) {
 	}
 }
 
+func TestServiceCreateAndUpdateWithIPPoolNoRouters(t *testing.T) {
+	db := packageTestDB(t)
+	service := Service{Repository: Repository{DB: db}}
+
+	pkg, err := service.Create(context.Background(), Package{
+		Name:      "Package With Pool",
+		SpeedMbps: 30,
+		Price:     200000,
+		IPPool:    "pool-test",
+	})
+	if err != nil {
+		t.Fatalf("failed to create package with IP pool: %v", err)
+	}
+
+	if pkg.IPPool != "pool-test" {
+		t.Errorf("expected IP Pool 'pool-test', got %q", pkg.IPPool)
+	}
+
+	if pkg.LocalAddress != "" {
+		t.Errorf("expected local address to be empty, got %q", pkg.LocalAddress)
+	}
+
+	pkg2, err := service.Create(context.Background(), Package{
+		Name:        "Package With Pool Range",
+		SpeedMbps:   30,
+		Price:       200000,
+		IPPool:      "pool-range-test",
+		IPPoolRange: "10.0.0.1-10.0.0.100",
+	})
+	if err != nil {
+		t.Fatalf("failed to create package with pool range: %v", err)
+	}
+	if pkg2.LocalAddress != "10.0.0.254" {
+		t.Errorf("expected derived local address '10.0.0.254', got %q", pkg2.LocalAddress)
+	}
+}
+
+
 func packageTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -115,5 +153,25 @@ func mustPackageExec(t *testing.T, db *sql.DB, query string) {
 
 	if _, err := db.Exec(query); err != nil {
 		t.Fatalf("exec query %q: %v", query, err)
+	}
+}
+
+func TestDeriveLocalAddress(t *testing.T) {
+	tests := []struct {
+		poolRange string
+		expected  string
+	}{
+		{"10.10.10.1-10.10.10.253", "10.10.10.254"},
+		{"192.168.1.100-192.168.1.200", "192.168.1.254"},
+		{"10.0.0.5", "10.0.0.254"},
+		{"invalid-ip", ""},
+		{"", ""},
+	}
+
+	for _, tc := range tests {
+		actual := deriveLocalAddress(tc.poolRange)
+		if actual != tc.expected {
+			t.Errorf("deriveLocalAddress(%q) = %q; expected %q", tc.poolRange, actual, tc.expected)
+		}
 	}
 }

@@ -36,24 +36,16 @@ export function usePackages({ withFeedback, askForConfirmation, onSuccess }: Omi
     }, "save-package");
   }
 
-  function handlePackageDelete(id: number) {
-    askForConfirmation({
-      title: "Hapus paket internet",
-      body: "Paket akan dihapus dari daftar master. Pastikan tidak ada pelanggan aktif yang masih bergantung pada paket ini.",
-      confirmLabel: "Ya, hapus paket",
-      tone: "danger",
-      onConfirm: async () => {
-        await withFeedback(async () => {
-          await deletePackage(id);
-          if (editingPackageId === id) {
-            setPackageForm(defaultPackageForm());
-            setEditingPackageId(null);
-          }
-          onSuccess("Paket berhasil dihapus.");
-          await refreshPackages();
-        }, "delete-package");
-      },
-    });
+  async function handlePackageDelete(id: number, deletePool?: boolean) {
+    await withFeedback(async () => {
+      await deletePackage(id, deletePool);
+      if (editingPackageId === id) {
+        setPackageForm(defaultPackageForm());
+        setEditingPackageId(null);
+      }
+      onSuccess("Paket berhasil dihapus.");
+      await refreshPackages();
+    }, "delete-package");
   }
 
   return {

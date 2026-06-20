@@ -411,6 +411,21 @@ const listActiveScheduledMessages = () => {
     `).all().map(normalizeScheduledMessage);
 };
 
+const updateFormStatus = (id, status) => {
+    const db = getDb();
+    db.prepare('UPDATE contact_forms SET status = ? WHERE id = ?').run(status, id);
+    const row = db.prepare('SELECT * FROM contact_forms WHERE id = ?').get(id);
+    if (row) {
+        row.data = JSON.parse(row.data);
+    }
+    return row;
+};
+
+const deleteForm = (id) => {
+    const db = getDb();
+    db.prepare('DELETE FROM contact_forms WHERE id = ?').run(id);
+};
+
 module.exports = {
     getDb,
     resolveDatabasePath,
@@ -423,6 +438,8 @@ module.exports = {
     getAllSessions,
     saveContactForm,
     getForms,
+    updateFormStatus,
+    deleteForm,
     saveAccount,
     removeAccount,
     getSavedAccounts,

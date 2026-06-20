@@ -5,12 +5,15 @@ import { Modal } from "../../components/ui/Modal";
 import { Loader2, Plus, RefreshCw, Check, AlertTriangle } from "lucide-react";
 import type { PackageItem } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
+import { fetchMikrotikIPPools, type MikrotikIPPoolItem, apiRequest } from "../../lib/api";
 
 export type PackageFormState = {
   name: string;
   speed_mbps: number;
   price: number;
   description: string;
+  ip_pool?: string;
+  ip_pool_range?: string;
 };
 
 export const defaultPackageForm = (): PackageFormState => ({
@@ -18,6 +21,8 @@ export const defaultPackageForm = (): PackageFormState => ({
   speed_mbps: 10,
   price: 150000,
   description: "",
+  ip_pool: "",
+  ip_pool_range: "",
 });
 
 type PackagesPageProps = {
@@ -31,7 +36,7 @@ type PackagesPageProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onEdit: (pkg: PackageItem) => void;
   onCancelEdit: () => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: number, deletePool?: boolean) => void;
   onRefresh?: () => void;
 };
 
@@ -59,11 +64,38 @@ export function PackagesPage({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSyncOpen, setIsSyncOpen] = useState(false);
 
+  // IP Pools list
+  const [ipPools, setIpPools] = useState<MikrotikIPPoolItem[]>([]);
+  const [loadingPools, setLoadingPools] = useState(false);
+  const [newPoolName, setNewPoolName] = useState("");
+  const [isCreatingNewPool, setIsCreatingNewPool] = useState(false);
+
   // MikroTik sync state
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncProfiles, setSyncProfiles] = useState<MikrotikProfileSync[]>([]);
   const [selectedSyncNames, setSelectedSyncNames] = useState<Record<string, boolean>>({});
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Delete package states
+  const [deletingPkg, setDeletingPkg] = useState<PackageItem | null>(null);
+  const [deletePoolChecked, setDeletePoolChecked] = useState(false);
+
+  // Fetch IP Pools on modal open
+  useEffect(() => {
+    if (isFormOpen || editingPackageId !== null) {
+      setLoadingPools(true);
+      fetchMikrotikIPPools()
+        .then((res) => {
+          setIpPools(res.data || []);
+        })
+        .catch((err) => {
+          console.error("Gagal memuat IP Pool", err);
+        })
+        .finally(() => {
+          setLoadingPools(false);
+        });
+    }
+  }, [isFormOpen, editingPackageId]);
 
   // Close form modal on successful save/update
   useEffect(() => {
@@ -76,11 +108,7 @@ export function PackagesPage({
     setSyncLoading(true);
     setSyncError(null);
     try {
-      const res = await fetch("/api/v1/integration/mikrotik/sync-packages-preview", {
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Gagal memuat profil MikroTik");
+      const data = await apiRequest<{ profiles: MikrotikProfileSync[] }>("/api/v1/integration/mikrotik/sync-packages-preview");
       setSyncProfiles(data.profiles || []);
       
       // Auto select ones that do not exist yet
@@ -130,14 +158,10 @@ export function PackagesPage({
 
     setSyncLoading(true);
     try {
-      const res = await fetch("/api/v1/integration/mikrotik/sync-packages-import", {
+      const data = await apiRequest<{ imported: number }>("/api/v1/integration/mikrotik/sync-packages-import", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ names: selectedNames }),
-        credentials: "include",
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Gagal mengimpor profil");
 
       alert(`Berhasil mengimpor ${data.imported} paket internet.`);
       setIsSyncOpen(false);
@@ -153,6 +177,7 @@ export function PackagesPage({
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
+    setIsCreatingNewPool(false);
     onCancelEdit();
   };
 
@@ -184,6 +209,7 @@ export function PackagesPage({
             type="button"
             onClick={() => {
               onCancelEdit();
+              setIsCreatingNewPool(false);
               setIsFormOpen(true);
             }}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
@@ -232,6 +258,7 @@ export function PackagesPage({
                           type="button"
                           className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
                           onClick={() => {
+                            setIsCreatingNewPool(false);
                             onEdit(pkg);
                             setIsFormOpen(true);
                           }}
@@ -241,7 +268,10 @@ export function PackagesPage({
                         <button
                           type="button"
                           className="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors"
-                          onClick={() => onDelete(pkg.id)}
+                          onClick={() => {
+                            setDeletingPkg(pkg);
+                            setDeletePoolChecked(false);
+                          }}
                           disabled={pkg.customer_count > 0}
                           title={pkg.customer_count > 0 ? "Tidak bisa menghapus paket yang memiliki pelanggan aktif" : ""}
                         >
@@ -317,6 +347,78 @@ export function PackagesPage({
               error={packageErrors.price}
             />
 
+            {/* IP Pool selection */}
+            {!isCreatingNewPool ? (
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-350">IP Pool MikroTik</span>
+                {loadingPools ? (
+                  <div className="text-xs text-slate-400 italic">Memuat IP Pool dari MikroTik...</div>
+                ) : (
+                  <select
+                    className={inputClassName(packageErrors.ip_pool)}
+                    value={packageForm.ip_pool || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "new") {
+                        setIsCreatingNewPool(true);
+                        onFormChange((curr) => ({ ...curr, ip_pool: "", ip_pool_range: "" }));
+                      } else {
+                        onFormChange((curr) => ({ ...curr, ip_pool: val, ip_pool_range: "" }));
+                      }
+                    }}
+                  >
+                    <option value="">-- Tanpa IP Pool (Gunakan default MikroTik) --</option>
+                    {ipPools.map((pool) => (
+                      <option key={pool.id} value={pool.name}>
+                        {pool.name} ({pool.ranges})
+                      </option>
+                    ))}
+                    <option value="new">+ Buat IP Pool Baru...</option>
+                  </select>
+                )}
+                {renderInlineError(packageErrors.ip_pool)}
+              </label>
+            ) : (
+              <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Buat IP Pool Baru di MikroTik</span>
+                  <button
+                    type="button"
+                    className="text-xs font-bold text-indigo-650 hover:text-indigo-700"
+                    onClick={() => {
+                      setIsCreatingNewPool(false);
+                      onFormChange((curr) => ({ ...curr, ip_pool: "", ip_pool_range: "" }));
+                    }}
+                  >
+                    Batal
+                  </button>
+                </div>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Nama IP Pool Baru</span>
+                  <input
+                    type="text"
+                    className={inputClassName()}
+                    placeholder="contoh: POOL-10MBPS"
+                    value={packageForm.ip_pool || ""}
+                    onChange={(e) => onFormChange((curr) => ({ ...curr, ip_pool: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Range IP Address (Contoh: 10.10.10.1-10.10.10.253)</span>
+                  <input
+                    type="text"
+                    className={inputClassName(packageErrors.ip_pool_range)}
+                    placeholder="10.10.10.1-10.10.10.253"
+                    value={packageForm.ip_pool_range || ""}
+                    onChange={(e) => onFormChange((curr) => ({ ...curr, ip_pool_range: e.target.value }))}
+                    required
+                  />
+                  {renderInlineError(packageErrors.ip_pool_range)}
+                </label>
+              </div>
+            )}
+
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Deskripsi Paket</span>
               <textarea
@@ -340,7 +442,7 @@ export function PackagesPage({
             <>
               <button
                 type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-55 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 onClick={() => setIsSyncOpen(false)}
               >
                 Tutup
@@ -431,6 +533,60 @@ export function PackagesPage({
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {deletingPkg && (
+        <Modal
+          title="Hapus Paket Internet"
+          onClose={() => setDeletingPkg(null)}
+          actions={
+            <>
+              <button
+                type="button"
+                className="bg-white border border-gray-300 text-slate-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                onClick={() => setDeletingPkg(null)}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                onClick={() => {
+                  const id = deletingPkg.id;
+                  const deletePool = deletePoolChecked;
+                  setDeletingPkg(null);
+                  onDelete(id, deletePool);
+                }}
+              >
+                Ya, Hapus Paket
+              </button>
+            </>
+          }
+        >
+          <div className="flex flex-col gap-4 font-sans text-slate-800">
+            <p className="text-xs">
+              Apakah Anda yakin ingin menghapus paket <strong className="text-slate-900">{deletingPkg.name}</strong>?
+            </p>
+            <p className="text-xs text-slate-500">
+              Paket akan dihapus dari daftar master. Pastikan tidak ada pelanggan aktif yang masih bergantung pada paket ini.
+            </p>
+            
+            {deletingPkg.ip_pool && (
+              <label className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 p-3.5 rounded-xl cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={deletePoolChecked}
+                  onChange={(e) => setDeletePoolChecked(e.target.checked)}
+                  className="accent-indigo-600 w-4 h-4 rounded border-gray-350"
+                />
+                <div className="text-xs text-left">
+                  <span className="font-bold text-slate-900 block">Hapus IP Pool juga dari MikroTik</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">Hapus IP Pool <code className="bg-slate-200 px-1 rounded font-mono font-bold text-indigo-700">{deletingPkg.ip_pool}</code> dari seluruh router MikroTik aktif.</span>
+                </div>
+              </label>
             )}
           </div>
         </Modal>

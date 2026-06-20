@@ -51,6 +51,7 @@ import { CustomersPage, defaultCustomerForm } from "./features/customers/Custome
 import { DiscountsPage } from "./features/discounts/DiscountsPage";
 import { BillsPage } from "./features/bills/BillsPage";
 import { TemplatesPage, defaultTemplateForm } from "./features/templates/TemplatesPage";
+import { EmailTemplatesPage } from "./features/templates/EmailTemplatesPage";
 import { MonitoringPage } from "./features/monitoring/MonitoringPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { AuditLogsPage } from "./features/audit/AuditLogsPage";
@@ -97,6 +98,9 @@ const RegistrationPage = lazy(() =>
 const WhatsAppPage = lazy(() =>
   import("./features/whatsapp/WhatsAppPage").then((module) => ({ default: module.WhatsAppPage }))
 );
+const TrafficPage = lazy(() =>
+  import("./features/traffic/TrafficPage").then((module) => ({ default: module.TrafficPage }))
+);
 
 type NavItem = {
   key: ViewKey;
@@ -115,17 +119,19 @@ const navItems: NavItem[] = [
   { key: "odp", label: "Data ODP", caption: "Status & maintenance node" },
   { key: "network-map", label: "Peta Jaringan", caption: "Topologi fiber & ODP" },
   { key: "devices", label: "Perangkat ONT", caption: "Kelola CPE via GenieACS" },
-  { key: "monitoring", label: "Monitoring", caption: "Status node & backup" },
+  { key: "traffic", label: "Traffic Monitor", caption: "Tx/Rx real-time pelanggan" },
   { key: "tickets", label: "Tiket Support", caption: "Bantuan & keluhan" },
-  { key: "registration", label: "Registrasi", caption: "Daftar mandiri" },
+  { key: "registration", label: "Registrasi WA", caption: "Review pendaftaran dari WA" },
   // === Komunikasi ===
   { key: "whatsapp", label: "WhatsApp Gateway", caption: "Multi-akun & Chatbot" },
   { key: "templates", label: "Template WA", caption: "Draft pesan notif" },
+  { key: "email-templates", label: "Template Email", caption: "Draft email notif" },
   // === Admin ===
   { key: "reports", label: "Laporan Keuangan", caption: "Analisis & proyeksi omset" },
   { key: "audit", label: "Audit Log", caption: "Jejak aktivitas tim" },
   { key: "users", label: "Manajemen Tim", caption: "Akses login admin" },
   // === Pengaturan (paling bawah) ===
+  { key: "monitoring", label: "System", caption: "Status node & backup" },
   { key: "settings", label: "Pengaturan", caption: "Konfigurasi sistem" },
 ];
 
@@ -156,17 +162,17 @@ export default function App() {
   }, [theme]);
 
   const toggleTheme = () => setTheme((prev) => (prev === "light" ? "dark" : "light"));
-  
+
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
   const [revenue, setRevenue] = useState<RevenueItem[]>([]);
   const [aging, setAging] = useState<AgingReport | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
-  
+
   const feedback = useAppFeedback();
-  
+
   const [loginForm, setLoginForm] = useState({ username: "admin", password: "password" });
   const [loginErrors, setLoginErrors] = useState<FieldErrors>({});
-  
+
   const [navOpen, setNavOpen] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
   const [loadFailure, setLoadFailure] = useState<string | null>(null);
@@ -250,10 +256,10 @@ export default function App() {
   const visibleNavItems = useMemo(
     () =>
       navItems.filter((item) => {
-        if (["reports", "audit", "users", "settings", "packages", "templates"].includes(item.key)) {
+        if (["reports", "audit", "users", "settings", "packages", "templates", "email-templates"].includes(item.key)) {
           return user?.role === "admin";
         }
-        if (item.key === "devices") {
+        if (["devices", "traffic"].includes(item.key)) {
           return user?.role === "admin" || user?.role === "petugas";
         }
         return true;
@@ -269,9 +275,12 @@ export default function App() {
   const filteredCustomers = useMemo(
     () =>
       customersHook.state.customers.filter((customer) => {
-        const lifecycle = customerLifecycleMap[customer.id]?.key ?? "lunas";
         const filter = customersHook.state.customerLifecycleFilter;
+        if (filter === "exclude_inactive") {
+          return customer.status !== "inactive";
+        }
         if (filter === "all") return true;
+        const lifecycle = customerLifecycleMap[customer.id]?.key ?? "lunas";
         return lifecycle === filter;
       }),
     [customersHook.state.customerLifecycleFilter, customerLifecycleMap, customersHook.state.customers],
@@ -393,302 +402,356 @@ export default function App() {
 
         {loadFailure ? (
           <div className="mb-6">
-            <ErrorState 
-              title="Data panel belum berhasil dimuat penuh" 
-              message={loadFailure} 
-              onRetry={() => void feedback.withFeedback(reloadProtectedData, "retry-load")} 
+            <ErrorState
+              title="Data panel belum berhasil dimuat penuh"
+              message={loadFailure}
+              onRetry={() => void feedback.withFeedback(reloadProtectedData, "retry-load")}
             />
           </div>
         ) : null}
 
-      <div key={view} className="fade-in-slide-up flex-1 flex flex-col gap-6">
-      {view === "dashboard" ? (
-        <DashboardPage
-          pageLoading={pageLoading}
-          summary={summary}
-          health={monitoringHook.state.health}
-          user={user}
-          revenue={revenue}
-          aging={aging}
-          appTone={appTone}
-          workerTone={workerTone}
-          backupTone={backupTone}
-          onSwitchView={switchView}
-        />
-      ) : null}
+        <div key={view} className="fade-in-slide-up flex-1 flex flex-col gap-6">
+          {view === "dashboard" ? (
+            <DashboardPage
+              pageLoading={pageLoading}
+              summary={summary}
+              health={monitoringHook.state.health}
+              user={user}
+              revenue={revenue}
+              aging={aging}
+              appTone={appTone}
+              workerTone={workerTone}
+              backupTone={backupTone}
+              onSwitchView={switchView}
+            />
+          ) : null}
 
-      {view === "packages" ? (
-        <PackagesPage
-          packages={packagesHook.state.packages}
-          packageForm={packagesHook.state.packageForm}
-          packageErrors={packagesHook.state.packageErrors}
-          editingPackageId={packagesHook.state.editingPackageId}
-          submitting={feedback.submitting}
-          busyAction={feedback.busyAction}
-          onFormChange={packagesHook.handlers.setPackageForm}
-          onSubmit={packagesHook.handlers.handlePackageSubmit}
-          onEdit={(pkg) => {
-            packagesHook.handlers.setEditingPackageId(pkg.id);
-            packagesHook.handlers.setPackageForm({
-              name: pkg.name,
-              speed_mbps: pkg.speed_mbps,
-              price: pkg.price,
-              description: pkg.description,
-            });
-          }}
-          onCancelEdit={() => {
-            packagesHook.handlers.setEditingPackageId(null);
-            packagesHook.handlers.setPackageForm(defaultPackageForm());
-          }}
-          onDelete={(id) => void packagesHook.handlers.handlePackageDelete(id)}
-        />
-      ) : null}
+          {view === "packages" ? (
+            <PackagesPage
+              packages={packagesHook.state.packages}
+              packageForm={packagesHook.state.packageForm}
+              packageErrors={packagesHook.state.packageErrors}
+              editingPackageId={packagesHook.state.editingPackageId}
+              submitting={feedback.submitting}
+              busyAction={feedback.busyAction}
+              onFormChange={packagesHook.handlers.setPackageForm}
+              onSubmit={packagesHook.handlers.handlePackageSubmit}
+              onEdit={(pkg) => {
+                packagesHook.handlers.setEditingPackageId(pkg.id);
+                packagesHook.handlers.setPackageForm({
+                  name: pkg.name,
+                  speed_mbps: pkg.speed_mbps,
+                  price: pkg.price,
+                  description: pkg.description,
+                  ip_pool: pkg.ip_pool || "",
+                  ip_pool_range: "",
+                });
+              }}
+              onCancelEdit={() => {
+                packagesHook.handlers.setEditingPackageId(null);
+                packagesHook.handlers.setPackageForm(defaultPackageForm());
+              }}
+              onDelete={(id, deletePool) => void packagesHook.handlers.handlePackageDelete(id, deletePool)}
+            />
+          ) : null}
 
-      {view === "customers" ? (
-        <CustomersPage
-          user={user}
-          packages={packagesHook.state.packages}
-          customers={customersHook.state.customers}
-          filteredCustomers={filteredCustomers}
-          customerForm={customersHook.state.customerForm}
-          customerErrors={customersHook.state.customerErrors}
-          editingCustomerId={customersHook.state.editingCustomerId}
-          customerLifecycleFilter={customersHook.state.customerLifecycleFilter}
-          customerLifecycleMap={customerLifecycleMap}
-          submitting={feedback.submitting}
-          busyAction={feedback.busyAction}
-          onFormChange={customersHook.handlers.setCustomerForm}
-          onFilterChange={(filter) => customersHook.handlers.setCustomerLifecycleFilter(filter)}
-          onSubmit={customersHook.handlers.handleCustomerSubmit}
-          onStatusChange={(id, status) => void customersHook.handlers.handleStatusChange(id, status)}
-          onEdit={(customer) => {
-            customersHook.handlers.setEditingCustomerId(customer.id);
-            customersHook.handlers.setCustomerForm({
-              name: customer.name,
-              package_id: customer.package_id,
-              user_pppoe: customer.user_pppoe,
-              password_pppoe: customer.password_pppoe,
-              whatsapp: customer.whatsapp,
-              sn_ont: customer.sn_ont,
-              due_day: customer.due_day,
-              status: customer.status,
-              address: customer.address,
-              diskon: customer.diskon ?? 0,
-              referred_by_id: customer.referred_by_id ?? 0,
-              referral_balance: customer.referral_balance ?? 0,
-              odp_id: customer.odp_id ?? 0,
-              odp_port: customer.odp_port ?? undefined,
-            });
-          }}
-          onCancelEdit={() => {
-            customersHook.handlers.setEditingCustomerId(null);
-            customersHook.handlers.setCustomerForm(defaultCustomerForm());
-          }}
-          pushSuccess={feedback.pushSuccess}
-          pushError={feedback.pushError}
-          onRefresh={reloadProtectedData}
-        />
-      ) : null}
+          {view === "customers" ? (
+            <CustomersPage
+              user={user}
+              packages={packagesHook.state.packages}
+              customers={customersHook.state.customers}
+              filteredCustomers={filteredCustomers}
+              customerForm={customersHook.state.customerForm}
+              customerErrors={customersHook.state.customerErrors}
+              editingCustomerId={customersHook.state.editingCustomerId}
+              customerLifecycleFilter={customersHook.state.customerLifecycleFilter}
+              customerLifecycleMap={customerLifecycleMap}
+              submitting={feedback.submitting}
+              busyAction={feedback.busyAction}
+              onFormChange={customersHook.handlers.setCustomerForm}
+              onFilterChange={(filter) => customersHook.handlers.setCustomerLifecycleFilter(filter)}
+              onSubmit={customersHook.handlers.handleCustomerSubmit}
+              onStatusChange={(id, status) => void customersHook.handlers.handleStatusChange(id, status)}
+              onEdit={(customer) => {
+                customersHook.handlers.setEditingCustomerId(customer.id);
+                customersHook.handlers.setCustomerForm({
+                  name: customer.name,
+                  package_id: customer.package_id,
+                  user_pppoe: customer.user_pppoe,
+                  password_pppoe: customer.password_pppoe,
+                  whatsapp: customer.whatsapp,
+                  email: customer.email || "",
+                  sn_ont: customer.sn_ont,
+                  due_day: customer.due_day,
+                  status: customer.status,
+                  address: customer.address,
+                  diskon: customer.diskon ?? 0,
+                  referred_by_id: customer.referred_by_id ?? 0,
+                  referral_balance: customer.referral_balance ?? 0,
+                  odp_id: customer.odp_id ?? 0,
+                  odp_port: customer.odp_port ?? undefined,
+                });
+              }}
+              onCancelEdit={() => {
+                customersHook.handlers.setEditingCustomerId(null);
+                customersHook.handlers.setCustomerForm(defaultCustomerForm());
+              }}
+              pushSuccess={feedback.pushSuccess}
+              pushError={feedback.pushError}
+              onRefresh={reloadProtectedData}
+              onDelete={(id) => void customersHook.handlers.handleCustomerDelete(id)}
+              onDeleteBulk={(ids) => void customersHook.handlers.handleBulkDelete(ids)}
+            />
+          ) : null}
 
-      {view === "discounts" ? (
-        <DiscountsPage
-          user={user}
-          customers={customersHook.state.customers}
-          pushSuccess={feedback.pushSuccess}
-          pushError={feedback.pushError}
-          onRefresh={reloadProtectedData}
-        />
-      ) : null}
+          {view === "discounts" ? (
+            <DiscountsPage
+              user={user}
+              customers={customersHook.state.customers}
+              pushSuccess={feedback.pushSuccess}
+              pushError={feedback.pushError}
+              onRefresh={reloadProtectedData}
+            />
+          ) : null}
 
-      {view === "odp" ? (
-        <OdpPage
-          user={user}
-          pushSuccess={feedback.pushSuccess}
-          pushError={feedback.pushError}
-        />
-      ) : null}
+          {view === "odp" ? (
+            <OdpPage
+              user={user}
+              pushSuccess={feedback.pushSuccess}
+              pushError={feedback.pushError}
+            />
+          ) : null}
 
-      {view === "devices" ? (
-        <DevicesPage
-          pushSuccess={feedback.pushSuccess}
-          pushError={feedback.pushError}
-        />
-      ) : null}
+          {view === "devices" ? (
+            <DevicesPage
+              pushSuccess={feedback.pushSuccess}
+              pushError={feedback.pushError}
+            />
+          ) : null}
 
-      {view === "network-map" ? (
-        <NetworkMapPage
-          pushSuccess={feedback.pushSuccess}
-          pushError={feedback.pushError}
-        />
-      ) : null}
+          {view === "network-map" ? (
+            <NetworkMapPage
+              pushSuccess={feedback.pushSuccess}
+              pushError={feedback.pushError}
+            />
+          ) : null}
 
-      {view === "bills" ? (
-        <BillsPage
-          user={user}
-          bills={billsHook.state.bills}
-          billPeriod={billsHook.state.billPeriod}
-          billErrors={billsHook.state.billErrors}
-          submitting={feedback.submitting}
-          busyAction={feedback.busyAction}
-          expandedBillId={billsHook.state.expandedBillId}
-          notificationLogs={billsHook.state.notificationLogs}
-          proofFiles={billsHook.state.proofFiles}
-          search={billsHook.state.search}
-          status={billsHook.state.status}
-          page={billsHook.state.page}
-          total={billsHook.state.total}
-          limit={billsHook.state.limit}
-          onBillPeriodChange={billsHook.handlers.setBillPeriod}
-          onGenerateBills={billsHook.handlers.handleGenerateBills}
-          onMarkBillPaid={(id) => void billsHook.handlers.handleMarkBillPaid(id)}
-          onToggleNotifications={(id) => void billsHook.handlers.handleToggleNotifications(id)}
-          onSearchChange={billsHook.handlers.handleSearchChange}
-          onStatusChange={billsHook.handlers.handleStatusChange}
-          onPageChange={billsHook.handlers.handlePageChange}
-          onProofFileChange={(id, file) =>
-            billsHook.handlers.setProofFiles((current) => ({
-              ...current,
-              [id]: file,
-            }))
-          }
-          onUploadProof={(id) => void billsHook.handlers.handleUploadProof(id)}
-          pushToast={feedback.pushToast}
-          pushSuccess={feedback.pushSuccess}
-          pushError={feedback.pushError}
-          onShowCustomerDetails={handleShowCustomerDetails}
-        />
-      ) : null}
+          {view === "traffic" ? (
+            <TrafficPage
+              customers={customersHook.state.customers}
+              packages={packagesHook.state.packages}
+            />
+          ) : null}
 
-      {view === "templates" ? (
-        <TemplatesPage
-          templates={templatesHook.state.templates}
-          templateForm={templatesHook.state.templateForm}
-          templateErrors={templatesHook.state.templateErrors}
-          editingTemplateId={templatesHook.state.editingTemplateId}
-          submitting={feedback.submitting}
-          busyAction={feedback.busyAction}
-          onFormChange={templatesHook.handlers.setTemplateForm}
-          onSubmit={templatesHook.handlers.handleTemplateSubmit}
-          onEdit={(item) => {
-            templatesHook.handlers.setEditingTemplateId(item.id);
-            templatesHook.handlers.setTemplateForm({
-              name: item.name,
-              trigger_key: item.trigger_key,
-              content: item.content,
-              is_active: item.is_active,
-            });
-          }}
-          onCancelEdit={() => {
-            templatesHook.handlers.setEditingTemplateId(null);
-            templatesHook.handlers.setTemplateForm(defaultTemplateForm());
-          }}
-          onDelete={(id) => void templatesHook.handlers.handleTemplateDelete(id)}
-        />
-      ) : null}
+          {view === "bills" ? (
+            <BillsPage
+              user={user}
+              bills={billsHook.state.bills}
+              billPeriod={billsHook.state.billPeriod}
+              billErrors={billsHook.state.billErrors}
+              submitting={feedback.submitting}
+              busyAction={feedback.busyAction}
+              expandedBillId={billsHook.state.expandedBillId}
+              notificationLogs={billsHook.state.notificationLogs}
+              proofFiles={billsHook.state.proofFiles}
+              search={billsHook.state.search}
+              status={billsHook.state.status}
+              page={billsHook.state.page}
+              total={billsHook.state.total}
+              limit={billsHook.state.limit}
+              onBillPeriodChange={billsHook.handlers.setBillPeriod}
+              onGenerateBills={billsHook.handlers.handleGenerateBills}
+              onMarkBillPaid={(id) => void billsHook.handlers.handleMarkBillPaid(id)}
+              onToggleNotifications={(id) => void billsHook.handlers.handleToggleNotifications(id)}
+              onSearchChange={billsHook.handlers.handleSearchChange}
+              onStatusChange={billsHook.handlers.handleStatusChange}
+              onPageChange={billsHook.handlers.handlePageChange}
+              onProofFileChange={(id, file) =>
+                billsHook.handlers.setProofFiles((current) => ({
+                  ...current,
+                  [id]: file,
+                }))
+              }
+              onUploadProof={(id) => void billsHook.handlers.handleUploadProof(id)}
+              pushToast={feedback.pushToast}
+              pushSuccess={feedback.pushSuccess}
+              pushError={feedback.pushError}
+              onShowCustomerDetails={handleShowCustomerDetails}
+            />
+          ) : null}
 
-      {view === "monitoring" ? (
-        <MonitoringPage
-          health={monitoringHook.state.health}
-          backups={monitoringHook.state.backups}
-          restoreSimulation={monitoringHook.state.restoreSimulation}
-          submitting={feedback.submitting}
-          busyAction={feedback.busyAction}
-          appTone={appTone}
-          databaseTone={databaseTone}
-          workerTone={workerTone}
-          backupTone={backupTone}
-          schedulerTone={schedulerTone}
-          onRefresh={() => void feedback.withFeedback(monitoringHook.handlers.refreshMonitoringData)}
-          onCreateBackup={() => void monitoringHook.handlers.handleCreateBackup()}
-          onVerifyBackup={(filename) => void monitoringHook.handlers.handleVerifyBackup(filename)}
-          onSimulateRestore={(filename) => void monitoringHook.handlers.handleSimulateRestore(filename)}
-          onApplyRestore={() => void monitoringHook.handlers.handleApplyRestore()}
-          onCancelRestore={monitoringHook.handlers.cancelRestore}
-          onCheckIntegrations={async () => {
-            await feedback.withFeedback(async () => {
-              await monitoringHook.handlers.checkExternalIntegrations();
-            }, "check-integrations");
-          }}
-          pushSuccess={feedback.pushSuccess}
-          pushError={feedback.pushError}
-        />
-      ) : null}
+          {view === "templates" ? (
+            <TemplatesPage
+              templates={templatesHook.state.templates}
+              templateForm={templatesHook.state.templateForm}
+              templateErrors={templatesHook.state.templateErrors}
+              editingTemplateId={templatesHook.state.editingTemplateId}
+              submitting={feedback.submitting}
+              busyAction={feedback.busyAction}
+              onFormChange={templatesHook.handlers.setTemplateForm}
+              onSubmit={templatesHook.handlers.handleTemplateSubmit}
+              onEdit={(item) => {
+                templatesHook.handlers.setEditingTemplateId(item.id);
+                templatesHook.handlers.setTemplateForm({
+                  name: item.name,
+                  trigger_key: item.trigger_key,
+                  content: item.content,
+                  is_active: item.is_active,
+                });
+              }}
+              onCancelEdit={() => {
+                templatesHook.handlers.setEditingTemplateId(null);
+                templatesHook.handlers.setTemplateForm(defaultTemplateForm());
+              }}
+              onDelete={(id) => void templatesHook.handlers.handleTemplateDelete(id)}
+            />
+          ) : null}
 
-      {view === "settings" ? (
-        <SettingsPage
-          settingsForm={settingsHook.state.settingsForm}
-          settingsErrors={settingsHook.state.settingsErrors}
-          submitting={feedback.submitting}
-          busyAction={feedback.busyAction}
-          onFormChange={settingsHook.handlers.setSettingsForm}
-          onSubmit={settingsHook.handlers.handleSettingsSubmit}
-          pushSuccess={feedback.pushSuccess}
-          pushError={feedback.pushError}
-        />
-      ) : null}
+          {view === "email-templates" ? (
+            <EmailTemplatesPage
+              pushSuccess={feedback.pushSuccess}
+              pushError={feedback.pushError}
+              withFeedback={feedback.withFeedback}
+            />
+          ) : null}
 
-      {view === "audit" ? (
-        <AuditLogsPage
-          auditLogs={auditLogs}
-          submitting={feedback.submitting}
-          onRefresh={() => {
-            void feedback.withFeedback(async () => {
-              const payload = await fetchAuditLogs(100);
-              setAuditLogs(payload.data);
-            });
-          }}
-        />
-      ) : null}
+          {view === "monitoring" ? (
+            <MonitoringPage
+              health={monitoringHook.state.health}
+              backups={monitoringHook.state.backups}
+              restoreSimulation={monitoringHook.state.restoreSimulation}
+              submitting={feedback.submitting}
+              busyAction={feedback.busyAction}
+              appTone={appTone}
+              databaseTone={databaseTone}
+              workerTone={workerTone}
+              backupTone={backupTone}
+              schedulerTone={schedulerTone}
+              onRefresh={() => void feedback.withFeedback(monitoringHook.handlers.refreshMonitoringData)}
+              onCreateBackup={() => void monitoringHook.handlers.handleCreateBackup()}
+              onVerifyBackup={(filename) => void monitoringHook.handlers.handleVerifyBackup(filename)}
+              onSimulateRestore={(filename) => void monitoringHook.handlers.handleSimulateRestore(filename)}
+              onApplyRestore={() => void monitoringHook.handlers.handleApplyRestore()}
+              onCancelRestore={monitoringHook.handlers.cancelRestore}
+              onCheckIntegrations={async () => {
+                await feedback.withFeedback(async () => {
+                  await monitoringHook.handlers.checkExternalIntegrations();
+                }, "check-integrations");
+              }}
+              pushSuccess={feedback.pushSuccess}
+              pushError={feedback.pushError}
+            />
+          ) : null}
 
-      {view === "reports" ? (
-        <ReportsPage
-          customers={customersHook.state.customers}
-          revenue={revenue}
-          aging={aging}
-          submitting={feedback.submitting}
-        />
-      ) : null}
+          {view === "settings" ? (
+            <SettingsPage
+              settingsForm={settingsHook.state.settingsForm}
+              settingsErrors={settingsHook.state.settingsErrors}
+              submitting={feedback.submitting}
+              busyAction={feedback.busyAction}
+              onFormChange={settingsHook.handlers.setSettingsForm}
+              onSubmit={settingsHook.handlers.handleSettingsSubmit}
+              pushSuccess={feedback.pushSuccess}
+              pushError={feedback.pushError}
+            />
+          ) : null}
 
-      {view === "users" ? (
-        <UsersPage
-          managedUsers={usersHook.state.managedUsers}
-          managedUserForm={usersHook.state.managedUserForm}
-          managedUserErrors={usersHook.state.managedUserErrors}
-          submitting={feedback.submitting}
-          busyAction={feedback.busyAction}
-          onFormChange={usersHook.handlers.setManagedUserForm}
-          onSubmit={usersHook.handlers.handleManagedUserSubmit}
-          onUpdateRole={(item, role) => void usersHook.handlers.handleManagedUserUpdate(item, { role })}
-          onUpdateStatus={(item, isActive) => void usersHook.handlers.handleManagedUserUpdate(item, { is_active: isActive })}
-          onResetPassword={(item) => void usersHook.handlers.handleResetUserPassword(item)}
-        />
-      ) : null}
+          {view === "audit" ? (
+            <AuditLogsPage
+              auditLogs={auditLogs}
+              submitting={feedback.submitting}
+              onRefresh={() => {
+                void feedback.withFeedback(async () => {
+                  const payload = await fetchAuditLogs(100);
+                  setAuditLogs(payload.data);
+                });
+              }}
+            />
+          ) : null}
 
-      {view === "tickets" ? (
-        <Suspense fallback={<SkeletonCard />}>
-          <TicketsPage />
-        </Suspense>
-      ) : null}
-      {view === "registration" ? (
-        <Suspense fallback={<SkeletonCard />}>
-          <RegistrationPage />
-        </Suspense>
-      ) : null}
-      {view === "whatsapp" ? (
-        <Suspense fallback={<SkeletonCard />}>
-          <WhatsAppPage
-            user={user}
-            waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
-            waAccountId={settingsHook.state.settingsForm.wa_account_id}
-            waApiKey={settingsHook.state.settingsForm.wa_api_key}
-            pushSuccess={feedback.pushSuccess}
-            pushError={feedback.pushError}
-            withFeedback={feedback.withFeedback}
-            askForConfirmation={feedback.askForConfirmation}
-          />
-        </Suspense>
-      ) : null}
-      </div>
+          {view === "reports" ? (
+            <ReportsPage
+              customers={customersHook.state.customers}
+              revenue={revenue}
+              aging={aging}
+              submitting={feedback.submitting}
+            />
+          ) : null}
+
+          {view === "users" ? (
+            <UsersPage
+              managedUsers={usersHook.state.managedUsers}
+              managedUserForm={usersHook.state.managedUserForm}
+              managedUserErrors={usersHook.state.managedUserErrors}
+              submitting={feedback.submitting}
+              busyAction={feedback.busyAction}
+              onFormChange={usersHook.handlers.setManagedUserForm}
+              onSubmit={usersHook.handlers.handleManagedUserSubmit}
+              onUpdateRole={(item, role) => void usersHook.handlers.handleManagedUserUpdate(item, { role })}
+              onUpdateStatus={(item, isActive) => void usersHook.handlers.handleManagedUserUpdate(item, { is_active: isActive })}
+              onResetPassword={(item) => void usersHook.handlers.handleResetUserPassword(item)}
+            />
+          ) : null}
+
+          {view === "tickets" ? (
+            <Suspense fallback={<SkeletonCard />}>
+              <TicketsPage />
+            </Suspense>
+          ) : null}
+          {view === "registration" ? (
+            <Suspense fallback={<SkeletonCard />}>
+              <RegistrationPage
+                waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
+                waAccountId={settingsHook.state.settingsForm.wa_account_id}
+                waApiKey={settingsHook.state.settingsForm.wa_api_key}
+                pushSuccess={feedback.pushSuccess}
+                pushError={feedback.pushError}
+                withFeedback={feedback.withFeedback}
+                askForConfirmation={feedback.askForConfirmation}
+                onConvert={(leadData) => {
+                  const notes = [];
+                  if (leadData.ssid) notes.push(`WiFi: ${leadData.ssid}`);
+                  if (leadData.password) notes.push(`Pass: ${leadData.password}`);
+                  if (leadData.referral) notes.push(`Referral: ${leadData.referral}`);
+                  const extra = notes.length > 0 ? ` [${notes.join(", ")}]` : "";
+
+                  customersHook.handlers.setCustomerForm({
+                    name: leadData.name || "",
+                    package_id: 0,
+                    user_pppoe: "",
+                    password_pppoe: "",
+                    whatsapp: leadData.whatsapp || "",
+                    email: "",
+                    sn_ont: "",
+                    due_day: 5,
+                    status: "active",
+                    address: (leadData.address || "") + extra,
+                    diskon: 0,
+                    referred_by_id: 0,
+                    referral_balance: 0,
+                    odp_id: 0,
+                    odp_port: undefined,
+                  });
+                  switchView("customers");
+                }}
+              />
+            </Suspense>
+          ) : null}
+          {view === "whatsapp" ? (
+            <Suspense fallback={<SkeletonCard />}>
+              <WhatsAppPage
+                user={user}
+                waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
+                waAccountId={settingsHook.state.settingsForm.wa_account_id}
+                waApiKey={settingsHook.state.settingsForm.wa_api_key}
+                pushSuccess={feedback.pushSuccess}
+                pushError={feedback.pushError}
+                withFeedback={feedback.withFeedback}
+                askForConfirmation={feedback.askForConfirmation}
+              />
+            </Suspense>
+          ) : null}
+        </div>
       </div>
 
       <ToastStack toasts={feedback.toasts} />

@@ -25,6 +25,14 @@ type statusPayload struct {
 	Status string `json:"status"`
 }
 
+type bulkStatusPayload struct {
+	IDs          []int64 `json:"ids"`
+	Status       *string `json:"status,omitempty"`
+	OdpID        *int64  `json:"odp_id,omitempty"`
+	PackageID    *int64  `json:"paket_id,omitempty"`
+	ReferredByID *int64  `json:"referred_by_id,omitempty"`
+}
+
 func NewCustomerHandler(service customers.Service, auditService audit.Service) CustomerHandler {
 	return CustomerHandler{Service: service, Audit: auditService}
 }
@@ -148,6 +156,230 @@ func (h CustomerHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		"message": "customer status updated",
 	})
 }
+
+func (h CustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	user, err := currentUser(r)
+	if err != nil {
+		WriteError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid customer id")
+		return
+	}
+
+	// Fetch customer first for audit log before deleting
+	cust, err := h.Service.FindByID(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, customers.ErrCustomerNotFound) {
+			WriteError(w, http.StatusNotFound, "customer not found")
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, "failed to load customer")
+		return
+	}
+
+	ip := r.RemoteAddr
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+
+	if err := h.Service.Delete(r.Context(), id); err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &id, "customer.delete", fmt.Sprintf("Hapus pelanggan %s dengan PPPoE %s sukses", cust.Name, cust.UserPPPoE), ip)
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"message": "customer deleted successfully",
+	})
+}
+
+
+func (h CustomerHandler) BulkUpdateStatus(w http.ResponseWriter, r *http.Request) {
+	user, err := currentUser(r)
+	if err != nil {
+		WriteError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var payload bulkStatusPayload
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid bulk update payload")
+		return
+	}
+
+	if len(payload.IDs) == 0 {
+		WriteError(w, http.StatusBadRequest, "no customer ids provided")
+		return
+	}
+
+	// Validate status if provided
+	if payload.Status != nil {
+		status := strings.TrimSpace(*payload.Status)
+		if status != "active" && status != "limit" && status != "inactive" {
+			WriteError(w, http.StatusBadRequest, "invalid status")
+			return
+		}
+	}
+
+	ip := r.RemoteAddr
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+
+	successCount := 0
+	var updateErrors []string
+
+	for _, id := range payload.IDs {
+		cust, err := h.Service.FindByID(r.Context(), id)
+		if err != nil {
+			updateErrors = append(updateErrors, fmt.Sprintf("id %d: not found", id))
+			continue
+		}
+
+		modified := false
+		var auditChanges []string
+
+		if payload.Status != nil {
+			newStatus := strings.TrimSpace(*payload.Status)
+			if cust.Status != newStatus {
+				cust.Status = newStatus
+				modified = true
+				auditChanges = append(auditChanges, fmt.Sprintf("status: %s", newStatus))
+			}
+		}
+
+		if payload.OdpID != nil {
+			var newOdpID *int64
+			if *payload.OdpID > 0 {
+				newOdpID = payload.OdpID
+			}
+			// Compare OdpID
+			if (cust.OdpID == nil && newOdpID != nil) || (cust.OdpID != nil && newOdpID == nil) || (cust.OdpID != nil && newOdpID != nil && *cust.OdpID != *newOdpID) {
+				cust.OdpID = newOdpID
+				modified = true
+				if newOdpID != nil {
+					auditChanges = append(auditChanges, fmt.Sprintf("odp_id: %d", *newOdpID))
+				} else {
+					auditChanges = append(auditChanges, "odp_id: dikosongkan")
+				}
+			}
+		}
+
+		if payload.PackageID != nil {
+			newPkgID := *payload.PackageID
+			if cust.PackageID != newPkgID {
+				cust.PackageID = newPkgID
+				modified = true
+				auditChanges = append(auditChanges, fmt.Sprintf("paket_id: %d", newPkgID))
+			}
+		}
+
+		if payload.ReferredByID != nil {
+			var newRefID *int64
+			if *payload.ReferredByID > 0 {
+				newRefID = payload.ReferredByID
+			}
+			// Compare ReferredByID
+			if (cust.ReferredByID == nil && newRefID != nil) || (cust.ReferredByID != nil && newRefID == nil) || (cust.ReferredByID != nil && newRefID != nil && *cust.ReferredByID != *newRefID) {
+				cust.ReferredByID = newRefID
+				modified = true
+				if newRefID != nil {
+					auditChanges = append(auditChanges, fmt.Sprintf("referred_by_id: %d", *newRefID))
+				} else {
+					auditChanges = append(auditChanges, "referred_by_id: dikosongkan")
+				}
+			}
+		}
+
+		if !modified {
+			successCount++
+			continue
+		}
+
+		_, err = h.Service.Update(r.Context(), id, cust)
+		if err != nil {
+			updateErrors = append(updateErrors, fmt.Sprintf("id %d (%s): %v", id, cust.Name, err))
+			continue
+		}
+
+		changesStr := strings.Join(auditChanges, ", ")
+		_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &id, "customer.bulk_update", fmt.Sprintf("Ubah data pelanggan %s secara massal (%s) berhasil", cust.Name, changesStr), ip)
+		successCount++
+	}
+
+	res := map[string]any{
+		"message": fmt.Sprintf("Successfully updated %d customers", successCount),
+		"success_count": successCount,
+	}
+	if len(updateErrors) > 0 {
+		res["errors"] = updateErrors
+	}
+
+	WriteJSON(w, http.StatusOK, res)
+}
+
+type bulkDeletePayload struct {
+	IDs []int64 `json:"ids"`
+}
+
+func (h CustomerHandler) BulkDelete(w http.ResponseWriter, r *http.Request) {
+	user, err := currentUser(r)
+	if err != nil {
+		WriteError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var payload bulkDeletePayload
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid bulk delete payload")
+		return
+	}
+
+	if len(payload.IDs) == 0 {
+		WriteError(w, http.StatusBadRequest, "no customer ids provided")
+		return
+	}
+
+	ip := r.RemoteAddr
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+
+	successCount := 0
+	var deleteErrors []string
+
+	for _, id := range payload.IDs {
+		cust, err := h.Service.FindByID(r.Context(), id)
+		if err != nil {
+			deleteErrors = append(deleteErrors, fmt.Sprintf("id %d: not found", id))
+			continue
+		}
+
+		if err := h.Service.Delete(r.Context(), id); err != nil {
+			deleteErrors = append(deleteErrors, fmt.Sprintf("id %d (%s): %v", id, cust.Name, err))
+			continue
+		}
+
+		_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &id, "customer.bulk_delete", fmt.Sprintf("Hapus pelanggan %s dengan PPPoE %s secara massal sukses", cust.Name, cust.UserPPPoE), ip)
+		successCount++
+	}
+
+	res := map[string]any{
+		"message": fmt.Sprintf("Successfully deleted %d customers", successCount),
+		"success_count": successCount,
+	}
+	if len(deleteErrors) > 0 {
+		res["errors"] = deleteErrors
+	}
+
+	WriteJSON(w, http.StatusOK, res)
+}
+
 
 func (h CustomerHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)

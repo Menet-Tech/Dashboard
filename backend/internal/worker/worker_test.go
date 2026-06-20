@@ -111,6 +111,7 @@ func TestRunLoopStaysAliveWhileLeaseHeldByAnotherWorker(t *testing.T) {
 	svc := Service{
 		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Settings: settingsSvc,
+		DB:       db,
 	}
 
 	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)

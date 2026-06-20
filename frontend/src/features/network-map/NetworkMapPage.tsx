@@ -177,6 +177,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   // Customer linkages states
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [selectedEdgeForWaypoints, setSelectedEdgeForWaypoints] = useState<MapEdge | null>(null);
 
   useEffect(() => {
     localStorage.setItem("map-layer-preference", mapLayer);
@@ -592,7 +593,82 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     const updatedEdges = edges.filter((edge) => edge.edge_id !== edgeId);
     setEdges(updatedEdges);
     setIsDirty(true);
+    if (selectedEdgeForWaypoints?.edge_id === edgeId) {
+      setSelectedEdgeForWaypoints(null);
+    }
     pushSuccess("Kabel dihapus.");
+    void syncData(nodes, updatedEdges);
+  };
+
+  const handleWaypointDragEnd = (edgeId: string, index: number, event: L.DragEndEvent) => {
+    const marker = event.target as L.Marker;
+    const position = marker.getLatLng();
+
+    const updatedEdges = edges.map((edge) => {
+      if (edge.edge_id !== edgeId || !edge.waypoints) return edge;
+      const updatedWps = [...edge.waypoints];
+      updatedWps[index] = [position.lat, position.lng];
+      return { ...edge, waypoints: updatedWps };
+    });
+
+    setEdges(updatedEdges);
+    setIsDirty(true);
+    void syncData(nodes, updatedEdges);
+  };
+
+  const handleAddWaypoint = (edgeId: string) => {
+    const edge = edges.find((e) => e.edge_id === edgeId);
+    if (!edge) return;
+
+    const srcNode = nodes.find((n) => n.node_id === edge.source);
+    const tgtNode = nodes.find((n) => n.node_id === edge.target);
+    if (!srcNode || !tgtNode) return;
+
+    // Default to midpoint between source and target, or last waypoint and target
+    let startLat = parseLatitude(srcNode.latitude);
+    let startLng = parseLongitude(srcNode.longitude);
+    if (edge.waypoints && edge.waypoints.length > 0) {
+      const lastWp = edge.waypoints[edge.waypoints.length - 1];
+      startLat = lastWp[0];
+      startLng = lastWp[1];
+    }
+    const endLat = parseLatitude(tgtNode.latitude);
+    const endLng = parseLongitude(tgtNode.longitude);
+
+    const midLat = (startLat + endLat) / 2;
+    const midLng = (startLng + endLng) / 2;
+
+    const currentWps = edge.waypoints ? [...edge.waypoints] : [];
+    const updatedWps: [number, number][] = [...currentWps, [midLat, midLng]];
+
+    const updatedEdges = edges.map((e) =>
+      e.edge_id === edgeId ? { ...e, waypoints: updatedWps } : e
+    );
+    setEdges(updatedEdges);
+    setIsDirty(true);
+    void syncData(nodes, updatedEdges);
+  };
+
+  const handleRemoveWaypoint = (edgeId: string, index: number) => {
+    const updatedEdges = edges.map((edge) => {
+      if (edge.edge_id !== edgeId || !edge.waypoints) return edge;
+      const updatedWps = edge.waypoints.filter((_, idx) => idx !== index);
+      return { ...edge, waypoints: updatedWps };
+    });
+
+    setEdges(updatedEdges);
+    setIsDirty(true);
+    void syncData(nodes, updatedEdges);
+  };
+
+  const handleResetWaypoints = (edgeId: string) => {
+    if (!confirm("Hapus semua belokan di kabel ini?")) return;
+    const updatedEdges = edges.map((edge) =>
+      edge.edge_id === edgeId ? { ...edge, waypoints: [] } : edge
+    );
+
+    setEdges(updatedEdges);
+    setIsDirty(true);
     void syncData(nodes, updatedEdges);
   };
 
@@ -716,10 +792,13 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     const srcNode = nodes.find((n) => n.node_id === edge.source);
     const tgtNode = nodes.find((n) => n.node_id === edge.target);
     if (!srcNode || !tgtNode) return [];
-    return [
-      [parseLatitude(srcNode.latitude), parseLongitude(srcNode.longitude)],
-      [parseLatitude(tgtNode.latitude), parseLongitude(tgtNode.longitude)],
-    ];
+    const srcPos: [number, number] = [parseLatitude(srcNode.latitude), parseLongitude(srcNode.longitude)];
+    const tgtPos: [number, number] = [parseLatitude(tgtNode.latitude), parseLongitude(tgtNode.longitude)];
+    if (edge.waypoints && Array.isArray(edge.waypoints)) {
+      const wps: [number, number][] = edge.waypoints.map(wp => [parseLatitude(wp[0]), parseLongitude(wp[1])]);
+      return [srcPos, ...wps, tgtPos];
+    }
+    return [srcPos, tgtPos];
   };
 
   // Resolve fiber line color (GACS colors)
@@ -828,6 +907,65 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               Tambah Hubungan Kabel
             </button>
           </div>
+
+          {/* Waypoints Editor (Rendered when an edge is selected) */}
+          {selectedEdgeForWaypoints && (() => {
+            const edge = edges.find(e => e.edge_id === selectedEdgeForWaypoints.edge_id);
+            if (!edge) return null;
+            return (
+              <div className="mt-4 border border-indigo-150 rounded-2xl p-4 bg-indigo-50/30 space-y-3 font-sans">
+                <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                  <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                    <Link className="w-3.5 h-3.5 text-indigo-500" />
+                    Edit Belokan: {edge.edge_id}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEdgeForWaypoints(null)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-snug">
+                  Tambahkan titik belokan pada kabel ini. Anda bisa menyeret titik kuning di peta untuk mengatur posisi belokannya.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleAddWaypoint(edge.edge_id)}
+                    className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-indigo-600 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Tambah Belokan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResetWaypoints(edge.edge_id)}
+                    className="bg-white hover:bg-red-50 border border-slate-200 text-red-600 text-xs font-semibold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                {edge.waypoints && edge.waypoints.length > 0 && (
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                    {edge.waypoints.map((wp, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-1.5 text-[10px] font-mono">
+                        <span className="text-slate-600">Pt #{idx + 1}: {wp[0].toFixed(5)}, {wp[1].toFixed(5)}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveWaypoint(edge.edge_id, idx)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Quick Stats */}
           <div className="border-t border-slate-100 pt-5 text-xs text-slate-500 grid grid-cols-2 gap-4">
@@ -962,15 +1100,22 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
             const isTargetOffline = targetNode ? isNodeOffline(targetNode) : false;
             const isOffline = isSourceOffline || isTargetOffline;
 
+            const isSelected = selectedEdgeForWaypoints?.edge_id === edge.edge_id;
             return (
               <Polyline
                 key={edge.edge_id}
                 positions={positions}
                 color={isOffline ? "#EF4444" : getFiberColor(edge.fiber_type)}
-                weight={6}
+                weight={isSelected ? 10 : 6}
                 opacity={0.9}
-                dashArray="10, 15"
+                dashArray={isSelected ? undefined : "10, 15"}
                 className={isOffline ? "blink-red" : "animated-polyline"}
+                eventHandlers={{
+                  click: (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    setSelectedEdgeForWaypoints(edge);
+                  }
+                }}
               >
                 <Popup>
                   <div className="p-1 text-slate-800 min-w-[200px] dark:text-slate-200">
@@ -1031,6 +1176,28 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               </Polyline>
             );
           })}
+
+          {/* Draggable Waypoint Handles for the selected Edge */}
+          {selectedEdgeForWaypoints && (() => {
+            const edge = edges.find(e => e.edge_id === selectedEdgeForWaypoints.edge_id);
+            if (!edge || !edge.waypoints || edge.waypoints.length === 0) return null;
+            return edge.waypoints.map((wp, idx) => (
+              <Marker
+                key={`wp-${edge.edge_id}-${idx}`}
+                position={[wp[0], wp[1]]}
+                draggable={true}
+                icon={L.divIcon({
+                  className: "waypoint-handle",
+                  html: `<div style="background-color: #f59e0b; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,0.3);"></div>`,
+                  iconSize: [12, 12],
+                  iconAnchor: [6, 6]
+                })}
+                eventHandlers={{
+                  dragend: (e) => handleWaypointDragEnd(edge.edge_id, idx, e)
+                }}
+              />
+            ));
+          })()}
 
           {/* Render Infrastructure Markers (Nodes) */}
           {nodes.map((node) => {

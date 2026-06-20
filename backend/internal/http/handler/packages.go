@@ -94,7 +94,9 @@ func (h PackageHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Service.Delete(r.Context(), id); err != nil {
+	deletePool := r.URL.Query().Get("delete_pool") == "true"
+
+	if err := h.Service.Delete(r.Context(), id, deletePool); err != nil {
 		switch {
 		case errors.Is(err, packages.ErrPackageNotFound):
 			WriteError(w, http.StatusNotFound, "package not found")

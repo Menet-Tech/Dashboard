@@ -3,9 +3,12 @@ package handler
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/smtp"
 	"os"
 	"strings"
 	"time"
@@ -25,6 +28,7 @@ type IntegrationHandler struct {
 	HTTPClient *http.Client
 	Customers  customers.Service
 	Packages   packages.Service
+	Routers    *mikrotik.RouterService
 }
 
 func NewIntegrationHandler(settingsService settings.Service, whatsAppService notifications.WhatsAppService, discordSender notifications.DiscordSender) IntegrationHandler {
@@ -36,6 +40,30 @@ func NewIntegrationHandler(settingsService settings.Service, whatsAppService not
 	}
 }
 
+// resolveActiveMikrotik returns the host, username, and password to use for a
+// MikroTik operation. It first checks the old single-router settings keys;
+// if those are empty it falls back to the first active router in the DB table.
+func (h IntegrationHandler) resolveActiveMikrotik(ctx context.Context) (host, user, pass string, err error) {
+	host, _ = h.Settings.GetString(ctx, settings.KeyMikrotikHost)
+	user, _ = h.Settings.GetString(ctx, settings.KeyMikrotikUser)
+	pass, _ = h.Settings.GetString(ctx, settings.KeyMikrotikPass)
+
+	if strings.TrimSpace(host) != "" && strings.TrimSpace(user) != "" {
+		return host, user, pass, nil
+	}
+
+	// Fall back to multi-router table
+	if h.Routers == nil {
+		return "", "", "", fmt.Errorf("konfigurasi MikroTik belum lengkap — isi host, user, dan password terlebih dahulu")
+	}
+	routers, lerr := h.Routers.ListActive(ctx)
+	if lerr != nil || len(routers) == 0 {
+		return "", "", "", fmt.Errorf("konfigurasi MikroTik belum lengkap — isi host, user, dan password terlebih dahulu")
+	}
+	r := routers[0]
+	return r.Host, r.Username, r.Password, nil
+}
+
 func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
@@ -45,9 +73,7 @@ func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 	trimmedWAGatewayURL := strings.TrimSpace(waGatewayURL)
 	if envValue := strings.TrimSpace(os.Getenv("WA_GATEWAY_URL")); envValue != "" && (trimmedWAGatewayURL == "" || trimmedWAGatewayURL == "http://localhost:3001") {
 		waGatewayURL = envValue
-	}
-	if strings.TrimSpace(waGatewayURL) == "" {
-		waGatewayURL = "http://localhost:3001"
+		trimmedWAGatewayURL = envValue
 	}
 	waAPIKey, _ := h.Settings.GetString(ctx, settings.KeyWAAPIKey)
 	waAccountID, _ := h.Settings.GetString(ctx, settings.KeyWAAccountID)
@@ -59,8 +85,19 @@ func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 		waAccountID = "default"
 	}
 
+	// Treat an empty URL or the bare localhost default as "not configured" — the
+	// user must explicitly save a real URL+API-key in settings for this to be active.
+	waConfigured := trimmedWAGatewayURL != "" &&
+		trimmedWAGatewayURL != "http://localhost:3001" &&
+		strings.TrimSpace(waAPIKey) != ""
+
+	// Apply localhost fallback only for the actual HTTP request (after the configured gate).
+	if strings.TrimSpace(waGatewayURL) == "" {
+		waGatewayURL = "http://localhost:3001"
+	}
+
 	waStatus := "not_configured"
-	if strings.TrimSpace(waGatewayURL) != "" && strings.TrimSpace(waAPIKey) != "" {
+	if waConfigured {
 		waStatus = "disconnected"
 
 		client := h.HTTPClient
@@ -119,9 +156,7 @@ func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Check MikroTik RouterOS API
-	mikrotikHost, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
-	mikrotikUser, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
-	mikrotikPass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
+	mikrotikHost, mikrotikUser, mikrotikPass, _ := h.resolveActiveMikrotik(ctx)
 
 	mikrotikStatus := "not_configured"
 	if strings.TrimSpace(mikrotikHost) != "" && strings.TrimSpace(mikrotikUser) != "" {
@@ -172,12 +207,9 @@ func (h IntegrationHandler) SyncPreview(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 
-	host, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
-	user, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
-	pass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
-
-	if strings.TrimSpace(host) == "" || strings.TrimSpace(user) == "" || strings.TrimSpace(pass) == "" {
-		WriteError(w, http.StatusBadRequest, "konfigurasi MikroTik belum lengkap — isi host, user, dan password terlebih dahulu")
+	host, user, pass, err := h.resolveActiveMikrotik(ctx)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -252,12 +284,9 @@ func (h IntegrationHandler) SyncImport(w http.ResponseWriter, r *http.Request) {
 		dueDay = 1
 	}
 
-	host, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
-	user, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
-	pass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
-
-	if strings.TrimSpace(host) == "" {
-		WriteError(w, http.StatusBadRequest, "konfigurasi MikroTik belum lengkap")
+	host, user, pass, err := h.resolveActiveMikrotik(ctx)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -506,6 +535,159 @@ func (h IntegrationHandler) TestWhatsApp(w http.ResponseWriter, r *http.Request)
 	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Koneksi ke WhatsApp Gateway berhasil"})
 }
 
+// TestSMTP tests sending an email with provided SMTP settings.
+func (h IntegrationHandler) TestSMTP(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Host       string `json:"host"`
+		Port       string `json:"port"`
+		Username   string `json:"username"`
+		Password   string `json:"password"`
+		FromEmail  string `json:"from_email"`
+		Encryption string `json:"encryption"`
+		ToEmail    string `json:"to_email"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "payload tidak valid")
+		return
+	}
+	if strings.TrimSpace(payload.Host) == "" || strings.TrimSpace(payload.ToEmail) == "" {
+		WriteError(w, http.StatusBadRequest, "Host SMTP dan email penerima wajib diisi")
+		return
+	}
+
+	portStr := strings.TrimSpace(payload.Port)
+	if portStr == "" {
+		portStr = "587"
+	}
+
+	addr := net.JoinHostPort(payload.Host, portStr)
+	var auth smtp.Auth
+	if payload.Username != "" {
+		auth = smtp.PlainAuth("", payload.Username, payload.Password, payload.Host)
+	}
+
+	msg := []byte(fmt.Sprintf("To: %s\r\n"+
+		"From: %s\r\n"+
+		"Subject: Test SMTP Connection\r\n"+
+		"Content-Type: text/plain; charset=UTF-8\r\n"+
+		"MIME-Version: 1.0\r\n"+
+		"\r\n"+
+		"Koneksi SMTP berhasil dikonfigurasi! Ini adalah email uji dari Menet-Tech Dashboard Control Panel.\r\n", 
+		payload.ToEmail, payload.FromEmail))
+
+	if strings.ToLower(payload.Encryption) == "ssl" || portStr == "465" {
+		tlsconfig := &tls.Config{
+			InsecureSkipVerify: true,
+			ServerName:         payload.Host,
+		}
+
+		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp", addr, tlsconfig)
+		if err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("tls dial error: %v", err)})
+			return
+		}
+		defer conn.Close()
+
+		c, err := smtp.NewClient(conn, payload.Host)
+		if err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("smtp new client error: %v", err)})
+			return
+		}
+		defer c.Close()
+
+		if auth != nil {
+			if ok, _ := c.Extension("AUTH"); ok {
+				if err = c.Auth(auth); err != nil {
+					WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("smtp auth error: %v", err)})
+					return
+				}
+			}
+		}
+
+		if err = c.Mail(payload.FromEmail); err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("smtp mail command error: %v", err)})
+			return
+		}
+		if err = c.Rcpt(payload.ToEmail); err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("smtp rcpt command error: %v", err)})
+			return
+		}
+
+		wr, err := c.Data()
+		if err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("smtp data command error: %v", err)})
+			return
+		}
+
+		if _, err = wr.Write(msg); err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("write body error: %v", err)})
+			return
+		}
+
+		_ = wr.Close()
+		_ = c.Quit()
+	} else {
+		conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
+		if err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("tcp dial error: %v", err)})
+			return
+		}
+		defer conn.Close()
+
+		c, err := smtp.NewClient(conn, payload.Host)
+		if err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("smtp new client error: %v", err)})
+			return
+		}
+		defer c.Close()
+
+		if strings.ToLower(payload.Encryption) == "tls" || strings.ToLower(payload.Encryption) == "starttls" || portStr == "587" {
+			tlsconfig := &tls.Config{
+				InsecureSkipVerify: true,
+				ServerName:         payload.Host,
+			}
+			if err = c.StartTLS(tlsconfig); err != nil {
+				WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("smtp starttls error: %v", err)})
+				return
+			}
+		}
+
+		if auth != nil {
+			if ok, _ := c.Extension("AUTH"); ok {
+				if err = c.Auth(auth); err != nil {
+					WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("smtp auth error: %v", err)})
+					return
+				}
+			}
+		}
+
+		if err = c.Mail(payload.FromEmail); err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("smtp mail command error: %v", err)})
+			return
+		}
+		if err = c.Rcpt(payload.ToEmail); err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("smtp rcpt command error: %v", err)})
+			return
+		}
+
+		wr, err := c.Data()
+		if err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("smtp data command error: %v", err)})
+			return
+		}
+
+		if _, err = wr.Write(msg); err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": fmt.Sprintf("write body error: %v", err)})
+			return
+		}
+
+		_ = wr.Close()
+		_ = c.Quit()
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Email uji coba berhasil dikirim"})
+}
+
 type packageSyncPreviewItem struct {
 	Name        string `json:"name"`
 	RateLimit   string `json:"rate_limit"`
@@ -517,12 +699,9 @@ func (h IntegrationHandler) SyncPackagesPreview(w http.ResponseWriter, r *http.R
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 
-	host, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
-	user, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
-	pass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
-
-	if strings.TrimSpace(host) == "" || strings.TrimSpace(user) == "" || strings.TrimSpace(pass) == "" {
-		WriteError(w, http.StatusBadRequest, "konfigurasi MikroTik belum lengkap — isi host, user, dan password terlebih dahulu")
+	host, user, pass, err := h.resolveActiveMikrotik(ctx)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -579,12 +758,9 @@ func (h IntegrationHandler) SyncPackagesImport(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	host, _ := h.Settings.GetString(ctx, settings.KeyMikrotikHost)
-	user, _ := h.Settings.GetString(ctx, settings.KeyMikrotikUser)
-	pass, _ := h.Settings.GetString(ctx, settings.KeyMikrotikPass)
-
-	if strings.TrimSpace(host) == "" {
-		WriteError(w, http.StatusBadRequest, "konfigurasi MikroTik belum lengkap")
+	host, user, pass, err := h.resolveActiveMikrotik(ctx)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 

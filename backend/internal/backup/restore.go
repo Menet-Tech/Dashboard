@@ -26,8 +26,12 @@ func (s *Service) getStagingPath() string {
 }
 
 func (s *Service) getLiveDbPath() string {
+	if s.LiveDBPath != "" {
+		return s.LiveDBPath
+	}
+	// Fallback: derive from BackupDir parent (legacy behaviour)
 	storageDir := filepath.Dir(s.BackupDir)
-	return filepath.Join(storageDir, "database.db")
+	return filepath.Join(storageDir, "dashboard.db")
 }
 
 // SimulateRestore copies a backup to staging.db, runs integrity checks, and counts records

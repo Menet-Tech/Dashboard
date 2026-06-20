@@ -27,9 +27,9 @@ import (
 )
 
 var (
-	botToken      = envOrFatal("DISCORD_BOT_TOKEN")
-	applicationID = envOrFatal("DISCORD_APPLICATION_ID")
-	guildID       = os.Getenv("DISCORD_GUILD_ID") // optional for guild commands
+	botToken      string
+	applicationID string
+	guildID       string
 	apiBaseURL    = os.Getenv("API_BASE_URL")      // e.g. http://localhost:8080
 	sqlitePath    = envOrDefault("SQLITE_PATH", "../storage/dashboard.db")
 
@@ -60,6 +60,30 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Load settings from env or database
+	botToken = os.Getenv("DISCORD_BOT_TOKEN")
+	if botToken == "" {
+		botToken, _ = settingsSvc.GetString(ctx, "discord_bot_token")
+	}
+	if botToken == "" {
+		logger.Error("DISCORD_BOT_TOKEN is not set in env or settings")
+		os.Exit(1)
+	}
+
+	applicationID = os.Getenv("DISCORD_APPLICATION_ID")
+	if applicationID == "" {
+		applicationID, _ = settingsSvc.GetString(ctx, "discord_bot_application_id")
+	}
+	if applicationID == "" {
+		logger.Error("DISCORD_APPLICATION_ID is not set in env or settings")
+		os.Exit(1)
+	}
+
+	guildID = os.Getenv("DISCORD_GUILD_ID")
+	if guildID == "" {
+		guildID, _ = settingsSvc.GetString(ctx, "discord_bot_guild_id")
+	}
 
 	dg, err := discordgo.New("Bot " + botToken)
 	if err != nil {
@@ -231,6 +255,38 @@ var slashCommands = []*discordgo.ApplicationCommand{
 			},
 		},
 	},
+	{
+		Name:        "ubah-status",
+		Description: "Ubah status layanan pelanggan dan sinkronkan ke MikroTik",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "target",
+				Description: "Nama, User PPPoE, atau Serial Number ONT pelanggan",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "status",
+				Description: "Status layanan baru (active/limit/inactive)",
+				Required:    true,
+				Choices: []*discordgo.ApplicationCommandOptionChoice{
+					{
+						Name:  "Active (Aktif)",
+						Value: "active",
+					},
+					{
+						Name:  "Limit (Isolir)",
+						Value: "limit",
+					},
+					{
+						Name:  "Inactive (Nonaktif)",
+						Value: "inactive",
+					},
+				},
+			},
+		},
+	},
 }
 
 func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -274,6 +330,17 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		responseContent = handleKickCommand(i, cmdData.Options)
 	case "ont":
 		responseContent = handleOntCommand(i, cmdData.Options)
+	case "ubah-status":
+		var target, status string
+		for _, opt := range cmdData.Options {
+			switch opt.Name {
+			case "target":
+				target = opt.StringValue()
+			case "status":
+				status = opt.StringValue()
+			}
+		}
+		responseContent = handleUbahStatusCommand(i, target, status)
 	default:
 		responseContent = "Unknown command"
 	}
@@ -869,4 +936,27 @@ func handleOntCommand(_ *discordgo.InteractionCreate, options []*discordgo.Appli
 		statusEmoji,
 		status.LastInformTime.Format("2006-01-02 15:04:05"),
 	)
+}
+
+func handleUbahStatusCommand(i *discordgo.InteractionCreate, target, status string) string {
+	if target == "" || status == "" {
+		return "❌ Parameter `target` dan `status` diperlukan."
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	cust, err := findCustomerByTarget(ctx, target)
+	if err != nil {
+		return "❌ " + err.Error()
+	}
+
+	err = customersSvc.UpdateStatus(ctx, cust.ID, status)
+	if err != nil {
+		return fmt.Sprintf("❌ Gagal memperbarui status pelanggan **%s** menjadi **%s**: %v", cust.Name, status, err)
+	}
+
+	discordUser := getDiscordUser(i)
+	_ = auditSvc.Record(ctx, nil, nil, "discord.customer_update_status", fmt.Sprintf("User %s changed customer %s status to %s via Discord bot", discordUser, cust.Name, status))
+
+	return fmt.Sprintf("✅ Berhasil mengubah status pelanggan **%s** menjadi **%s** dan mensinkronkan ke MikroTik.", cust.Name, status)
 }

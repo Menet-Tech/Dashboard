@@ -27,16 +27,18 @@ type VerificationResult struct {
 }
 
 type Service struct {
-	DB        *sql.DB
-	BackupDir string
-	MaxRetain int
+	DB         *sql.DB
+	BackupDir  string
+	LiveDBPath string // absolute or relative path to the live SQLite file
+	MaxRetain  int
 }
 
-func NewService(db *sql.DB, backupDir string) *Service {
+func NewService(db *sql.DB, backupDir, liveDBPath string) *Service {
 	return &Service{
-		DB:        db,
-		BackupDir: backupDir,
-		MaxRetain: 7, // retain last 7 backups by default
+		DB:         db,
+		BackupDir:  backupDir,
+		LiveDBPath: liveDBPath,
+		MaxRetain:  7, // retain last 7 backups by default
 	}
 }
 

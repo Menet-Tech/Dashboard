@@ -13,7 +13,7 @@ import (
 
 func TestListBackups_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
-	svc := backup.NewService(nil, dir)
+	svc := backup.NewService(nil, dir, "")
 
 	backups, err := svc.ListBackups()
 	if err != nil {
@@ -26,7 +26,7 @@ func TestListBackups_EmptyDir(t *testing.T) {
 
 func TestListBackups_WithFiles(t *testing.T) {
 	dir := t.TempDir()
-	svc := backup.NewService(nil, dir)
+	svc := backup.NewService(nil, dir, "")
 
 	for _, name := range []string{"dashboard_2026-01-01_00-00-00.db", "dashboard_2026-01-02_00-00-00.db"} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte("test"), 0644); err != nil {
@@ -45,7 +45,7 @@ func TestListBackups_WithFiles(t *testing.T) {
 
 func TestGetBackupPath_Invalid(t *testing.T) {
 	dir := t.TempDir()
-	svc := backup.NewService(nil, dir)
+	svc := backup.NewService(nil, dir, "")
 
 	_, err := svc.GetBackupPath("../../etc/passwd")
 	if err == nil {
@@ -60,7 +60,7 @@ func TestGetBackupPath_Invalid(t *testing.T) {
 
 func TestGetBackupPath_NotFound(t *testing.T) {
 	dir := t.TempDir()
-	svc := backup.NewService(nil, dir)
+	svc := backup.NewService(nil, dir, "")
 
 	_, err := svc.GetBackupPath("missing_2026-01-01_00-00-00.db")
 	if err == nil {
@@ -70,7 +70,7 @@ func TestGetBackupPath_NotFound(t *testing.T) {
 
 func TestGetBackupPath_Valid(t *testing.T) {
 	dir := t.TempDir()
-	svc := backup.NewService(nil, dir)
+	svc := backup.NewService(nil, dir, "")
 
 	name := "dashboard_2026-01-01_00-00-00.db"
 	_ = os.WriteFile(filepath.Join(dir, name), []byte("data"), 0644)
@@ -86,7 +86,7 @@ func TestGetBackupPath_Valid(t *testing.T) {
 
 func TestPruneOldBackups_CountLimit(t *testing.T) {
 	dir := t.TempDir()
-	svc := backup.NewService(nil, dir)
+	svc := backup.NewService(nil, dir, "")
 	svc.MaxRetain = 2
 
 	names := []string{
@@ -120,7 +120,7 @@ func TestCreateBackup_WithRealDB(t *testing.T) {
 		t.Fatalf("create table: %v", err)
 	}
 
-	svc := backup.NewService(db, backupDir)
+	svc := backup.NewService(db, backupDir, dbPath)
 	svc.MaxRetain = 3
 
 	filename, err := svc.CreateBackup(context.Background())
@@ -152,7 +152,7 @@ func TestVerifyBackup_WithRealDB(t *testing.T) {
 		t.Fatalf("create table: %v", err)
 	}
 
-	svc := backup.NewService(db, backupDir)
+	svc := backup.NewService(db, backupDir, dbPath)
 	filename, err := svc.CreateBackup(context.Background())
 	if err != nil {
 		t.Fatalf("create backup: %v", err)
@@ -193,7 +193,7 @@ func TestSimulateRestore_WithRealDB(t *testing.T) {
 		}
 	}
 
-	svc := backup.NewService(db, backupDir)
+	svc := backup.NewService(db, backupDir, dbPath)
 	filename, err := svc.CreateBackup(context.Background())
 	if err != nil {
 		t.Fatalf("create backup: %v", err)
@@ -222,7 +222,7 @@ func TestApplyRestore_WithRealDB(t *testing.T) {
 	// Create a dummy live db
 	_ = os.WriteFile(dbPath, []byte("live db"), 0644)
 	
-	svc := backup.NewService(nil, backupDir)
+	svc := backup.NewService(nil, backupDir, dbPath)
 	
 	// Create a dummy staging db
 	stagingPath := filepath.Join(dbDir, "staging.db")

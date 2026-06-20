@@ -33,7 +33,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("api", "worker", "frontend", "whatsapp", "test", "watch", "check", "setup-env", "clean", "reset", "help", $null)]
+    [ValidateSet("api", "worker", "frontend", "whatsapp", "bot", "test", "watch", "check", "setup-env", "clean", "reset", "help", $null)]
     [string]$Command = "",
 
     [Parameter(Position = 1)]
@@ -289,6 +289,21 @@ function Invoke-StartFrontend {
         } else {
             & npm run dev
         }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Invoke-StartBot {
+    Write-Header "Discord Bot"
+    
+    Write-Log "Starting Discord Bot..." -Type Info
+    Write-Log "Press Ctrl+C to stop" -Type Warning
+    
+    Push-Location $script:Config.BackendDir
+    try {
+        & go run ./cmd/discord-bot
     }
     finally {
         Pop-Location
@@ -811,6 +826,9 @@ function Main {
                 }
             }
             Invoke-StartGateway
+        }
+        "bot" {
+            Invoke-StartBot
         }
         "test" {
             Invoke-RunTests

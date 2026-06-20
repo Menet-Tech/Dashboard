@@ -21,9 +21,9 @@ func (s Service) SendBroadcast(ctx context.Context, targetType string, targetIDs
 	}
 
 	query := `
-		SELECT nama, nomor_wa 
+		SELECT nama, COALESCE(nomor_wa, ''), COALESCE(email, '')
 		FROM pelanggan 
-		WHERE status != 'inactive' AND COALESCE(nomor_wa, '') != ''
+		WHERE status != 'inactive'
 	`
 	var args []interface{}
 
@@ -66,31 +66,46 @@ func (s Service) SendBroadcast(ctx context.Context, targetType string, targetIDs
 
 	count := 0
 	for rows.Next() {
-		var name, phone string
-		if err := rows.Scan(&name, &phone); err != nil {
+		var name, phone, email string
+		if err := rows.Scan(&name, &phone, &email); err != nil {
 			return count, fmt.Errorf("scan broadcast target: %w", err)
-		}
-
-		// Clean up phone number
-		cleanPhone := strings.TrimSpace(phone)
-		if cleanPhone == "" {
-			continue
-		}
-		if !strings.Contains(cleanPhone, "@c.us") {
-			cleanPhone = cleanPhone + "@c.us"
 		}
 
 		// Personalize message: replace {nama} with customer's name
 		personalizedMsg := strings.ReplaceAll(message, "{nama}", name)
+		queuedAny := false
 
-		// Queue the message
-		err = s.WhatsApp.QueueDirectMessage(ctx, "default", cleanPhone, personalizedMsg)
-		if err != nil {
-			// Log and continue, don't abort the entire broadcast
-			fmt.Printf("failed to queue broadcast message to %s: %v\n", cleanPhone, err)
-			continue
+		// Clean up phone number and queue if not empty
+		cleanPhone := strings.TrimSpace(phone)
+		if cleanPhone != "" {
+			if !strings.Contains(cleanPhone, "@c.us") {
+				cleanPhone = cleanPhone + "@c.us"
+			}
+			err = s.WhatsApp.QueueDirectMessage(ctx, "default", cleanPhone, personalizedMsg)
+			if err != nil {
+				fmt.Printf("failed to queue broadcast message to %s: %v\n", cleanPhone, err)
+			} else {
+				queuedAny = true
+			}
 		}
-		count++
+
+		// Queue email if email is not empty
+		cleanEmail := strings.TrimSpace(email)
+		if cleanEmail != "" {
+			_, err = s.DB.ExecContext(ctx, `
+				INSERT INTO email_queue (to_email, subject, body, status, attempts)
+				VALUES (?, 'Pesan Siaran (Broadcast)', ?, 'pending', 0)
+			`, cleanEmail, personalizedMsg)
+			if err != nil {
+				fmt.Printf("failed to queue broadcast email to %s: %v\n", cleanEmail, err)
+			} else {
+				queuedAny = true
+			}
+		}
+
+		if queuedAny {
+			count++
+		}
 	}
 
 	return count, rows.Err()
