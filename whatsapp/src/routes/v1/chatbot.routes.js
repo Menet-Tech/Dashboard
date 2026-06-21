@@ -1,6 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const { getAllSessions, deleteSession, getForms, updateFormStatus, deleteForm, getGatewaySettings, setGatewaySetting } = require('../../utils/database');
+const { getAllSessions, deleteSession, getForms, updateFormStatus, deleteForm, getGatewaySettings, setGatewaySetting, saveContactForm } = require('../../utils/database');
 
 /**
  * GET /api/v1/chatbot/sessions
@@ -52,6 +52,19 @@ router.put('/settings', (req, res) => {
         }
     }
     res.json({ status: 'success', message: 'Pengaturan chatbot diperbarui', data: result });
+});
+
+/**
+ * POST /api/v1/chatbot/forms
+ * Tambah contact form baru (untuk registrasi manual oleh admin)
+ */
+router.post('/forms', (req, res) => {
+    const { type, phone, account_id, data } = req.body;
+    if (!type || !phone) {
+        return res.status(400).json({ status: 'error', message: 'Type and phone are required' });
+    }
+    const formId = saveContactForm(type, phone, account_id || 'manual', data || {});
+    res.status(201).json({ status: 'success', message: 'Data form berhasil ditambahkan', data: { id: formId } });
 });
 
 /**

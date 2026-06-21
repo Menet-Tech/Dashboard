@@ -121,10 +121,10 @@ const navItems: NavItem[] = [
   { key: "devices", label: "Perangkat ONT", caption: "Kelola CPE via GenieACS" },
   { key: "traffic", label: "Traffic Monitor", caption: "Tx/Rx real-time pelanggan" },
   { key: "tickets", label: "Tiket Support", caption: "Bantuan & keluhan" },
-  { key: "registration", label: "Registrasi WA", caption: "Review pendaftaran dari WA" },
+  { key: "registration", label: "Registrasi List", caption: "Review & tambah pendaftaran" },
   // === Komunikasi ===
-  { key: "whatsapp", label: "WhatsApp Gateway", caption: "Multi-akun & Chatbot" },
-  { key: "templates", label: "Template WA", caption: "Draft pesan notif" },
+  { key: "whatsapp", label: "WhatsApp Gateway", caption: "Multi-akun & status" },
+  { key: "templates", label: "Template & Chatbot WA", caption: "Pesan & otomatisasi" },
   { key: "email-templates", label: "Template Email", caption: "Draft email notif" },
   // === Admin ===
   { key: "reports", label: "Laporan Keuangan", caption: "Analisis & proyeksi omset" },
@@ -225,7 +225,7 @@ export default function App() {
       ]);
       setSummary(summaryPayload);
       if (user?.role === "admin") {
-        setRevenue(revenuePayload.data);
+        setRevenue(revenuePayload.data || []);
         setAging(agingPayload.data);
       }
       setAuditLogs(auditPayload.data);
@@ -343,6 +343,7 @@ export default function App() {
       billsHook.handlers.setBills([]);
       templatesHook.handlers.setTemplates([]);
       setAuditLogs([]);
+      setRevenue([]);
       usersHook.handlers.setManagedUsers([]);
       startTransition(() => setView("dashboard"));
       localStorage.setItem("active_view", "dashboard");
@@ -468,6 +469,8 @@ export default function App() {
               customerLifecycleMap={customerLifecycleMap}
               submitting={feedback.submitting}
               busyAction={feedback.busyAction}
+              isFormOpen={customersHook.state.isFormOpen}
+              onSetFormOpen={customersHook.handlers.setIsFormOpen}
               onFormChange={customersHook.handlers.setCustomerForm}
               onFilterChange={(filter) => customersHook.handlers.setCustomerLifecycleFilter(filter)}
               onSubmit={customersHook.handlers.handleCustomerSubmit}
@@ -486,6 +489,7 @@ export default function App() {
                   status: customer.status,
                   address: customer.address,
                   diskon: customer.diskon ?? 0,
+                  tipe_diskon: customer.tipe_diskon || "flat",
                   referred_by_id: customer.referred_by_id ?? 0,
                   referral_balance: customer.referral_balance ?? 0,
                   odp_id: customer.odp_id ?? 0,
@@ -548,6 +552,7 @@ export default function App() {
               user={user}
               bills={billsHook.state.bills}
               billPeriod={billsHook.state.billPeriod}
+              filterPeriod={billsHook.state.filterPeriod}
               billErrors={billsHook.state.billErrors}
               submitting={feedback.submitting}
               busyAction={feedback.busyAction}
@@ -560,6 +565,7 @@ export default function App() {
               total={billsHook.state.total}
               limit={billsHook.state.limit}
               onBillPeriodChange={billsHook.handlers.setBillPeriod}
+              onFilterPeriodChange={billsHook.handlers.handleFilterPeriodChange}
               onGenerateBills={billsHook.handlers.handleGenerateBills}
               onMarkBillPaid={(id) => void billsHook.handlers.handleMarkBillPaid(id)}
               onToggleNotifications={(id) => void billsHook.handlers.handleToggleNotifications(id)}
@@ -596,6 +602,7 @@ export default function App() {
                   name: item.name,
                   trigger_key: item.trigger_key,
                   content: item.content,
+                  trigger_keywords: item.trigger_keywords || "",
                   is_active: item.is_active,
                 });
               }}
@@ -604,6 +611,13 @@ export default function App() {
                 templatesHook.handlers.setTemplateForm(defaultTemplateForm());
               }}
               onDelete={(id) => void templatesHook.handlers.handleTemplateDelete(id)}
+              user={user}
+              waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
+              waApiKey={settingsHook.state.settingsForm.wa_api_key}
+              pushSuccess={feedback.pushSuccess}
+              pushError={feedback.pushError}
+              withFeedback={feedback.withFeedback}
+              askForConfirmation={feedback.askForConfirmation}
             />
           ) : null}
 
@@ -704,6 +718,7 @@ export default function App() {
                 waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
                 waAccountId={settingsHook.state.settingsForm.wa_account_id}
                 waApiKey={settingsHook.state.settingsForm.wa_api_key}
+                packages={packagesHook.state.packages}
                 pushSuccess={feedback.pushSuccess}
                 pushError={feedback.pushError}
                 withFeedback={feedback.withFeedback}
@@ -715,6 +730,21 @@ export default function App() {
                   if (leadData.referral) notes.push(`Referral: ${leadData.referral}`);
                   const extra = notes.length > 0 ? ` [${notes.join(", ")}]` : "";
 
+                  let referredById = 0;
+                  if (leadData.referral) {
+                    const refClean = leadData.referral.trim().toLowerCase();
+                    const matchedCustomer = customersHook.state.customers.find(
+                      (c) =>
+                        (c.referral_code && c.referral_code.trim().toLowerCase() === refClean) ||
+                        (c.name && c.name.trim().toLowerCase() === refClean)
+                    );
+                    if (matchedCustomer) {
+                      referredById = matchedCustomer.id;
+                    }
+                  }
+
+                  customersHook.handlers.setEditingCustomerId(null);
+                  customersHook.handlers.setCustomerErrors({});
                   customersHook.handlers.setCustomerForm({
                     name: leadData.name || "",
                     package_id: 0,
@@ -723,15 +753,17 @@ export default function App() {
                     whatsapp: leadData.whatsapp || "",
                     email: "",
                     sn_ont: "",
-                    due_day: 5,
+                    due_day: 8,
                     status: "active",
                     address: (leadData.address || "") + extra,
                     diskon: 0,
-                    referred_by_id: 0,
+                    tipe_diskon: "flat",
+                    referred_by_id: referredById,
                     referral_balance: 0,
                     odp_id: 0,
                     odp_port: undefined,
                   });
+                  customersHook.handlers.setIsFormOpen(true);
                   switchView("customers");
                 }}
               />
@@ -748,6 +780,11 @@ export default function App() {
                 pushError={feedback.pushError}
                 withFeedback={feedback.withFeedback}
                 askForConfirmation={feedback.askForConfirmation}
+                settingsForm={settingsHook.state.settingsForm}
+                setSettingsForm={settingsHook.handlers.setSettingsForm}
+                refreshSettings={settingsHook.handlers.refreshSettings}
+                templates={templatesHook.state.templates}
+                refreshTemplates={templatesHook.handlers.refreshTemplates}
               />
             </Suspense>
           ) : null}

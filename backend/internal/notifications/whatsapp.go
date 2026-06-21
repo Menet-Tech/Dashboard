@@ -90,6 +90,14 @@ func (s WhatsAppService) QueueDirectMessage(ctx context.Context, accountID, toNu
 	return s.QueueMessage(ctx, accountID, toNumber, body, 0, "")
 }
 
+func (s WhatsAppService) SendDirectMessage(ctx context.Context, accountID, toNumber, body string) error {
+	return s.sendDirect(ctx, QueuedMessage{
+		AccountID: accountID,
+		ToNumber:  toNumber,
+		Body:      body,
+	})
+}
+
 func (s WhatsAppService) QueueMessage(ctx context.Context, accountID, toNumber, body string, billID int64, triggerKey string) error {
 	var bID sql.NullInt64
 	if billID > 0 {

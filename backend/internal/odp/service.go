@@ -112,32 +112,85 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Odp, error) {
 	return item, nil
 }
 
+func parseCoordinates(lokasi string) (float64, float64) {
+	lat := -6.2088
+	lng := 106.8456
+
+	parts := strings.Split(lokasi, ",")
+	if len(parts) == 2 {
+		var pLat, pLng float64
+		_, err1 := fmt.Sscanf(strings.TrimSpace(parts[0]), "%f", &pLat)
+		_, err2 := fmt.Sscanf(strings.TrimSpace(parts[1]), "%f", &pLng)
+		if err1 == nil && err2 == nil && pLat >= -90 && pLat <= 90 && pLng >= -180 && pLng <= 180 {
+			lat = pLat
+			lng = pLng
+		}
+	}
+	return lat, lng
+}
+
 func (r Repository) Create(ctx context.Context, o Odp) (Odp, error) {
-	result, err := r.DB.ExecContext(ctx, `
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return Odp{}, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.ExecContext(ctx, `
 		INSERT INTO odp (nama, lokasi, deskripsi, ports, updated_at)
 		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`, o.Nama, o.Lokasi, strings.TrimSpace(o.Deskripsi), o.Ports)
 	if err != nil {
-		return Odp{}, fmt.Errorf("create odp: %w", err)
+		return Odp{}, fmt.Errorf("create odp in table: %w", err)
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
 		return Odp{}, fmt.Errorf("get odp id: %w", err)
 	}
-
 	o.ID = id
+
+	lat, lng := parseCoordinates(o.Lokasi)
+	nodeID := fmt.Sprintf("odp-%d", id)
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO mapping_nodes (node_id, type, name, latitude, longitude, capacity, notes, created_at, updated_at)
+		VALUES (?, 'odp', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		ON CONFLICT(node_id) DO UPDATE SET
+			name = ?,
+			latitude = ?,
+			longitude = ?,
+			capacity = ?,
+			notes = ?,
+			updated_at = CURRENT_TIMESTAMP`,
+		nodeID, o.Nama, lat, lng, o.Ports, strings.TrimSpace(o.Deskripsi),
+		o.Nama, lat, lng, o.Ports, strings.TrimSpace(o.Deskripsi),
+	)
+	if err != nil {
+		return Odp{}, fmt.Errorf("create mapping node for odp: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Odp{}, fmt.Errorf("commit create odp: %w", err)
+	}
+
 	return o, nil
 }
 
 func (r Repository) Update(ctx context.Context, id int64, o Odp) (Odp, error) {
-	result, err := r.DB.ExecContext(ctx, `
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return Odp{}, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.ExecContext(ctx, `
 		UPDATE odp
 		SET nama = ?, lokasi = ?, deskripsi = ?, ports = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, o.Nama, o.Lokasi, strings.TrimSpace(o.Deskripsi), o.Ports, id)
 	if err != nil {
-		return Odp{}, fmt.Errorf("update odp: %w", err)
+		return Odp{}, fmt.Errorf("update odp table: %w", err)
 	}
 
 	affected, err := result.RowsAffected()
@@ -146,6 +199,30 @@ func (r Repository) Update(ctx context.Context, id int64, o Odp) (Odp, error) {
 	}
 	if affected == 0 {
 		return Odp{}, ErrOdpNotFound
+	}
+
+	lat, lng := parseCoordinates(o.Lokasi)
+	nodeID := fmt.Sprintf("odp-%d", id)
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO mapping_nodes (node_id, type, name, latitude, longitude, capacity, notes, created_at, updated_at)
+		VALUES (?, 'odp', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		ON CONFLICT(node_id) DO UPDATE SET
+			name = ?,
+			latitude = ?,
+			longitude = ?,
+			capacity = ?,
+			notes = ?,
+			updated_at = CURRENT_TIMESTAMP`,
+		nodeID, o.Nama, lat, lng, o.Ports, strings.TrimSpace(o.Deskripsi),
+		o.Nama, lat, lng, o.Ports, strings.TrimSpace(o.Deskripsi),
+	)
+	if err != nil {
+		return Odp{}, fmt.Errorf("update mapping node for odp: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Odp{}, fmt.Errorf("commit update odp: %w", err)
 	}
 
 	o.ID = id
@@ -161,7 +238,13 @@ func (r Repository) Delete(ctx context.Context, id int64) error {
 		return ErrOdpInUse
 	}
 
-	result, err := r.DB.ExecContext(ctx, `DELETE FROM odp WHERE id = ?`, id)
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.ExecContext(ctx, `DELETE FROM odp WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("delete odp: %w", err)
 	}
@@ -173,5 +256,12 @@ func (r Repository) Delete(ctx context.Context, id int64) error {
 	if affected == 0 {
 		return ErrOdpNotFound
 	}
-	return nil
+
+	nodeID := fmt.Sprintf("odp-%d", id)
+	_, err = tx.ExecContext(ctx, "DELETE FROM mapping_nodes WHERE node_id = ?", nodeID)
+	if err != nil {
+		return fmt.Errorf("delete mapping node for odp: %w", err)
+	}
+
+	return tx.Commit()
 }

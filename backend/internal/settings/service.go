@@ -17,6 +17,7 @@ const (
 	KeyTrialGraceDays        = "trial_overdue_grace_days"
 	KeyTrialPeriodDays       = "trial_period_days"
 	KeyTrialAutoGenerate     = "trial_auto_generate_bills"
+	KeyTrialEnabled          = "trial_enabled"
 	KeyBillingAutoEnabled    = "billing_auto_generate_enabled"
 	KeyBillingGenerateDay    = "billing_generate_day"
 	KeyBillingGenerateTime   = "billing_generate_time"
@@ -67,6 +68,8 @@ const (
 	KeySMTPEncryption        = "smtp_encryption"
 	KeySMTPEnabled           = "smtp_enabled"
 	KeyMikrotikIsolirProfile = "mikrotik_isolir_profile"
+	KeyWAGatewayEnabled      = "wa_gateway_enabled"
+	KeyDiscordBotEnabled     = "discord_bot_enabled"
 )
 
 var defaults = map[string]string{
@@ -76,6 +79,7 @@ var defaults = map[string]string{
 	KeyTrialGraceDays:        "7",
 	KeyTrialPeriodDays:       "3",
 	KeyTrialAutoGenerate:     "1",
+	KeyTrialEnabled:          "1",
 	KeyBillingAutoEnabled:    "1",
 	KeyBillingGenerateDay:    "1",
 	KeyBillingGenerateTime:   "00:05",
@@ -126,6 +130,8 @@ var defaults = map[string]string{
 	KeySMTPFromEmail:         "",
 	KeySMTPEncryption:        "tls",
 	KeySMTPEnabled:           "0",
+	KeyWAGatewayEnabled:      "0",
+	KeyDiscordBotEnabled:     "0",
 }
 
 func IsAllowedKey(key string) bool {
@@ -135,6 +141,8 @@ func IsAllowedKey(key string) bool {
 	}
 	switch {
 	case strings.HasPrefix(key, "worker_"):
+		return true
+	case strings.HasPrefix(key, "chatbot_trigger_"):
 		return true
 	default:
 		return false
@@ -222,6 +230,10 @@ func (s Service) ReleaseLease(ctx context.Context, leaseKey, owner string) error
 	return s.Repository.ReleaseLease(ctx, leaseKey, owner)
 }
 
+func (s Service) Delete(ctx context.Context, key string) error {
+	return s.Repository.Delete(ctx, key)
+}
+
 func (r Repository) GetString(ctx context.Context, key string) (string, error) {
 	row := r.DB.QueryRowContext(ctx, `SELECT value FROM pengaturan WHERE key = ? LIMIT 1`, key)
 	var value string
@@ -257,6 +269,14 @@ func (r Repository) Set(ctx context.Context, key, value string) error {
 	`, key, value)
 	if err != nil {
 		return fmt.Errorf("set setting %s: %w", key, err)
+	}
+	return nil
+}
+
+func (r Repository) Delete(ctx context.Context, key string) error {
+	_, err := r.DB.ExecContext(ctx, `DELETE FROM pengaturan WHERE key = ?`, key)
+	if err != nil {
+		return fmt.Errorf("delete setting %s: %w", key, err)
 	}
 	return nil
 }

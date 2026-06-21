@@ -6,6 +6,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"menettech/dashboard/backend/internal/settings"
 )
 
 func TestServiceCreateInitializesTrialPeriod(t *testing.T) {
@@ -198,5 +200,103 @@ func TestTrialFieldsInList(t *testing.T) {
 
 	if cust.TrialStartedAt == nil {
 		t.Error("expected trial_started_at to be set")
+	}
+}
+
+func TestServiceCreateRespectsTrialSettings(t *testing.T) {
+	db := customerTestDB(t)
+	
+	// Create package first
+	_, err := db.Exec(`INSERT INTO paket (nama, kecepatan_mbps, harga) VALUES (?, ?, ?)`, "Test Paket", 20, 100000)
+	if err != nil {
+		t.Fatalf("insert package: %v", err)
+	}
+
+	// 1. Test when trial is enabled (trial_enabled = "1" or default)
+	serviceEnabled := Service{
+		Repository: Repository{DB: db},
+		Settings: settings.Service{
+			Repository: settings.Repository{DB: db},
+		},
+	}
+
+	// Make sure setting is explicitly set to "1"
+	err = serviceEnabled.Settings.Set(context.Background(), "trial_enabled", "1")
+	if err != nil {
+		t.Fatalf("set trial_enabled setting: %v", err)
+	}
+	err = serviceEnabled.Settings.Set(context.Background(), "trial_period_days", "5")
+	if err != nil {
+		t.Fatalf("set trial_period_days setting: %v", err)
+	}
+
+	customerEnabled, err := serviceEnabled.Create(context.Background(), Customer{
+		Name:      "Trial Enabled Customer",
+		PackageID: 1,
+		DueDay:    8,
+		Status:    "active",
+	})
+	if err != nil {
+		t.Fatalf("create enabled customer: %v", err)
+	}
+
+	if !customerEnabled.IsTrial {
+		t.Error("expected customer to be in trial mode")
+	}
+	if customerEnabled.TrialDays != 5 {
+		t.Errorf("expected trial days to be 5, got %d", customerEnabled.TrialDays)
+	}
+	if customerEnabled.TrialStartedAt == nil {
+		t.Error("expected trial started at to be set")
+	}
+
+	// 2. Test when trial is disabled (trial_enabled = "0")
+	serviceDisabled := Service{
+		Repository: Repository{DB: db},
+		Settings: settings.Service{
+			Repository: settings.Repository{DB: db},
+		},
+	}
+
+	err = serviceDisabled.Settings.Set(context.Background(), "trial_enabled", "0")
+	if err != nil {
+		t.Fatalf("set trial_enabled setting to 0: %v", err)
+	}
+
+	customerDisabled, err := serviceDisabled.Create(context.Background(), Customer{
+		Name:      "Trial Disabled Customer",
+		PackageID: 1,
+		DueDay:    8,
+		Status:    "active",
+	})
+	if err != nil {
+		t.Fatalf("create disabled customer: %v", err)
+	}
+
+	if customerDisabled.IsTrial {
+		t.Error("expected customer to NOT be in trial mode")
+	}
+	if customerDisabled.TrialDays != 0 {
+		t.Errorf("expected trial days to be 0, got %d", customerDisabled.TrialDays)
+	}
+	if customerDisabled.TrialStartedAt != nil {
+		t.Errorf("expected trial started at to be nil, got %s", *customerDisabled.TrialStartedAt)
+	}
+
+	// Check DB row directly
+	var isTrial, trialDays int
+	var trialStartedAt *string
+	err = db.QueryRow(`SELECT is_trial, trial_days, trial_started_at FROM pelanggan WHERE id = ?`, customerDisabled.ID).Scan(&isTrial, &trialDays, &trialStartedAt)
+	if err != nil {
+		t.Fatalf("query customerDisabled from DB: %v", err)
+	}
+	if isTrial != 0 {
+		t.Errorf("expected DB column is_trial to be 0, got %d", isTrial)
+	}
+	if trialDays != 0 {
+		t.Errorf("expected DB column trial_days to be 0, got %d", trialDays)
+	}
+	if trialStartedAt != nil {
+		t.Errorf("expected DB column trial_started_at to be NULL, got %s", *trialStartedAt)
 	}
 }

@@ -98,7 +98,11 @@ const initWhatsAppClient = (accountId = 'default') => {
     setupEvents(client, accountId);
 
     logger.info(`[${accountId}] Sedang mencoba menghubungi peladen WhatsApp (membuka browser). Mohon tunggu...`);
-    client.initialize();
+    client.initialize().catch(err => {
+        logger.error(`[${accountId}] Failed to initialize client: ${err.message}`);
+        readyStatuses.set(accountId, false);
+        scheduleReconnect(accountId);
+    });
     clients.set(accountId, client);
     return client;
 };

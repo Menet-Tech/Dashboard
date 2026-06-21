@@ -63,8 +63,10 @@ export function DashboardPage({
   backupTone,
   onSwitchView,
 }: DashboardPageProps) {
+  const safeRevenue = revenue || [];
+
   const revenueChartData = useMemo(() => {
-    const sortedRevenue = [...revenue].reverse();
+    const sortedRevenue = [...safeRevenue].reverse();
     return {
       labels: sortedRevenue.map((r) => r.period),
       datasets: [
@@ -112,7 +114,7 @@ export function DashboardPage({
         },
       ],
     };
-  }, [revenue]);
+  }, [safeRevenue]);
 
   return (
     <div className="space-y-6">
@@ -156,7 +158,7 @@ export function DashboardPage({
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
             <h3 className="text-base font-semibold text-slate-800 mb-4">Pendapatan Bulanan</h3>
-            {revenue.length > 0 ? (
+            {safeRevenue.length > 0 ? (
               <div className="h-72">
                 <Line
                   data={revenueChartData}

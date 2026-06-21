@@ -13,6 +13,8 @@ import {
 
 type CustomerDetailModalProps = {
   customer: CustomerItem;
+  customers?: CustomerItem[];
+  onSelectCustomer?: (customer: CustomerItem) => void;
   onClose: () => void;
   user: User | null;
   pushSuccess: (msg: string) => void;
@@ -22,6 +24,8 @@ type CustomerDetailModalProps = {
 
 export function CustomerDetailModal({
   customer,
+  customers = [],
+  onSelectCustomer,
   onClose,
   user,
   pushSuccess,
@@ -37,6 +41,13 @@ export function CustomerDetailModal({
   const [kickingMikrotik, setKickingMikrotik] = useState(false);
   const [updatingWifi, setUpdatingWifi] = useState(false);
   const [ontError, setOntError] = useState<string | null>(null);
+
+  const linkedAccounts = customers.filter(c => {
+    if (!c.whatsapp || c.id === customer.id) return false;
+    const p1 = c.whatsapp.trim().replace(/[+\-\s]/g, "").replace(/^0/, "62");
+    const p2 = customer.whatsapp ? customer.whatsapp.trim().replace(/[+\-\s]/g, "").replace(/^0/, "62") : "";
+    return p1 === p2;
+  });
 
   // Load bills on mount/customer change
   useEffect(() => {
@@ -265,8 +276,8 @@ export function CustomerDetailModal({
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Status Layanan</span>
               <span className="mt-1 block">
                 <StatusPill
-                  label={customer.status}
-                  tone={customer.status === "active" ? "green" : customer.status === "limit" ? "red" : "slate"}
+                  label={customer.status === "pending" ? "pending (perpanjangan)" : customer.status}
+                  tone={customer.status === "active" ? "green" : customer.status === "limit" ? "red" : customer.status === "pending" ? "gold" : "slate"}
                 />
               </span>
             </div>
@@ -291,7 +302,7 @@ export function CustomerDetailModal({
               <span className="text-slate-750 text-sm mt-0.5 block font-semibold">
                 {customer.whatsapp ? (
                   <a
-                    href={`https://wa.me/${customer.whatsapp}`}
+                    href={`https://wa.me/+${customer.whatsapp.replace(/[+\-\s]/g, "").replace(/^0/, "62")}`}
                     target="_blank"
                     rel="noreferrer"
                     className="text-indigo-600 hover:underline"
@@ -318,7 +329,11 @@ export function CustomerDetailModal({
             <div>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Diskon Bulanan</span>
               <strong className="text-slate-800 text-sm mt-0.5 block">
-                {customer.diskon > 0 ? formatCurrency(customer.diskon) : "-"}
+                {customer.diskon > 0
+                  ? customer.tipe_diskon === "percent"
+                    ? `${customer.diskon}%`
+                    : formatCurrency(customer.diskon)
+                  : "-"}
               </strong>
             </div>
             <div className="lg:col-span-3">
@@ -327,6 +342,27 @@ export function CustomerDetailModal({
                 {customer.address || "Belum ada informasi alamat."}
               </p>
             </div>
+
+            {linkedAccounts.length > 0 && (
+              <div className="lg:col-span-3 bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl space-y-2">
+                <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider block font-sans">
+                  Akun Terhubung (Nomor WA Sama)
+                </span>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {linkedAccounts.map((acc) => (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      onClick={() => onSelectCustomer?.(acc)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-indigo-55 hover:text-indigo-800 text-indigo-700 border border-indigo-200 transition-colors shadow-sm cursor-pointer"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-indigo-500"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                      {acc.name} ({acc.address || "Tanpa Alamat"})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {customer.sn_ont && (
               <div className="lg:col-span-3 bg-slate-50 border border-slate-200 p-4 rounded-xl">

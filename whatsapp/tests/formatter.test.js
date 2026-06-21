@@ -21,6 +21,10 @@ describe('📞 Formatter — formatPhoneNumber()', () => {
         expect(formatPhoneNumber('120363xxxxxx@g.us')).toBe('120363xxxxxx@g.us');
     });
 
+    it('harus diteruskan apa adanya jika sudah dalam format LID (@lid)', () => {
+        expect(formatPhoneNumber('44084114776150@lid')).toBe('44084114776150@lid');
+    });
+
     it('harus membersihkan karakter non-digit seperti +, -, dan spasi', () => {
         expect(formatPhoneNumber('+62-812-3456-7890')).toBe('6281234567890@c.us');
     });

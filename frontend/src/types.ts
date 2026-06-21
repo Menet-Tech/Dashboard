@@ -40,12 +40,13 @@ export type CustomerItem = {
   email?: string;
   sn_ont: string;
   due_day: number;
-  status: "active" | "limit" | "inactive";
+  status: "active" | "limit" | "inactive" | "pending";
   address: string;
   is_trial?: boolean;
   trial_started_at?: string;
   trial_days?: number;
   diskon: number;
+  tipe_diskon?: "flat" | "percent";
   referred_by_id?: number;
   referral_balance: number;
   referral_code?: string;
@@ -92,6 +93,7 @@ export type TemplateItem = {
   name: string;
   trigger_key: string;
   content: string;
+  trigger_keywords?: string;
   is_active: boolean;
 };
 
@@ -138,6 +140,8 @@ export type SettingsState = {
   mikrotik_pass?: string;
   mikrotik_test_username?: string;
   mikrotik_isolir_profile?: string;
+  trial_enabled?: string;
+  trial_period_days?: string;
   trial_overdue_grace_days?: string;
   chatbot_trigger_billing?: string;
   chatbot_trigger_register?: string;
@@ -158,6 +162,8 @@ export type SettingsState = {
   smtp_password?: string;
   smtp_from_email?: string;
   smtp_encryption?: string;
+  wa_gateway_enabled?: string;
+  discord_bot_enabled?: string;
 };
 
 export type AuditLogItem = {

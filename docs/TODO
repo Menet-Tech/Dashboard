@@ -1,13 +1,54 @@
-BUG : masih ada bug, seperti tidak bisa menambah node di peta jaringan
-
-QoL : saat kita nambahin diskon di input "Nominal Diskon Bulanan (Rp)" kalau kita kita ntar 0 placeholder nya ilang, terus nomernya otomatis ada titik nya, kayak 1.000, saat ini masih 1000
-
 feat : data odp sama maps di bikin sinkron, jadi waktu kita nambah di maps, di data odp juga ada
-
-QoL : tambahin cari berdasarkan ip di audit log
-
-Feat : diskon bisa berapa kali di pake, ada yang permanen ada yang 1 kali pake, ada yang 2 kali pake, gitu gitu, hasil itu bisa dapetin duit (NOTE, tagihan hanya bisa menggunakan 1 voucher), user bisa menggunakan diskonnya secara manual lewat wa (Chatbot) sebelum invoice di buat, atau di aktifikan oleh admin, dan pastikan ada log voucher yang sudah terpakai, jadi ada lognya, dan tanyakan pelanggan, jika ada mereka ada voucher, mau automatis pake atau tidka untuk next billing
 
 Feat: pelanggan bisa mengganti ssid dan password lewat chat wa yang akan langsung integrasi ke genieACS, dengan workflow, Pelanggan mengirim nomer 7 untuk mengganti password -> chatbot memberikan balasan dengan ssid dan password apa -> user memasukan ssid dan password -> aplikasi akan membaca ssid dan password ya -> aplikasi akan menggunakan api dari genieACS buat mengganti password client -> genieACS memberikan respons -> system akan mengkonfirmasi kalo sudah berubah -> chatbot ngirim konfirmasi ke client
 
-feat : buat sistem ticket buat pelanggan, jadi pelanggan bisa bikin ticket lewat wa, entar bisa di lihat sama admin, dan bisa di status status, jadi ada statusnya, open, closed, pending, dan lain lain, workflow nya, pelanggan bikin ticket -> admin bisa lihat ticket -> admin bisa ngasih balasan -> customer bisa ngasih balasan, bisa seen by, time sent, time read, by admin, dan lain lain, di dalam system dibuat juga 
+oke, auto response nya udah berhasil (tadi waktu di wa langsung muncul menu nya dan lain lain, gw udah ngetest yang buka tiket, itu berhasil, tapi minusnya kita gak bisa chat dia lewat dashboard dah, tolong benerin.
+
+terus untuk pendaftaran client, tolong dibenerin, masa wa udah gw aktifin lewat pengaturan, tapi waktu gw buka registrasi wa munculnya gini
+```
+<div class="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-2xl p-6 text-center max-w-xl mx-auto"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-alert w-12 h-12 text-amber-600 dark:text-amber-400 mx-auto mb-4" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg><h3 class="text-lg font-bold text-amber-900 dark:text-amber-300">WhatsApp Gateway Belum Terkonfigurasi</h3><p class="text-xs text-amber-700 dark:text-amber-500 mt-2">Silakan lengkapi URL WhatsApp Gateway dan API Key di menu Pengaturan terlebih dahulu untuk melihat pendaftaran dari WA.</p></div>
+```
+
+selanjutnya buat kalo dia nomer whatsapp nya sama, maka dia akan gabungin tagihannya, contoh gini:
+ada: nama nya andi, nomer wa nya 081234567890, terus, ibunya dia daftar, namanya siti, tapi wa nya di gabung sama anaknya, yaitu andi, untuk ngatasin itu kita bakal gabungin keduanya, jadi cukup ngirim satu pesan, dia bakal tagih 2 orang, contohnya gini
+```
+Pelanggan Yth,
+Bapak/Ibu {nama}, // nama yang pertama kali terdaftar di database, jadi kalo nomer andi duluan terus ibunya yang terdaftar belakangan, maka nama nya andi, bukan siti
+
+Tagihan Anda periode {periode} sebesar Rp. {harga}., dengan detail berikut //h arga di ambil dari total 2 orang itu
+
+Paket: {paket} untuk Bapak/Ibu {nama} // misal disini nama si andi dulu
+Harga: Rp. {harga}. // harga paket
+
+Paket: {paket} untuk Bapak/Ibu {nama} // disini baru nama ibunya, si siti
+Harga: Rp. {harga}.
+
+Diskon: Rp. {diskon} // disini dapet diskon berapanya, jadi
+
+Total Tagihan: Rp {harga}. // disini baru total harga
+
+Mohon lakukan pembayaran sebelum tanggal  {tgl_jatuh_tempo} agar terhindar dari Pembatasan Layanan.
+
+Rekening Pembayaran:
+Bank Mandiri
+1570006636691
+
+Shopeepay, gopay
+089621743796
+
+Seabank
+901096534584 
+
+a.n. Irfan Dharmawan 
+
+Untuk konfirmasi pembayaran & Pengaduan kendala dapat menghubungi kami melalui Pesan ini, atau Nomor di bawah ini.
+087782297657 - Menet CS
+08987700897 - Elam
+089621743796 - Ipong
+
+Atas perhatian dan kerja samanya, kami ucapkan terima kasih.
+Hormat kami,
+Tim Billing — MeNet Tech
+```
+
+buat fitur perpajangan buat client, contoh pelanggan junet, terus dia minta perpajangan, untuk bayar di bulan depan, nanti di bulan ini status client pending, dan di bulan depan pembayaran dia akan menjadi 2 kali lipat karena tagihan bulan kemarin akan di gabung dengan bulan ini

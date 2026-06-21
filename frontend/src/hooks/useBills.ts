@@ -8,6 +8,7 @@ import type { HookDeps } from "./types";
 export function useBills({ withFeedback, askForConfirmation, onSuccess, onError }: HookDeps) {
   const [bills, setBills] = useState<BillItem[]>([]);
   const [billPeriod, setBillPeriod] = useState(currentPeriod());
+  const [filterPeriod, setFilterPeriod] = useState(currentPeriod());
   const [billErrors, setBillErrors] = useState<FieldErrors>({});
   const [proofFiles, setProofFiles] = useState<Record<number, File | null>>({});
   const [notificationLogs, setNotificationLogs] = useState<Record<number, NotificationLog[]>>({});
@@ -27,7 +28,7 @@ export function useBills({ withFeedback, askForConfirmation, onSuccess, onError 
   }) {
     const activeSearch = params?.search !== undefined ? params.search : search;
     const activeStatus = params?.status !== undefined ? params.status : status;
-    const activePeriod = params?.period !== undefined ? params.period : billPeriod;
+    const activePeriod = params?.period !== undefined ? params.period : filterPeriod;
     const activePage = params?.page !== undefined ? params.page : page;
 
     const payload = await fetchBills({
@@ -115,13 +116,19 @@ export function useBills({ withFeedback, askForConfirmation, onSuccess, onError 
     void refreshBills({ status: val, page: 1 });
   };
 
+  const handleFilterPeriodChange = (val: string) => {
+    setFilterPeriod(val);
+    setPage(1);
+    void refreshBills({ period: val, page: 1 });
+  };
+
   const handlePageChange = (val: number) => {
     setPage(val);
     void refreshBills({ page: val });
   };
 
   return {
-    state: { bills, billPeriod, billErrors, proofFiles, notificationLogs, expandedBillId, search, status, page, total, limit },
-    handlers: { setBills, setBillPeriod, setProofFiles, refreshBills, handleGenerateBills, handleMarkBillPaid, handleUploadProof, handleToggleNotifications, handleSearchChange, handleStatusChange, handlePageChange },
+    state: { bills, billPeriod, filterPeriod, billErrors, proofFiles, notificationLogs, expandedBillId, search, status, page, total, limit },
+    handlers: { setBills, setBillPeriod, setProofFiles, refreshBills, handleGenerateBills, handleMarkBillPaid, handleUploadProof, handleToggleNotifications, handleSearchChange, handleStatusChange, handlePageChange, handleFilterPeriodChange },
   };
 }

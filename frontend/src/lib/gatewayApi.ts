@@ -239,6 +239,22 @@ export function updateChatbotForm(
   );
 }
 
+export function createChatbotForm(
+  url: string,
+  apiKey: string,
+  payload: {
+    type: "registration" | "support";
+    phone: string;
+    account_id?: string;
+    data: Record<string, any>;
+  }
+) {
+  return gatewayRequest<{ data: { id: string } }>(url, apiKey, "/api/v1/chatbot/forms", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function deleteChatbotForm(url: string, apiKey: string, id: string) {
   return gatewayRequest<{ message: string }>(
     url,
@@ -247,3 +263,4 @@ export function deleteChatbotForm(url: string, apiKey: string, id: string) {
     { method: "DELETE" }
   );
 }
+

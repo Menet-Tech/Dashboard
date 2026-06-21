@@ -12,7 +12,7 @@ const accountMatchesSetting = (settingValue, accountId) => {
 
 const setupEvents = (client, accountId) => {
     client.on('auth_failure', (msg) => {
-        logger.error(`[${accountId}] Authentication failed:`, msg);
+        logger.error(`[${accountId}] Authentication failed: ${msg}`);
     });
 
     client.on('message', async (message) => {
@@ -21,7 +21,20 @@ const setupEvents = (client, accountId) => {
             return;
         }
 
-        logger.debug(`[${accountId}] Pesan masuk dari ${message.from}: ${message.body}`);
+        // Resolusi LID JID ke @c.us jika memungkinkan
+        let contactName = '';
+        let realFrom = message.from;
+        try {
+            const contact = await message.getContact();
+            contactName = contact.pushname || contact.name || '';
+            if (contact.id && contact.id.server === 'c.us') {
+                realFrom = contact.id._serialized;
+            }
+        } catch (err) {
+            logger.error(`[${accountId}] Gagal getContact untuk ${message.from}: ${err.message}`);
+        }
+
+        logger.debug(`[${accountId}] Pesan masuk dari ${realFrom} (LID asli: ${message.from}): ${message.body}`);
 
         // Simpan pesan ke history
         try {
@@ -31,7 +44,7 @@ const setupEvents = (client, accountId) => {
                 message.hasMedia ? 'media' : 'text',
                 message.id.id,
                 'inbound',
-                message.from,
+                realFrom,
                 accountId
             );
 
@@ -41,7 +54,7 @@ const setupEvents = (client, accountId) => {
                     id: internalId,
                     account_id: accountId,
                     direction: 'inbound',
-                    from_number: message.from,
+                    from_number: realFrom,
                     to_number: message.to || 'me',
                     body: message.body,
                     type: message.hasMedia ? 'media' : 'text',
@@ -50,7 +63,7 @@ const setupEvents = (client, accountId) => {
                 });
             }
         } catch (err) {
-            logger.error(`[${accountId}] Gagal simpan pesan:`, err.message);
+            logger.error(`[${accountId}] Gagal simpan pesan: ${err.message}`);
         }
 
         const autoReplyAccount = getGatewaySetting('auto_reply_account_id', '*');
@@ -60,7 +73,11 @@ const setupEvents = (client, accountId) => {
         if (autoReplyBeforeChatbot && accountMatchesSetting(autoReplyAccount, accountId)) {
             const reply = findReply(message.body, accountId);
             if (reply) {
-                await sendTextMessage(accountId, message.from, reply);
+                try {
+                    await sendTextMessage(accountId, realFrom, reply);
+                } catch (err) {
+                    logger.error(`[${accountId}] Gagal mengirim autoreply ke ${realFrom}: ${err.message}`);
+                }
                 return;
             }
         }
@@ -69,24 +86,17 @@ const setupEvents = (client, accountId) => {
             return;
         }
 
-        // Ambil nama kontak (opsional, tidak fatal jika gagal)
-        let contactName = '';
-        try {
-            const contact = await message.getContact();
-            contactName = contact.pushname || contact.name || '';
-        } catch (_) {}
-
         // Teruskan ke chatbot ISP
         try {
             await handleMessage(
-                message.from,
+                realFrom,
                 message.body,
                 accountId,
                 sendTextMessage,
                 contactName
             );
         } catch (err) {
-            logger.error(`[${accountId}] Chatbot error:`, err.message);
+            logger.error(`[${accountId}] Chatbot error: ${err.message}`);
         }
     });
 };

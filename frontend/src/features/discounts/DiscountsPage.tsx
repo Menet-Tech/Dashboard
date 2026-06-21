@@ -93,6 +93,7 @@ export function DiscountsPage({
   // Modal State - Discounts
   const [editingDiscountCustomer, setEditingDiscountCustomer] = useState<CustomerItem | null>(null);
   const [discountValueInput, setDiscountValueInput] = useState<string>("");
+  const [discountTypeInput, setDiscountTypeInput] = useState<"flat" | "percent">("flat");
   const [isCreateDiscountOpen, setIsCreateDiscountOpen] = useState(false);
   const [selectedCustomerForNewDiscount, setSelectedCustomerForNewDiscount] = useState<number>(0);
 
@@ -124,14 +125,19 @@ export function DiscountsPage({
   // === DISCOUNT CRUD HANDLERS ===
   const handleOpenEditDiscount = (customer: CustomerItem) => {
     setEditingDiscountCustomer(customer);
-    setDiscountValueInput(customer.diskon ? formatNumberWithDots(customer.diskon) : "");
+    setDiscountTypeInput(customer.tipe_diskon || "flat");
+    setDiscountValueInput(
+      customer.diskon
+        ? (customer.tipe_diskon === "percent" ? String(customer.diskon) : formatNumberWithDots(customer.diskon))
+        : ""
+    );
   };
 
-  const handleSaveDiscount = async (e: React.FormEvent, targetCustomer: CustomerItem, val: number) => {
+  const handleSaveDiscount = async (e: React.FormEvent, targetCustomer: CustomerItem, val: number, type: "flat" | "percent") => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: Omit<CustomerItem, "id" | "package_name" | "package_price"> = {
         name: targetCustomer.name,
         package_id: targetCustomer.package_id,
         user_pppoe: targetCustomer.user_pppoe,
@@ -142,6 +148,7 @@ export function DiscountsPage({
         status: targetCustomer.status,
         address: targetCustomer.address,
         diskon: val,
+        tipe_diskon: type,
         referred_by_id: targetCustomer.referred_by_id || 0,
         referral_balance: targetCustomer.referral_balance || 0,
       };
@@ -166,7 +173,7 @@ export function DiscountsPage({
     }
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: Omit<CustomerItem, "id" | "package_name" | "package_price"> = {
         name: customer.name,
         package_id: customer.package_id,
         user_pppoe: customer.user_pppoe,
@@ -177,6 +184,7 @@ export function DiscountsPage({
         status: customer.status,
         address: customer.address,
         diskon: 0, // Reset discount
+        tipe_diskon: "flat",
         referred_by_id: customer.referred_by_id || 0,
         referral_balance: customer.referral_balance || 0,
       };
@@ -582,7 +590,12 @@ export function DiscountsPage({
                   discountCustomers.map((customer) => {
                     const price = customer.package_price || 0;
                     const discount = customer.diskon || 0;
-                    const finalPrice = Math.max(0, price - discount);
+                    const finalPrice = Math.max(
+                      0,
+                      customer.tipe_diskon === "percent"
+                        ? price - (price * discount) / 100
+                        : price - discount
+                    );
 
                     return (
                       <tr key={customer.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
@@ -592,7 +605,7 @@ export function DiscountsPage({
                         <td className="px-6 py-4">{customer.package_name || "-"}</td>
                         <td className="px-6 py-4 font-mono text-xs">{formatCurrency(price)}</td>
                         <td className="px-6 py-4 font-mono text-xs text-red-600 dark:text-red-400 font-semibold">
-                          - {formatCurrency(discount)}
+                          - {customer.tipe_diskon === "percent" ? `${discount}%` : formatCurrency(discount)}
                         </td>
                         <td className="px-6 py-4 font-mono text-xs text-green-600 dark:text-green-400 font-bold">
                           {formatCurrency(finalPrice)}
@@ -973,7 +986,7 @@ export function DiscountsPage({
               onSubmit={(e) => {
                 const targetCust = customers.find((c) => c.id === selectedCustomerForNewDiscount);
                 if (targetCust) {
-                  void handleSaveDiscount(e, targetCust, parseFormattedNumber(discountValueInput));
+                  void handleSaveDiscount(e, targetCust, parseFormattedNumber(discountValueInput), discountTypeInput);
                 } else {
                   e.preventDefault();
                   alert("Pilih pelanggan terlebih dahulu.");
@@ -992,8 +1005,8 @@ export function DiscountsPage({
                   onChange={(e) => {
                     const cid = Number(e.target.value) || 0;
                     setSelectedCustomerForNewDiscount(cid);
-                    const selected = customers.find((c) => c.id === cid);
-                    setDiscountValueInput(selected && selected.diskon ? formatNumberWithDots(selected.diskon) : "");
+                    setDiscountValueInput("");
+                    setDiscountTypeInput("flat");
                   }}
                 >
                   <option value={0}>-- Pilih Pelanggan --</option>
@@ -1006,27 +1019,49 @@ export function DiscountsPage({
               </div>
 
               {selectedCustomerForNewDiscount > 0 && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
-                    Nominal Diskon Bulanan (Rp)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
-                    value={discountValueInput}
-                    onChange={(e) => {
-                      const rawVal = e.target.value.replace(/\D/g, "");
-                      const valNum = rawVal ? parseInt(rawVal, 10) : 0;
-                      const maxVal = (customers.find((c) => c.id === selectedCustomerForNewDiscount)?.package_price) || 999999;
-                      const clampedVal = Math.min(valNum, maxVal);
-                      setDiscountValueInput(clampedVal > 0 ? formatNumberWithDots(clampedVal) : "");
-                    }}
-                    placeholder="Masukkan nominal diskon (Contoh: 10.000)..."
-                  />
-                  <span className="text-[10px] text-slate-400 mt-1 block">
-                    *Nominal diskon tidak boleh melebihi harga asli paket.
-                  </span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                      Tipe Diskon
+                    </label>
+                    <select
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                      value={discountTypeInput}
+                      onChange={(e) => {
+                        const newType = e.target.value as "flat" | "percent";
+                        setDiscountTypeInput(newType);
+                        setDiscountValueInput("");
+                      }}
+                    >
+                      <option value="flat">Rupiah (Rp)</option>
+                      <option value="percent">Persen (%)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                      {discountTypeInput === "percent" ? "Diskon (%)" : "Nominal Diskon (Rp)"}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                      value={discountValueInput}
+                      onChange={(e) => {
+                        const rawVal = e.target.value.replace(/\D/g, "");
+                        const valNum = rawVal ? parseInt(rawVal, 10) : 0;
+                        if (discountTypeInput === "percent") {
+                          const clampedVal = Math.min(valNum, 100);
+                          setDiscountValueInput(clampedVal > 0 ? String(clampedVal) : "");
+                        } else {
+                          const maxVal = (customers.find((c) => c.id === selectedCustomerForNewDiscount)?.package_price) || 999999;
+                          const clampedVal = Math.min(valNum, maxVal);
+                          setDiscountValueInput(clampedVal > 0 ? formatNumberWithDots(clampedVal) : "");
+                        }
+                      }}
+                      placeholder={discountTypeInput === "percent" ? "Contoh: 10" : "Contoh: 10.000"}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -1036,8 +1071,11 @@ export function DiscountsPage({
                   {formatCurrency(
                     Math.max(
                       0,
-                      ((customers.find((c) => c.id === selectedCustomerForNewDiscount)?.package_price) || 0) -
-                        parseFormattedNumber(discountValueInput)
+                      discountTypeInput === "percent"
+                        ? ((customers.find((c) => c.id === selectedCustomerForNewDiscount)?.package_price) || 0) -
+                          (((customers.find((c) => c.id === selectedCustomerForNewDiscount)?.package_price) || 0) * parseFormattedNumber(discountValueInput)) / 100
+                        : ((customers.find((c) => c.id === selectedCustomerForNewDiscount)?.package_price) || 0) -
+                          parseFormattedNumber(discountValueInput)
                     )
                   )}
                 </div>
@@ -1087,42 +1125,73 @@ export function DiscountsPage({
               Mengatur nominal diskon tetap bulanan untuk pelanggan <strong>{editingDiscountCustomer.name}</strong>.
             </p>
 
-            <form onSubmit={(e) => handleSaveDiscount(e, editingDiscountCustomer, parseFormattedNumber(discountValueInput))} className="space-y-4">
+            <form onSubmit={(e) => handleSaveDiscount(e, editingDiscountCustomer, parseFormattedNumber(discountValueInput), discountTypeInput)} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
-                  Paket & Harga Aktif
+                  Paket & Harga Asli
                 </label>
                 <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-4 py-2.5 rounded-2xl text-xs text-slate-650 dark:text-slate-300">
                   {editingDiscountCustomer.package_name || "Tanpa Paket"} ({formatCurrency(editingDiscountCustomer.package_price || 0)})
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
-                  Nominal Diskon Bulanan (Rp)
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
-                  value={discountValueInput}
-                  onChange={(e) => {
-                    const rawVal = e.target.value.replace(/\D/g, "");
-                    const valNum = rawVal ? parseInt(rawVal, 10) : 0;
-                    const maxVal = editingDiscountCustomer.package_price || 0;
-                    const clampedVal = Math.min(valNum, maxVal);
-                    setDiscountValueInput(clampedVal > 0 ? formatNumberWithDots(clampedVal) : "");
-                  }}
-                  placeholder="Contoh: 20.000"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  *Nominal diskon tidak boleh melebihi harga asli paket.
-                </span>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                    Tipe Diskon
+                  </label>
+                  <select
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                    value={discountTypeInput}
+                    onChange={(e) => {
+                      const newType = e.target.value as "flat" | "percent";
+                      setDiscountTypeInput(newType);
+                      setDiscountValueInput("");
+                    }}
+                  >
+                    <option value="flat">Rupiah (Rp)</option>
+                    <option value="percent">Persen (%)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                    {discountTypeInput === "percent" ? "Diskon (%)" : "Nominal Diskon (Rp)"}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                    value={discountValueInput}
+                    onChange={(e) => {
+                      const rawVal = e.target.value.replace(/\D/g, "");
+                      const valNum = rawVal ? parseInt(rawVal, 10) : 0;
+                      if (discountTypeInput === "percent") {
+                        const clampedVal = Math.min(valNum, 100);
+                        setDiscountValueInput(clampedVal > 0 ? String(clampedVal) : "");
+                      } else {
+                        const maxVal = editingDiscountCustomer.package_price || 0;
+                        const clampedVal = Math.min(valNum, maxVal);
+                        setDiscountValueInput(clampedVal > 0 ? formatNumberWithDots(clampedVal) : "");
+                      }
+                    }}
+                    placeholder={discountTypeInput === "percent" ? "Contoh: 10" : "Contoh: 10.000"}
+                  />
+                </div>
               </div>
 
               {parseFormattedNumber(discountValueInput) > 0 && (
                 <div className="bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/40 p-3 rounded-2xl text-xs text-green-700 dark:text-green-300 font-semibold">
-                  Harga Akhir Tagihan: {formatCurrency(Math.max(0, (editingDiscountCustomer.package_price || 0) - parseFormattedNumber(discountValueInput)))}
+                  Harga Akhir Tagihan:{" "}
+                  {formatCurrency(
+                    Math.max(
+                      0,
+                      discountTypeInput === "percent"
+                        ? (editingDiscountCustomer.package_price || 0) -
+                          ((editingDiscountCustomer.package_price || 0) * parseFormattedNumber(discountValueInput)) / 100
+                        : (editingDiscountCustomer.package_price || 0) - parseFormattedNumber(discountValueInput)
+                    )
+                  )}
                 </div>
               )}
 

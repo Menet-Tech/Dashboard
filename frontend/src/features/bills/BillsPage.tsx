@@ -10,6 +10,7 @@ type BillsPageProps = {
   user: User | null;
   bills: BillItem[];
   billPeriod: string;
+  filterPeriod: string;
   billErrors: FieldErrors;
   submitting: boolean;
   busyAction: string | null;
@@ -22,6 +23,7 @@ type BillsPageProps = {
   total: number;
   limit: number;
   onBillPeriodChange: (period: string) => void;
+  onFilterPeriodChange: (period: string) => void;
   onGenerateBills: (e: FormEvent<HTMLFormElement>) => void;
   onMarkBillPaid: (id: number) => void;
   onToggleNotifications: (id: number) => void;
@@ -40,6 +42,7 @@ export function BillsPage({
   user,
   bills,
   billPeriod,
+  filterPeriod,
   billErrors,
   submitting,
   busyAction,
@@ -52,6 +55,7 @@ export function BillsPage({
   total,
   limit,
   onBillPeriodChange,
+  onFilterPeriodChange,
   onGenerateBills,
   onMarkBillPaid,
   onToggleNotifications,
@@ -90,13 +94,16 @@ export function BillsPage({
             <h2 className="text-lg font-bold text-slate-900">Generate Tagihan</h2>
           </div>
           <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onGenerateBills}>
-            <label>
-              <span>Periode (YYYY-MM)</span>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-slate-650 dark:text-slate-400">Periode (YYYY-MM)</span>
               <input
                 type="month"
                 className={inputClassName(billErrors.period)}
                 value={billPeriod}
                 onChange={(e) => onBillPeriodChange(e.target.value)}
+                onClick={(e) => {
+                  try { (e.target as any).showPicker(); } catch (err) {}
+                }}
               />
               {renderInlineError(billErrors.period)}
             </label>
@@ -128,7 +135,7 @@ export function BillsPage({
               onChange={(e) => onSearchChange(e.target.value)}
             />
             <select
-              className="bg-white border border-slate-200 text-slate-750 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+              className="bg-white border border-slate-200 text-slate-750 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer"
               value={status}
               onChange={(e) => onStatusChange(e.target.value)}
             >
@@ -138,6 +145,27 @@ export function BillsPage({
               <option value="jatuh_tempo">Jatuh Tempo</option>
               <option value="menunggak">Menunggak</option>
             </select>
+            <div className="relative flex items-center">
+              <input
+                type="month"
+                className="bg-white border border-slate-200 text-slate-750 text-xs rounded-xl pl-3 pr-8 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer w-40"
+                value={filterPeriod}
+                onChange={(e) => onFilterPeriodChange(e.target.value)}
+                onClick={(e) => {
+                  try { (e.target as any).showPicker(); } catch (err) {}
+                }}
+              />
+              {filterPeriod && (
+                <button
+                  type="button"
+                  onClick={() => onFilterPeriodChange("")}
+                  className="absolute right-2.5 text-slate-400 hover:text-slate-650 p-1 flex items-center justify-center transition-colors cursor-pointer"
+                  title="Bersihkan Filter Bulan"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              )}
+            </div>
             <a
               href="/api/v1/reports/bills/csv"
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"

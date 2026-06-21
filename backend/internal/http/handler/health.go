@@ -87,12 +87,10 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	acsPassword, _ := h.Settings.GetString(ctx, settings.KeyACSPassword)
 	billingAutoEnabled := strings.TrimSpace(billingAutoEnabledValue) != "0"
 
-	// Treat empty URL or the bare localhost default as "not configured" — the user
-	// must explicitly save a real URL+API-key in settings for WhatsApp to be active.
+	// Treat empty URL or the bare localhost default as configured since the service manager
+	// defaults to http://localhost:3001 when empty. A non-empty API key is required.
 	waURLTrimmed := strings.TrimSpace(waGatewayURL)
-	waConfigured := waURLTrimmed != "" &&
-		waURLTrimmed != "http://localhost:3001" &&
-		strings.TrimSpace(waAPIKey) != ""
+	waConfigured := strings.TrimSpace(waAPIKey) != ""
 
 	// Apply localhost fallback only for the actual HTTP reachability check.
 	if waURLTrimmed == "" {

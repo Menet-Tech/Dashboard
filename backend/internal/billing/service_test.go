@@ -18,8 +18,9 @@ import (
 func TestServiceGenerateCreatesBillsForEligibleCustomers(t *testing.T) {
 	db := billingTestDB(t)
 	service := Service{
-		Repository: Repository{DB: db},
-		Customers:  customers.Service{Repository: customers.Repository{DB: db}},
+		Repository:    Repository{DB: db},
+		Customers:     customers.Service{Repository: customers.Repository{DB: db}},
+		Notifications: notifications.NotificationLogRepository{DB: db},
 	}
 
 	mustBillingExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
@@ -39,8 +40,9 @@ func TestServiceGenerateCreatesBillsForEligibleCustomers(t *testing.T) {
 func TestServiceGenerateSkipsTrialCustomers(t *testing.T) {
 	db := billingTestDB(t)
 	service := Service{
-		Repository: Repository{DB: db},
-		Customers:  customers.Service{Repository: customers.Repository{DB: db}},
+		Repository:    Repository{DB: db},
+		Customers:     customers.Service{Repository: customers.Repository{DB: db}},
+		Notifications: notifications.NotificationLogRepository{DB: db},
 	}
 
 	mustBillingExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
@@ -78,9 +80,10 @@ func TestServiceMarkPaidCreatesHistoryAndRestoresCustomerStatus(t *testing.T) {
 	db := billingTestDB(t)
 	waSender := &mockWhatsAppSender{payloads: make(chan notifications.BillMessagePayload, 1)}
 	service := Service{
-		Repository: Repository{DB: db},
-		WhatsApp:   waSender,
-		Customers:  customers.Service{Repository: customers.Repository{DB: db}},
+		Repository:    Repository{DB: db},
+		WhatsApp:      waSender,
+		Customers:     customers.Service{Repository: customers.Repository{DB: db}},
+		Notifications: notifications.NotificationLogRepository{DB: db},
 	}
 
 	mustBillingExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
@@ -165,8 +168,9 @@ func TestServiceProcessAutomation(t *testing.T) {
 	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (4, 4, 1, '2026-04', '08-04-2026/4/20/004', 250000, '2026-04-08', 'belum_bayar')`)
 
 	service := Service{
-		Repository: Repository{DB: db},
-		Customers:  customers.Service{Repository: customers.Repository{DB: db}},
+		Repository:    Repository{DB: db},
+		Customers:     customers.Service{Repository: customers.Repository{DB: db}},
+		Notifications: notifications.NotificationLogRepository{DB: db},
 	}
 
 	waCalls := make(map[int64]int)
@@ -235,5 +239,109 @@ func TestServiceProcessAutomation(t *testing.T) {
 
 	if limitAlertCount != 1 {
 		t.Errorf("expected exactly 1 limit Discord alert, got %d. Alerts: %v", limitAlertCount, discordAlerts)
+	}
+}
+
+func TestServiceGenerateAppliesDiscounts(t *testing.T) {
+	db := billingTestDB(t)
+	service := Service{
+		Repository:    Repository{DB: db},
+		Customers:     customers.Service{Repository: customers.Repository{DB: db}},
+		Notifications: notifications.NotificationLogRepository{DB: db},
+	}
+
+	mustBillingExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
+	
+	// Customer 1: Flat discount of Rp 50.000
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status, diskon, tipe_diskon) VALUES (1, 'Budi Flat', 1, 8, 'active', 50000, 'flat')`)
+	
+	// Customer 2: Percentage discount of 20% (20% of 250.000 = 50.000)
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status, diskon, tipe_diskon) VALUES (2, 'Sari Percent', 1, 8, 'active', 20, 'percent')`)
+
+	result, err := service.Generate(context.Background(), "2026-04")
+	if err != nil {
+		t.Fatalf("generate bills: %v", err)
+	}
+
+	if result.Generated != 2 {
+		t.Fatalf("expected 2 generated bills, got %d", result.Generated)
+	}
+
+	// Verify bill for Customer 1 (flat discount)
+	var nominal1 float64
+	if err := db.QueryRow(`SELECT nominal FROM tagihan WHERE pelanggan_id = 1`).Scan(&nominal1); err != nil {
+		t.Fatalf("query bill 1 nominal: %v", err)
+	}
+	if nominal1 != 200000 {
+		t.Errorf("expected nominal 200000 (250000 - 50000), got %.2f", nominal1)
+	}
+
+	// Verify bill for Customer 2 (percent discount)
+	var nominal2 float64
+	if err := db.QueryRow(`SELECT nominal FROM tagihan WHERE pelanggan_id = 2`).Scan(&nominal2); err != nil {
+		t.Fatalf("query bill 2 nominal: %v", err)
+	}
+	if nominal2 != 200000 {
+		t.Errorf("expected nominal 200000 (250000 - 20%%), got %.2f", nominal2)
+	}
+}
+
+func TestServiceGenerateAppliesPerpanjangan(t *testing.T) {
+	db := billingTestDB(t)
+	service := Service{
+		Repository:    Repository{DB: db},
+		Customers:     customers.Service{Repository: customers.Repository{DB: db}},
+		Notifications: notifications.NotificationLogRepository{DB: db},
+	}
+
+	mustBillingExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
+	
+	// Customer is 'pending' status
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (1, 'Junet Pending', 1, 8, 'pending')`)
+	
+	// Previous unpaid bill
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (1, 1, 1, '2026-03', '08-03-2026/1/20/001', 250000, '2026-03-08', 'belum_bayar')`)
+
+	result, err := service.Generate(context.Background(), "2026-04")
+	if err != nil {
+		t.Fatalf("generate bills: %v", err)
+	}
+
+	if result.Generated != 1 {
+		t.Fatalf("expected 1 generated bill, got %d", result.Generated)
+	}
+
+	// Verify bill for Customer 1 (nominal is double: 250000 * 2 = 500000)
+	var nominal1 float64
+	var status1 string
+	if err := db.QueryRow(`SELECT nominal, status FROM tagihan WHERE periode = '2026-04' AND pelanggan_id = 1`).Scan(&nominal1, &status1); err != nil {
+		t.Fatalf("query bill nominal: %v", err)
+	}
+	if nominal1 != 500000 {
+		t.Errorf("expected nominal 500000, got %.2f", nominal1)
+	}
+	if status1 != "belum_bayar" {
+		t.Errorf("expected status 'belum_bayar', got %q", status1)
+	}
+
+	// Verify old bill status is now 'lunas' with method 'perpanjangan'
+	var oldStatus, oldMethod string
+	if err := db.QueryRow(`SELECT status, payment_method FROM tagihan WHERE id = 1`).Scan(&oldStatus, &oldMethod); err != nil {
+		t.Fatalf("query old bill: %v", err)
+	}
+	if oldStatus != "lunas" {
+		t.Errorf("expected old bill status to be 'lunas', got %q", oldStatus)
+	}
+	if oldMethod != "perpanjangan" {
+		t.Errorf("expected old bill method to be 'perpanjangan', got %q", oldMethod)
+	}
+
+	// Verify customer status reset to 'active'
+	var custStatus string
+	if err := db.QueryRow(`SELECT status FROM pelanggan WHERE id = 1`).Scan(&custStatus); err != nil {
+		t.Fatalf("query customer status: %v", err)
+	}
+	if custStatus != "active" {
+		t.Errorf("expected customer status to be 'active', got %q", custStatus)
 	}
 }

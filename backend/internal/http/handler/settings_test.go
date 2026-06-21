@@ -16,7 +16,7 @@ func TestSettingsHandlerGetAndUpdate(t *testing.T) {
 	db := handlerTestDB(t)
 	repo := settings.Repository{DB: db}
 	svc := settings.Service{Repository: repo}
-	h := handler.NewSettingsHandler(svc)
+	h := handler.NewSettingsHandler(svc, nil)
 
 	t.Run("Get settings", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/settings", nil)

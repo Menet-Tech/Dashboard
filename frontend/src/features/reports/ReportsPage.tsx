@@ -57,6 +57,8 @@ export function ReportsPage({
   aging,
   submitting,
 }: ReportsPageProps) {
+  const safeRevenue = revenue || [];
+
   // 1. Proyeksi Omset (MRR)
   const activeCustomers = useMemo(() => {
     return customers.filter((c) => c.status === "active" || c.is_trial);
@@ -71,21 +73,21 @@ export function ReportsPage({
   }, [activeCustomers]);
 
   // 2. Ringkasan Bulan Ini
-  const currentMonthReport = revenue[0] || null;
+  const currentMonthReport = safeRevenue[0] || null;
   const billedThisMonth = currentMonthReport?.total_billed ?? 0;
   const paidThisMonth = currentMonthReport?.total_paid ?? 0;
   const collectionRate = billedThisMonth > 0 ? (paidThisMonth / billedThisMonth) * 100 : 0;
 
   // 3. Proyeksi tahunan / rata-rata
   const averageMonthlyCollection = useMemo(() => {
-    if (revenue.length === 0) return 0;
-    const total = revenue.reduce((acc, r) => acc + r.total_paid, 0);
-    return total / revenue.length;
-  }, [revenue]);
+    if (safeRevenue.length === 0) return 0;
+    const total = safeRevenue.reduce((acc, r) => acc + r.total_paid, 0);
+    return total / safeRevenue.length;
+  }, [safeRevenue]);
 
   // 4. Data untuk Grafik Pendapatan
   const revenueChartData = useMemo(() => {
-    const sortedRevenue = [...revenue].reverse();
+    const sortedRevenue = [...safeRevenue].reverse();
     return {
       labels: sortedRevenue.map((r) => r.period),
       datasets: [
@@ -133,7 +135,7 @@ export function ReportsPage({
         },
       ],
     };
-  }, [revenue]);
+  }, [safeRevenue]);
 
   // 5. Data untuk Grafik Aging
   const agingChartData = useMemo(() => {
@@ -248,7 +250,7 @@ export function ReportsPage({
         {/* Trend Keuangan */}
         <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm lg:col-span-2">
           <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-6">Tren Keuangan Bulanan</h3>
-          {revenue.length > 0 ? (
+          {safeRevenue.length > 0 ? (
             <div className="h-72">
               <Line
                 data={revenueChartData}

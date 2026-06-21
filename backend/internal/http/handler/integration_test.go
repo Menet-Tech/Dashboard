@@ -42,7 +42,7 @@ func TestHealthEndpoints(t *testing.T) {
 		SessionTTL:        24 * time.Hour,
 	}
 
-	server := httptest.NewServer(router.New(cfg, nil, db, authSvc))
+	server := httptest.NewServer(router.New(cfg, nil, db, authSvc, nil))
 	defer server.Close()
 
 	tests := []struct {
@@ -120,7 +120,7 @@ func TestAuthEndpoints(t *testing.T) {
 		t.Fatalf("bootstrap: %v", err)
 	}
 
-	server := httptest.NewServer(router.New(cfg, nil, db, authSvc))
+	server := httptest.NewServer(router.New(cfg, nil, db, authSvc, nil))
 	defer server.Close()
 
 	t.Run("Invalid login", func(t *testing.T) {
@@ -185,7 +185,7 @@ func TestPackageEndpoints(t *testing.T) {
 		SessionTTL:        24 * time.Hour,
 	}
 
-	server := httptest.NewServer(router.New(cfg, nil, db, authSvc))
+	server := httptest.NewServer(router.New(cfg, nil, db, authSvc, nil))
 	defer server.Close()
 
 	t.Run("List packages (empty)", func(t *testing.T) {
@@ -217,7 +217,7 @@ func TestBillingEndpoints(t *testing.T) {
 	custID := createCustomerForTest(t, db, pkgID)
 	billID := generateBillForTest(t, db, custID, pkgID)
 
-	server := httptest.NewServer(router.New(cfg, nil, db, authSvc))
+	server := httptest.NewServer(router.New(cfg, nil, db, authSvc, nil))
 	defer server.Close()
 
 	t.Run("Get bill by ID without auth", func(t *testing.T) {
@@ -674,7 +674,7 @@ func TestIntegrationFlow_PackageCustomerBill(t *testing.T) {
 		t.Fatalf("bootstrap: %v", err)
 	}
 
-	server := httptest.NewServer(router.New(cfg, nil, db, authSvc))
+	server := httptest.NewServer(router.New(cfg, nil, db, authSvc, nil))
 	defer server.Close()
 
 	// 1. Admin login to get session cookie

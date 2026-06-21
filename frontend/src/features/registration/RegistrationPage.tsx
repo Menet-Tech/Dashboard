@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react";
-import { StatusPill, EmptyTableRow } from "../../components/ui";
-import { Trash2, CheckCircle2, UserPlus, AlertCircle } from "lucide-react";
+import { StatusPill, EmptyTableRow, inputClassName, renderInlineError } from "../../components/ui";
+import { Trash2, CheckCircle2, UserPlus, Plus } from "lucide-react";
+import { Modal } from "../../components/ui/Modal";
 import type { ConfirmDialogState } from "../../hooks/types";
 import type { ContactForm } from "../../lib/gatewayApi";
-import { getChatbotForms, updateChatbotForm, deleteChatbotForm } from "../../lib/gatewayApi";
+import { getChatbotForms, updateChatbotForm, deleteChatbotForm, createChatbotForm } from "../../lib/gatewayApi";
+import type { PackageItem } from "../../types";
 
 type RegistrationPageProps = {
   waGatewayUrl?: string;
   waAccountId?: string;
   waApiKey?: string;
+  packages?: PackageItem[];
   pushSuccess: (msg: string) => void;
   pushError: (msg: string) => void;
   withFeedback: (fn: () => Promise<void>, busyKey?: string) => Promise<void>;
@@ -23,9 +26,20 @@ type RegistrationPageProps = {
   }) => void;
 };
 
+type ManualRegistrationForm = {
+  nama: string;
+  phone: string;
+  alamat: string;
+  ssid: string;
+  password: string;
+  paket: string;
+  referral: string;
+};
+
 export function RegistrationPage({
   waGatewayUrl,
   waApiKey,
+  packages = [],
   pushSuccess,
   pushError,
   withFeedback,
@@ -34,12 +48,26 @@ export function RegistrationPage({
 }: RegistrationPageProps) {
   const [leads, setLeads] = useState<ContactForm[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [manualForm, setManualForm] = useState<ManualRegistrationForm>({
+    nama: "",
+    phone: "",
+    alamat: "",
+    ssid: "",
+    password: "",
+    paket: "",
+    referral: "",
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+
+  const gatewayUrl = waGatewayUrl?.trim() || "http://localhost:3001";
+  const apiKey = waApiKey?.trim() || "";
 
   const loadLeads = async () => {
-    if (!waGatewayUrl || !waApiKey) return;
     setLoading(true);
     try {
-      const res = await getChatbotForms(waGatewayUrl, waApiKey, "registration", 100);
+      const res = await getChatbotForms(gatewayUrl, apiKey, "registration", 100);
       setLeads(res.data);
     } catch (err: any) {
       pushError(err.message || "Gagal memuat data pendaftaran dari WA");
@@ -51,13 +79,12 @@ export function RegistrationPage({
   useEffect(() => {
     void loadLeads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waGatewayUrl, waApiKey]);
+  }, [gatewayUrl, apiKey]);
 
   const handleResolve = async (lead: ContactForm) => {
-    if (!waGatewayUrl || !waApiKey) return;
     await withFeedback(async () => {
       try {
-        await updateChatbotForm(waGatewayUrl, waApiKey, lead.id, "resolved");
+        await updateChatbotForm(gatewayUrl, apiKey, lead.id, "resolved");
         pushSuccess("Pendaftaran ditandai telah selesai diproses");
         await loadLeads();
       } catch (err: any) {
@@ -67,7 +94,6 @@ export function RegistrationPage({
   };
 
   const handleDelete = (id: string) => {
-    if (!waGatewayUrl || !waApiKey) return;
     askForConfirmation({
       title: "Hapus Pendaftaran",
       body: "Apakah Anda yakin ingin menghapus data pendaftaran ini?",
@@ -84,8 +110,7 @@ export function RegistrationPage({
   };
 
   const deleteForm = async (id: string) => {
-    if (!waGatewayUrl || !waApiKey) return;
-    await deleteChatbotForm(waGatewayUrl, waApiKey, id);
+    await deleteChatbotForm(gatewayUrl, apiKey, id);
     pushSuccess("Data pendaftaran berhasil dihapus");
     await loadLeads();
   };
@@ -103,19 +128,62 @@ export function RegistrationPage({
     pushSuccess("Data pendaftaran berhasil dimuat ke formulir pelanggan baru!");
   };
 
-  if (!waGatewayUrl || !waApiKey) {
-    return (
-      <section className="w-full p-6">
-        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-2xl p-6 text-center max-w-xl mx-auto">
-          <AlertCircle className="w-12 h-12 text-amber-600 dark:text-amber-400 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-amber-900 dark:text-amber-300">WhatsApp Gateway Belum Terkonfigurasi</h3>
-          <p className="text-xs text-amber-700 dark:text-amber-500 mt-2">
-            Silakan lengkapi URL WhatsApp Gateway dan API Key di menu Pengaturan terlebih dahulu untuk melihat pendaftaran dari WA.
-          </p>
-        </div>
-      </section>
-    );
-  }
+  const handleManualSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errors: Record<string, string> = {};
+    if (!manualForm.nama.trim()) errors.nama = "Nama lengkap wajib diisi";
+    if (!manualForm.phone.trim()) {
+      errors.phone = "Nomor WhatsApp wajib diisi";
+    }
+    if (!manualForm.alamat.trim()) errors.alamat = "Alamat lengkap wajib diisi";
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setManualSubmitting(true);
+    try {
+      let cleanPhone = manualForm.phone.replace(/[^\d]/g, "");
+      if (cleanPhone.startsWith("0")) {
+        cleanPhone = "62" + cleanPhone.slice(1);
+      } else if (!cleanPhone.startsWith("62")) {
+        cleanPhone = "62" + cleanPhone;
+      }
+
+      await createChatbotForm(gatewayUrl, apiKey, {
+        type: "registration",
+        phone: cleanPhone,
+        data: {
+          nama: manualForm.nama,
+          alamat: manualForm.alamat,
+          ssid: manualForm.ssid,
+          password: manualForm.password,
+          paket: manualForm.paket,
+          referral: manualForm.referral,
+          source: "manual",
+        },
+      });
+
+      pushSuccess("Pendaftaran manual berhasil ditambahkan!");
+      setManualForm({
+        nama: "",
+        phone: "",
+        alamat: "",
+        ssid: "",
+        password: "",
+        paket: "",
+        referral: "",
+      });
+      setFormErrors({});
+      setIsManualModalOpen(false);
+      await loadLeads();
+    } catch (err: any) {
+      pushError(err.message || "Gagal menambahkan registrasi manual");
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
 
   const pendingLeads = leads.filter(l => l.status === "pending").length;
 
@@ -124,21 +192,43 @@ export function RegistrationPage({
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-sans">Registrasi WA</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-sans">Registrasi List</h2>
           <p className="text-xs text-slate-500 mt-1">
-            Review dan kelola formulir pendaftaran mandiri pelanggan baru yang dikirimkan melalui chatbot WhatsApp.
+            Review dan kelola formulir pendaftaran pelanggan baru baik secara mandiri via WhatsApp maupun manual oleh admin.
           </p>
         </div>
-        <div className="flex gap-2">
-          <StatusPill label={`${pendingLeads} Leads Pending`} tone={pendingLeads > 0 ? "gold" : "slate"} />
-          <StatusPill label={`${leads.length} Total`} tone="slate" />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setManualForm({
+                nama: "",
+                phone: "",
+                alamat: "",
+                ssid: "",
+                password: "",
+                paket: "",
+                referral: "",
+              });
+              setFormErrors({});
+              setIsManualModalOpen(true);
+            }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer animate-in"
+          >
+            <Plus size={14} />
+            Tambah Registrasi Manual
+          </button>
+          <div className="flex gap-2">
+            <StatusPill label={`${pendingLeads} Leads Pending`} tone={pendingLeads > 0 ? "gold" : "slate"} />
+            <StatusPill label={`${leads.length} Total`} tone="slate" />
+          </div>
         </div>
       </div>
 
       {/* Leads Table */}
       <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans">Pendaftaran Chatbot WA</h3>
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans">List Pendaftaran Calon Pelanggan</h3>
           <button
             type="button"
             onClick={() => void loadLeads()}
@@ -164,10 +254,11 @@ export function RegistrationPage({
             </thead>
             <tbody className="divide-y divide-gray-200">
               {leads.length === 0 ? (
-                <EmptyTableRow message={loading ? "Memuat pendaftaran..." : "Belum ada pendaftaran melalui chatbot WA."} colSpan={7} />
+                <EmptyTableRow message={loading ? "Memuat pendaftaran..." : "Belum ada pendaftaran di database."} colSpan={7} />
               ) : (
                 leads.map((lead) => {
                   const d = lead.data || {};
+                  const isManual = d.source === "manual";
                   const dateStr = new Date(lead.created_at).toLocaleString("id-ID", {
                     dateStyle: "medium",
                     timeStyle: "short",
@@ -178,7 +269,16 @@ export function RegistrationPage({
                         {dateStr}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="font-bold text-slate-900 dark:text-slate-100">{d.nama || d.name || "-"}</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 dark:text-slate-100">{d.nama || d.name || "-"}</span>
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                            isManual
+                              ? "bg-blue-50 text-blue-700 border border-blue-100"
+                              : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                          }`}>
+                            {isManual ? "Manual" : "WhatsApp"}
+                          </span>
+                        </div>
                         <div className="text-xs text-indigo-600 dark:text-indigo-400 font-mono">+{lead.phone}</div>
                       </td>
                       <td className="px-6 py-4 text-slate-700 dark:text-slate-350 max-w-[200px] break-words">
@@ -216,7 +316,7 @@ export function RegistrationPage({
                                 type="button"
                                 title="Konversi ke Pelanggan"
                                 onClick={() => handleConvert(lead)}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-2 rounded-lg shadow-sm transition-colors flex items-center gap-1 text-xs"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-2 rounded-lg shadow-sm transition-colors flex items-center gap-1 text-xs cursor-pointer"
                               >
                                 <UserPlus size={14} />
                                 Konversi
@@ -225,7 +325,7 @@ export function RegistrationPage({
                                 type="button"
                                 title="Tandai Selesai"
                                 onClick={() => void handleResolve(lead)}
-                                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold p-2 rounded-lg transition-colors"
+                                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold p-2 rounded-lg transition-colors cursor-pointer"
                               >
                                 <CheckCircle2 size={14} />
                               </button>
@@ -235,7 +335,7 @@ export function RegistrationPage({
                             type="button"
                             title="Hapus Lead"
                             onClick={() => handleDelete(lead.id)}
-                            className="bg-red-50 hover:bg-red-100 text-red-700 font-bold p-2 rounded-lg transition-colors"
+                            className="bg-red-50 hover:bg-red-100 text-red-700 font-bold p-2 rounded-lg transition-colors cursor-pointer"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -249,6 +349,123 @@ export function RegistrationPage({
           </table>
         </div>
       </article>
+
+      {/* Manual Registration Modal */}
+      {isManualModalOpen && (
+        <Modal
+          title="Tambah Registrasi Manual"
+          onClose={() => setIsManualModalOpen(false)}
+          actions={
+            <>
+              <button
+                type="button"
+                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer text-xs"
+                onClick={() => setIsManualModalOpen(false)}
+                disabled={manualSubmitting}
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                form="manual-reg-form"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer text-xs"
+                disabled={manualSubmitting}
+              >
+                {manualSubmitting ? "Menyimpan..." : "Simpan Pendaftaran"}
+              </button>
+            </>
+          }
+        >
+          <form id="manual-reg-form" onSubmit={handleManualSubmit} className="space-y-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Nama Lengkap *</span>
+              <input
+                type="text"
+                className={inputClassName(formErrors.nama)}
+                value={manualForm.nama}
+                onChange={(e) => setManualForm(prev => ({ ...prev, nama: e.target.value }))}
+                placeholder="Nama Lengkap Calon Pelanggan"
+              />
+              {renderInlineError(formErrors.nama)}
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Nomor WhatsApp *</span>
+              <input
+                type="text"
+                className={inputClassName(formErrors.phone)}
+                value={manualForm.phone}
+                onChange={(e) => setManualForm(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="Contoh: 08123456789 atau +628123456789"
+              />
+              {renderInlineError(formErrors.phone)}
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Alamat Lengkap *</span>
+              <textarea
+                className={inputClassName(formErrors.alamat)}
+                rows={2}
+                value={manualForm.alamat}
+                onChange={(e) => setManualForm(prev => ({ ...prev, alamat: e.target.value }))}
+                placeholder="Alamat pemasangan lengkap"
+              />
+              {renderInlineError(formErrors.alamat)}
+            </label>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">SSID WiFi (Opsional)</span>
+                <input
+                  type="text"
+                  className={inputClassName()}
+                  value={manualForm.ssid}
+                  onChange={(e) => setManualForm(prev => ({ ...prev, ssid: e.target.value }))}
+                  placeholder="Nama WiFi yang diinginkan"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">WiFi Password (Opsional)</span>
+                <input
+                  type="text"
+                  className={inputClassName()}
+                  value={manualForm.password}
+                  onChange={(e) => setManualForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Password WiFi"
+                />
+              </label>
+            </div>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pilihan Paket Internet (Opsional)</span>
+              <select
+                className={inputClassName()}
+                value={manualForm.paket}
+                onChange={(e) => setManualForm(prev => ({ ...prev, paket: e.target.value }))}
+              >
+                <option value="">Pilih paket internet</option>
+                {packages.map((pkg) => (
+                  <option key={pkg.id} value={pkg.name}>
+                    {pkg.name} ({pkg.speed_mbps} Mbps)
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Referral (Kode / Nama - Opsional)</span>
+              <input
+                type="text"
+                className={inputClassName()}
+                value={manualForm.referral}
+                onChange={(e) => setManualForm(prev => ({ ...prev, referral: e.target.value }))}
+                placeholder="Kode referral atau nama pemberi saran"
+              />
+            </label>
+          </form>
+        </Modal>
+      )}
     </section>
   );
 }

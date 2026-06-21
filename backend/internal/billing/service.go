@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -62,9 +63,11 @@ type GenerateResult struct {
 
 type AutomationMessage struct {
 	BillID       int64
+	GroupBillIDs []int64
 	TriggerKey   string
 	PhoneNumber  string
 	TemplateData map[string]string
+	CustomBody   string
 }
 
 type AutomationOptions struct {
@@ -358,17 +361,270 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		return err
 	}
 
+	// 1. Group candidates by phone number
+	phoneGroups := make(map[string][]automationCandidate)
+	var emptyPhoneCandidates []automationCandidate
+	for _, item := range candidates {
+		phone := strings.TrimSpace(item.CustomerPhone)
+		if phone == "" {
+			emptyPhoneCandidates = append(emptyPhoneCandidates, item)
+			continue
+		}
+		phoneGroups[phone] = append(phoneGroups[phone], item)
+	}
+
+	// Sort candidates in each group by CustomerID ascending (first registered first)
+	for phone, group := range phoneGroups {
+		sort.Slice(group, func(i, j int) bool {
+			return group[i].CustomerID < group[j].CustomerID
+		})
+		phoneGroups[phone] = group
+	}
+
 	type discordKey struct {
 		BillID int64
 		Event  string
 	}
 	discordSentThisCycle := make(map[discordKey]bool)
 
+	// Process billing notifications (reminder_custom and jatuh_tempo) per phone number group
+	for phone, group := range phoneGroups {
+		// Process reminder_custom trigger
+		var reminderUnsent []automationCandidate
+		for _, item := range group {
+			dueDate, err := time.Parse("2006-01-02", item.DueDate)
+			if err != nil {
+				continue
+			}
+			if sameDate(dueDate, options.Now.AddDate(0, 0, options.ReminderDays)) {
+				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "reminder_custom")
+				if err == nil && !sent {
+					reminderUnsent = append(reminderUnsent, item)
+				}
+			}
+		}
+
+		if len(reminderUnsent) == 1 {
+			waErr := sendAutomationMessage(ctx, options, reminderUnsent[0], "reminder_custom")
+			if waErr != nil {
+				slog.Error("automation: send reminder WA failed, continuing",
+					"bill_id", reminderUnsent[0].ID, "customer", reminderUnsent[0].CustomerName, "error", waErr)
+			}
+			key := discordKey{reminderUnsent[0].ID, "reminder"}
+			if options.SendDiscord != nil && !discordSentThisCycle[key] {
+				var msg string
+				if waErr != nil {
+					msg = fmt.Sprintf("⚠️ **Reminder Gagal (WA)**: Gagal mengirim pengingat tagihan **%s** ke **%s**: %v", reminderUnsent[0].InvoiceNumber, reminderUnsent[0].CustomerName, waErr)
+				} else {
+					msg = fmt.Sprintf("⏳ **Reminder Terkirim**: Pengingat tagihan **%s** telah dikirim ke **%s**", reminderUnsent[0].InvoiceNumber, reminderUnsent[0].CustomerName)
+				}
+				_ = options.SendDiscord(ctx, msg)
+				discordSentThisCycle[key] = true
+			}
+		} else if len(reminderUnsent) > 1 {
+			// Send combined reminder
+			var totalAmount int
+			var totalDiscount int
+			var detailBlock strings.Builder
+			var billIDs []int64
+
+			for _, c := range reminderUnsent {
+				totalAmount += c.Amount
+				totalDiscount += (c.Diskon + c.DiskonReferral)
+				pkgPrice := c.Amount + c.Diskon + c.DiskonReferral
+				detailBlock.WriteString(fmt.Sprintf("Paket: %s untuk Bapak/Ibu %s\nHarga: %s\n\n", c.PackageName, c.CustomerName, formatIDRCurrency(pkgPrice)))
+				billIDs = append(billIDs, c.ID)
+			}
+
+			var sb strings.Builder
+			sb.WriteString("Pelanggan Yth,\n")
+			sb.WriteString(fmt.Sprintf("Bapak/Ibu %s,\n\n", reminderUnsent[0].CustomerName))
+			sb.WriteString(fmt.Sprintf("Tagihan Anda periode %s sebesar %s, dengan detail berikut:\n\n", reminderUnsent[0].Period, formatIDRCurrency(totalAmount)))
+			sb.WriteString(detailBlock.String())
+			if totalDiscount > 0 {
+				sb.WriteString(fmt.Sprintf("Diskon: %s\n\n", formatIDRCurrency(totalDiscount)))
+			}
+			sb.WriteString(fmt.Sprintf("Total Tagihan: %s\n\n", formatIDRCurrency(totalAmount)))
+			sb.WriteString(fmt.Sprintf("Mohon lakukan pembayaran sebelum tanggal %s agar terhindar dari Pembatasan Layanan.\n\n", formatDateLabel(reminderUnsent[0].DueDate)))
+			sb.WriteString("Rekening Pembayaran:\n")
+			sb.WriteString("Bank Mandiri\n1570006636691\n\n")
+			sb.WriteString("Shopeepay, gopay\n089621743796\n\n")
+			sb.WriteString("Seabank\n901096534584\n\n")
+			sb.WriteString("a.n. Irfan Dharmawan\n\n")
+			sb.WriteString("Untuk konfirmasi pembayaran & Pengaduan kendala dapat menghubungi kami melalui Pesan ini, atau Nomor di bawah ini.\n")
+			sb.WriteString("087782297657 - Menet CS\n")
+			sb.WriteString("08987700897 - Elam\n")
+			sb.WriteString("089621743796 - Ipong\n\n")
+			sb.WriteString("Atas perhatian dan kerja samanya, kami ucapkan terima kasih.\n")
+			sb.WriteString("Hormat kami,\n")
+			sb.WriteString("Tim Billing — MeNet Tech")
+
+			waErr := options.SendWhatsApp(ctx, AutomationMessage{
+				BillID:       reminderUnsent[0].ID,
+				GroupBillIDs: billIDs,
+				TriggerKey:   "reminder_custom",
+				PhoneNumber:  phone,
+				CustomBody:   sb.String(),
+			})
+			key := discordKey{reminderUnsent[0].ID, "reminder"}
+			if options.SendDiscord != nil && !discordSentThisCycle[key] {
+				var msg string
+				if waErr != nil {
+					msg = fmt.Sprintf("⚠️ **Combined Reminder Gagal (WA)**: Gagal mengirim tagihan gabungan ke %s (%s): %v", reminderUnsent[0].CustomerName, phone, waErr)
+				} else {
+					msg = fmt.Sprintf("⏳ **Combined Reminder Terkirim**: Tagihan gabungan telah dikirim ke %s (%s)", reminderUnsent[0].CustomerName, phone)
+				}
+				_ = options.SendDiscord(ctx, msg)
+				discordSentThisCycle[key] = true
+			}
+		}
+
+		// Process jatuh_tempo trigger
+		var jatuhTempoUnsent []automationCandidate
+		for _, item := range group {
+			dueDate, err := time.Parse("2006-01-02", item.DueDate)
+			if err != nil {
+				continue
+			}
+			if sameDate(dueDate, options.Now) {
+				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "jatuh_tempo")
+				if err == nil && !sent {
+					jatuhTempoUnsent = append(jatuhTempoUnsent, item)
+				}
+			}
+		}
+
+		if len(jatuhTempoUnsent) == 1 {
+			waErr := sendAutomationMessage(ctx, options, jatuhTempoUnsent[0], "jatuh_tempo")
+			if waErr != nil {
+				slog.Error("automation: send jatuh_tempo WA failed, continuing",
+					"bill_id", jatuhTempoUnsent[0].ID, "customer", jatuhTempoUnsent[0].CustomerName, "error", waErr)
+			}
+			key := discordKey{jatuhTempoUnsent[0].ID, "jatuh_tempo"}
+			if options.SendDiscord != nil && !discordSentThisCycle[key] {
+				var msg string
+				if waErr != nil {
+					msg = fmt.Sprintf("⚠️ **Jatuh Tempo Gagal (WA)**: Gagal mengirim notifikasi jatuh tempo tagihan **%s** ke **%s**: %v", jatuhTempoUnsent[0].InvoiceNumber, jatuhTempoUnsent[0].CustomerName, waErr)
+				} else {
+					msg = fmt.Sprintf("⚠️ **Jatuh Tempo**: Notifikasi jatuh tempo tagihan **%s** telah dikirim ke **%s**", jatuhTempoUnsent[0].InvoiceNumber, jatuhTempoUnsent[0].CustomerName)
+				}
+				_ = options.SendDiscord(ctx, msg)
+				discordSentThisCycle[key] = true
+			}
+		} else if len(jatuhTempoUnsent) > 1 {
+			// Send combined jatuh tempo
+			var totalAmount int
+			var totalDiscount int
+			var detailBlock strings.Builder
+			var billIDs []int64
+
+			for _, c := range jatuhTempoUnsent {
+				totalAmount += c.Amount
+				totalDiscount += (c.Diskon + c.DiskonReferral)
+				pkgPrice := c.Amount + c.Diskon + c.DiskonReferral
+				detailBlock.WriteString(fmt.Sprintf("Paket: %s untuk Bapak/Ibu %s\nHarga: %s\n\n", c.PackageName, c.CustomerName, formatIDRCurrency(pkgPrice)))
+				billIDs = append(billIDs, c.ID)
+			}
+
+			var sb strings.Builder
+			sb.WriteString("Pelanggan Yth,\n")
+			sb.WriteString(fmt.Sprintf("Bapak/Ibu %s,\n\n", jatuhTempoUnsent[0].CustomerName))
+			sb.WriteString(fmt.Sprintf("Tagihan Anda periode %s sebesar %s, dengan detail berikut:\n\n", jatuhTempoUnsent[0].Period, formatIDRCurrency(totalAmount)))
+			sb.WriteString(detailBlock.String())
+			if totalDiscount > 0 {
+				sb.WriteString(fmt.Sprintf("Diskon: %s\n\n", formatIDRCurrency(totalDiscount)))
+			}
+			sb.WriteString(fmt.Sprintf("Total Tagihan: %s\n\n", formatIDRCurrency(totalAmount)))
+			sb.WriteString(fmt.Sprintf("Mohon lakukan pembayaran sebelum tanggal %s agar terhindar dari Pembatasan Layanan.\n\n", formatDateLabel(jatuhTempoUnsent[0].DueDate)))
+			sb.WriteString("Rekening Pembayaran:\n")
+			sb.WriteString("Bank Mandiri\n1570006636691\n\n")
+			sb.WriteString("Shopeepay, gopay\n089621743796\n\n")
+			sb.WriteString("Seabank\n901096534584\n\n")
+			sb.WriteString("a.n. Irfan Dharmawan\n\n")
+			sb.WriteString("Untuk konfirmasi pembayaran & Pengaduan kendala dapat menghubungi kami melalui Pesan ini, atau Nomor di bawah ini.\n")
+			sb.WriteString("087782297657 - Menet CS\n")
+			sb.WriteString("08987700897 - Elam\n")
+			sb.WriteString("089621743796 - Ipong\n\n")
+			sb.WriteString("Atas perhatian dan kerja samanya, kami ucapkan terima kasih.\n")
+			sb.WriteString("Hormat kami,\n")
+			sb.WriteString("Tim Billing — MeNet Tech")
+
+			waErr := options.SendWhatsApp(ctx, AutomationMessage{
+				BillID:       jatuhTempoUnsent[0].ID,
+				GroupBillIDs: billIDs,
+				TriggerKey:   "jatuh_tempo",
+				PhoneNumber:  phone,
+				CustomBody:   sb.String(),
+			})
+			key := discordKey{jatuhTempoUnsent[0].ID, "jatuh_tempo"}
+			if options.SendDiscord != nil && !discordSentThisCycle[key] {
+				var msg string
+				if waErr != nil {
+					msg = fmt.Sprintf("⚠️ **Combined Jatuh Tempo Gagal (WA)**: Gagal mengirim tagihan gabungan jatuh tempo ke %s (%s): %v", jatuhTempoUnsent[0].CustomerName, phone, waErr)
+				} else {
+					msg = fmt.Sprintf("⏳ **Combined Jatuh Tempo Terkirim**: Tagihan gabungan jatuh tempo telah dikirim ke %s (%s)", jatuhTempoUnsent[0].CustomerName, phone)
+				}
+				_ = options.SendDiscord(ctx, msg)
+				discordSentThisCycle[key] = true
+			}
+		}
+	}
+
+	// Process empty phone candidates individually
+	for _, item := range emptyPhoneCandidates {
+		dueDate, err := time.Parse("2006-01-02", item.DueDate)
+		if err != nil {
+			continue
+		}
+		if sameDate(dueDate, options.Now.AddDate(0, 0, options.ReminderDays)) {
+			sent, err := s.Notifications.AlreadySent(ctx, item.ID, "reminder_custom")
+			if err == nil && !sent {
+				waErr := sendAutomationMessage(ctx, options, item, "reminder_custom")
+				if waErr != nil {
+					slog.Error("automation: send reminder WA failed, continuing",
+						"bill_id", item.ID, "customer", item.CustomerName, "error", waErr)
+				}
+				key := discordKey{item.ID, "reminder"}
+				if options.SendDiscord != nil && !discordSentThisCycle[key] {
+					var msg string
+					if waErr != nil {
+						msg = fmt.Sprintf("⚠️ **Reminder Gagal (WA)**: Gagal mengirim pengingat tagihan **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
+					} else {
+						msg = fmt.Sprintf("⏳ **Reminder Terkirim**: Pengingat tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+					}
+					_ = options.SendDiscord(ctx, msg)
+					discordSentThisCycle[key] = true
+				}
+			}
+		}
+
+		if sameDate(dueDate, options.Now) {
+			sent, err := s.Notifications.AlreadySent(ctx, item.ID, "jatuh_tempo")
+			if err == nil && !sent {
+				waErr := sendAutomationMessage(ctx, options, item, "jatuh_tempo")
+				if waErr != nil {
+					slog.Error("automation: send jatuh_tempo WA failed, continuing",
+						"bill_id", item.ID, "customer", item.CustomerName, "error", waErr)
+				}
+				key := discordKey{item.ID, "jatuh_tempo"}
+				if options.SendDiscord != nil && !discordSentThisCycle[key] {
+					var msg string
+					if waErr != nil {
+						msg = fmt.Sprintf("⚠️ **Jatuh Tempo Gagal (WA)**: Gagal mengirim notifikasi jatuh tempo tagihan **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
+					} else {
+						msg = fmt.Sprintf("⚠️ **Jatuh Tempo**: Notifikasi jatuh tempo tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+					}
+					_ = options.SendDiscord(ctx, msg)
+					discordSentThisCycle[key] = true
+				}
+			}
+		}
+	}
+
+	// 2. Process isolir/limit trigger individually for all candidates
 	for _, item := range candidates {
 		dueDate, err := time.Parse("2006-01-02", item.DueDate)
 		if err != nil {
-			slog.Error("automation: invalid due date, skipping candidate",
-				"bill_id", item.ID, "due_date", item.DueDate, "error", err)
 			continue
 		}
 		effectiveDueDate := dueDate
@@ -376,45 +632,8 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 			effectiveDueDate = adjustedDueDate
 		}
 
-		if sameDate(dueDate, options.Now.AddDate(0, 0, options.ReminderDays)) {
-			waErr := sendAutomationMessage(ctx, options, item, "reminder_custom")
-			if waErr != nil {
-				slog.Error("automation: send reminder WA failed, continuing",
-					"bill_id", item.ID, "customer", item.CustomerName, "error", waErr)
-			}
-			key := discordKey{item.ID, "reminder"}
-			if options.SendDiscord != nil && !discordSentThisCycle[key] {
-				var msg string
-				if waErr != nil {
-					msg = fmt.Sprintf("⚠️ **Reminder Gagal (WA)**: Gagal mengirim pengingat tagihan **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
-				} else {
-					msg = fmt.Sprintf("⏳ **Reminder Terkirim**: Pengingat tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
-				}
-				_ = options.SendDiscord(ctx, msg)
-				discordSentThisCycle[key] = true
-			}
-		}
-
-		if sameDate(dueDate, options.Now) {
-			waErr := sendAutomationMessage(ctx, options, item, "jatuh_tempo")
-			if waErr != nil {
-				slog.Error("automation: send jatuh_tempo WA failed, continuing",
-					"bill_id", item.ID, "customer", item.CustomerName, "error", waErr)
-			}
-			key := discordKey{item.ID, "jatuh_tempo"}
-			if options.SendDiscord != nil && !discordSentThisCycle[key] {
-				var msg string
-				if waErr != nil {
-					msg = fmt.Sprintf("⚠️ **Jatuh Tempo Gagal (WA)**: Gagal mengirim notifikasi jatuh tempo tagihan **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
-				} else {
-					msg = fmt.Sprintf("⚠️ **Jatuh Tempo**: Notifikasi jatuh tempo tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
-				}
-				_ = options.SendDiscord(ctx, msg)
-				discordSentThisCycle[key] = true
-			}
-		}
-
-		if overdueDays(effectiveDueDate, options.Now) >= options.LimitDays {
+		// Bypass isolir check if customer status is "pending"
+		if item.CustomerStatus != "pending" && overdueDays(effectiveDueDate, options.Now) >= options.LimitDays {
 			wasAlreadyLimited := item.CustomerStatus == "limit"
 
 			if !wasAlreadyLimited {
@@ -539,7 +758,9 @@ type billCandidate struct {
 	PackagePrice    int
 	DueDay          int
 	Diskon          int
+	TipeDiskon      string
 	VoucherDiscount int
+	CustomerStatus  string
 }
 
 type automationCandidate struct {

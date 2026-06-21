@@ -847,6 +847,7 @@ export type MikrotikRouterItem = {
   username: string;
   password?: string;
   is_active: boolean;
+  role: string;
   status?: "online" | "failed_auth" | "offline";
 };
 
@@ -876,6 +877,19 @@ export function deleteMikrotikRouter(id: number) {
 
 export function testRouterConnection(id: number) {
   return request<{ success: boolean; message: string }>(`/api/v1/mikrotik/routers/${id}/test`, {
+    method: "POST",
+  });
+}
+
+export type SyncResultData = {
+  pools_synced: number;
+  profiles_synced: number;
+  secrets_synced: number;
+  errors?: string[];
+};
+
+export function syncMikrotikRouters() {
+  return request<{ success: boolean; message: string; data: SyncResultData }>("/api/v1/mikrotik/routers/sync", {
     method: "POST",
   });
 }
@@ -913,6 +927,12 @@ export function testSMTP(payload: SMTPTestPayload) {
   return request<{ success: boolean; message: string }>("/api/v1/integration/test-smtp", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export function deleteSetting(key: string) {
+  return request<{ message: string }>(`/api/v1/settings/${key}`, {
+    method: "DELETE",
   });
 }
 

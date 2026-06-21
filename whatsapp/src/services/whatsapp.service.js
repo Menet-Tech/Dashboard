@@ -1,4 +1,6 @@
-const { getClient } = require('../whatsapp/client');
+const getClient = (accountId) => {
+    return require('../whatsapp/client').getClient(accountId);
+};
 const { formatPhoneNumber } = require('../utils/formatter');
 const { MessageMedia, Buttons, List } = require('whatsapp-web.js');
 const { WhatsAppError } = require('../utils/errors');

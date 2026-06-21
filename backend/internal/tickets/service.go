@@ -76,7 +76,7 @@ func (s Service) CreateTicket(ctx context.Context, ticket Ticket) (Ticket, error
 	}
 
 	// Try to match phone number to associate with an existing pelanggan
-	cleanPhone := strings.ReplaceAll(ticket.NoHP, "@c.us", "")
+	cleanPhone := strings.Split(ticket.NoHP, "@")[0]
 	cleanPhone = strings.TrimPrefix(cleanPhone, "+")
 	if strings.HasPrefix(cleanPhone, "0") {
 		cleanPhone = "62" + cleanPhone[1:]
@@ -117,15 +117,15 @@ func (s Service) AddTicketMessage(ctx context.Context, ticketID int64, senderTyp
 	if senderType == "admin" {
 		// Clean phone for WhatsApp destination
 		targetPhone := detail.NoHP
-		if !strings.Contains(targetPhone, "@c.us") {
+		if !strings.Contains(targetPhone, "@") {
 			targetPhone = targetPhone + "@c.us"
 		}
 		
-		// Send reply via WA queue
-		err = s.WhatsApp.QueueDirectMessage(ctx, "default", targetPhone, message)
+		// Send reply via WA directly
+		err = s.WhatsApp.SendDirectMessage(ctx, "default", targetPhone, message)
 		if err != nil {
 			// Don't rollback message creation, just log error
-			fmt.Printf("failed to queue ticket reply to whatsapp: %v\n", err)
+			fmt.Printf("failed to send ticket reply to whatsapp: %v\n", err)
 		}
 	}
 

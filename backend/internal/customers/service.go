@@ -33,6 +33,7 @@ type Customer struct {
 	TrialStartedAt  *string `json:"trial_started_at,omitempty"`
 	TrialDays       int     `json:"trial_days"`
 	Diskon          int     `json:"diskon"`
+	TipeDiskon      string  `json:"tipe_diskon"`
 	ReferredByID    *int64  `json:"referred_by_id,omitempty"`
 	ReferralBalance int     `json:"referral_balance"`
 	ReferralCode    string  `json:"referral_code,omitempty"`
@@ -73,6 +74,31 @@ func (s Service) FindByID(ctx context.Context, id int64) (Customer, error) {
 func (s Service) Create(ctx context.Context, customer Customer) (Customer, error) {
 	if err := validateCustomer(customer); err != nil {
 		return Customer{}, err
+	}
+
+	// Fetch trial settings
+	trialEnabled := true
+	trialPeriodDays := 3
+
+	if s.Settings.Repository.DB != nil {
+		enabledStr, err := s.Settings.GetString(ctx, settings.KeyTrialEnabled)
+		if err == nil && enabledStr == "0" {
+			trialEnabled = false
+		}
+
+		days, err := s.Settings.GetInt(ctx, settings.KeyTrialPeriodDays)
+		if err == nil && days > 0 {
+			trialPeriodDays = days
+		}
+	}
+
+	if trialEnabled {
+		customer.IsTrial = true
+		customer.TrialDays = trialPeriodDays
+	} else {
+		customer.IsTrial = false
+		customer.TrialDays = 0
+		customer.TrialStartedAt = nil
 	}
 
 	created, err := s.Repository.Create(ctx, normalizeCustomer(customer))
@@ -299,6 +325,10 @@ func normalizeCustomer(customer Customer) Customer {
 		customer.ReferredByID = nil
 	}
 
+	if customer.TipeDiskon == "" {
+		customer.TipeDiskon = "flat"
+	}
+
 	return customer
 }
 
@@ -319,12 +349,24 @@ func validateCustomer(customer Customer) error {
 		return errors.New("customer status is invalid")
 	}
 
+	if customer.TipeDiskon == "percent" && (customer.Diskon < 0 || customer.Diskon > 100) {
+		return errors.New("percentage discount must be between 0 and 100")
+	}
+
+	if customer.Diskon < 0 {
+		return errors.New("discount cannot be negative")
+	}
+
+	if customer.TipeDiskon != "" && customer.TipeDiskon != "flat" && customer.TipeDiskon != "percent" {
+		return errors.New("invalid discount type")
+	}
+
 	return nil
 }
 
 func isValidStatus(status string) bool {
 	switch status {
-	case "active", "limit", "inactive":
+	case "active", "limit", "inactive", "pending":
 		return true
 	default:
 		return false
@@ -336,7 +378,7 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),
 		       COALESCE(c.password_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
 		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days,
-		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
+		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
 		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
@@ -390,6 +432,7 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 			&trialStartedAt,
 			&item.TrialDays,
 			&item.Diskon,
+			&item.TipeDiskon,
 			&referredByID,
 			&item.ReferralBalance,
 			&referralCode,
@@ -456,10 +499,25 @@ func (r Repository) Create(ctx context.Context, customer Customer) (Customer, er
 		return Customer{}, err
 	}
 
-	// Set default trial values
+	// Set trial values based on customer object properties
+	isTrialVal := 0
+	var trialStartedAt *string
 	trialDays := customer.TrialDays
-	if trialDays <= 0 {
-		trialDays = 3
+
+	if customer.IsTrial {
+		isTrialVal = 1
+		if customer.TrialStartedAt != nil {
+			trialStartedAt = customer.TrialStartedAt
+		} else {
+			nowStr := time.Now().UTC().Format(time.RFC3339)
+			trialStartedAt = &nowStr
+		}
+		if trialDays <= 0 {
+			trialDays = 3
+		}
+	} else {
+		trialDays = 0
+		trialStartedAt = nil
 	}
 
 	referralCode := strings.TrimSpace(customer.ReferralCode)
@@ -484,11 +542,12 @@ func (r Repository) Create(ctx context.Context, customer Customer) (Customer, er
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO pelanggan (
 			nama, paket_id, user_pppoe, password_pppoe, nomor_wa, sn_ont, tgl_jatuh_tempo, status, alamat,
-			is_trial, trial_started_at, trial_days, diskon, referred_by_id, referral_balance, referral_code, voucher_discount,
+			is_trial, trial_started_at, trial_days, diskon, tipe_diskon, referred_by_id, referral_balance, referral_code, voucher_discount,
 			ont_status, ont_ip, ont_uptime, ont_rx_power, ont_tx_power, pppoe_status, pppoe_ip, pppoe_uptime, last_sync_at, odp_id, odp_port, email, updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address, 1, trialDays, customer.Diskon, customer.ReferredByID, customer.ReferralBalance, referralCode, customer.VoucherDiscount,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address,
+		isTrialVal, trialStartedAt, trialDays, customer.Diskon, customer.TipeDiskon, customer.ReferredByID, customer.ReferralBalance, referralCode, customer.VoucherDiscount,
 		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt, customer.OdpID, customer.OdpPort, customer.Email)
 	if err != nil {
 		_ = tx.Rollback()
@@ -519,9 +578,7 @@ func (r Repository) Create(ctx context.Context, customer Customer) (Customer, er
 	}
 
 	customer.ID = id
-	customer.IsTrial = true
-	now := time.Now().UTC().Format(time.RFC3339)
-	customer.TrialStartedAt = &now
+	customer.TrialStartedAt = trialStartedAt
 	customer.TrialDays = trialDays
 	customer.ReferralCode = referralCode
 
@@ -544,12 +601,12 @@ func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Cu
 	result, err := r.DB.ExecContext(ctx, `
 		UPDATE pelanggan
 		SET nama = ?, paket_id = ?, user_pppoe = ?, password_pppoe = ?, nomor_wa = ?, sn_ont = ?, tgl_jatuh_tempo = ?, status = ?, alamat = ?,
-		    diskon = ?, referred_by_id = ?, referral_balance = ?, referral_code = ?, voucher_discount = ?,
+		    diskon = ?, tipe_diskon = ?, referred_by_id = ?, referral_balance = ?, referral_code = ?, voucher_discount = ?,
 		    ont_status = ?, ont_ip = ?, ont_uptime = ?, ont_rx_power = ?, ont_tx_power = ?, pppoe_status = ?, pppoe_ip = ?, pppoe_uptime = ?, last_sync_at = ?,
 		    odp_id = ?, odp_port = ?, voucher_auto_apply = ?, email = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address,
-		customer.Diskon, customer.ReferredByID, customer.ReferralBalance, toNullString(customer.ReferralCode), customer.VoucherDiscount,
+		customer.Diskon, customer.TipeDiskon, customer.ReferredByID, customer.ReferralBalance, toNullString(customer.ReferralCode), customer.VoucherDiscount,
 		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt,
 		customer.OdpID, customer.OdpPort, customer.VoucherAutoApply, customer.Email, id)
 	if err != nil {
@@ -646,7 +703,7 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),
 		       COALESCE(c.password_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
 		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days,
-		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
+		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
 		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
@@ -702,6 +759,7 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 			&trialStartedAt,
 			&item.TrialDays,
 			&item.Diskon,
+			&item.TipeDiskon,
 			&referredByID,
 			&item.ReferralBalance,
 			&referralCode,
@@ -786,7 +844,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),
 		       COALESCE(c.password_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
 		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days,
-		       c.diskon, c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
+		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
 		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
@@ -836,6 +894,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		&trialStartedAt,
 		&item.TrialDays,
 		&item.Diskon,
+		&item.TipeDiskon,
 		&referredByID,
 		&item.ReferralBalance,
 		&referralCode,

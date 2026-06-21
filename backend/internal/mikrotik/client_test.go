@@ -105,6 +105,7 @@ type mockRouterOS struct {
 	t        *testing.T
 	done     chan struct{}
 	handlers map[string][][]string
+	onCommand func(words []string)
 }
 
 func newMockRouterOS(t *testing.T) *mockRouterOS {
@@ -181,6 +182,10 @@ func (s *mockRouterOS) handleConnection(conn net.Conn) {
 			continue
 		}
 
+		if s.onCommand != nil {
+			s.onCommand(cmdWords)
+		}
+
 		cmd := cmdWords[0]
 
 		// Intercept queries for unknown user to return empty result
@@ -201,6 +206,27 @@ func (s *mockRouterOS) handleConnection(conn net.Conn) {
 			// fallback to a default !done response
 			_ = writeSentenceToConn(conn, []string{"!done"})
 			continue
+		}
+
+		// Filter sentences if name filter is present
+		if nameFilter != "" && (cmd == "/ppp/secret/print" || cmd == "/ppp/active/print") {
+			var filtered [][]string
+			for _, sentence := range sentences {
+				isRe := false
+				matchesName := false
+				for _, word := range sentence {
+					if word == "!re" {
+						isRe = true
+					}
+					if strings.HasPrefix(word, "=name=") && strings.TrimPrefix(word, "=name=") == nameFilter {
+						matchesName = true
+					}
+				}
+				if !isRe || matchesName {
+					filtered = append(filtered, sentence)
+				}
+			}
+			sentences = filtered
 		}
 
 		for _, sentence := range sentences {
@@ -342,7 +368,7 @@ func TestListOperations(t *testing.T) {
 		{"!done"},
 	}
 	s.handlers["/ppp/profile/print"] = [][]string{
-		{"!re", "=name=default", "=rate-limit=10M/10M"},
+		{"!re", "=name=default", "=local-address=192.168.1.1", "=remote-address=pool1", "=rate-limit=10M/10M"},
 		{"!done"},
 	}
 	s.Start()
@@ -387,7 +413,7 @@ func TestListOperations(t *testing.T) {
 	if len(profiles) != 1 {
 		t.Errorf("expected 1 profile, got %d", len(profiles))
 	}
-	if profiles[0].Name != "default" || profiles[0].RateLimit != "10M/10M" {
+	if profiles[0].Name != "default" || profiles[0].LocalAddress != "192.168.1.1" || profiles[0].RemoteAddress != "pool1" || profiles[0].RateLimit != "10M/10M" {
 		t.Errorf("profile parsing mismatch: %+v", profiles)
 	}
 }

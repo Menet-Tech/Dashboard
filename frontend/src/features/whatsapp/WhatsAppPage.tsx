@@ -5,31 +5,17 @@ import {
   deleteGatewayAccount,
   getGatewayAccountQr,
   getGatewayHistory,
-  getChatbotSessions,
-  resetChatbotSession,
-  getChatbotForms,
-  getAutoReplyRules,
-  createAutoReplyRule,
-  updateAutoReplyRule,
-  deleteAutoReplyRule,
-  getChatbotSettings,
-  updateChatbotSettings,
   type GatewayAccount,
   type GatewayMessage,
-  type ChatbotSession,
-  type ContactForm,
-  type AutoReplyRule,
-  type ChatbotSettings,
   createGatewayAccount,
 } from "../../lib/gatewayApi";
-import { RefreshCw, Plus, Wifi, MessageSquare, ShieldAlert } from "lucide-react";
-import type { User } from "../../types";
+import { RefreshCw, Wifi, MessageSquare, ShieldAlert } from "lucide-react";
+import type { User, SettingsState, TemplateItem } from "../../types";
 import type { ConfirmDialogState } from "../../hooks/types";
 
 import { AccountsTab } from "./components/AccountsTab";
 import { QrTab } from "./components/QrTab";
 import { HistoryTab } from "./components/HistoryTab";
-import { ChatbotTab } from "./components/ChatbotTab";
 
 type WhatsAppPageProps = {
   user: User;
@@ -40,9 +26,14 @@ type WhatsAppPageProps = {
   pushError: (msg: string) => void;
   withFeedback: (fn: () => Promise<void>, actionKey?: string) => Promise<void>;
   askForConfirmation: (config: ConfirmDialogState) => void;
+  settingsForm: SettingsState;
+  setSettingsForm: (form: SettingsState) => void;
+  refreshSettings: () => Promise<void>;
+  templates: TemplateItem[];
+  refreshTemplates: () => Promise<void>;
 };
 
-type ActiveTab = "accounts" | "qr" | "history" | "chatbot";
+type ActiveTab = "accounts" | "qr" | "history";
 
 export function WhatsAppPage({
   user,
@@ -53,24 +44,21 @@ export function WhatsAppPage({
   pushError,
   withFeedback,
   askForConfirmation,
+  settingsForm,
+  setSettingsForm,
+  refreshSettings,
+  templates,
+  refreshTemplates,
 }: WhatsAppPageProps) {
   const gatewayUrl = waGatewayUrl?.trim() || "http://localhost:3001";
   const configuredAccountId = waAccountId?.trim() || "default";
-  const apiKey = waApiKey?.trim();
+  const apiKey = waApiKey?.trim() || "";
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("accounts");
   const [qrSelectedAccountId, setQrSelectedAccountId] = useState(configuredAccountId);
 
   // Shared Gateway States
   const [historyMessages, setHistoryMessages] = useState<GatewayMessage[]>([]);
-  const [chatbotSessions, setChatbotSessions] = useState<ChatbotSession[]>([]);
-  const [contactForms, setContactForms] = useState<ContactForm[]>([]);
-  const [autoReplyRules, setAutoReplyRules] = useState<AutoReplyRule[]>([]);
-  const [chatbotSettings, setChatbotSettings] = useState<ChatbotSettings>({
-    chatbot_account_id: "*",
-    auto_reply_account_id: "*",
-    auto_reply_before_chatbot: "1",
-  });
 
   const [loading, setLoading] = useState(false);
   const [gatewayError, setGatewayError] = useState<string | null>(null);
@@ -93,30 +81,22 @@ export function WhatsAppPage({
     setQrSelectedAccountId(configuredAccountId);
   }, [configuredAccountId]);
 
-  // Fetch initial gateway details, history, rules & settings
+  // Fetch initial gateway details & history
   useEffect(() => {
-    if (!gatewayUrl || !apiKey) return;
+    if (!gatewayUrl) return;
 
     let active = true;
     async function loadData() {
       try {
         setLoading(true);
-        const [accRes, histRes, sessionsRes, formsRes, rulesRes, settingsRes] = await Promise.all([
+        const [accRes, histRes] = await Promise.all([
           getGatewayAccounts(gatewayUrl!, apiKey!),
           getGatewayHistory(gatewayUrl!, apiKey!, null, 100),
-          getChatbotSessions(gatewayUrl!, apiKey!),
-          getChatbotForms(gatewayUrl!, apiKey!, undefined, 100),
-          getAutoReplyRules(gatewayUrl!, apiKey!),
-          getChatbotSettings(gatewayUrl!, apiKey!),
         ]);
 
         if (active) {
           setAccounts(accRes.data);
           setHistoryMessages(histRes.data);
-          setChatbotSessions(sessionsRes.data);
-          setContactForms(formsRes.data);
-          setAutoReplyRules(rulesRes.data);
-          setChatbotSettings(settingsRes.data);
           setGatewayError(null);
 
           if (accRes.data.length > 0) {
@@ -138,29 +118,13 @@ export function WhatsAppPage({
 
     void loadData();
 
-    // Poll chatbot logs/sessions periodically
-    const timer = setInterval(() => {
-      if (!gatewayUrl || !apiKey) return;
-      void getChatbotSessions(gatewayUrl, apiKey).then(res => {
-        setChatbotSessions(res.data);
-        setGatewayError(null);
-      }).catch((err: any) => setGatewayError(err?.message || "Sinkronisasi gateway gagal"));
-      void getChatbotForms(gatewayUrl, apiKey, undefined, 100).then(res => setContactForms(res.data)).catch(() => {});
-      void getAutoReplyRules(gatewayUrl, apiKey).then(res => setAutoReplyRules(res.data)).catch(() => {});
-    }, 10000);
-
     return () => {
       active = false;
-      clearInterval(timer);
     };
   }, [gatewayUrl, apiKey, setAccounts, configuredAccountId]);
 
   // Accounts Tab Handlers
   async function handleAddAccount(id: string, label: string) {
-    if (!apiKey) {
-      pushError("API Key belum dikonfigurasi. Buka Pengaturan → WhatsApp Gateway dan isi field API Key terlebih dahulu.");
-      return;
-    }
     await withFeedback(async () => {
       await createGatewayAccount(gatewayUrl, apiKey, id, label);
       pushSuccess(`Inisialisasi akun '${id}' berhasil dimulai`);
@@ -183,10 +147,6 @@ export function WhatsAppPage({
   }
 
   async function handleDeleteAccount(id: string) {
-    if (!apiKey) {
-      pushError("API Key belum dikonfigurasi. Buka Pengaturan → WhatsApp Gateway.");
-      return;
-    }
     askForConfirmation({
       title: "Hapus akun WhatsApp?",
       body: `Akun '${id}' akan dihapus dari gateway dan session login akan dibersihkan dari disk.`,
@@ -204,10 +164,6 @@ export function WhatsAppPage({
   }
 
   async function handleRefreshAccounts() {
-    if (!apiKey) {
-      pushError("API Key belum dikonfigurasi. Buka Pengaturan → WhatsApp Gateway.");
-      return;
-    }
     await withFeedback(async () => {
       const accRes = await getGatewayAccounts(gatewayUrl, apiKey);
       const histRes = await getGatewayHistory(gatewayUrl, apiKey, null, 100);
@@ -220,7 +176,7 @@ export function WhatsAppPage({
 
   // QR Fetch Fallback
   async function triggerQrFetch(id: string) {
-    if (!gatewayUrl || !apiKey) return;
+    if (!gatewayUrl) return;
     try {
       const res = await getGatewayAccountQr(gatewayUrl, apiKey, id);
       if (res.data?.qr) {
@@ -231,75 +187,7 @@ export function WhatsAppPage({
     }
   }
 
-  // Chatbot settings & Auto replies handlers
-  async function handleSaveChatbotSettings(settings: ChatbotSettings) {
-    if (!gatewayUrl || !apiKey) return;
-    await withFeedback(async () => {
-      const res = await updateChatbotSettings(gatewayUrl, apiKey, settings);
-      setChatbotSettings((current) => ({ ...current, ...res.data }));
-      pushSuccess("Pengaturan akun bot WhatsApp berhasil disimpan");
-    }, "save-chatbot-settings");
-  }
-
-  async function handleAddAutoReplyRule(ruleForm: {
-    accountId: string;
-    keyword: string;
-    reply: string;
-    matchType: AutoReplyRule["match_type"];
-    priority: number;
-  }) {
-    if (!gatewayUrl || !apiKey) return;
-    await withFeedback(async () => {
-      await createAutoReplyRule(gatewayUrl, apiKey, ruleForm);
-      const res = await getAutoReplyRules(gatewayUrl, apiKey);
-      setAutoReplyRules(res.data);
-      pushSuccess("Rule auto-response berhasil ditambahkan");
-    }, "add-auto-reply");
-  }
-
-  async function handleToggleAutoReplyRule(rule: AutoReplyRule) {
-    if (!gatewayUrl || !apiKey) return;
-    await withFeedback(async () => {
-      await updateAutoReplyRule(gatewayUrl, apiKey, rule.id, { enabled: !rule.enabled });
-      const res = await getAutoReplyRules(gatewayUrl, apiKey);
-      setAutoReplyRules(res.data);
-    }, `toggle-auto-reply-${rule.id}`);
-  }
-
-  async function handleDeleteAutoReplyRule(id: string) {
-    if (!gatewayUrl || !apiKey) return;
-    askForConfirmation({
-      title: "Hapus auto-response?",
-      body: "Rule ini akan dihapus dan tidak akan membalas pesan masuk lagi.",
-      confirmLabel: "Hapus Rule",
-      tone: "danger",
-      onConfirm: async () => {
-        await withFeedback(async () => {
-          await deleteAutoReplyRule(gatewayUrl, apiKey, id);
-          setAutoReplyRules((current) => current.filter((rule) => rule.id !== id));
-          pushSuccess("Rule auto-response dihapus");
-        }, `delete-auto-reply-${id}`);
-      },
-    });
-  }
-
-  async function handleResetSession(phone: string) {
-    if (!gatewayUrl || !apiKey) return;
-    askForConfirmation({
-      title: "Reset sesi chatbot?",
-      body: `Sesi chatbot untuk ${phone} akan dikembalikan ke awal. Data form yang belum selesai bisa hilang.`,
-      confirmLabel: "Reset Sesi",
-      tone: "danger",
-      onConfirm: async () => {
-        await withFeedback(async () => {
-          await resetChatbotSession(gatewayUrl, apiKey, phone);
-          pushSuccess(`Sesi chatbot untuk ${phone} berhasil direset`);
-          const sessionsRes = await getChatbotSessions(gatewayUrl, apiKey);
-          setChatbotSessions(sessionsRes.data);
-        }, "reset-session");
-      },
-    });
-  }
+  
 
   // Encryption helper
   const canDecrypt = user.role === "admin" || user.role === "petugas";
@@ -325,7 +213,7 @@ export function WhatsAppPage({
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
           <div>
             <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <span>WhatsApp Gateway & Chatbot</span>
+              <span>WhatsApp Gateway</span>
               {socketConnected ? (
                 <span className="flex items-center gap-1 text-xs font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -411,17 +299,6 @@ export function WhatsAppPage({
             <ShieldAlert size={16} />
             Log Percakapan
           </button>
-          <button
-            onClick={() => setActiveTab("chatbot")}
-            className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "chatbot"
-                ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <Plus size={16} />
-            Form Chatbot ({contactForms.length})
-          </button>
         </div>
 
         {/* Tab content 1: Accounts list & Create account */}
@@ -465,24 +342,6 @@ export function WhatsAppPage({
             canDecrypt={canDecrypt}
             maskPhone={maskPhone}
             maskText={maskText}
-          />
-        )}
-
-        {/* Tab content 4: Chatbot sessions & Contact forms */}
-        {activeTab === "chatbot" && (
-          <ChatbotTab
-            accounts={accounts}
-            canDecrypt={canDecrypt}
-            chatbotSettings={chatbotSettings}
-            onSaveChatbotSettings={handleSaveChatbotSettings}
-            autoReplyRules={autoReplyRules}
-            onAddAutoReplyRule={handleAddAutoReplyRule}
-            onToggleAutoReplyRule={handleToggleAutoReplyRule}
-            onDeleteAutoReplyRule={handleDeleteAutoReplyRule}
-            chatbotSessions={chatbotSessions}
-            onResetSession={handleResetSession}
-            contactForms={contactForms}
-            maskPhone={maskPhone}
           />
         )}
       </article>
