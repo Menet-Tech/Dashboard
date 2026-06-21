@@ -31,7 +31,7 @@ jest.mock('whatsapp-web.js', () => ({
             on: jest.fn((event, cb) => {
                 handlers[event] = cb;
             }),
-            initialize: jest.fn(),
+            initialize: jest.fn().mockResolvedValue(undefined),
             destroy: jest.fn().mockResolvedValue(undefined),
         };
         mockClientInstances.push(instance);

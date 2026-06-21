@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,7 +54,11 @@ func (h MikrotikHandler) ListRouters(w http.ResponseWriter, r *http.Request) {
 
 			client := mikrotik.NewClient(rt.Host, rt.Username, rt.Password)
 			if err := client.TestConnection(ctx); err != nil {
-				res[idx].Status = "failed_auth"
+				if strings.Contains(err.Error(), "login rejected") {
+					res[idx].Status = "failed_auth"
+				} else {
+					res[idx].Status = "offline"
+				}
 			} else {
 				res[idx].Status = "online"
 			}
@@ -87,13 +92,43 @@ func (h MikrotikHandler) UpdateRouter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var payload mikrotik.Router
+	var payload map[string]any
 	if err := decodeJSON(r, &payload); err != nil {
 		WriteError(w, http.StatusBadRequest, "payload tidak valid")
 		return
 	}
 
-	router, err := h.RouterService.Update(r.Context(), id, payload)
+	// Fetch existing router values
+	router, err := h.RouterService.FindByID(r.Context(), id)
+	if err != nil {
+		WriteError(w, http.StatusNotFound, "Router tidak ditemukan")
+		return
+	}
+
+	// Merge provided fields
+	if val, ok := payload["name"].(string); ok {
+		router.Name = val
+	}
+	if val, ok := payload["host"].(string); ok {
+		router.Host = val
+	}
+	if val, ok := payload["username"].(string); ok {
+		router.Username = val
+	}
+	if val, ok := payload["role"].(string); ok {
+		router.Role = val
+	}
+	if val, ok := payload["is_active"].(bool); ok {
+		router.IsActive = val
+	}
+
+	updatePassword := false
+	if val, ok := payload["password"].(string); ok {
+		router.Password = val
+		updatePassword = true
+	}
+
+	router, err = h.RouterService.Update(r.Context(), id, router, updatePassword)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -151,8 +186,19 @@ func (h MikrotikHandler) ListIPPools(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch from the first active router
-	router := routers[0]
+	// Fetch from the active main router if available, otherwise first active
+	var router mikrotik.Router
+	foundMain := false
+	for _, rt := range routers {
+		if rt.Role == "main" {
+			router = rt
+			foundMain = true
+			break
+		}
+	}
+	if !foundMain {
+		router = routers[0]
+	}
 	client := mikrotik.NewClient(router.Host, router.Username, router.Password)
 	if err := client.Connect(r.Context()); err != nil {
 		WriteError(w, http.StatusBadGateway, fmt.Sprintf("gagal menghubungkan ke MikroTik: %v", err))
@@ -176,4 +222,18 @@ func (h MikrotikHandler) GetTrafficStats(w http.ResponseWriter, r *http.Request)
 	}
 	stats := h.Poller.GetAllStats()
 	WriteJSON(w, http.StatusOK, map[string]any{"data": stats})
+}
+
+func (h MikrotikHandler) SyncRouters(w http.ResponseWriter, r *http.Request) {
+	result, err := h.RouterService.SyncMainToSlaves(r.Context())
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"success": true,
+		"message": "Sinkronisasi router berhasil",
+		"data":    result,
+	})
 }

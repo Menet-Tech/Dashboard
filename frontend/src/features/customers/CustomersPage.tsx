@@ -26,6 +26,7 @@ export type CustomerFormState = {
   status: CustomerItem["status"];
   address: string;
   diskon: number;
+  tipe_diskon: "flat" | "percent";
   referred_by_id: number;
   referral_balance: number;
   odp_id: number;
@@ -44,6 +45,7 @@ export const defaultCustomerForm = (): CustomerFormState => ({
   status: "active",
   address: "",
   diskon: 0,
+  tipe_diskon: "flat",
   referred_by_id: 0,
   referral_balance: 0,
   odp_id: 0,
@@ -73,6 +75,8 @@ type CustomersPageProps = {
   onRefresh?: () => void;
   onDelete: (id: number) => void;
   onDeleteBulk: (ids: number[]) => void;
+  isFormOpen: boolean;
+  onSetFormOpen: (open: boolean) => void;
 };
 
 export function CustomersPage({
@@ -98,10 +102,11 @@ export function CustomersPage({
   onRefresh,
   onDelete,
   onDeleteBulk,
+  isFormOpen,
+  onSetFormOpen,
 }: CustomersPageProps) {
   const [selectedIds, setSelectedIds] = useState<Record<number, boolean>>({});
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [detailedCustomer, setDetailedCustomer] = useState<CustomerItem | null>(null);
 
   const [sortField, setSortField] = useState<string | null>("name");
@@ -197,9 +202,9 @@ export function CustomersPage({
   // Close form modal on successful save/update
   useEffect(() => {
     if (!submitting && Object.keys(customerErrors).length === 0 && !editingCustomerId) {
-      setIsFormOpen(false);
+      onSetFormOpen(false);
     }
-  }, [submitting, customerErrors, editingCustomerId]);
+  }, [submitting, customerErrors, editingCustomerId, onSetFormOpen]);
 
   const selectedCount = Object.values(selectedIds).filter(Boolean).length;
 
@@ -292,7 +297,7 @@ export function CustomersPage({
   };
 
   const handleCloseForm = () => {
-    setIsFormOpen(false);
+    onSetFormOpen(false);
     onCancelEdit();
   };
 
@@ -313,7 +318,7 @@ export function CustomersPage({
                 type="button"
                 onClick={() => {
                   onCancelEdit();
-                  setIsFormOpen(true);
+                  onSetFormOpen(true);
                 }}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
               >
@@ -416,28 +421,43 @@ export function CustomersPage({
                   colSpan={user?.role !== "viewer" ? 13 : 12}
                 />
               ) : (
-                sortedCustomers.map((customer) => (
-                  <tr key={customer.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
-                    {user?.role !== "viewer" && (
-                      <td className="px-4 py-4 text-center">
-                        <input
-                          type="checkbox"
-                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                          checked={!!selectedIds[customer.id]}
-                          onChange={(e) => handleToggleSelectOne(customer.id, e.target.checked)}
-                          aria-label={`Pilih ${customer.name}`}
-                        />
+                sortedCustomers.map((customer) => {
+                  const isMultiAccount = customer.whatsapp && customers.filter(c => {
+                    if (!c.whatsapp) return false;
+                    const p1 = c.whatsapp.trim().replace(/[+\-\s]/g, "").replace(/^0/, "62");
+                    const p2 = customer.whatsapp.trim().replace(/[+\-\s]/g, "").replace(/^0/, "62");
+                    return p1 === p2;
+                  }).length > 1;
+
+                  return (
+                    <tr key={customer.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
+                      {user?.role !== "viewer" && (
+                        <td className="px-4 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            checked={!!selectedIds[customer.id]}
+                            onChange={(e) => handleToggleSelectOne(customer.id, e.target.checked)}
+                            aria-label={`Pilih ${customer.name}`}
+                          />
+                        </td>
+                      )}
+                      <td className="px-4 py-4 font-semibold text-slate-900 dark:text-slate-100">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDetails(customer)}
+                            className="text-indigo-600 hover:text-indigo-700 hover:underline font-semibold text-left transition-colors"
+                          >
+                            {customer.name}
+                          </button>
+                          {isMultiAccount && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+                              Multi-Akun
+                            </span>
+                          )}
+                        </div>
                       </td>
-                    )}
-                    <td className="px-4 py-4 font-semibold text-slate-900 dark:text-slate-100">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenDetails(customer)}
-                        className="text-indigo-600 hover:text-indigo-700 hover:underline font-semibold text-left transition-colors"
-                      >
-                        {customer.name}
-                      </button>
-                    </td>
                     <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-medium">{customer.package_name ?? "-"}</td>
                     <td className="px-4 py-4 text-slate-600 dark:text-slate-400">Tgl {customer.due_day}</td>
                     <td className="px-4 py-4 text-gray-700">
@@ -453,7 +473,7 @@ export function CustomersPage({
                     </td>
                     <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-medium">{customer.odp_name || "-"}</td>
                     <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-semibold">
-                      {customer.diskon > 0 ? `Rp ${customer.diskon.toLocaleString("id-ID")}` : "-"}
+                      {customer.diskon > 0 ? (customer.tipe_diskon === "percent" ? `${customer.diskon}%` : `Rp ${customer.diskon.toLocaleString("id-ID")}`) : "-"}
                     </td>
                     <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-semibold">
                       {customer.referral_balance > 0 ? `Rp ${customer.referral_balance.toLocaleString("id-ID")}` : "-"}
@@ -474,7 +494,7 @@ export function CustomersPage({
                     <td className="px-4 py-4 text-slate-700 dark:text-slate-300">
                       {customer.whatsapp ? (
                         <a
-                          href={`https://wa.me/${customer.whatsapp}`}
+                          href={`https://wa.me/+${customer.whatsapp.replace(/[+\-\s]/g, "").replace(/^0/, "62")}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline font-mono text-xs font-semibold"
@@ -493,7 +513,7 @@ export function CustomersPage({
                             className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
                             onClick={() => {
                               onEdit(customer);
-                              setIsFormOpen(true);
+                              onSetFormOpen(true);
                             }}
                           >
                             Edit
@@ -509,8 +529,9 @@ export function CustomersPage({
                       )}
                     </td>
                   </tr>
-                ))
-              )}
+                );
+              })
+            )}
             </tbody>
           </table>
         </div>
@@ -571,6 +592,8 @@ export function CustomersPage({
       {detailedCustomer && (
         <CustomerDetailModal
           customer={detailedCustomer}
+          customers={customers}
+          onSelectCustomer={(cust) => setDetailedCustomer(cust)}
           onClose={() => setDetailedCustomer(null)}
           user={user}
           pushSuccess={pushSuccess}
@@ -625,8 +648,8 @@ export function CustomersPage({
             {bulkActionType === "status" && (
               <div className="flex flex-col gap-2.5">
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Pilih Status Baru</span>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["active", "limit", "inactive"] as const).map((st) => (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {(["active", "limit", "pending", "inactive"] as const).map((st) => (
                     <button
                       key={st}
                       type="button"
@@ -637,7 +660,13 @@ export function CustomersPage({
                           : "bg-white border-gray-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
                       }`}
                     >
-                      {st === "active" ? "Active (Aktif)" : st === "limit" ? "Limit (Isolir)" : "Inactive (Nonaktif)"}
+                      {st === "active"
+                        ? "Active (Aktif)"
+                        : st === "limit"
+                          ? "Limit (Isolir)"
+                          : st === "pending"
+                            ? "Pending (Perpanjangan)"
+                            : "Inactive (Nonaktif)"}
                     </button>
                   ))}
                 </div>

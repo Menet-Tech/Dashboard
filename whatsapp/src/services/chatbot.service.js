@@ -13,12 +13,12 @@
 
 const logger = require('../utils/logger');
 const { getSession, upsertSession, deleteSession, saveContactForm } = require('../utils/database');
-const { findCustomerByPhone, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket, getTemplateByTrigger, getSettings, getReferredCount, withdrawReferral, convertReferralToVoucher, getActiveTicket, replyToTicket, updateCustomerWifi, claimVoucher, toggleAutoApplyVoucher, getCustomerVouchers } = require('./isp.service');
+const { findCustomerByPhone, findCustomersByPhone, findCustomerByID, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket, getTemplateByTrigger, getAllTemplates, getSettings, getReferredCount, withdrawReferral, convertReferralToVoucher, getActiveTicket, replyToTicket, updateCustomerWifi, claimVoucher, toggleAutoApplyVoucher, getCustomerVouchers } = require('./isp.service');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /** Stripping @c.us dan normalize ke 62xxx */
-const normalizePhone = (rawFrom) => rawFrom.replace(/@c\.us$/, '').replace(/^0/, '62');
+const normalizePhone = (rawFrom) => rawFrom.replace(/@(c\.us|lid)$/, '').replace(/^0/, '62');
 
 /** Greeting berdasarkan jam WIB */
 const greeting = () => {
@@ -165,25 +165,75 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
 
     logger.debug(`[Chatbot] ${phone} state=${state} msg="${text}"`);
 
-    // Fetch dynamic chatbot triggers
-    const settings = await getSettings();
-    const triggerBilling = settings.chatbot_trigger_billing || '1';
-    const triggerRegister = settings.chatbot_trigger_register || '1';
-    const triggerSupport = settings.chatbot_trigger_support || '2';
-    const triggerPackages = settings.chatbot_trigger_packages || '3';
-    const triggerFAQ = settings.chatbot_trigger_faq || '4';
-    const triggerAdmin = settings.chatbot_trigger_admin || '5';
+    // Fetch dynamic chatbot templates & triggers from DB
+    const allTemplates = await getAllTemplates();
+
+    const findTriggerKeywords = (key, defaultVal) => {
+        const found = allTemplates.find(t => t.trigger_key === key && t.is_active);
+        return found ? (found.trigger_keywords || defaultVal) : defaultVal;
+    };
+
+    const triggerBilling = findTriggerKeywords('chatbot_trigger_billing', '1');
+    const triggerRegister = findTriggerKeywords('chatbot_trigger_register', '1');
+    const triggerSupport = findTriggerKeywords('chatbot_trigger_support', '2');
+    const triggerPackages = findTriggerKeywords('chatbot_trigger_packages', '3');
+    const triggerFAQ = findTriggerKeywords('chatbot_trigger_faq', '4');
+    const triggerAdmin = findTriggerKeywords('chatbot_trigger_admin', '5');
 
     const matchTrigger = (inputStr, triggerStr) => {
         if (!triggerStr) return false;
         return triggerStr.split(',').map(x => x.trim().toLowerCase()).includes(inputStr.trim().toLowerCase());
     };
 
+    const checkCustomTriggers = async () => {
+        const systemTriggers = [
+            'chatbot_trigger_billing',
+            'chatbot_trigger_register',
+            'chatbot_trigger_support',
+            'chatbot_trigger_packages',
+            'chatbot_trigger_faq',
+            'chatbot_trigger_admin',
+            'chatbot_menu_unreg',
+            'chatbot_menu_reg',
+            'chatbot_trial',
+            'chatbot_no_bill',
+            'chatbot_due_bill',
+            'chatbot_active_bill',
+            'alert_teknisi'
+        ];
+        const customChatbotTemplates = allTemplates.filter(t => 
+            t.is_active && 
+            t.trigger_key.startsWith('chatbot_') && 
+            !systemTriggers.includes(t.trigger_key) &&
+            t.trigger_keywords &&
+            t.trigger_keywords.trim() !== ''
+        );
+
+        for (const tpl of customChatbotTemplates) {
+            if (matchTrigger(text, tpl.trigger_keywords)) {
+                const customer = await findCustomerByPhone(rawFrom);
+                const replyText = renderTemplate(tpl.content || tpl.isi_template || '', {
+                    nama: customer ? customer.name : (contactName || 'Pelanggan'),
+                    alamat: customer ? customer.alamat : '',
+                    no_hp: rawFrom.replace(/@c\.us$/, ''),
+                });
+                await sendFn(accountId, rawFrom, replyText);
+                return true;
+            }
+        }
+        return false;
+    };
+
     // ── IDLE: cek apakah terdaftar ──────────────────────────────────────────
     if (state === 'IDLE') {
-        const customer = await findCustomerByPhone(rawFrom);
-        if (customer) {
-            upsertSession(rawFrom, accountId, 'REG_MENU', { customerId: customer.id, customerName: customer.name });
+        const customersList = await findCustomersByPhone(rawFrom);
+        if (customersList && customersList.length > 0) {
+            const customer = customersList[0];
+            upsertSession(rawFrom, accountId, 'REG_MENU', { 
+                customerId: customer.id, 
+                customerName: customer.name,
+                customers: customersList.map(c => ({ id: c.id, name: c.name, address: c.address || c.alamat }))
+            });
             const mRegText = await getMenuReg(customer.name, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
             await sendFn(accountId, rawFrom, mRegText);
         } else {
@@ -209,17 +259,38 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
         } else if (matchTrigger(text, triggerAdmin)) {
             await requestAdmin(rawFrom, accountId, contactName, sendFn);
         } else {
-            const mUnregText = await getMenuUnreg(triggerRegister, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
-            await sendFn(accountId, rawFrom, `Hm, aku kurang ngerti 😅\n\n${mUnregText}`);
+            const matchedCustom = await checkCustomTriggers();
+            if (!matchedCustom) {
+                const mUnregText = await getMenuUnreg(triggerRegister, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+                await sendFn(accountId, rawFrom, `Hm, aku kurang ngerti 😅\n\n${mUnregText}`);
+            }
         }
         return;
     }
 
     // ── REG_MENU ────────────────────────────────────────────────────────────
     if (state === 'REG_MENU') {
-        const { customerId, customerName } = formData;
+        const { customerId, customerName, customers } = formData;
         if (matchTrigger(text, triggerBilling)) {
-            await sendBillInfo(customerId, customerName, accountId, rawFrom, sendFn);
+            let customersList = customers;
+            if (!customersList) {
+                const list = await findCustomersByPhone(rawFrom);
+                customersList = list.map(c => ({ id: c.id, name: c.name, address: c.address || c.alamat }));
+            }
+            if (customersList && customersList.length > 1) {
+                upsertSession(rawFrom, accountId, 'REG_SELECT_BILL_CUSTOMER', { 
+                    ...formData, 
+                    customers: customersList 
+                });
+                let optionsMsg = `Halo, kami menemukan ${customersList.length} akun terdaftar dengan nomor ini. Silakan pilih akun yang ingin dicek tagihannya:\n\n`;
+                customersList.forEach((c, idx) => {
+                    optionsMsg += `${idx + 1}. ${c.name} - ${c.address}\n`;
+                });
+                optionsMsg += `\nSilakan ketik angka pilihan Anda (1-${customersList.length}):\n_(Ketik *menu* atau *0* untuk kembali menu utama)_`;
+                await sendFn(accountId, rawFrom, optionsMsg);
+            } else {
+                await sendBillInfo(customerId, customerName, accountId, rawFrom, sendFn);
+            }
         } else if (matchTrigger(text, triggerSupport)) {
             upsertSession(rawFrom, accountId, 'SUPPORT_FORM_0', { ...formData });
             await sendFn(accountId, rawFrom, `Halo ${customerName}, ${SUPPORT_STEPS[0].prompt.replace(/^🔧.*\n\n/, '')}`);
@@ -233,7 +304,7 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
             upsertSession(rawFrom, accountId, 'REG_REFERRAL_MENU', { ...formData });
             await sendReferralMenu(customerId, customerName, accountId, rawFrom, sendFn);
         } else if (matchTrigger(text, '7') || matchTrigger(text, 'wifi') || matchTrigger(text, 'ganti wifi')) {
-            const customer = await findCustomerByPhone(rawFrom);
+            const customer = await findCustomerByID(customerId);
             if (!customer || !customer.sn_ont || customer.sn_ont.trim() === "") {
                 await sendFn(accountId, rawFrom, "❌ Maaf, Serial Number ONT Anda belum dikonfigurasi di dashboard oleh admin. Fitur ubah WiFi mandiri tidak tersedia sementara.");
                 return;
@@ -241,16 +312,47 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
             upsertSession(rawFrom, accountId, 'REG_WIFI_FORM_SSID', { ...formData, snOnt: customer.sn_ont });
             await sendFn(accountId, rawFrom, "SSID dan Password apa yang ingin Anda gunakan?\n\nSilakan masukkan Nama WiFi (SSID) baru Anda:\n_(Ketik 'batal' untuk membatalkan)_");
         } else {
-            const mRegText = await getMenuReg(customerName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
-            await sendFn(accountId, rawFrom, `Hm, aku kurang ngerti 😅\n\n${mRegText}`);
+            const matchedCustom = await checkCustomTriggers();
+            if (!matchedCustom) {
+                const mRegText = await getMenuReg(customerName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+                await sendFn(accountId, rawFrom, `Hm, aku kurang ngerti 😅\n\n${mRegText}`);
+            }
         }
         return;
     }
  
+    // ── REG_SELECT_BILL_CUSTOMER ───────────────────────────────────────────
+    if (state === 'REG_SELECT_BILL_CUSTOMER') {
+        const { customers } = formData;
+        if (!customers || customers.length === 0) {
+            deleteSession(rawFrom);
+            return handleMessage(rawFrom, '', accountId, sendFn, contactName);
+        }
+
+        const selectedIndex = parseInt(text, 10) - 1;
+        if (Number.isInteger(selectedIndex) && selectedIndex >= 0 && selectedIndex < customers.length) {
+            const selectedCustomer = customers[selectedIndex];
+            upsertSession(rawFrom, accountId, 'REG_MENU', { 
+                ...formData, 
+                customerId: selectedCustomer.id, 
+                customerName: selectedCustomer.name 
+            });
+            await sendBillInfo(selectedCustomer.id, selectedCustomer.name, accountId, rawFrom, sendFn);
+        } else {
+            let optionsMsg = `Pilihan tidak valid. Silakan pilih nomor 1 sampai ${customers.length}:\n\n`;
+            customers.forEach((c, idx) => {
+                optionsMsg += `${idx + 1}. ${c.name} - ${c.address}\n`;
+            });
+            optionsMsg += `\nSilakan ketik angka pilihan Anda (1-${customers.length}):\n_(Ketik *menu* atau *0* untuk kembali ke menu utama)_`;
+            await sendFn(accountId, rawFrom, optionsMsg);
+        }
+        return;
+    }
+
     // ── REG_REFERRAL_MENU ───────────────────────────────────────────────────
     if (state === 'REG_REFERRAL_MENU') {
         const { customerId, customerName } = formData;
-        const customer = await findCustomerByPhone(rawFrom);
+        const customer = await findCustomerByID(customerId);
         if (!customer) {
             deleteSession(rawFrom);
             return handleMessage(rawFrom, '', accountId, sendFn, contactName);
@@ -389,7 +491,7 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
         } else {
             // Form selesai — simpan & konfirmasi
             upsertSession(rawFrom, accountId, 'UNREG_MENU', {});
-            saveContactForm('registration', rawFrom, accountId, updatedForm);
+            saveContactForm('registration', rawFrom, accountId, { ...updatedForm, source: 'whatsapp' });
 
             // Notif admin with detailed registration info
             const cleanPhone = rawFrom.replace(/@c\.us$/, '').replace(/^\+/, '');
@@ -513,7 +615,7 @@ Nomor WA: wa.me/+${linkNumber}`;
 
 /** Kirim info tagihan aktif */
 const sendBillInfo = async (customerId, customerName, accountId, to, sendFn) => {
-    const customer = await findCustomerByPhone(to);
+    const customer = await findCustomerByID(customerId);
     if (customer && customer.is_trial) {
         let remainingDays = customer.trial_days || 3;
         if (customer.trial_started_at) {
@@ -582,7 +684,7 @@ const sendBillInfo = async (customerId, customerName, accountId, to, sendFn) => 
 
 /** Kirim menu status & pencairan referral */
 const sendReferralMenu = async (customerId, customerName, accountId, to, sendFn) => {
-    const customer = await findCustomerByPhone(to);
+    const customer = await findCustomerByID(customerId);
     if (!customer) {
         await sendFn(accountId, to, 'Maaf, data pelanggan Anda tidak ditemukan.');
         return;

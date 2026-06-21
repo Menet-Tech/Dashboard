@@ -138,3 +138,18 @@ func TestMikrotikHandler_GetTrafficStats(t *testing.T) {
 		t.Error("expected non-nil data map in response")
 	}
 }
+
+func TestMikrotikHandler_SyncRouters_NoMain(t *testing.T) {
+	db := handlerTestDB(t)
+	routerSvc := mikrotik.NewRouterService(db)
+	poller := mikrotik.NewTrafficPoller(routerSvc)
+	h := handler.NewMikrotikHandler(routerSvc, poller)
+
+	req := httptest.NewRequest(http.MethodPost, "/routers/sync", nil)
+	w := httptest.NewRecorder()
+	h.SyncRouters(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400 when no main router, got %d. Body: %s", w.Code, w.Body.String())
+	}
+}

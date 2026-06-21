@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 type MapSettings struct {
@@ -404,6 +405,47 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 	}
 	defer tx.Rollback()
 
+	// Query existing ODPs from the database first
+	rows, err := tx.QueryContext(ctx, "SELECT id, nama FROM odp")
+	if err != nil {
+		return fmt.Errorf("query existing odps: %w", err)
+	}
+	dbOdps := make(map[string]int64)
+	for rows.Next() {
+		var id int64
+		var nama string
+		if err := rows.Scan(&id, &nama); err == nil {
+			dbOdps[nama] = id
+		}
+	}
+	rows.Close()
+
+	// Validate and delete ODPs that are no longer present on the map
+	for dbOdpName, dbOdpID := range dbOdps {
+		matched := false
+		expectedNodeID := fmt.Sprintf("odp-%d", dbOdpID)
+		for _, n := range nodes {
+			if n.Type == "odp" && (n.NodeID == expectedNodeID || n.Name == dbOdpName) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			var count int
+			err := tx.QueryRowContext(ctx, "SELECT COUNT(1) FROM pelanggan WHERE odp_id = ?", dbOdpID).Scan(&count)
+			if err != nil {
+				return fmt.Errorf("check customer count for ODP '%s': %w", dbOdpName, err)
+			}
+			if count > 0 {
+				return fmt.Errorf("ODP '%s' masih digunakan oleh pelanggan dan tidak dapat dihapus", dbOdpName)
+			}
+			_, err = tx.ExecContext(ctx, "DELETE FROM odp WHERE id = ?", dbOdpID)
+			if err != nil {
+				return fmt.Errorf("delete ODP '%s' from odp table: %w", dbOdpName, err)
+			}
+		}
+	}
+
 	// Clear tables
 	_, err = tx.ExecContext(ctx, "DELETE FROM mapping_edges")
 	if err != nil {
@@ -436,15 +478,46 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 			if n.Notes != nil {
 				desc = *n.Notes
 			}
-			_, err = tx.ExecContext(ctx, `
-				INSERT INTO odp (nama, lokasi, deskripsi, updated_at)
-				VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-				ON CONFLICT(nama) DO UPDATE SET
-					lokasi = ?,
-					deskripsi = ?,
-					updated_at = CURRENT_TIMESTAMP`,
-				n.Name, loc, desc, loc, desc,
-			)
+			ports := 8
+			if n.Capacity != nil && *n.Capacity > 0 {
+				ports = *n.Capacity
+			}
+
+			// Try to parse ID from NodeID (e.g. "odp-123")
+			var odpID int64
+			var hasOdpID bool
+			if strings.HasPrefix(n.NodeID, "odp-") {
+				if _, err := fmt.Sscanf(n.NodeID, "odp-%d", &odpID); err == nil {
+					hasOdpID = true
+				}
+			}
+
+			if hasOdpID {
+				_, err = tx.ExecContext(ctx, `
+					INSERT INTO odp (id, nama, lokasi, deskripsi, ports, updated_at)
+					VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+					ON CONFLICT(id) DO UPDATE SET
+						nama = ?,
+						lokasi = ?,
+						deskripsi = ?,
+						ports = ?,
+						updated_at = CURRENT_TIMESTAMP`,
+					odpID, n.Name, loc, desc, ports,
+					n.Name, loc, desc, ports,
+				)
+			} else {
+				_, err = tx.ExecContext(ctx, `
+					INSERT INTO odp (nama, lokasi, deskripsi, ports, updated_at)
+					VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+					ON CONFLICT(nama) DO UPDATE SET
+						lokasi = ?,
+						deskripsi = ?,
+						ports = ?,
+						updated_at = CURRENT_TIMESTAMP`,
+					n.Name, loc, desc, ports,
+					loc, desc, ports,
+				)
+			}
 			if err != nil {
 				return fmt.Errorf("sync odp node '%s' to odp table: %w", n.Name, err)
 			}
@@ -483,7 +556,7 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 	}
 
 	// 2. Query all ODPs from the database to map their Name to their ID
-	rows, err := tx.QueryContext(ctx, "SELECT id, nama FROM odp")
+	rows, err = tx.QueryContext(ctx, "SELECT id, nama FROM odp")
 	if err != nil {
 		return fmt.Errorf("query odp table: %w", err)
 	}

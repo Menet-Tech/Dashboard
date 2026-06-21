@@ -21,6 +21,7 @@ import (
 	"menettech/dashboard/backend/internal/config"
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/http/handler"
+	"menettech/dashboard/backend/internal/integration"
 	"menettech/dashboard/backend/internal/mikrotik"
 	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/odp"
@@ -33,7 +34,7 @@ import (
 	"menettech/dashboard/backend/internal/vouchers"
 )
 
-func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Service) http.Handler {
+func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Service, serviceMgr *integration.ServiceManager) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(traceIDHeader)
@@ -95,7 +96,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	}, cfg.AppName, cfg.StoragePath)
 	templateHandler := handler.NewTemplateHandler(templateService)
 	emailTemplateHandler := handler.NewEmailTemplateHandler(templateService)
-	settingsHandler := handler.NewSettingsHandler(settingsService)
+	settingsHandler := handler.NewSettingsHandler(settingsService, serviceMgr)
 	notificationHandler := handler.NewNotificationHandler(notifications.NotificationLogRepository{DB: db})
 	backupDir := filepath.Join(cfg.StoragePath, "backups")
 	backupHandler := &handler.BackupHandler{Service: backup.NewService(db, backupDir, cfg.SQLitePath)}
@@ -270,6 +271,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Delete("/email-templates/{id}", emailTemplateHandler.Delete)
 				admin.Get("/settings", settingsHandler.Get)
 				admin.Put("/settings", settingsHandler.Update)
+				admin.Delete("/settings/{key}", settingsHandler.Delete)
 				admin.Post("/backups", backupHandler.Create)
 				admin.Get("/backups", backupHandler.List)
 				admin.Post("/odps", odpHandler.Create)
@@ -293,6 +295,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Put("/mikrotik/routers/{id}", mikrotikHandler.UpdateRouter)
 				admin.Delete("/mikrotik/routers/{id}", mikrotikHandler.DeleteRouter)
 				admin.Post("/mikrotik/routers/{id}/test", mikrotikHandler.TestRouterConnection)
+				admin.Post("/mikrotik/routers/sync", mikrotikHandler.SyncRouters)
 				admin.Get("/mikrotik/ip-pools", mikrotikHandler.ListIPPools)
 				admin.Post("/integration/test-smtp", integrationHandler.TestSMTP)
 				admin.Put("/map-settings", gacsHandler.UpdateMapSettings)

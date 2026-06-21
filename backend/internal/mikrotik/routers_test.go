@@ -32,6 +32,7 @@ func TestRouterService_Create(t *testing.T) {
 		Username: "admin",
 		Password: "password123",
 		IsActive: true,
+		Role:     "main",
 	})
 	if err != nil {
 		t.Fatalf("failed to create router: %v", err)
@@ -47,7 +48,7 @@ func TestRouterService_Create(t *testing.T) {
 		t.Fatalf("failed to find router: %v", err)
 	}
 
-	if found.Name != "Router Test" || found.Host != "192.168.1.1:8728" || found.Username != "admin" || !found.IsActive {
+	if found.Name != "Router Test" || found.Host != "192.168.1.1:8728" || found.Username != "admin" || !found.IsActive || found.Role != "main" {
 		t.Errorf("retrieved router does not match expected fields: %+v", found)
 	}
 }
@@ -64,24 +65,26 @@ func TestRouterService_Update(t *testing.T) {
 		Username: "admin",
 		Password: "old",
 		IsActive: true,
+		Role:     "none",
 	})
 	if err != nil {
 		t.Fatalf("failed to create router: %v", err)
 	}
 
-	// Test updating fields including password
+	// Test updating fields including password and role
 	updated, err := svc.Update(ctx, router.ID, Router{
 		Name:     "Updated Router",
 		Host:     "10.0.0.2",
 		Username: "newadmin",
 		Password: "new",
 		IsActive: false,
-	})
+		Role:     "slave",
+	}, true)
 	if err != nil {
 		t.Fatalf("failed to update router: %v", err)
 	}
 
-	if updated.Name != "Updated Router" || updated.Host != "10.0.0.2" || updated.Username != "newadmin" || updated.IsActive {
+	if updated.Name != "Updated Router" || updated.Host != "10.0.0.2" || updated.Username != "newadmin" || updated.IsActive || updated.Role != "slave" {
 		t.Errorf("returned router does not match updated values: %+v", updated)
 	}
 
@@ -89,6 +92,9 @@ func TestRouterService_Update(t *testing.T) {
 	found, _ := svc.FindByID(ctx, router.ID)
 	if found.Password != "new" {
 		t.Errorf("expected updated password to be 'new', got %q", found.Password)
+	}
+	if found.Role != "slave" {
+		t.Errorf("expected updated role to be 'slave', got %q", found.Role)
 	}
 
 	// Test updating fields without password (password should remain 'new')
@@ -98,7 +104,8 @@ func TestRouterService_Update(t *testing.T) {
 		Username: "newadmin",
 		Password: "", // empty means do not update password
 		IsActive: true,
-	})
+		Role:     "main",
+	}, false)
 	if err != nil {
 		t.Fatalf("failed to update router: %v", err)
 	}
@@ -106,6 +113,9 @@ func TestRouterService_Update(t *testing.T) {
 	found2, _ := svc.FindByID(ctx, router.ID)
 	if found2.Password != "new" {
 		t.Errorf("password should have remained 'new', got %q", found2.Password)
+	}
+	if found2.Role != "main" {
+		t.Errorf("role should have been updated to 'main', got %q", found2.Role)
 	}
 }
 
@@ -185,6 +195,60 @@ func TestRouterService_Delete(t *testing.T) {
 	_, err = svc.FindByID(ctx, router.ID)
 	if err == nil || !strings.Contains(err.Error(), "router not found") {
 		t.Errorf("expected router not found error, got %v", err)
+	}
+}
+
+func TestRouterService_UpdateOnlineStatus(t *testing.T) {
+	db := testDB(t)
+	svc := NewRouterService(db)
+	ctx := context.Background()
+
+	router, err := svc.Create(ctx, Router{
+		Name:     "Test Router Online",
+		Host:     "10.0.0.10",
+		Username: "admin",
+		IsActive: true,
+		IsOnline: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should be offline initially
+	found, err := svc.FindByID(ctx, router.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found.IsOnline {
+		t.Error("expected IsOnline to be false initially")
+	}
+
+	// Update to online
+	err = svc.UpdateOnlineStatus(ctx, router.ID, true)
+	if err != nil {
+		t.Fatalf("failed to update online status: %v", err)
+	}
+
+	found, err = svc.FindByID(ctx, router.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found.IsOnline {
+		t.Error("expected IsOnline to be true after update")
+	}
+
+	// Update back to offline
+	err = svc.UpdateOnlineStatus(ctx, router.ID, false)
+	if err != nil {
+		t.Fatalf("failed to update online status: %v", err)
+	}
+
+	found, err = svc.FindByID(ctx, router.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found.IsOnline {
+		t.Error("expected IsOnline to be false after updating to false")
 	}
 }
 

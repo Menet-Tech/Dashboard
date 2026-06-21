@@ -34,17 +34,41 @@ let packagesCacheTime = 0;
  * @returns {object|null}    — data pelanggan atau null jika tidak terdaftar
  */
 const findCustomerByPhone = async (rawPhone) => {
-    const phone = rawPhone.replace(/@c\.us$/, '').replace(/^0/, '62');
+    const phone = rawPhone.replace(/@(c\.us|lid)$/, '').replace(/^0/, '62');
     try {
         const res = await client.get('/api/v1/customers', { params: { wa_number: phone, limit: 1 } });
         const data = res.data?.data;
         if (Array.isArray(data) && data.length > 0) return data[0];
         return null;
     } catch (err) {
-        logger.error(`[ISP] findCustomerByPhone failed for ${phone}:`, err.message);
+        logger.error(`[ISP] findCustomerByPhone failed for ${phone}: ${err.message}`);
         return null;
     }
 };
+
+const findCustomersByPhone = async (rawPhone) => {
+    const phone = rawPhone.replace(/@(c\.us|lid)$/, '').replace(/^0/, '62');
+    try {
+        const res = await client.get('/api/v1/customers', { params: { wa_number: phone } });
+        const data = res.data?.data;
+        if (Array.isArray(data)) return data;
+        return [];
+    } catch (err) {
+        logger.error(`[ISP] findCustomersByPhone failed for ${phone}: ${err.message}`);
+        return [];
+    }
+};
+
+const findCustomerByID = async (id) => {
+    try {
+        const res = await client.get(`/api/v1/customers/${id}`);
+        return res.data?.data ?? null;
+    } catch (err) {
+        logger.error(`[ISP] findCustomerByID failed for ${id}:`, err.message);
+        return null;
+    }
+};
+
 
 /**
  * Cek tagihan aktif (belum_bayar) pelanggan untuk bulan ini.
@@ -134,6 +158,23 @@ const createTicket = async (data) => {
         logger.error('[ISP] createTicket failed:', err.message);
         return null;
     }
+};
+
+const getAllTemplates = async () => {
+    const now = Date.now();
+    if (!templatesCache || (now - templatesCacheTime > 60000)) {
+        try {
+            const res = await client.get('/api/v1/templates');
+            templatesCache = res.data?.data ?? [];
+            templatesCacheTime = now;
+        } catch (err) {
+            logger.error(`[ISP] fetch templates failed:`, err.message);
+            if (!templatesCache) {
+                templatesCache = [];
+            }
+        }
+    }
+    return templatesCache;
 };
 
 const getTemplateByTrigger = async (triggerKey) => {
@@ -292,12 +333,15 @@ const getCustomerVouchers = async (customerId) => {
 
 module.exports = {
     findCustomerByPhone,
+    findCustomersByPhone,
+    findCustomerByID,
     getActiveBill,
     getPackageList,
     notifyAdminViaWA,
     notifyAdminViaDiscord,
     createTicket,
     getTemplateByTrigger,
+    getAllTemplates,
     getSettings,
     getReferredCount,
     withdrawReferral,

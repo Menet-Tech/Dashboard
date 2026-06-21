@@ -1,5 +1,5 @@
 const formatPhoneNumber = (to) => {
-    if (to.includes('@g.us') || to.includes('@c.us')) return to;
+    if (to.includes('@g.us') || to.includes('@c.us') || to.includes('@lid')) return to;
     // Hapus semua karakter non-digit
     const cleaned = to.replace(/\D/g, '');
     if (cleaned.startsWith('0')) {

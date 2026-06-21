@@ -119,11 +119,23 @@ func (s *Service) ApplyRestore(ctx context.Context) error {
 		return fmt.Errorf("restore failed but database recovered from backup: %w", err)
 	}
 
+	// CRITICAL: Remove WAL and SHM sidecar files from the old database.
+	// If these are left behind they are incompatible with the newly restored .db file
+	// and SQLite will report "database disk image is malformed" on the next open.
+	walPath := livePath + "-wal"
+	shmPath := livePath + "-shm"
+	_ = os.Remove(walPath)
+	_ = os.Remove(shmPath)
+
 	// Clean up the pre-restore backup after successful replace
 	_ = os.Remove(backupPath)
 
+	// Clean up staging
+	_ = os.Remove(stagingPath)
+
 	return nil
 }
+
 
 // CleanupStaging removes the staging database file if it exists.
 func (s *Service) CleanupStaging() error {

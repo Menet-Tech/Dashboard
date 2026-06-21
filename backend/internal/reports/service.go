@@ -45,7 +45,7 @@ func (s Service) MonthlyRevenue(ctx context.Context, limit int) ([]RevenueItem, 
 	}
 	defer rows.Close()
 
-	var items []RevenueItem
+	items := []RevenueItem{}
 	for rows.Next() {
 		var item RevenueItem
 		if err := rows.Scan(&item.Period, &item.TotalBilled, &item.TotalPaid); err != nil {
@@ -122,14 +122,14 @@ func (s Service) ExportCustomersCSV(ctx context.Context, w io.Writer) error {
 	writer := csv.NewWriter(w)
 	defer writer.Flush()
 
-	header := []string{"Nama", "Paket", "PPPoE User", "WhatsApp", "SN ONT", "Jatuh Tempo", "Status", "Alamat", "Referral Balance", "Diskon"}
+	header := []string{"Nama", "Paket", "PPPoE User", "WhatsApp", "SN ONT", "Jatuh Tempo", "Status", "Alamat", "Referral Balance", "Diskon", "Tipe Diskon"}
 	if err := writer.Write(header); err != nil {
 		return fmt.Errorf("write customers csv header: %w", err)
 	}
 
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT c.nama, p.nama, COALESCE(c.user_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
-		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.referral_balance, c.diskon
+		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.referral_balance, c.diskon, COALESCE(c.tipe_diskon, 'flat')
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		ORDER BY c.id DESC
@@ -140,9 +140,9 @@ func (s Service) ExportCustomersCSV(ctx context.Context, w io.Writer) error {
 	defer rows.Close()
 
 	for rows.Next() {
-		var name, packageName, pppoeUser, whatsapp, snOnt, status, address string
+		var name, packageName, pppoeUser, whatsapp, snOnt, status, address, tipeDiskon string
 		var dueDay, referralBalance, diskon int
-		if err := rows.Scan(&name, &packageName, &pppoeUser, &whatsapp, &snOnt, &dueDay, &status, &address, &referralBalance, &diskon); err != nil {
+		if err := rows.Scan(&name, &packageName, &pppoeUser, &whatsapp, &snOnt, &dueDay, &status, &address, &referralBalance, &diskon, &tipeDiskon); err != nil {
 			return fmt.Errorf("scan customer for csv: %w", err)
 		}
 		record := []string{
@@ -156,6 +156,7 @@ func (s Service) ExportCustomersCSV(ctx context.Context, w io.Writer) error {
 			address,
 			strconv.Itoa(referralBalance),
 			strconv.Itoa(diskon),
+			tipeDiskon,
 		}
 		if err := writer.Write(record); err != nil {
 			return fmt.Errorf("write customer record to csv: %w", err)

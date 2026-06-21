@@ -1,11 +1,21 @@
 const mockSessions = new Map();
 const mockSaveContactForm = jest.fn();
 const mockFindCustomerByPhone = jest.fn();
+const mockFindCustomersByPhone = jest.fn();
+const mockFindCustomerByID = jest.fn();
 const mockGetActiveBill = jest.fn();
 const mockGetPackageList = jest.fn();
 const mockNotifyAdminViaWA = jest.fn();
 const mockNotifyAdminViaDiscord = jest.fn();
 const mockCreateTicket = jest.fn();
+const mockGetAllTemplates = jest.fn().mockResolvedValue([
+    { trigger_key: 'chatbot_trigger_billing', trigger_keywords: '1', is_active: true },
+    { trigger_key: 'chatbot_trigger_register', trigger_keywords: '1', is_active: true },
+    { trigger_key: 'chatbot_trigger_support', trigger_keywords: '2', is_active: true },
+    { trigger_key: 'chatbot_trigger_packages', trigger_keywords: '3', is_active: true },
+    { trigger_key: 'chatbot_trigger_faq', trigger_keywords: '4', is_active: true },
+    { trigger_key: 'chatbot_trigger_admin', trigger_keywords: '5', is_active: true }
+]);
 
 jest.mock('../src/utils/database', () => ({
     getSession: jest.fn((phone) => mockSessions.get(phone) || null),
@@ -20,12 +30,15 @@ jest.mock('../src/utils/database', () => ({
 
 jest.mock('../src/services/isp.service', () => ({
     findCustomerByPhone: mockFindCustomerByPhone,
+    findCustomersByPhone: mockFindCustomersByPhone,
+    findCustomerByID: mockFindCustomerByID,
     getActiveBill: mockGetActiveBill,
     getPackageList: mockGetPackageList,
     notifyAdminViaWA: mockNotifyAdminViaWA,
     notifyAdminViaDiscord: mockNotifyAdminViaDiscord,
     createTicket: mockCreateTicket,
     getTemplateByTrigger: jest.fn().mockResolvedValue(null),
+    getAllTemplates: mockGetAllTemplates,
     getSettings: jest.fn().mockResolvedValue({
         chatbot_trigger_billing: '1',
         chatbot_trigger_register: '1',
@@ -47,10 +60,13 @@ describe('Chatbot ISP state machine', () => {
         jest.clearAllMocks();
         mockSessions.clear();
         sendFn = jest.fn().mockResolvedValue(undefined);
+        mockFindCustomersByPhone.mockResolvedValue([]);
+        mockFindCustomerByID.mockResolvedValue({ id: 5, name: 'Budi', is_trial: false });
     });
 
     it('IDLE pelanggan tidak terdaftar masuk menu unregistered', async () => {
         mockFindCustomerByPhone.mockResolvedValue(null);
+        mockFindCustomersByPhone.mockResolvedValue([]);
 
         await handleMessage(phone, 'halo', 'support', sendFn, 'Budi');
 
@@ -59,15 +75,22 @@ describe('Chatbot ISP state machine', () => {
     });
 
     it('IDLE pelanggan terdaftar masuk menu registered', async () => {
-        mockFindCustomerByPhone.mockResolvedValue({ id: 5, name: 'Budi', nama: 'Budi' });
+        const customer = { id: 5, name: 'Budi', nama: 'Budi' };
+        mockFindCustomerByPhone.mockResolvedValue(customer);
+        mockFindCustomersByPhone.mockResolvedValue([customer]);
 
         await handleMessage(phone, 'halo', 'billing', sendFn);
 
-        expect(database.upsertSession).toHaveBeenCalledWith(phone, 'billing', 'REG_MENU', { customerId: 5, customerName: 'Budi' });
+        expect(database.upsertSession).toHaveBeenCalledWith(phone, 'billing', 'REG_MENU', {
+            customerId: 5,
+            customerName: 'Budi',
+            customers: [{ id: 5, name: 'Budi', address: undefined }]
+        });
         expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('Budi'));
     });
 
     it('menu registered opsi tagihan menampilkan tagihan aktif', async () => {
+        mockFindCustomersByPhone.mockResolvedValue([{ id: 5, name: 'Budi', address: 'Jl. Mawar' }]);
         mockSessions.set(phone, {
             phone,
             account_id: 'billing',
@@ -77,7 +100,7 @@ describe('Chatbot ISP state machine', () => {
         mockGetActiveBill.mockResolvedValue({
             periode: '2026-06',
             nominal: 150000,
-            jatuh_tempo: '2026-06-20',
+            jatuh_tempo: '2026-06-30',
             invoice_number: 'INV-1',
         });
 
@@ -157,7 +180,7 @@ describe('Chatbot ISP state machine', () => {
     });
 
     it('menggunakan custom trigger dan custom menu template', async () => {
-        const { getSettings, getTemplateByTrigger } = require('../src/services/isp.service');
+        const { getSettings, getTemplateByTrigger, getAllTemplates } = require('../src/services/isp.service');
         getSettings.mockResolvedValue({
             chatbot_trigger_billing: 'tagihan, billing, cek',
             chatbot_trigger_register: 'daftar',
@@ -166,6 +189,14 @@ describe('Chatbot ISP state machine', () => {
             chatbot_trigger_faq: 'tanya',
             chatbot_trigger_admin: 'halo admin',
         });
+        getAllTemplates.mockResolvedValue([
+            { trigger_key: 'chatbot_trigger_billing', trigger_keywords: 'tagihan, billing, cek', is_active: true },
+            { trigger_key: 'chatbot_trigger_register', trigger_keywords: 'daftar', is_active: true },
+            { trigger_key: 'chatbot_trigger_support', trigger_keywords: 'lapor', is_active: true },
+            { trigger_key: 'chatbot_trigger_packages', trigger_keywords: 'paket', is_active: true },
+            { trigger_key: 'chatbot_trigger_faq', trigger_keywords: 'tanya', is_active: true },
+            { trigger_key: 'chatbot_trigger_admin', trigger_keywords: 'halo admin', is_active: true }
+        ]);
         getTemplateByTrigger.mockImplementation(async (triggerKey) => {
             if (triggerKey === 'chatbot_menu_reg') {
                 return {
@@ -177,6 +208,7 @@ describe('Chatbot ISP state machine', () => {
             return null;
         });
 
+        mockFindCustomersByPhone.mockResolvedValue([{ id: 5, name: 'Budi', address: 'Jl. Mawar' }]);
         mockSessions.set(phone, {
             phone,
             account_id: 'billing',
@@ -187,7 +219,7 @@ describe('Chatbot ISP state machine', () => {
         mockGetActiveBill.mockResolvedValue({
             periode: '2026-06',
             nominal: 150000,
-            jatuh_tempo: '2026-06-20',
+            jatuh_tempo: '2026-06-30',
             invoice_number: 'INV-1',
         });
 

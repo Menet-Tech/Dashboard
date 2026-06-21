@@ -227,14 +227,23 @@ func (s Service) RunOnce(ctx context.Context) error {
 		LimitDays:      limitDays,
 		TrialGraceDays: trialGraceDays,
 		SendWhatsApp: func(ctx context.Context, payload billing.AutomationMessage) error {
-			waErr := s.WhatsApp.SendTemplate(ctx, notifications.BillMessagePayload{
-				BillID:      payload.BillID,
-				TriggerKey:  payload.TriggerKey,
-				PhoneNumber: payload.PhoneNumber,
-				MessageData: payload.TemplateData,
-			})
-
-			s.Billing.QueueEmailForTrigger(ctx, payload.BillID, payload.TriggerKey, payload.TemplateData)
+			var waErr error
+			if payload.CustomBody != "" {
+				waErr = s.WhatsApp.QueueDirectMessage(ctx, "default", payload.PhoneNumber, payload.CustomBody)
+				if waErr == nil {
+					for _, bID := range payload.GroupBillIDs {
+						_ = s.WhatsApp.Logs.Record(ctx, bID, payload.TriggerKey, payload.PhoneNumber, "sent", "OK")
+					}
+				}
+			} else {
+				waErr = s.WhatsApp.SendTemplate(ctx, notifications.BillMessagePayload{
+					BillID:      payload.BillID,
+					TriggerKey:  payload.TriggerKey,
+					PhoneNumber: payload.PhoneNumber,
+					MessageData: payload.TemplateData,
+				})
+				s.Billing.QueueEmailForTrigger(ctx, payload.BillID, payload.TriggerKey, payload.TemplateData)
+			}
 			return waErr
 		},
 		SendDiscord: func(ctx context.Context, message string) error {
@@ -534,6 +543,25 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 			for _, r := range routers {
 				client := mikrotik.NewClient(r.Host, r.Username, r.Password)
 				if err := client.Connect(ctx); err == nil {
+					// Check offline -> online transition
+					if !r.IsOnline {
+						s.Logger.Info("Router transitioned from offline to online, running reconciliation", "router", r.Name, "host", r.Host)
+						if err := routerSvc.ReconcileSecrets(ctx, r); err != nil {
+							s.Logger.Error("failed to reconcile secrets on recovered router", "router", r.Name, "error", err)
+						} else {
+							s.Logger.Info("reconciliation of secrets completed successfully", "router", r.Name)
+							if r.Role == "main" {
+								s.Logger.Info("recovered router is main, syncing main to slaves", "router", r.Name)
+								if _, syncErr := routerSvc.SyncMainToSlaves(ctx); syncErr != nil {
+									s.Logger.Error("failed to sync main to slaves after recovery", "error", syncErr)
+								} else {
+									s.Logger.Info("sync main to slaves completed successfully")
+								}
+							}
+						}
+						_ = routerSvc.UpdateOnlineStatus(ctx, r.ID, true)
+					}
+
 					if activeList, err := client.ListActiveConnections(ctx); err == nil {
 						for _, act := range activeList {
 							activePPPMap[strings.ToLower(strings.TrimSpace(act.Name))] = act
@@ -542,6 +570,11 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 					client.Close()
 				} else {
 					s.Logger.Error("worker status pooling: failed to connect to router", "router", r.Name, "host", r.Host, "error", err)
+					// Check online -> offline transition
+					if r.IsOnline {
+						s.Logger.Warn("Router transitioned from online to offline", "router", r.Name, "host", r.Host, "error", err)
+						_ = routerSvc.UpdateOnlineStatus(ctx, r.ID, false)
+					}
 				}
 			}
 		}

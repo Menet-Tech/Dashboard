@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 
 	"menettech/dashboard/backend/internal/mikrotik"
@@ -159,6 +160,11 @@ func (s Service) syncPackageToMikrotik(ctx context.Context, pkg Package) (Packag
 		return pkg, nil // No active routers, skip sync
 	}
 
+	// Sort routers so that main router is first
+	sort.Slice(routers, func(i, j int) bool {
+		return routers[i].Role == "main" && routers[j].Role != "main"
+	})
+
 	// 1. If range is provided, create/update pool and calculate local address
 	if pkg.IPPoolRange != "" {
 		for _, r := range routers {
@@ -206,7 +212,19 @@ func (s Service) syncPackageToMikrotik(ctx context.Context, pkg Package) (Packag
 		if err := client.Connect(ctx); err != nil {
 			return pkg, fmt.Errorf("connect to router %s: %w", r.Name, err)
 		}
-		err = client.SyncPPPProfile(ctx, pkg.Name, pkg.LocalAddress, pkg.IPPool, rateLimit)
+
+		// Resolve the exact pool name case-sensitively from the router's pools
+		actualPoolName := pkg.IPPool
+		if pools, err := client.ListIPPools(ctx); err == nil {
+			for _, p := range pools {
+				if strings.EqualFold(p.Name, pkg.IPPool) {
+					actualPoolName = p.Name
+					break
+				}
+			}
+		}
+
+		err = client.SyncPPPProfile(ctx, pkg.Name, pkg.LocalAddress, actualPoolName, rateLimit)
 		client.Close()
 		if err != nil {
 			return pkg, fmt.Errorf("sync ppp profile on router %s: %w", r.Name, err)

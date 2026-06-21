@@ -593,8 +593,10 @@ func (c *Client) KickUser(ctx context.Context, username string) error {
 
 // PPPoEProfile represents a PPPoE profile from RouterOS /ppp/profile/print.
 type PPPoEProfile struct {
-	Name      string `json:"name"`
-	RateLimit string `json:"rate_limit"`
+	Name          string `json:"name"`
+	LocalAddress  string `json:"local_address"`
+	RemoteAddress string `json:"remote_address"`
+	RateLimit     string `json:"rate_limit"`
 }
 
 // ListProfiles retrieves all PPPoE profiles from RouterOS /ppp/profile/print.
@@ -628,6 +630,10 @@ func (c *Client) ListProfiles(ctx context.Context) ([]PPPoEProfile, error) {
 		for _, word := range sentence {
 			if strings.HasPrefix(word, "=name=") {
 				p.Name = strings.TrimPrefix(word, "=name=")
+			} else if strings.HasPrefix(word, "=local-address=") {
+				p.LocalAddress = strings.TrimPrefix(word, "=local-address=")
+			} else if strings.HasPrefix(word, "=remote-address=") {
+				p.RemoteAddress = strings.TrimPrefix(word, "=remote-address=")
 			} else if strings.HasPrefix(word, "=rate-limit=") {
 				p.RateLimit = strings.TrimPrefix(word, "=rate-limit=")
 			}

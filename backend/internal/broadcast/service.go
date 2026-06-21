@@ -78,7 +78,7 @@ func (s Service) SendBroadcast(ctx context.Context, targetType string, targetIDs
 		// Clean up phone number and queue if not empty
 		cleanPhone := strings.TrimSpace(phone)
 		if cleanPhone != "" {
-			if !strings.Contains(cleanPhone, "@c.us") {
+			if !strings.Contains(cleanPhone, "@") {
 				cleanPhone = cleanPhone + "@c.us"
 			}
 			err = s.WhatsApp.QueueDirectMessage(ctx, "default", cleanPhone, personalizedMsg)

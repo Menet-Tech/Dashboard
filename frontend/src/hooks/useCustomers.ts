@@ -22,6 +22,7 @@ export function useCustomers({ withFeedback, onSuccess }: Pick<HookDeps, "withFe
   const [customerErrors, setCustomerErrors] = useState<FieldErrors>({});
   const [customerLifecycleFilter, setCustomerLifecycleFilter] =
     useState<CustomerLifecycleFilter>(() => readCustomerLifecycleFilter() as CustomerLifecycleFilter);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   useEffect(() => {
     window.localStorage.setItem("customers.lifecycleFilter", customerLifecycleFilter);
@@ -48,6 +49,7 @@ export function useCustomers({ withFeedback, onSuccess }: Pick<HookDeps, "withFe
       setCustomerErrors({});
       setCustomerForm(defaultCustomerForm());
       setEditingCustomerId(null);
+      setIsFormOpen(false);
       await refreshCustomers();
     }, "save-customer");
   }
@@ -79,17 +81,19 @@ export function useCustomers({ withFeedback, onSuccess }: Pick<HookDeps, "withFe
 
 
   return {
-    state: { customers, customerForm, editingCustomerId, customerErrors, customerLifecycleFilter },
+    state: { customers, customerForm, editingCustomerId, customerErrors, customerLifecycleFilter, isFormOpen },
     handlers: {
       setCustomers,
       setCustomerForm,
       setEditingCustomerId,
+      setCustomerErrors,
       setCustomerLifecycleFilter,
       refreshCustomers,
       handleCustomerSubmit,
       handleStatusChange,
       handleCustomerDelete,
       handleBulkDelete,
+      setIsFormOpen,
     },
   };
 }

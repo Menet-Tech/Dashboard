@@ -24,6 +24,7 @@ import (
 	"menettech/dashboard/backend/internal/customers"
 	apphttp "menettech/dashboard/backend/internal/http/router"
 	"menettech/dashboard/backend/internal/importer"
+	"menettech/dashboard/backend/internal/integration"
 	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/platform/database"
 	"menettech/dashboard/backend/internal/platform/migrate"
@@ -97,9 +98,21 @@ func main() {
 }
 
 func runAPI(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Service) {
+	settingsService := settings.Service{Repository: settings.Repository{DB: db}}
+	serviceManager := integration.NewServiceManager(settingsService, logger, cfg.SQLitePath)
+
+	// Reconcile services on startup
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		if err := serviceManager.Reconcile(ctx); err != nil {
+			logger.Error("failed to reconcile services on startup", "error", err)
+		}
+	}()
+
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           apphttp.New(cfg, logger, db, authService),
+		Handler:           apphttp.New(cfg, logger, db, authService, serviceManager),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -115,6 +128,7 @@ func runAPI(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth
 	}()
 
 	waitForShutdown(logger, func(ctx context.Context) error {
+		serviceManager.StopAll()
 		return server.Shutdown(ctx)
 	})
 	logger.Info("api server stopped")

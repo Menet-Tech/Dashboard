@@ -167,9 +167,12 @@ export function CustomerFormCard({
         >
           <option value="active">Active</option>
           <option value="limit">Limit</option>
+          <option value="pending">Pending (Perpanjangan)</option>
           <option value="inactive">Inactive</option>
         </select>
       </label>
+      
+
 
       {/* ODP Node selector */}
       <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4">

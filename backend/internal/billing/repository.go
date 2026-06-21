@@ -205,6 +205,9 @@ func (r Repository) Generate(ctx context.Context, period string) (int, error) {
 		)
 
 		diskon := candidate.Diskon
+		if candidate.TipeDiskon == "percent" {
+			diskon = (candidate.PackagePrice * candidate.Diskon) / 100
+		}
 		if diskon < 0 {
 			diskon = 0
 		}
@@ -253,6 +256,10 @@ func (r Repository) Generate(ctx context.Context, period string) (int, error) {
 		}
 
 		finalAmount := afterDiskon - diskonReferral
+		isPending := candidate.CustomerStatus == "pending"
+		if isPending {
+			finalAmount = finalAmount * 2
+		}
 
 		result, err := tx.ExecContext(ctx, `
 			INSERT INTO tagihan (
@@ -269,6 +276,28 @@ func (r Repository) Generate(ctx context.Context, period string) (int, error) {
 		if err != nil {
 			_ = tx.Rollback()
 			return 0, fmt.Errorf("get generated bill ID: %w", err)
+		}
+
+		if isPending {
+			_, err = tx.ExecContext(ctx, `
+				UPDATE tagihan
+				SET status = 'lunas', payment_method = 'perpanjangan', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+				WHERE pelanggan_id = ? AND status = 'belum_bayar' AND id != ?
+			`, candidate.CustomerID, billID)
+			if err != nil {
+				_ = tx.Rollback()
+				return 0, fmt.Errorf("mark previous bills as perpanjangan: %w", err)
+			}
+
+			_, err = tx.ExecContext(ctx, `
+				UPDATE pelanggan
+				SET status = 'active', updated_at = CURRENT_TIMESTAMP
+				WHERE id = ?
+			`, candidate.CustomerID)
+			if err != nil {
+				_ = tx.Rollback()
+				return 0, fmt.Errorf("reset customer status to active: %w", err)
+			}
 		}
 
 		if hasVoucher {
@@ -364,6 +393,9 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 	)
 
 	diskon := candidate.Diskon
+	if candidate.TipeDiskon == "percent" {
+		diskon = (candidate.PackagePrice * candidate.Diskon) / 100
+	}
 	if diskon < 0 {
 		diskon = 0
 	}
@@ -412,6 +444,10 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 	}
 
 	finalAmount := afterDiskon - diskonReferral
+	isPending := candidate.CustomerStatus == "pending"
+	if isPending {
+		finalAmount = finalAmount * 2
+	}
 
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO tagihan (
@@ -428,6 +464,28 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 	if err != nil {
 		_ = tx.Rollback()
 		return Bill{}, false, fmt.Errorf("single generated bill id: %w", err)
+	}
+
+	if isPending {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE tagihan
+			SET status = 'lunas', payment_method = 'perpanjangan', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+			WHERE pelanggan_id = ? AND status = 'belum_bayar' AND id != ?
+		`, candidate.CustomerID, billID)
+		if err != nil {
+			_ = tx.Rollback()
+			return Bill{}, false, fmt.Errorf("mark previous bills as perpanjangan: %w", err)
+		}
+
+		_, err = tx.ExecContext(ctx, `
+			UPDATE pelanggan
+			SET status = 'active', updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, candidate.CustomerID)
+		if err != nil {
+			_ = tx.Rollback()
+			return Bill{}, false, fmt.Errorf("reset customer status to active: %w", err)
+		}
 	}
 
 	if hasVoucher {
@@ -616,7 +674,8 @@ func (r Repository) AutomationCandidates(ctx context.Context) ([]automationCandi
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT t.id, t.pelanggan_id, c.nama, COALESCE(c.nomor_wa, ''), t.paket_id, p.nama, p.kecepatan_mbps,
 		       t.periode, t.invoice_number, t.nominal, t.jatuh_tempo, t.status, t.paid_at,
-		       COALESCE(t.payment_method, ''), t.proof_path, c.status, COALESCE(c.trial_started_at, ''), COALESCE(c.trial_days, 0)
+		       COALESCE(t.payment_method, ''), t.proof_path, c.status, COALESCE(c.trial_started_at, ''), COALESCE(c.trial_days, 0),
+		       t.diskon, t.diskon_referral
 		FROM tagihan t
 		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
 		INNER JOIN paket p ON p.id = t.paket_id
@@ -653,6 +712,8 @@ func (r Repository) AutomationCandidates(ctx context.Context) ([]automationCandi
 			&item.CustomerStatus,
 			&trialStartedAt,
 			&item.TrialDays,
+			&item.Diskon,
+			&item.DiskonReferral,
 		); err != nil {
 			return nil, fmt.Errorf("scan automation candidate: %w", err)
 		}
@@ -686,10 +747,10 @@ func (r Repository) UpdateCustomerStatus(ctx context.Context, customerID int64, 
 func (r Repository) findCandidates(ctx context.Context, period string) ([]billCandidate, error) {
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo,
-		       c.diskon, c.voucher_discount
+		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.voucher_discount, c.status
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
-		WHERE c.status IN ('active', 'limit')
+		WHERE c.status IN ('active', 'limit', 'pending')
 		  AND COALESCE(c.is_trial, 0) = 0
 		  AND NOT EXISTS (
 			SELECT 1
@@ -717,7 +778,9 @@ func (r Repository) findCandidates(ctx context.Context, period string) ([]billCa
 			&item.PackagePrice,
 			&item.DueDay,
 			&item.Diskon,
+			&item.TipeDiskon,
 			&item.VoucherDiscount,
+			&item.CustomerStatus,
 		); err != nil {
 			return nil, fmt.Errorf("scan bill candidate: %w", err)
 		}
@@ -730,11 +793,11 @@ func (r Repository) findCandidates(ctx context.Context, period string) ([]billCa
 func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int64, period string) (billCandidate, bool, error) {
 	row := r.DB.QueryRowContext(ctx, `
 		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo,
-		       c.diskon, c.voucher_discount
+		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.voucher_discount, c.status
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		WHERE c.id = ?
-		  AND c.status IN ('active', 'limit')
+		  AND c.status IN ('active', 'limit', 'pending')
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM tagihan t
@@ -755,7 +818,9 @@ func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int
 		&item.PackagePrice,
 		&item.DueDay,
 		&item.Diskon,
+		&item.TipeDiskon,
 		&item.VoucherDiscount,
+		&item.CustomerStatus,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return billCandidate{}, false, nil
