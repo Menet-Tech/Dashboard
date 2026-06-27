@@ -13,7 +13,7 @@
 
 const logger = require('../utils/logger');
 const { getSession, upsertSession, deleteSession, saveContactForm } = require('../utils/database');
-const { findCustomerByPhone, findCustomersByPhone, findCustomerByID, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket, getTemplateByTrigger, getAllTemplates, getSettings, getReferredCount, withdrawReferral, convertReferralToVoucher, getActiveTicket, replyToTicket, updateCustomerWifi, claimVoucher, toggleAutoApplyVoucher, getCustomerVouchers } = require('./isp.service');
+const { findCustomerByPhone, findCustomersByPhone, findCustomerByID, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket, getTemplateByTrigger, getAllTemplates, getSettings, getReferredCount, withdrawReferral, convertReferralToVoucher, getActiveTicket, getTicket, replyToTicket, updateCustomerWifi, claimVoucher, toggleAutoApplyVoucher, getCustomerVouchers, saveChatbotFormToBackend, getPendingConfirmation, uploadProofBase64, createPaymentConfirmation } = require('./isp.service');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -77,30 +77,50 @@ const getMenuUnreg = async (triggerRegister, triggerSupport, triggerPackages, tr
     return defaultMenuUnreg(triggerRegister, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
 };
 
-const getMenuReg = async (nama, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin) => {
-    const tpl = await getTemplateByTrigger('chatbot_menu_reg');
-    let baseText = "";
-    if (tpl) {
-        baseText = renderTemplate(tpl.content || tpl.isi_template, {
-            greeting: greeting(),
-            nama,
-            trigger_billing: triggerBilling,
-            trigger_support: triggerSupport,
-            trigger_packages: triggerPackages,
-            trigger_faq: triggerFAQ,
-            trigger_admin: triggerAdmin
-        });
-    } else {
-        baseText = defaultMenuReg(nama, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+const hasUnpaidBills = async (phone) => {
+    try {
+        const customersList = await findCustomersByPhone(phone);
+        if (!customersList || customersList.length === 0) return false;
+        for (const cust of customersList) {
+            if (cust.is_trial) continue;
+            const bill = await getActiveBill(cust.id);
+            if (bill && bill.status === 'belum_bayar') {
+                const pendingConf = await getPendingConfirmation(bill.id);
+                if (!pendingConf) {
+                    return true;
+                }
+            }
+        }
+    } catch (err) {
+        logger.error('[Chatbot] failed to check unpaid bills for menu:', err.message);
     }
+    return false;
+};
 
-    if (!baseText.toLowerCase().includes('referral') && !baseText.toLowerCase().includes('reward') && !baseText.toLowerCase().includes('klaim')) {
-        baseText += `\nkirim 6 atau referral untuk cek & klaim reward referal`;
+const getMenuReg = async (nama, phone, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin) => {
+    const hasBills = await hasUnpaidBills(phone);
+    const greetingStr = greeting();
+    
+    let text = `hai, selamat ${greetingStr} ${nama}, apa ada yang bisa di bantu ?\n`;
+    text += `ketik 1 untuk cek tagihan anda\n`;
+    
+    if (hasBills) {
+        text += `ketik 2 konfirmasi pembayaran\n`;
+        text += `ketik 3 jika ada kendala mengenai wifi\n`;
+        text += `ketik 4 untuk melihat paket yang disediakan\n`;
+        text += `ketik 5 untuk melihat pertanyaan umum\n`;
+        text += `ketik 6 untuk chat ke admin\n`;
+        text += `ketik 7 untuk cek referral dan clain\n`;
+        text += `ketik 8 untuk ganti nama/password wifi`;
+    } else {
+        text += `ketik 2 jika ada kendala mengenai wifi\n`;
+        text += `ketik 3 untuk melihat paket yang disediakan\n`;
+        text += `ketik 4 untuk melihat pertanyaan umum\n`;
+        text += `ketik 5 untuk chat ke admin\n`;
+        text += `ketik 6 untuk cek referral dan clain\n`;
+        text += `ketik 7 untuk ganti nama/password wifi`;
     }
-    if (!baseText.toLowerCase().includes('ssid') && !baseText.toLowerCase().includes('password') && !baseText.toLowerCase().includes('wifi') && !baseText.includes('7')) {
-        baseText += `\nkirim 7 atau wifi untuk ganti nama/password wifi`;
-    }
-    return baseText;
+    return text;
 };
 
 const FAQ_TEXT = `halo, ini adalah pertanyaan yang paling umum di tanyakan,
@@ -123,7 +143,7 @@ const REG_STEPS = [
     { key: 'nama',       prompt: 'silahkan lengkapi form ini\nnama : ' },
     { key: 'no_hp',      prompt: 'no hp : ' },
     { key: 'alamat',     prompt: 'alamat : ' },
-    { key: 'paket',      prompt: 'paket yang diambil\nnama wifi (ssid) : ' }, // Combines nicely with prompt structure
+    { key: 'paket',      prompt: 'Silakan masukkan paket yang kamu pilih:' },
     { key: 'ssid',       prompt: 'nama wifi (ssid) : ' },
     { key: 'password',   prompt: 'password wifi : ' },
     { key: 'referral',   prompt: 'mengetahui kami dari siapa atau berikan kode referal : ' },
@@ -148,7 +168,7 @@ const SUPPORT_STEPS = [
  * @param {Function} sendFn      — async (accountId, to, text) => void
  * @param {string} contactName   — nama kontak dari WhatsApp (opsional)
  */
-const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '') => {
+const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '', rawMsg = null) => {
     const phone = normalizePhone(rawFrom);
     const text  = (body || '').trim();
     const lower = text.toLowerCase();
@@ -234,7 +254,7 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
                 customerName: customer.name,
                 customers: customersList.map(c => ({ id: c.id, name: c.name, address: c.address || c.alamat }))
             });
-            const mRegText = await getMenuReg(customer.name, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+            const mRegText = await getMenuReg(customer.name, rawFrom, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
             await sendFn(accountId, rawFrom, mRegText);
         } else {
             upsertSession(rawFrom, accountId, 'UNREG_MENU', {});
@@ -255,7 +275,9 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
         } else if (matchTrigger(text, triggerPackages)) {
             await sendPackageList(accountId, rawFrom, sendFn);
         } else if (matchTrigger(text, triggerFAQ)) {
-            await sendFn(accountId, rawFrom, FAQ_TEXT);
+            const faqTpl = await getTemplateByTrigger('chatbot_faq');
+            const faqText = faqTpl && faqTpl.is_active ? (faqTpl.content || faqTpl.isi_template) : FAQ_TEXT;
+            await sendFn(accountId, rawFrom, faqText);
         } else if (matchTrigger(text, triggerAdmin)) {
             await requestAdmin(rawFrom, accountId, contactName, sendFn);
         } else {
@@ -271,39 +293,51 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
     // ── REG_MENU ────────────────────────────────────────────────────────────
     if (state === 'REG_MENU') {
         const { customerId, customerName, customers } = formData;
-        if (matchTrigger(text, triggerBilling)) {
-            let customersList = customers;
-            if (!customersList) {
-                const list = await findCustomersByPhone(rawFrom);
-                customersList = list.map(c => ({ id: c.id, name: c.name, address: c.address || c.alamat }));
-            }
-            if (customersList && customersList.length > 1) {
-                upsertSession(rawFrom, accountId, 'REG_SELECT_BILL_CUSTOMER', { 
-                    ...formData, 
-                    customers: customersList 
-                });
-                let optionsMsg = `Halo, kami menemukan ${customersList.length} akun terdaftar dengan nomor ini. Silakan pilih akun yang ingin dicek tagihannya:\n\n`;
-                customersList.forEach((c, idx) => {
-                    optionsMsg += `${idx + 1}. ${c.name} - ${c.address}\n`;
-                });
-                optionsMsg += `\nSilakan ketik angka pilihan Anda (1-${customersList.length}):\n_(Ketik *menu* atau *0* untuk kembali menu utama)_`;
-                await sendFn(accountId, rawFrom, optionsMsg);
-            } else {
-                await sendBillInfo(customerId, customerName, accountId, rawFrom, sendFn);
-            }
-        } else if (matchTrigger(text, triggerSupport)) {
+        const hasBills = await hasUnpaidBills(rawFrom);
+
+        let optionCekTagihan = matchTrigger(text, triggerBilling) || matchTrigger(text, '1') || matchTrigger(text, 'cek tagihan');
+        let optionKonfirmasi = false;
+        let optionSupport = false;
+        let optionPackages = false;
+        let optionFAQ = false;
+        let optionAdmin = false;
+        let optionReferral = matchTrigger(text, 'referral') || matchTrigger(text, 'reward') || matchTrigger(text, 'mgm');
+        let optionWifi = matchTrigger(text, 'wifi') || matchTrigger(text, 'ganti wifi') || matchTrigger(text, 'ganti password');
+
+        if (hasBills) {
+            optionKonfirmasi = matchTrigger(text, '2') || matchTrigger(text, 'bayar') || matchTrigger(text, 'konfirmasi') || matchTrigger(text, 'konfirmasi pembayaran');
+            optionSupport = matchTrigger(text, '3') || matchTrigger(text, triggerSupport);
+            optionPackages = matchTrigger(text, '4') || matchTrigger(text, triggerPackages);
+            optionFAQ = matchTrigger(text, '5') || matchTrigger(text, triggerFAQ);
+            optionAdmin = matchTrigger(text, '6') || matchTrigger(text, triggerAdmin);
+            optionReferral = optionReferral || matchTrigger(text, '7');
+            optionWifi = optionWifi || matchTrigger(text, '8');
+        } else {
+            optionSupport = matchTrigger(text, '2') || matchTrigger(text, triggerSupport);
+            optionPackages = matchTrigger(text, '3') || matchTrigger(text, triggerPackages);
+            optionFAQ = matchTrigger(text, '4') || matchTrigger(text, triggerFAQ);
+            optionAdmin = matchTrigger(text, '5') || matchTrigger(text, triggerAdmin);
+            optionReferral = optionReferral || matchTrigger(text, '6');
+            optionWifi = optionWifi || matchTrigger(text, '7');
+        }
+
+        if (optionCekTagihan) {
+            await sendBillInfo(customerId, customerName, accountId, rawFrom, sendFn);
+        } else if (optionSupport) {
             upsertSession(rawFrom, accountId, 'SUPPORT_FORM_0', { ...formData });
             await sendFn(accountId, rawFrom, `Halo ${customerName}, ${SUPPORT_STEPS[0].prompt.replace(/^🔧.*\n\n/, '')}`);
-        } else if (matchTrigger(text, triggerPackages)) {
+        } else if (optionPackages) {
             await sendPackageList(accountId, rawFrom, sendFn);
-        } else if (matchTrigger(text, triggerFAQ)) {
-            await sendFn(accountId, rawFrom, FAQ_TEXT);
-        } else if (matchTrigger(text, triggerAdmin)) {
+        } else if (optionFAQ) {
+            const faqTpl = await getTemplateByTrigger('chatbot_faq');
+            const faqText = faqTpl && faqTpl.is_active ? (faqTpl.content || faqTpl.isi_template) : FAQ_TEXT;
+            await sendFn(accountId, rawFrom, faqText);
+        } else if (optionAdmin) {
             await requestAdmin(rawFrom, accountId, contactName || customerName, sendFn);
-        } else if (matchTrigger(text, '6') || matchTrigger(text, 'referral') || matchTrigger(text, 'reward') || matchTrigger(text, 'mgm')) {
+        } else if (optionReferral) {
             upsertSession(rawFrom, accountId, 'REG_REFERRAL_MENU', { ...formData });
             await sendReferralMenu(customerId, customerName, accountId, rawFrom, sendFn);
-        } else if (matchTrigger(text, '7') || matchTrigger(text, 'wifi') || matchTrigger(text, 'ganti wifi')) {
+        } else if (optionWifi) {
             const customer = await findCustomerByID(customerId);
             if (!customer || !customer.sn_ont || customer.sn_ont.trim() === "") {
                 await sendFn(accountId, rawFrom, "❌ Maaf, Serial Number ONT Anda belum dikonfigurasi di dashboard oleh admin. Fitur ubah WiFi mandiri tidak tersedia sementara.");
@@ -311,10 +345,56 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
             }
             upsertSession(rawFrom, accountId, 'REG_WIFI_FORM_SSID', { ...formData, snOnt: customer.sn_ont });
             await sendFn(accountId, rawFrom, "SSID dan Password apa yang ingin Anda gunakan?\n\nSilakan masukkan Nama WiFi (SSID) baru Anda:\n_(Ketik 'batal' untuk membatalkan)_");
+        } else if (optionKonfirmasi) {
+            const customersList = await findCustomersByPhone(rawFrom);
+            const unpaidBills = [];
+            for (const cust of customersList) {
+                if (cust.is_trial) continue;
+                const bill = await getActiveBill(cust.id);
+                if (bill && bill.status === 'belum_bayar') {
+                    const pendingConf = await getPendingConfirmation(bill.id);
+                    if (!pendingConf) {
+                        unpaidBills.push({ customer: cust, bill });
+                    }
+                }
+            }
+
+            if (unpaidBills.length > 0) {
+                upsertSession(rawFrom, accountId, 'WAITING_PAYMENT_METHOD', {
+                    ...formData,
+                    unpaidBills: unpaidBills.map(item => ({ billId: item.bill.id, customerId: item.customer.id }))
+                });
+                await sendFn(accountId, rawFrom, "Bayar pake apa ?\n1. Transfer\n2. Cash\n\nSilakan balas dengan angka 1 atau 2:\n_(Ketik 'batal' untuk membatalkan)_");
+            } else {
+                await sendFn(accountId, rawFrom, "Anda tidak memiliki tagihan aktif yang perlu dikonfirmasi saat ini.");
+            }
+            return;
+        } else if (matchTrigger(text, 'oke') || matchTrigger(text, 'siap') || matchTrigger(text, 'sudah') || matchTrigger(text, 'ya') || matchTrigger(text, 'ok') || matchTrigger(text, 'baik') || matchTrigger(text, 'sudah bayar') || matchTrigger(text, 'ya saya sudah bayar')) {
+            const customersList = await findCustomersByPhone(rawFrom);
+            const unpaidBills = [];
+            for (const cust of customersList) {
+                if (cust.is_trial) continue;
+                const bill = await getActiveBill(cust.id);
+                if (bill && bill.status === 'belum_bayar') {
+                    const pendingConf = await getPendingConfirmation(bill.id);
+                    if (!pendingConf) {
+                        unpaidBills.push({ customer: cust, bill });
+                    }
+                }
+            }
+
+            if (unpaidBills.length > 0) {
+                upsertSession(rawFrom, accountId, 'WAITING_PROOF', {
+                    ...formData,
+                    unpaidBills: unpaidBills.map(item => ({ billId: item.bill.id, customerId: item.customer.id }))
+                });
+                await sendFn(accountId, rawFrom, "Jangan lupa kirimkan bukti transfer ya! Atau jika Anda membayar dengan cash, silakan balas dengan *\"ya saya sudah bayar\"*.\n\n_(Ketik 'batal' untuk membatalkan)_");
+                return;
+            }
         } else {
             const matchedCustom = await checkCustomTriggers();
             if (!matchedCustom) {
-                const mRegText = await getMenuReg(customerName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+                const mRegText = await getMenuReg(customerName, rawFrom, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
                 await sendFn(accountId, rawFrom, `Hm, aku kurang ngerti 😅\n\n${mRegText}`);
             }
         }
@@ -482,16 +562,55 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '')
     // ── REG_FORM_N ──────────────────────────────────────────────────────────
     if (state.startsWith('REG_FORM_')) {
         const step = parseInt(state.replace('REG_FORM_', ''), 10);
-        const updatedForm = { ...formData, [REG_STEPS[step].key]: text };
+        
+        let valToSave = text;
+        if (REG_STEPS[step].key === 'paket') {
+            const num = parseInt(text.trim(), 10);
+            if (!isNaN(num)) {
+                try {
+                    const packages = await getPackageList();
+                    if (packages && num > 0 && num <= packages.length) {
+                        const selectedPkg = packages[num - 1];
+                        valToSave = selectedPkg.nama || selectedPkg.name;
+                    }
+                } catch (err) {
+                    logger.error('[Chatbot] failed to resolve package selection index:', err.message);
+                }
+            }
+        }
+        
+        const updatedForm = { ...formData, [REG_STEPS[step].key]: valToSave };
 
         if (step < REG_STEPS.length - 1) {
             // Lanjut ke step berikutnya
             upsertSession(rawFrom, accountId, `REG_FORM_${step + 1}`, updatedForm);
-            await sendFn(accountId, rawFrom, REG_STEPS[step + 1].prompt);
+            
+            // If next step is 'paket', fetch packages and build dynamic prompt
+            if (REG_STEPS[step + 1].key === 'paket') {
+                try {
+                    const packages = await getPackageList();
+                    if (packages && packages.length > 0) {
+                        let promptMsg = "Silakan masukkan paket yang kamu pilih:\n";
+                        packages.forEach((pkg, index) => {
+                            promptMsg += `${index + 1}. ${pkg.nama || pkg.name} - ${pkg.kecepatan_mbps || pkg.speed_mbps} Mbps (${formatRp(pkg.harga || pkg.price)})\n`;
+                        });
+                        promptMsg += "\nKamu cukup kirim nomor pilihan kamu (misal: 1, 2, atau 3) untuk memilih paket.";
+                        await sendFn(accountId, rawFrom, promptMsg);
+                    } else {
+                        await sendFn(accountId, rawFrom, REG_STEPS[step + 1].prompt);
+                    }
+                } catch (err) {
+                    logger.error('[Chatbot] failed to load packages for registration prompt:', err.message);
+                    await sendFn(accountId, rawFrom, REG_STEPS[step + 1].prompt);
+                }
+            } else {
+                await sendFn(accountId, rawFrom, REG_STEPS[step + 1].prompt);
+            }
         } else {
             // Form selesai — simpan & konfirmasi
             upsertSession(rawFrom, accountId, 'UNREG_MENU', {});
             saveContactForm('registration', rawFrom, accountId, { ...updatedForm, source: 'whatsapp' });
+            saveChatbotFormToBackend('registration', rawFrom, accountId, { ...updatedForm, source: 'whatsapp' }).catch(() => {});
 
             // Notif admin with detailed registration info
             const cleanPhone = rawFrom.replace(/@c\.us$/, '').replace(/^\+/, '');
@@ -528,6 +647,7 @@ Nomor WA: wa.me/+${linkNumber}`;
             // Form selesai
             const isRegistered = !!formData.customerId;
             saveContactForm('support', rawFrom, accountId, updatedForm);
+            saveChatbotFormToBackend('support', rawFrom, accountId, updatedForm).catch(() => {});
 
             // POST support ticket to Go backend
             const ticket = await createTicket({
@@ -567,15 +687,115 @@ Nomor WA: wa.me/+${linkNumber}`;
         return;
     }
 
+    // ── WAITING_PAYMENT_METHOD ───────────────────────────────────────────────
+    if (state === 'WAITING_PAYMENT_METHOD') {
+        const { unpaidBills } = formData;
+        if (!unpaidBills || unpaidBills.length === 0) {
+            deleteSession(rawFrom);
+            return handleMessage(rawFrom, '', accountId, sendFn, contactName, rawMsg);
+        }
+
+        const isBatal = lower === 'batal' || lower === 'cancel' || lower === '0' || lower === 'menu';
+        if (isBatal) {
+            upsertSession(rawFrom, accountId, 'REG_MENU', { ...formData });
+            const mRegText = await getMenuReg(formData.customerName || contactName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+            await sendFn(accountId, rawFrom, `❌ Konfirmasi pembayaran dibatalkan.\n\n${mRegText}`);
+            return;
+        }
+
+        if (text === '1' || lower.includes('transfer')) {
+            upsertSession(rawFrom, accountId, 'WAITING_PROOF', { ...formData });
+            await sendFn(accountId, rawFrom, "Silakan kirimkan foto bukti pembayaran / bukti transfer Anda:\n_(Ketik 'batal' untuk membatalkan)_");
+        } else if (text === '2' || lower.includes('cash')) {
+            try {
+                for (const item of unpaidBills) {
+                    await createPaymentConfirmation(item.billId, item.customerId, null, "Cash");
+                }
+                upsertSession(rawFrom, accountId, 'REG_MENU', { ...formData });
+                await sendFn(accountId, rawFrom, "baik, akan kami konfirmasi");
+            } catch (err) {
+                logger.error('[Chatbot] Failed to handle cash payment confirmation:', err.message);
+                await sendFn(accountId, rawFrom, `❌ Gagal mengirim konfirmasi: ${err.message}. Silakan coba lagi.`);
+            }
+        } else {
+            await sendFn(accountId, rawFrom, "Pilihan tidak valid. Silakan balas dengan angka 1 (Transfer) atau 2 (Cash):\n_(Ketik 'batal' untuk membatalkan)_");
+        }
+        return;
+    }
+
+    // ── WAITING_PROOF ────────────────────────────────────────────────────────
+    if (state === 'WAITING_PROOF') {
+        const { unpaidBills } = formData;
+        if (!unpaidBills || unpaidBills.length === 0) {
+            deleteSession(rawFrom);
+            return handleMessage(rawFrom, '', accountId, sendFn, contactName, rawMsg);
+        }
+
+        const isBatal = lower === 'batal' || lower === 'cancel' || lower === '0' || lower === 'menu';
+        if (isBatal) {
+            upsertSession(rawFrom, accountId, 'REG_MENU', { ...formData });
+            const mRegText = await getMenuReg(formData.customerName || contactName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+            await sendFn(accountId, rawFrom, `❌ Konfirmasi pembayaran dibatalkan.\n\n${mRegText}`);
+            return;
+        }
+
+        let hasMedia = rawMsg && (rawMsg.hasMedia || rawMsg.type === 'image');
+        let isCashText = lower.includes('ya saya sudah bayar') || lower.includes('saya sudah bayar') || lower.includes('sudah bayar');
+
+        if (hasMedia) {
+            await sendFn(accountId, rawFrom, "🔄 Sedang memproses dan mengunggah bukti transfer Anda. Mohon tunggu...");
+            try {
+                const media = await rawMsg.downloadMedia();
+                if (media && media.data) {
+                    const uploadRes = await uploadProofBase64(media.data, media.mimetype, media.filename || 'payment_proof.png');
+                    const proofPath = uploadRes.proof_path;
+                    
+                    for (const item of unpaidBills) {
+                        await createPaymentConfirmation(item.billId, item.customerId, proofPath, text || "Diunggah via chatbot WA");
+                    }
+
+                    upsertSession(rawFrom, accountId, 'REG_MENU', { ...formData });
+                    await sendFn(accountId, rawFrom, "✅ *Terima kasih!* Bukti transfer Anda telah diterima dan sedang dalam proses verifikasi (pending) oleh admin.\n\nKetik *menu* untuk kembali.");
+                } else {
+                    await sendFn(accountId, rawFrom, "❌ Gagal mengunduh gambar bukti transfer. Silakan kirim ulang bukti transfer Anda.");
+                }
+            } catch (err) {
+                logger.error('[Chatbot] Failed to handle payment proof upload:', err.message);
+                await sendFn(accountId, rawFrom, `❌ Gagal memproses bukti transfer: ${err.message}. Silakan coba lagi.`);
+            }
+            return;
+        } else if (isCashText) {
+            try {
+                for (const item of unpaidBills) {
+                    await createPaymentConfirmation(item.billId, item.customerId, null, text);
+                }
+
+                upsertSession(rawFrom, accountId, 'REG_MENU', { ...formData });
+                await sendFn(accountId, rawFrom, "✅ *Konfirmasi Dicatat:* Pembayaran Anda sedang dalam proses pengecekan oleh admin.\n\nKetik *menu* untuk kembali.");
+            } catch (err) {
+                logger.error('[Chatbot] Failed to handle cash payment confirmation:', err.message);
+                await sendFn(accountId, rawFrom, `❌ Gagal mengirim konfirmasi: ${err.message}. Silakan coba lagi.`);
+            }
+            return;
+        } else {
+            await sendFn(accountId, rawFrom, "Format tidak dikenal. Silakan kirim foto bukti transfer Anda, atau balas dengan *\"ya saya sudah bayar\"* jika membayar cash.\n_(Ketik 'batal' untuk membatalkan)_");
+            return;
+        }
+    }
+
     // ── WAITING_ADMIN ────────────────────────────────────────────────────────
     if (state === 'WAITING_ADMIN') {
         const { activeTicketId } = formData;
         if (activeTicketId) {
             try {
                 await replyToTicket(activeTicketId, 'customer', text);
-                await sendFn(accountId, rawFrom,
-                    `💬 *Laporan Terkirim:* "${text}"\nPesan Anda telah diteruskan ke teknisi.\n\n_(Ketik *menu* atau *0* untuk kembali ke menu utama)_`
-                );
+                const ticket = await getTicket(activeTicketId);
+                const hasAdminReplied = ticket && ticket.messages && ticket.messages.some(m => m.sender_type === 'admin');
+                if (!hasAdminReplied) {
+                    await sendFn(accountId, rawFrom,
+                        `💬 *Laporan Terkirim:* "${text}"\nPesan Anda telah diteruskan ke teknisi.\n\n_(Ketik *menu* atau *0* untuk kembali ke menu utama)_`
+                    );
+                }
             } catch (err) {
                 logger.error('[Chatbot] Failed to forward message to ticket:', err.message);
                 await sendFn(accountId, rawFrom,
@@ -588,9 +808,14 @@ Nomor WA: wa.me/+${linkNumber}`;
                 try {
                     await replyToTicket(activeTicket.id, 'customer', text);
                     upsertSession(rawFrom, accountId, 'WAITING_ADMIN', { ...formData, activeTicketId: activeTicket.id });
-                    await sendFn(accountId, rawFrom,
-                        `💬 *Laporan Terkirim:* "${text}"\nPesan Anda telah diteruskan ke teknisi.\n\n_(Ketik *menu* atau *0* untuk kembali ke menu utama)_`
-                    );
+                    
+                    const ticket = await getTicket(activeTicket.id);
+                    const hasAdminReplied = ticket && ticket.messages && ticket.messages.some(m => m.sender_type === 'admin');
+                    if (!hasAdminReplied) {
+                        await sendFn(accountId, rawFrom,
+                            `💬 *Laporan Terkirim:* "${text}"\nPesan Anda telah diteruskan ke teknisi.\n\n_(Ketik *menu* atau *0* untuk kembali ke menu utama)_`
+                        );
+                    }
                 } catch (err) {
                     logger.error('[Chatbot] Failed to forward message to active ticket:', err.message);
                     await sendFn(accountId, rawFrom,
@@ -615,70 +840,190 @@ Nomor WA: wa.me/+${linkNumber}`;
 
 /** Kirim info tagihan aktif */
 const sendBillInfo = async (customerId, customerName, accountId, to, sendFn) => {
-    const customer = await findCustomerByID(customerId);
-    if (customer && customer.is_trial) {
-        let remainingDays = customer.trial_days || 3;
-        if (customer.trial_started_at) {
-            const start = new Date(customer.trial_started_at);
-            const now = new Date();
-            const elapsedMs = now.getTime() - start.getTime();
-            const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
-            remainingDays = Math.max(0, customer.trial_days - elapsedDays);
+    const customersList = await findCustomersByPhone(to);
+    
+    // Sort by customer ID to determine primary customer
+    customersList.sort((a, b) => a.id - b.id);
+    
+    if (customersList.length <= 1) {
+        const customer = customersList[0] || await findCustomerByID(customerId);
+        if (!customer) {
+            await sendFn(accountId, to, "Maaf, data pelanggan Anda tidak ditemukan.");
+            return;
+        }
+        
+        if (customer.is_trial) {
+            let remainingDays = customer.trial_days || 3;
+            if (customer.trial_started_at) {
+                const start = new Date(customer.trial_started_at);
+                const now = new Date();
+                const elapsedMs = now.getTime() - start.getTime();
+                const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
+                remainingDays = Math.max(0, customer.trial_days - elapsedDays);
+            }
+
+            const tpl = await getTemplateByTrigger('chatbot_trial');
+            if (tpl) {
+                const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customer.name, hari_limit: remainingDays });
+                await sendFn(accountId, to, msg);
+            } else {
+                await sendFn(accountId, to, `halo ${customer.name} terimakaish telah mengugunakan menet, kamu sedang ada di dalam masa trial, tidak akan ada tagihan selama ${remainingDays} hari kedepan, terimakasih.`);
+            }
+            await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
+            return;
         }
 
-        const tpl = await getTemplateByTrigger('chatbot_trial');
-        if (tpl) {
-            const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customerName, hari_limit: remainingDays });
-            await sendFn(accountId, to, msg);
+        const bill = await getActiveBill(customer.id);
+        if (!bill) {
+            const now = new Date();
+            const periode = `${now.toLocaleString('id-ID', { month: 'long' })} ${now.getFullYear()}`;
+            const tpl = await getTemplateByTrigger('chatbot_no_bill');
+            if (tpl) {
+                const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customer.name, periode });
+                await sendFn(accountId, to, msg);
+            } else {
+                await sendFn(accountId, to,
+                    `halo ${customer.name}, kamu gak ada tagihan aktif di periode ${periode}, terimakasih telah menggunakan menet`
+                );
+            }
         } else {
-            await sendFn(accountId, to, `halo ${customerName} terimakaish telah mengugunakan menet, kamu sedang ada di dalam masa trial, tidak akan ada tagihan selama ${remainingDays} hari kedepan, terimakasih.`);
+            const pendingConf = await getPendingConfirmation(bill.id);
+            if (pendingConf) {
+                if (pendingConf.bukti_transfer) {
+                    await sendFn(accountId, to, `halo ${customer.name}, Pembayaran Anda sedang dalam proses verifikasi (pending).`);
+                } else {
+                    await sendFn(accountId, to, `halo ${customer.name}, Pembayaran sedang dalam proses pengecekan.`);
+                }
+            } else {
+                const isDue = new Date(bill.jatuh_tempo) < new Date();
+                if (isDue) {
+                    const tpl = await getTemplateByTrigger('chatbot_due_bill');
+                    if (tpl) {
+                        const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customer.name });
+                        await sendFn(accountId, to, msg);
+                    } else {
+                        await sendFn(accountId, to,
+                            `halo ${customer.name}, tagihan kamu sudah jatuh tempo, mohon segera di bayar, agar service tidak terganggu`
+                        );
+                    }
+                } else {
+                    const tpl = await getTemplateByTrigger('chatbot_active_bill');
+                    if (tpl) {
+                        const msg = renderTemplate(tpl.content || tpl.isi_template, {
+                            nama: customer.name,
+                            periode: bill.periode,
+                            nominal: formatRp(bill.nominal),
+                            jatuh_tempo: formatDate(bill.jatuh_tempo)
+                        });
+                        await sendFn(accountId, to, msg);
+                    } else {
+                        await sendFn(accountId, to,
+                            `halo ${customer.name}, kamu punya tagihan aktif untuk periode ${bill.periode} dengan nominal sebesar ${formatRp(bill.nominal)}, dan akan jatuh tempo pada ${formatDate(bill.jatuh_tempo)}.`
+                        );
+                    }
+                }
+            }
         }
         await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
         return;
     }
 
-    const bill = await getActiveBill(customerId);
-    if (!bill) {
-        const now = new Date();
-        const periode = `${now.toLocaleString('id-ID', { month: 'long' })} ${now.getFullYear()}`;
-        const tpl = await getTemplateByTrigger('chatbot_no_bill');
-        if (tpl) {
-            const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customerName, periode });
-            await sendFn(accountId, to, msg);
-        } else {
-            await sendFn(accountId, to,
-                `halo ${customerName}, kamu gak ada tagihan aktif di periode ${periode}, terimakasih telah menggunakan menet`
-            );
-        }
-    } else {
-        const isDue = new Date(bill.jatuh_tempo) < new Date();
-        if (isDue) {
-            const tpl = await getTemplateByTrigger('chatbot_due_bill');
-            if (tpl) {
-                const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customerName });
-                await sendFn(accountId, to, msg);
+    // MULTIPLE CUSTOMER ACCOUNTS FLOW
+    const primaryCustomer = customersList[0];
+    const unpaidBills = [];
+    const pendingBills = [];
+    for (const cust of customersList) {
+        if (cust.is_trial) continue;
+        const bill = await getActiveBill(cust.id);
+        if (bill && bill.status === 'belum_bayar') {
+            const pendingConf = await getPendingConfirmation(bill.id);
+            if (pendingConf) {
+                pendingBills.push({ customer: cust, bill, pendingConf });
             } else {
-                await sendFn(accountId, to,
-                    `halo ${customerName}, tagihan kamu sudah jatuh tempo, mohon segera di bayar, agar service tidak terganggu`
-                );
-            }
-        } else {
-            const tpl = await getTemplateByTrigger('chatbot_active_bill');
-            if (tpl) {
-                const msg = renderTemplate(tpl.content || tpl.isi_template, {
-                    nama: customerName,
-                    periode: bill.periode,
-                    nominal: formatRp(bill.nominal),
-                    jatuh_tempo: formatDate(bill.jatuh_tempo)
-                });
-                await sendFn(accountId, to, msg);
-            } else {
-                await sendFn(accountId, to,
-                    `halo ${customerName}, kamu punya tagihan aktif untuk periode ${bill.periode} dengan nominal sebesar ${formatRp(bill.nominal)}, dan akan jatuh tempo pada ${formatDate(bill.jatuh_tempo)}.`
-                );
+                unpaidBills.push({ customer: cust, bill });
             }
         }
     }
+
+    if (unpaidBills.length === 0 && pendingBills.length > 0) {
+        const hasProof = pendingBills.some(item => item.pendingConf.bukti_transfer);
+        if (hasProof) {
+            await sendFn(accountId, to, `Halo ${primaryCustomer.name}, Pembayaran Anda sedang dalam proses verifikasi (pending).`);
+        } else {
+            await sendFn(accountId, to, `Halo ${primaryCustomer.name}, Pembayaran sedang dalam proses pengecekan.`);
+        }
+        await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
+        return;
+    }
+
+    if (unpaidBills.length === 0 && pendingBills.length === 0) {
+        const now = new Date();
+        const periode = `${now.toLocaleString('id-ID', { month: 'long' })} ${now.getFullYear()}`;
+        await sendFn(accountId, to, `Halo ${primaryCustomer.name}, semua akun Anda tidak memiliki tagihan aktif di periode ${periode}. Terima kasih telah menggunakan Menet.`);
+        await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
+        return;
+    }
+
+    if (unpaidBills.length === 1) {
+        const { customer, bill } = unpaidBills[0];
+        const isDue = new Date(bill.jatuh_tempo) < new Date();
+        if (isDue) {
+            await sendFn(accountId, to, `halo ${customer.name}, tagihan kamu sudah jatuh tempo, mohon segera di bayar, agar service tidak terganggu`);
+        } else {
+            await sendFn(accountId, to, `halo ${customer.name}, kamu punya tagihan aktif untuk periode ${bill.periode} dengan nominal sebesar ${formatRp(bill.nominal)}, dan akan jatuh tempo pada ${formatDate(bill.jatuh_tempo)}.`);
+        }
+        await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
+        return;
+    }
+
+    // Two or more unpaid bills: generate combined bill message
+    let totalAmount = 0;
+    let totalDiscount = 0;
+    let detailBlock = "";
+    let period = unpaidBills[0].bill.periode;
+    let dueDate = unpaidBills[0].bill.jatuh_tempo;
+
+    for (const item of unpaidBills) {
+        const itemNominal = Number(item.bill.nominal);
+        const itemDiscount = Number(item.bill.diskon || 0) + Number(item.bill.diskon_referral || 0);
+        const originalPrice = itemNominal + itemDiscount;
+        totalAmount += itemNominal;
+        totalDiscount += itemDiscount;
+
+        detailBlock += `Nama : ${item.customer.name}\n> Paket: ${item.customer.package_name || item.bill.package_name || 'Internet'}\n> Harga: ${formatRp(originalPrice)}.\n`;
+        if (itemDiscount > 0) {
+            detailBlock += `> Diskon: ${formatRp(itemDiscount)}.\n`;
+        }
+        detailBlock += `\n`;
+    }
+
+    let combinedMsg = `Tagihan Anda periode ${period} sebesar ${formatRp(totalAmount)}., dengan detail berikut
+
+${detailBlock}Total Tagihan: ${formatRp(totalAmount)}.\n\n`;
+    combinedMsg += `Mohon lakukan pembayaran sebelum tanggal ${formatDate(dueDate)} agar terhindar dari Pembatasan Layanan.
+
+Rekening Pembayaran:
+Bank Mandiri
+1570006636691
+
+Shopeepay, gopay
+089621743796
+
+Seabank
+901096534584
+
+a.n. Irfan Dharmawan
+
+Untuk konfirmasi pembayaran & Pengaduan kendala dapat menghubungi kami melalui Pesan ini, atau Nomor di bawah ini.
+087782297657 - Menet CS
+08987700897 - Elam
+089621743796 - Ipong
+
+Atas perhatian dan kerja samanya, kami ucapkan terima kasih.
+Hormat kami,
+Tim Billing — MeNet Tech`;
+
+    await sendFn(accountId, to, combinedMsg);
     await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
 };
 
@@ -750,12 +1095,34 @@ const sendPackageList = async (accountId, to, sendFn) => {
 
 /** Teruskan ke admin via WA + Discord */
 const requestAdmin = async (rawFrom, accountId, contactName, sendFn) => {
-    upsertSession(rawFrom, accountId, 'WAITING_ADMIN', {});
-    await sendFn(accountId, rawFrom,
-        `baik, tunggu sebentar ya, kami akan menghubungin admin`
-    );
-    await notifyAdminViaWA({ phone: rawFrom, contactName, accountId }, sendFn);
-    await notifyAdminViaDiscord({ phone: rawFrom, contactName });
+    // Send alert to technicians
+    const alertMsg = `⚠️ *Alert Admin:* Pelanggan *${contactName}* (${rawFrom.replace(/@c\.us$/, '')}) meminta bantuan admin.`;
+    try {
+        await sendFn(accountId, '628987700897@c.us', alertMsg);
+    } catch (e) {
+        logger.error('Failed to notify Elam via WA:', e.message);
+    }
+    try {
+        await sendFn(accountId, '6289621743796@c.us', alertMsg);
+    } catch (e) {
+        logger.error('Failed to notify Ipong via WA:', e.message);
+    }
+
+    // Send alert to Discord
+    try {
+        const discordMsg = `<@923237802618007562> <@173778121059860480> **Alert Admin**: Pelanggan **${contactName}** (${rawFrom.replace(/@c\.us$/, '')}) meminta bantuan admin.`;
+        await notifyAdminViaDiscord({ phone: rawFrom, contactName }, discordMsg);
+    } catch (e) {
+        logger.error('Failed to notify Discord:', e.message);
+    }
+
+    // Reply to user
+    await sendFn(accountId, rawFrom, "baik, tunggu sebentar ya, kami akan menghubungin admin");
+    await sendFn(accountId, rawFrom, "baik kami akan menghubungi segera menghubungi admin, mohon di tunggu ya");
+
+    // Reset session and go back to menu
+    deleteSession(rawFrom);
+    return handleMessage(rawFrom, '', accountId, sendFn, contactName);
 };
 
 module.exports = { handleMessage };

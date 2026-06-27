@@ -36,9 +36,14 @@ type WiFiSecurityConfig struct {
 // GetVendors retrieves all enabled vendors from database.
 func GetVendors(ctx context.Context, db *sql.DB) ([]Vendor, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT id, name, manufacturer_patterns, product_patterns, parameter_prefix, 
-		       service_list_path, lan_binding_path, vlan_id_path, http_wan_enable_path, 
-		       firewall_level_path, priority, enabled, COALESCE(description, '')
+		SELECT id, name, manufacturer_patterns, product_patterns, 
+		       COALESCE(parameter_prefix, ''), 
+		       COALESCE(service_list_path, ''), 
+		       COALESCE(lan_binding_path, ''), 
+		       COALESCE(vlan_id_path, ''), 
+		       COALESCE(http_wan_enable_path, ''), 
+		       COALESCE(firewall_level_path, ''), 
+		       priority, enabled, COALESCE(description, '')
 		FROM vendors 
 		WHERE enabled = 1 
 		ORDER BY priority DESC, name ASC

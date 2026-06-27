@@ -79,8 +79,8 @@ export type BillItem = {
   invoice_number: string;
   amount: number;
   due_date: string;
-  status: "belum_bayar" | "lunas";
-  display_status: "belum_bayar" | "jatuh_tempo" | "menunggak" | "lunas";
+  status: "belum_bayar" | "lunas" | "pending_paid" | "pending_extension";
+  display_status: "belum_bayar" | "jatuh_tempo" | "menunggak" | "lunas" | "perpanjangan" | "pending_lunas" | "pending_perpanjangan";
   paid_at?: string;
   payment_method?: string;
   proof_path?: string;
@@ -108,6 +108,7 @@ export type NotificationLog = {
 };
 
 export type SettingsState = {
+  [key: string]: string | undefined;
   wa_gateway_url?: string;
   wa_account_id?: string;
   wa_billing_account_id?: string;
@@ -164,6 +165,19 @@ export type SettingsState = {
   smtp_encryption?: string;
   wa_gateway_enabled?: string;
   discord_bot_enabled?: string;
+  appName?: string;
+  portalApiKey?: string;
+  vpPppoeUsername?: string;
+  vpWanBridge?: string;
+  vpRxPower?: string;
+  vpTemperature?: string;
+  vpActiveDevices?: string;
+  vpSuperAdmin?: string;
+  vpSuperPassword?: string;
+  vpUserAdmin?: string;
+  vpUserPassword?: string;
+  rxPowerThresholds?: string;
+  autoRefreshIntervals?: string;
 };
 
 export type AuditLogItem = {
@@ -190,6 +204,19 @@ export type AgingReport = {
   over_60: number;
 };
 
+export type PaymentConfirmationItem = {
+  id: number;
+  tagihan_id: number;
+  pelanggan_id: number;
+  customer_name: string;
+  invoice_number: string;
+  amount: number;
+  bukti_transfer?: string;
+  status: string;
+  catatan: string;
+  created_at: string;
+};
+
 export type ViewKey =
   | "dashboard"
   | "packages"
@@ -209,6 +236,7 @@ export type ViewKey =
   | "odp"
   | "devices"
   | "network-map"
+  | "payment-confirmations"
   | "traffic";
 
 export type MapSettings = {
@@ -234,6 +262,7 @@ export type MapNode = {
   pppoe?: string;
   serialnumber?: string;
   notes?: string;
+  locked?: boolean;
   created_at?: string;
   updated_at?: string;
 };
@@ -266,6 +295,9 @@ export type OdpItem = {
   lokasi: string;
   deskripsi: string;
   ports: number;
+  splitter_ratio: string;
+  latitude: number;
+  longitude: number;
   customer_count: number;
 };
 

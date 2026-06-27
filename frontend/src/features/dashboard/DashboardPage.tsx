@@ -124,7 +124,7 @@ export function DashboardPage({
         <StatusPill label={`backup ${health?.services.backup ?? "unknown"}`} tone={backupTone} />
       </div>
 
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {pageLoading ? (
           <>
             <SkeletonCard />
@@ -140,15 +140,15 @@ export function DashboardPage({
           summaryCards.map((card) => (
             <article
               key={card.key}
-              className={`bg-white border-x border-b border-slate-200 ${card.color} border-t-4 rounded-2xl p-6 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between`}
+              className={`bg-white dark:bg-slate-900 border-x border-b border-slate-200 dark:border-slate-800 ${card.color} border-t-4 rounded-2xl p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between`}
             >
-              <span className="text-sm font-semibold text-slate-500 mb-2">{card.label}</span>
-              <strong className="text-2xl font-extrabold text-slate-900 tracking-tight">
+              <span className="text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider mb-2">{card.label}</span>
+              <strong className="text-xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">
                 {card.isCurrency
                   ? formatCurrency(summary?.[card.key] as number ?? 0)
                   : (summary?.[card.key] as number ?? 0)}
               </strong>
-              <p className="text-xs text-slate-400 mt-4 leading-relaxed">{card.note}</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-3 leading-normal">{card.note}</p>
             </article>
           ))
         )}
@@ -156,8 +156,8 @@ export function DashboardPage({
 
       {user?.role === "admin" && (
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-base font-semibold text-slate-800 mb-4">Pendapatan Bulanan</h3>
+          <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-4">Pendapatan Bulanan</h3>
             {safeRevenue.length > 0 ? (
               <div className="h-72">
                 <Line
@@ -212,13 +212,13 @@ export function DashboardPage({
                 />
               </div>
             ) : (
-              <div className="flex items-center justify-center h-72 border-2 border-dashed border-slate-100 rounded-xl">
+              <div className="flex items-center justify-center h-72 border-2 border-dashed border-slate-150 dark:border-slate-800 rounded-xl">
                 <p className="text-slate-400 text-sm">Belum ada data pendapatan.</p>
               </div>
             )}
           </article>
-          <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-base font-semibold text-slate-800 mb-4">Aging Piutang (Belum Bayar)</h3>
+          <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-4">Aging Piutang (Belum Bayar)</h3>
             {aging && (aging.current > 0 || aging.days_1_30 > 0 || aging.days_31_60 > 0 || aging.over_60 > 0) ? (
               <div className="max-w-xs mx-auto">
                 <Pie
@@ -244,7 +244,7 @@ export function DashboardPage({
                 />
               </div>
             ) : (
-              <div className="flex items-center justify-center h-48 border-2 border-dashed border-slate-100 rounded-xl">
+              <div className="flex items-center justify-center h-48 border-2 border-dashed border-slate-150 dark:border-slate-800 rounded-xl">
                 <p className="text-slate-400 text-sm">Tidak ada tunggakan berjalan.</p>
               </div>
             )}
@@ -253,38 +253,38 @@ export function DashboardPage({
       )}
 
       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow hover:shadow-md transition-shadow flex items-start gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+        <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow hover:shadow-md transition-shadow flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
           </div>
           <div className="flex-1">
-            <p className="text-xs font-bold tracking-wider text-indigo-500 uppercase mb-1">Aksi Cepat</p>
-            <h2 className="text-lg font-bold text-slate-900 mb-2">Operasional Hari Ini</h2>
-            <p className="text-sm text-slate-500 mb-4">Lihat kesehatan sistem, generate tagihan, dan pantau tunggakan.</p>
+            <p className="text-[10px] font-bold tracking-wider text-indigo-500 uppercase mb-1">Aksi Cepat</p>
+            <h2 className="text-base font-bold text-slate-850 dark:text-slate-150 mb-2">Operasional Hari Ini</h2>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">Lihat kesehatan sistem, generate tagihan, dan pantau tunggakan.</p>
             <div className="flex gap-2">
-              <button type="button" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors" onClick={() => onSwitchView("bills")}>
+              <button type="button" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors cursor-pointer" onClick={() => onSwitchView("bills")}>
                 Buka Tagihan
               </button>
-              <button type="button" className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-2 px-4 rounded-lg transition-colors" onClick={() => onSwitchView("monitoring")}>
+              <button type="button" className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-755 text-slate-700 dark:text-slate-300 text-xs font-bold py-2 px-4 rounded-lg transition-colors cursor-pointer" onClick={() => onSwitchView("monitoring")}>
                 Buka Monitoring
               </button>
             </div>
           </div>
         </article>
-        <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow hover:shadow-md transition-shadow flex items-start gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow hover:shadow-md transition-shadow flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
           </div>
           <div className="flex-1">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xs font-bold tracking-wider text-amber-600 uppercase">Scheduler</p>
+              <p className="text-[10px] font-bold tracking-wider text-amber-600 uppercase">Scheduler</p>
               <StatusPill
                 label={health?.scheduler.billing_last_error ? "attention" : "scheduled"}
                 tone={health?.scheduler.billing_last_error ? "gold" : "green"}
               />
             </div>
-            <h2 className="text-lg font-bold text-slate-900 mb-2">Run Berikutnya</h2>
-            <p className="text-sm text-slate-500">
+            <h2 className="text-base font-bold text-slate-850 dark:text-slate-150 mb-2">Run Berikutnya</h2>
+            <p className="text-xs text-slate-500 leading-relaxed">
               {health?.scheduler.billing_next_run
                 ? `Auto billing dijadwalkan pada ${formatDateTime(health.scheduler.billing_next_run)}.`
                 : "Jadwal billing otomatis belum tercatat."}
@@ -294,38 +294,38 @@ export function DashboardPage({
       </section>
 
       <section className="grid grid-cols-1">
-        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-slate-900">5 Pembayaran Terbaru</h2>
-            <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">Realisasi Kas</span>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">5 Pembayaran Terbaru</h2>
+            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full uppercase tracking-wider">Realisasi Kas</span>
           </div>
-          <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200 text-gray-550">
+          <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
+            <table className="w-full text-left border-collapse text-sm min-w-[600px]">
+              <thead className="bg-gray-50 dark:bg-slate-950 border-b border-gray-250 dark:border-slate-850 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">
                 <tr>
-                  <th className="px-6 py-4 font-medium">Tanggal</th>
-                  <th className="px-6 py-4 font-medium">Invoice</th>
-                  <th className="px-6 py-4 font-medium">Pelanggan</th>
-                  <th className="px-6 py-4 font-medium">Nominal</th>
-                  <th className="px-6 py-4 font-medium">Metode</th>
+                  <th className="px-6 py-4 font-semibold">Tanggal</th>
+                  <th className="px-6 py-4 font-semibold">Invoice</th>
+                  <th className="px-6 py-4 font-semibold">Pelanggan</th>
+                  <th className="px-6 py-4 font-semibold">Nominal</th>
+                  <th className="px-6 py-4 font-semibold">Metode</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                 {!summary?.pembayaran_terbaru || summary.pembayaran_terbaru.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400 dark:text-slate-500">
                       Belum ada riwayat pembayaran terbaru.
                     </td>
                   </tr>
                 ) : (
                   summary.pembayaran_terbaru.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-4 text-slate-500">{formatDateTime(p.paid_at)}</td>
-                      <td className="px-6 py-4 text-slate-900 font-semibold">{p.invoice_number}</td>
-                      <td className="px-6 py-4 text-slate-700">{p.customer_name}</td>
-                      <td className="px-6 py-4 text-emerald-600 font-bold">{formatCurrency(p.amount)}</td>
+                    <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition-colors">
+                      <td className="px-6 py-4 text-slate-500 text-xs">{formatDateTime(p.paid_at)}</td>
+                      <td className="px-6 py-4 text-slate-900 dark:text-slate-100 font-bold font-mono text-xs">{p.invoice_number}</td>
+                      <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">{p.customer_name}</td>
+                      <td className="px-6 py-4 text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency(p.amount)}</td>
                       <td className="px-6 py-4">
-                        <span className="uppercase tracking-wider text-[10px] font-extrabold bg-slate-100 text-slate-700 px-2 py-1 rounded-lg">
+                        <span className="uppercase tracking-wider text-[9px] font-extrabold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-350 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
                           {p.payment_method}
                         </span>
                       </td>
@@ -339,27 +339,27 @@ export function DashboardPage({
       </section>
 
       <section className="grid grid-cols-1">
-        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-slate-900">Service Snapshot</h2>
+        <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Service Snapshot</h2>
             <StatusPill label={health?.status ?? "checking"} tone={appTone} />
           </div>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div>
-              <dt>App Name</dt>
-              <dd>{health?.app.name ?? "-"}</dd>
+          <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-150 dark:border-slate-850">
+              <dt className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">App Name</dt>
+              <dd className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-1 font-mono">{health?.app.name ?? "-"}</dd>
             </div>
-            <div>
-              <dt>Environment</dt>
-              <dd>{health?.app.environment ?? "-"}</dd>
+            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-150 dark:border-slate-850">
+              <dt className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Environment</dt>
+              <dd className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-1 uppercase font-mono">{health?.app.environment ?? "-"}</dd>
             </div>
-            <div>
-              <dt>Last Health Check</dt>
-              <dd>{health?.timestamp ?? "-"}</dd>
+            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-150 dark:border-slate-850">
+              <dt className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Last Health Check</dt>
+              <dd className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-1 text-xs">{health?.timestamp ?? "-"}</dd>
             </div>
-            <div>
-              <dt>Worker Heartbeat</dt>
-              <dd>{formatDateTime(health?.worker.last_heartbeat)}</dd>
+            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-150 dark:border-slate-850">
+              <dt className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Worker Heartbeat</dt>
+              <dd className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-1 text-xs">{formatDateTime(health?.worker.last_heartbeat)}</dd>
             </div>
           </dl>
         </article>

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { fetchBills, generateBills, markBillPaid, uploadBillProof, fetchBillNotifications } from "../lib/api";
+import { fetchBills, generateBills, markBillPaid, uploadBillProof, fetchBillNotifications, grantBillExtension, cancelPendingBillAction } from "../lib/api";
 import { validateBillPeriod, type FieldErrors } from "../utils/validation";
 import { currentPeriod } from "../utils/format";
 import type { BillItem, NotificationLog } from "../types";
@@ -68,15 +68,14 @@ export function useBills({ withFeedback, askForConfirmation, onSuccess, onError 
   function handleMarkBillPaid(id: number) {
     askForConfirmation({
       title: "Tandai tagihan lunas",
-      body: "Apakah Anda yakin? Tindakan ini akan mencatat pembayaran, memicu notifikasi lunas, dan tidak dirancang untuk dibatalkan dari UI operator.",
+      body: "Apakah Anda yakin? Pembayaran akan diproses dalam waktu 10 menit, selama waktu tersebut Anda masih dapat membatalkannya.",
       confirmLabel: "Ya, tandai lunas",
       tone: "danger",
       onConfirm: async () => {
         await withFeedback(async () => {
           await markBillPaid(id, "transfer");
-          onSuccess("Tagihan berhasil ditandai lunas.");
+          onSuccess("Tandai lunas berhasil diproses. Anda memiliki waktu 10 menit untuk membatalkannya.");
           await refreshBills();
-          await handleToggleNotifications(id);
         }, "mark-paid");
       },
     });
@@ -127,8 +126,32 @@ export function useBills({ withFeedback, askForConfirmation, onSuccess, onError 
     void refreshBills({ page: val });
   };
 
+  async function handleGrantExtension(id: number) {
+    await withFeedback(async () => {
+      await grantBillExtension(id);
+      onSuccess("Perpanjangan berhasil diproses. Anda memiliki waktu 10 menit untuk membatalkannya.");
+      await refreshBills();
+    }, `extend-${id}`);
+  }
+
+  async function handleCancelPendingAction(id: number) {
+    askForConfirmation({
+      title: "Batalkan tindakan pending",
+      body: "Apakah Anda yakin ingin membatalkan tanda lunas atau perpanjangan yang tertunda ini? Tagihan akan kembali ke status belum bayar.",
+      confirmLabel: "Ya, batalkan",
+      tone: "danger",
+      onConfirm: async () => {
+        await withFeedback(async () => {
+          await cancelPendingBillAction(id);
+          onSuccess("Tindakan berhasil dibatalkan.");
+          await refreshBills();
+        }, `cancel-pending-${id}`);
+      },
+    });
+  }
+
   return {
     state: { bills, billPeriod, filterPeriod, billErrors, proofFiles, notificationLogs, expandedBillId, search, status, page, total, limit },
-    handlers: { setBills, setBillPeriod, setProofFiles, refreshBills, handleGenerateBills, handleMarkBillPaid, handleUploadProof, handleToggleNotifications, handleSearchChange, handleStatusChange, handlePageChange, handleFilterPeriodChange },
+    handlers: { setBills, setBillPeriod, setProofFiles, refreshBills, handleGenerateBills, handleMarkBillPaid, handleUploadProof, handleToggleNotifications, handleSearchChange, handleStatusChange, handlePageChange, handleFilterPeriodChange, handleGrantExtension, handleCancelPendingAction },
   };
 }

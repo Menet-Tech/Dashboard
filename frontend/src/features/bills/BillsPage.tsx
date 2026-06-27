@@ -2,11 +2,13 @@ import { Fragment, type FormEvent } from "react";
 import { formatCurrency } from "../../utils/format";
 import { displayStatusLabel, displayStatusTone } from "../../utils/status";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
-import { notifyBill } from "../../lib/api";
+import { notifyBill, grantBillExtension } from "../../lib/api";
+import type { ConfirmDialogState } from "../../hooks/types";
 import type { BillItem, User, NotificationLog } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
 
 type BillsPageProps = {
+
   user: User | null;
   bills: BillItem[];
   billPeriod: string;
@@ -36,6 +38,9 @@ type BillsPageProps = {
   pushSuccess: (msg: string) => void;
   pushError: (msg: string) => void;
   onShowCustomerDetails?: (customerId: number) => void;
+  onGrantExtension?: (id: number) => void;
+  onCancelPendingAction?: (id: number) => void;
+  askForConfirmation?: (config: ConfirmDialogState) => void;
 };
 
 export function BillsPage({
@@ -68,7 +73,11 @@ export function BillsPage({
   pushSuccess,
   pushError,
   onShowCustomerDetails,
+  onGrantExtension,
+  onCancelPendingAction,
+  askForConfirmation,
 }: BillsPageProps) {
+
   const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
 
   const handleSendManualWA = async (id: number, triggerKey: string) => {
@@ -248,7 +257,7 @@ export function BillsPage({
                             disabled={isBusy(`notify-${bill.id}`)}
                           >
                             <option value="" disabled>Kirim WA</option>
-                            <option value="reminder_custom">Reminder Custom</option>
+                            <option value="reminder-h5">Reminder H-5</option>
                             <option value="jatuh_tempo">Jatuh Tempo</option>
                             <option value="limit_5hari">Limit 5 Hari</option>
                             <option value="lunas">Lunas</option>
@@ -261,7 +270,7 @@ export function BillsPage({
                           >
                             Log WA
                           </button>
-                          {user?.role !== "viewer" && bill.status === "belum_bayar" ? (
+                          {user?.role !== "viewer" && bill.status === "belum_bayar" && bill.display_status !== "perpanjangan" ? (
                             <button
                               type="button"
                               className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
@@ -271,7 +280,44 @@ export function BillsPage({
                               {isBusy("mark-paid") ? "Memproses..." : "Tandai Lunas"}
                             </button>
                           ) : null}
-                          {user?.role !== "viewer" && (
+                          {user?.role !== "viewer" && bill.status === "belum_bayar" && bill.display_status !== "perpanjangan" && onGrantExtension ? (
+                            <button
+                              type="button"
+                              title="Perpanjangan: tagihan ini digabung ke bulan depan (nominal dikali 2)"
+                              className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                              onClick={() => {
+                                if (askForConfirmation) {
+                                  askForConfirmation({
+                                    title: "Konfirmasi Perpanjangan Tagihan",
+                                    body: `Apakah Anda yakin ingin memperpanjang tagihan ${bill.invoice_number}? Pelanggan akan dialihkan ke status 'pending' (perpanjangan) dan tagihan bulan depan digabung (nominal dikali 2).`,
+                                    confirmLabel: "Perpanjang",
+                                    tone: "danger",
+                                    onConfirm: async () => {
+                                      onGrantExtension(bill.id);
+                                    }
+                                  });
+                                } else {
+                                  if (confirm(`Perpanjang tagihan ${bill.invoice_number}? Pelanggan akan dialihkan ke status 'pending' dan tagihan bulan depan digabung.`)) {
+                                    onGrantExtension(bill.id);
+                                  }
+                                }
+                              }}
+
+                            >
+                              Perpanjang
+                            </button>
+                          ) : null}
+                          {user?.role !== "viewer" && (bill.status === "pending_paid" || bill.status === "pending_extension") && onCancelPendingAction ? (
+                            <button
+                              type="button"
+                              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50 animate-pulse"
+                              onClick={() => onCancelPendingAction(bill.id)}
+                              disabled={isBusy(`cancel-pending-${bill.id}`)}
+                            >
+                              {isBusy(`cancel-pending-${bill.id}`) ? "Membatalkan..." : "Batal"}
+                            </button>
+                          ) : null}
+                          {user?.role !== "viewer" && bill.status !== "lunas" && bill.display_status !== "perpanjangan" && (
                             <>
                               <input
                                 type="file"

@@ -18,6 +18,7 @@ import (
 	"menettech/dashboard/backend/internal/backup"
 	"menettech/dashboard/backend/internal/billing"
 	"menettech/dashboard/backend/internal/broadcast"
+	"menettech/dashboard/backend/internal/chatbot_forms"
 	"menettech/dashboard/backend/internal/config"
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/http/handler"
@@ -122,6 +123,10 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	}
 	broadcastHandler := handler.NewBroadcastHandler(broadcastService)
 
+	chatbotFormHandler := handler.NewChatbotFormHandler(chatbot_forms.Service{
+		Repository: chatbot_forms.Repository{DB: db},
+	})
+
 	voucherService := vouchers.Service{
 		Repository: vouchers.Repository{DB: db},
 	}
@@ -221,6 +226,12 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 			protected.Delete("/vendor-management/vendors/{id}", gacsHandler.DeleteVendor)
 			protected.Get("/vendor-management/sub-types/{id}", gacsHandler.GetSubTypes)
 			protected.Get("/vendor-management/parameters/{id}", gacsHandler.GetParameters)
+			
+			// WiFi Security Config CRUD
+			protected.Get("/vendor-management/wifi-security", gacsHandler.GetWifiSecurities)
+			protected.Post("/vendor-management/wifi-security", gacsHandler.CreateWifiSecurity)
+			protected.Put("/vendor-management/wifi-security/{id}", gacsHandler.UpdateWifiSecurity)
+			protected.Delete("/vendor-management/wifi-security/{id}", gacsHandler.DeleteWifiSecurity)
 			protected.Get("/vendor-management/wifi-security/{id}", gacsHandler.GetWifiSecurity)
 
 			// Tags
@@ -274,15 +285,11 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Delete("/settings/{key}", settingsHandler.Delete)
 				admin.Post("/backups", backupHandler.Create)
 				admin.Get("/backups", backupHandler.List)
-				admin.Post("/odps", odpHandler.Create)
-				admin.Put("/odps/{id}", odpHandler.Update)
-				admin.Delete("/odps/{id}", odpHandler.Delete)
 				admin.Post("/backups/{filename}/verify", backupHandler.Verify)
 				admin.Get("/backups/{filename}/download", backupHandler.Download)
 				admin.Post("/backups/{filename}/restore", backupHandler.SimulateRestore)
 				admin.Post("/backups/staging/apply", backupHandler.ApplyRestore)
 				admin.Get("/integration/check", integrationHandler.Check)
-				admin.Get("/integration/mikrotik/sync-preview", integrationHandler.SyncPreview)
 				admin.Post("/integration/mikrotik/sync-import", integrationHandler.SyncImport)
 				admin.Get("/integration/mikrotik/sync-packages-preview", integrationHandler.SyncPackagesPreview)
 				admin.Post("/integration/mikrotik/sync-packages-import", integrationHandler.SyncPackagesImport)
@@ -321,17 +328,34 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				staff.Post("/customers/{id}/ont-wifi", customerHandler.ONTWifiUpdate)
 				staff.Post("/customers/{id}/mikrotik-kick", customerHandler.MikrotikKick)
 				staff.Patch("/customers/{id}/status", customerHandler.UpdateStatus)
+				staff.Post("/customers/{id}/end-trial", customerHandler.EndTrial)
 				staff.Post("/customers/{id}/referral/withdraw", customerHandler.WithdrawReferral)
 				staff.Post("/customers/{id}/referral/convert-voucher", customerHandler.ConvertReferralToVoucher)
 				staff.Post("/customers/{id}/vouchers/claim", voucherHandler.Claim)
 				staff.Post("/customers/{id}/vouchers/toggle-auto-apply", voucherHandler.ToggleAutoApply)
 				staff.Post("/bills/generate", billHandler.Generate)
 				staff.Post("/bills/{id}/pay", billHandler.Pay)
+				staff.Post("/bills/{id}/extend", billHandler.Extend)
+				staff.Post("/bills/{id}/cancel-pending", billHandler.CancelPendingAction)
 				staff.Post("/bills/{id}/proof", billHandler.UploadProof)
 				staff.Post("/bills/{id}/notify", billHandler.Notify)
+				staff.Get("/bills/confirmations/pending", billHandler.ListPendingConfirmations)
+				staff.Post("/bills/confirmations/{id}/approve", billHandler.ApprovePaymentConfirmation)
+				staff.Post("/bills/confirmations/{id}/reject", billHandler.RejectPaymentConfirmation)
+				staff.Post("/chatbot/confirmations", billHandler.CreatePaymentConfirmation)
+				staff.Get("/bills/{id}/pending-confirmation", billHandler.GetPendingConfirmation)
+				staff.Post("/bills/confirmations/upload-base64", billHandler.UploadConfirmationProofBase64)
 				staff.Post("/tickets/{id}/messages", ticketHandler.AddMessage)
 				staff.Post("/tickets/{id}/close", ticketHandler.Close)
 				staff.Post("/broadcast", broadcastHandler.Send)
+				staff.Post("/chatbot/forms", chatbotFormHandler.Create)
+				staff.Patch("/chatbot/forms/{id}", chatbotFormHandler.UpdateStatus)
+				staff.Delete("/chatbot/forms/{id}", chatbotFormHandler.Delete)
+				// ODP (Optical Distribution Point) management
+				staff.Post("/odps", odpHandler.Create)
+				staff.Put("/odps/{id}", odpHandler.Update)
+				staff.Delete("/odps/{id}", odpHandler.Delete)
+				staff.Get("/integration/mikrotik/sync-preview", integrationHandler.SyncPreview)
 
 				// GenieACS Extended Endpoints (v1 session-auth variants)
 				staff.Get("/gacs/devices", gacsHandler.GetDevices)
@@ -372,6 +396,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				all.Get("/reports/aging", reportsHandler.Aging)
 				all.Get("/reports/bills/csv", reportsHandler.ExportBills)
 				all.Get("/reports/customers/csv", reportsHandler.ExportCustomers)
+				all.Get("/chatbot/forms", chatbotFormHandler.List)
 				all.Post("/tickets", ticketHandler.CreateInternal)
 				all.Get("/tickets", ticketHandler.List)
 				all.Get("/tickets/{id}", ticketHandler.FindByID)

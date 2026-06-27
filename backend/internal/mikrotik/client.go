@@ -11,10 +11,13 @@ import (
 
 // PPPoESecret represents a PPPoE secret entry from RouterOS /ppp/secret/print.
 type PPPoESecret struct {
-	Name     string
-	Password string
-	Profile  string
-	Disabled bool
+	Name                 string
+	Password             string
+	Profile              string
+	Disabled             bool
+	LastLoggedOut        string
+	LastCallerID         string
+	LastDisconnectReason string
 }
 
 // Client is a minimal RouterOS API client using the RouterOS API protocol (port 8728).
@@ -33,7 +36,7 @@ func NewClient(host, username, password string) *Client {
 		Host:     host,
 		Username: username,
 		Password: password,
-		Timeout:  10 * time.Second,
+		Timeout:  5 * time.Second,
 	}
 }
 
@@ -293,9 +296,10 @@ func hasError(sentences [][]string) error {
 }
 
 type PPPActive struct {
-	Name    string
-	Address string
-	Uptime  string
+	Name     string
+	Address  string
+	Uptime   string
+	CallerID string
 }
 
 // ListActiveConnections retrieves all active PPPoE connections from RouterOS /ppp/active/print.
@@ -333,6 +337,8 @@ func (c *Client) ListActiveConnections(ctx context.Context) ([]PPPActive, error)
 				a.Address = strings.TrimPrefix(word, "=address=")
 			} else if strings.HasPrefix(word, "=uptime=") {
 				a.Uptime = strings.TrimPrefix(word, "=uptime=")
+			} else if strings.HasPrefix(word, "=caller-id=") {
+				a.CallerID = strings.TrimPrefix(word, "=caller-id=")
 			}
 		}
 		if a.Name != "" {
@@ -381,6 +387,12 @@ func (c *Client) ListSecrets(ctx context.Context) ([]PPPoESecret, error) {
 				s.Profile = strings.TrimPrefix(word, "=profile=")
 			} else if strings.HasPrefix(word, "=disabled=") {
 				s.Disabled = strings.TrimPrefix(word, "=disabled=") == "true"
+			} else if strings.HasPrefix(word, "=last-logged-out=") {
+				s.LastLoggedOut = strings.TrimPrefix(word, "=last-logged-out=")
+			} else if strings.HasPrefix(word, "=last-caller-id=") {
+				s.LastCallerID = strings.TrimPrefix(word, "=last-caller-id=")
+			} else if strings.HasPrefix(word, "=last-disconnect-reason=") {
+				s.LastDisconnectReason = strings.TrimPrefix(word, "=last-disconnect-reason=")
 			}
 		}
 		if s.Name != "" {
@@ -813,5 +825,113 @@ func (c *Client) DeleteIPPool(ctx context.Context, name string) error {
 type TrafficStats struct {
 	TxRate int64 `json:"tx_rate"` // bps
 	RxRate int64 `json:"rx_rate"` // bps
+}
+
+// GetSecret retrieves a single PPPoE secret by username.
+func (c *Client) GetSecret(ctx context.Context, username string) (*PPPoESecret, error) {
+	if c.conn == nil {
+		return nil, fmt.Errorf("not connected to RouterOS")
+	}
+
+	reply, err := c.run(ctx,
+		"/ppp/secret/print",
+		"?name="+username,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find ppp secret %q: %w", username, err)
+	}
+	if err := hasError(reply); err != nil {
+		return nil, fmt.Errorf("find ppp secret error for %q: %w", username, err)
+	}
+
+	var s PPPoESecret
+	found := false
+	for _, sentence := range reply {
+		hasRe := false
+		for _, word := range sentence {
+			if word == "!re" {
+				hasRe = true
+				break
+			}
+		}
+		if !hasRe {
+			continue
+		}
+
+		found = true
+		for _, word := range sentence {
+			if strings.HasPrefix(word, "=name=") {
+				s.Name = strings.TrimPrefix(word, "=name=")
+			} else if strings.HasPrefix(word, "=password=") {
+				s.Password = strings.TrimPrefix(word, "=password=")
+			} else if strings.HasPrefix(word, "=profile=") {
+				s.Profile = strings.TrimPrefix(word, "=profile=")
+			} else if strings.HasPrefix(word, "=disabled=") {
+				s.Disabled = strings.TrimPrefix(word, "=disabled=") == "true"
+			} else if strings.HasPrefix(word, "=last-logged-out=") {
+				s.LastLoggedOut = strings.TrimPrefix(word, "=last-logged-out=")
+			} else if strings.HasPrefix(word, "=last-caller-id=") {
+				s.LastCallerID = strings.TrimPrefix(word, "=last-caller-id=")
+			} else if strings.HasPrefix(word, "=last-disconnect-reason=") {
+				s.LastDisconnectReason = strings.TrimPrefix(word, "=last-disconnect-reason=")
+			}
+		}
+	}
+
+	if !found {
+		return nil, nil // not found
+	}
+	return &s, nil
+}
+
+// GetActiveConnection retrieves active session info for a username.
+func (c *Client) GetActiveConnection(ctx context.Context, username string) (*PPPActive, error) {
+	if c.conn == nil {
+		return nil, fmt.Errorf("not connected to RouterOS")
+	}
+
+	reply, err := c.run(ctx,
+		"/ppp/active/print",
+		"?name="+username,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find active ppp %q: %w", username, err)
+	}
+	if err := hasError(reply); err != nil {
+		return nil, fmt.Errorf("find active ppp error for %q: %w", username, err)
+	}
+
+	var a PPPActive
+	found := false
+	for _, sentence := range reply {
+		hasRe := false
+		for _, word := range sentence {
+			if word == "!re" {
+				hasRe = true
+				break
+			}
+		}
+		if !hasRe {
+			continue
+		}
+
+		found = true
+		for _, word := range sentence {
+			if strings.HasPrefix(word, "=name=") {
+				a.Name = strings.TrimPrefix(word, "=name=")
+			} else if strings.HasPrefix(word, "=address=") {
+				a.Address = strings.TrimPrefix(word, "=address=")
+			} else if strings.HasPrefix(word, "=uptime=") {
+				a.Uptime = strings.TrimPrefix(word, "=uptime=")
+			} else if strings.HasPrefix(word, "=caller-id=") {
+				a.CallerID = strings.TrimPrefix(word, "=caller-id=")
+			}
+		}
+	}
+
+	if !found {
+		return nil, nil // not active
+	}
+	return &a, nil
 }
 

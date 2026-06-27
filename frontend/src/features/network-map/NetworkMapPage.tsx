@@ -23,6 +23,9 @@ import {
   Link,
   ChevronRight,
   Info,
+  AlertTriangle,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import {
   fetchNodes,
@@ -36,7 +39,7 @@ import {
   updateCustomer,
   type GacsDevice,
 } from "../../lib/api";
-import type { MapNode, MapEdge, MapSettings, CustomerItem } from "../../types";
+import type { MapNode, MapEdge, MapSettings, CustomerItem, OdpItem } from "../../types";
 
 const DEFAULT_MAP_CENTER: [number, number] = [-6.2088, 106.8456];
 const DEFAULT_MAP_ZOOM = 13;
@@ -134,6 +137,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   const [isNodeModalOpen, setIsNodeModalOpen] = useState(false);
   const [isEdgeModalOpen, setIsEdgeModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetPasswordInput, setResetPasswordInput] = useState("");
 
   // Form states
   const [editingNode, setEditingNode] = useState<MapNode | null>(null);
@@ -179,6 +184,18 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [selectedEdgeForWaypoints, setSelectedEdgeForWaypoints] = useState<MapEdge | null>(null);
 
+  // Existing ODPs state (for referencing in node modal)
+  const [existingOdps, setExistingOdps] = useState<OdpItem[]>([]);
+  const [linkedOdpId, setLinkedOdpId] = useState<number | null>(null);
+  const [nodeLocked, setNodeLocked] = useState(false);
+
+  // Confirm modal state (replaces window.confirm)
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
   useEffect(() => {
     localStorage.setItem("map-layer-preference", mapLayer);
   }, [mapLayer]);
@@ -213,7 +230,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [nodesRes, edgesRes, settingsRes, gacsRes, customersRes] = await Promise.all([
+      const [nodesRes, edgesRes, settingsRes, gacsRes, customersRes, odpsRes] = await Promise.all([
         fetchNodes(),
         fetchEdges(),
         fetchMapSettings(),
@@ -221,7 +238,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
           console.warn("GACS integration not configured or offline:", e);
           return { success: false, data: [] };
         }),
-        fetch("/api/v1/customers", { credentials: "include" }).then(r => r.json()).catch(() => ({ data: [] }))
+        fetch("/api/v1/customers", { credentials: "include" }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch("/api/v1/odps", { credentials: "include" }).then(r => r.json()).catch(() => ({ data: [] }))
       ]);
       // Normalize API responses: some endpoints return { data: [...] },
       // while others return the array directly. Ensure we always store arrays.
@@ -247,15 +265,52 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
       setMaxZoomOutInput(settingsData?.max_zoom_out || "5");
 
       // Set GACS devices
-      if (gacsRes && Array.isArray(gacsRes.data)) {
-        setGacsDevices(gacsRes.data);
-      } else if (gacsRes && typeof gacsRes === "object" && Array.isArray((gacsRes as any).data?.data)) {
-        setGacsDevices((gacsRes as any).data.data);
+      const rawGacs: any = gacsRes;
+      let rawGacsList: any[] = [];
+      if (Array.isArray(rawGacs)) {
+        rawGacsList = rawGacs;
+      } else if (rawGacs && typeof rawGacs === "object") {
+        if (Array.isArray(rawGacs.data)) {
+          rawGacsList = rawGacs.data;
+        } else if (rawGacs.data && Array.isArray(rawGacs.data.data)) {
+          rawGacsList = rawGacs.data.data;
+        }
       }
+
+      const mappedGacsDevices = rawGacsList.map((d: any) => {
+        if (d && typeof d === "object" && d._deviceId) {
+          return d as GacsDevice;
+        }
+        const manufacturer = d.productclass ? d.productclass.split("-")[0].split(" ")[0] : "CIOT";
+        const serial = d.SerialNumber || d._id?.split("-").pop() || "";
+        const oui = d._id?.split("-")[0] || "";
+        return {
+          _id: d._id || "",
+          _deviceId: {
+            _Manufacturer: manufacturer,
+            _ProductClass: d.productclass || "Unknown",
+            _SerialNumber: serial,
+            _OUI: oui,
+          },
+          _lastInform: d._lastInform,
+          _tag: d.tags || [],
+          _summary: {
+            ssid: d.ssid1 || undefined,
+            pppoe_username: d.pppoe || undefined,
+            rx_power: d.rxpower ? `${d.rxpower} dBm` : undefined,
+          }
+        } as GacsDevice;
+      });
+      setGacsDevices(mappedGacsDevices);
 
       // Set Customers
       if (customersRes && Array.isArray(customersRes.data)) {
         setCustomers(customersRes.data);
+      }
+
+      // Set existing ODPs
+      if (odpsRes && Array.isArray(odpsRes.data)) {
+        setExistingOdps(odpsRes.data);
       }
 
       setIsDirty(false);
@@ -346,6 +401,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     setManualCoords(false);
     setSelectedCustomerId(null);
 
+    setLinkedOdpId(null);
+    setNodeLocked(false);
     setIsNodeModalOpen(true);
   }, [activeTool]);
 
@@ -363,17 +420,47 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         // Auto prefill edge details
         setEditingEdge(null);
         setEdgeIdInput(`LINE-${Date.now().toString().slice(-6)}`);
-        setEdgeSourceInput(firstNodeForEdge.node_id);
-        setEdgeTargetInput(node.node_id);
-        setEdgeFiberTypeInput(
-          firstNodeForEdge.type === "server" ? "feeder" : "distribution"
-        );
+        
+        // Define ranking
+        const typeRank: Record<string, number> = {
+          server: 0,
+          odc: 1,
+          odp: 2,
+          ont: 3,
+        };
+        const rankA = typeRank[firstNodeForEdge.type] ?? 99;
+        const rankB = typeRank[node.type] ?? 99;
+        
+        let sourceNode = firstNodeForEdge;
+        let targetNode = node;
+        if (rankA > rankB) {
+          sourceNode = node;
+          targetNode = firstNodeForEdge;
+        }
+
+        setEdgeSourceInput(sourceNode.node_id);
+        setEdgeTargetInput(targetNode.node_id);
+
+        let defaultFiberType = "distribution";
+        if (sourceNode.type === "server") {
+          defaultFiberType = "feeder";
+        } else if (sourceNode.type === "odp" && targetNode.type === "ont") {
+          defaultFiberType = "drop";
+        } else if (sourceNode.type === "odc" && targetNode.type === "odp") {
+          defaultFiberType = "distribution";
+        } else if (sourceNode.type === "odp" && targetNode.type === "odp") {
+          defaultFiberType = "odp_to_odp";
+        } else if (sourceNode.type === "odc" && targetNode.type === "odc") {
+          defaultFiberType = "odc_to_odc";
+        }
+        setEdgeFiberTypeInput(defaultFiberType);
+
         // Compute distance automatically
         const dist = calculateDistance(
-          parseLatitude(firstNodeForEdge.latitude),
-          parseLongitude(firstNodeForEdge.longitude),
-          parseLatitude(node.latitude),
-          parseLongitude(node.longitude)
+          parseLatitude(sourceNode.latitude),
+          parseLongitude(sourceNode.longitude),
+          parseLatitude(targetNode.latitude),
+          parseLongitude(targetNode.longitude)
         );
         setEdgeDistanceInput(String(dist));
         setEdgeNotesInput("");
@@ -396,8 +483,11 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     }
   }, [pushError]);
 
-  // Node marker dragged
+  // Node marker dragged — locked nodes skip drag
   const handleNodeDragEnd = (nodeId: string, event: L.DragEndEvent) => {
+    const node = nodes.find(n => n.node_id === nodeId);
+    if (node?.locked) return; // locked nodes can't be moved
+
     const marker = event.target as L.Marker;
     const position = marker.getLatLng();
 
@@ -405,6 +495,16 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
       n.node_id === nodeId
         ? { ...n, latitude: position.lat, longitude: position.lng }
         : n
+    );
+    setNodes(updatedNodes);
+    setIsDirty(true);
+    void syncData(updatedNodes, edges);
+  };
+
+  // Toggle lock for a node directly from popup
+  const handleToggleLock = (nodeId: string) => {
+    const updatedNodes = nodes.map((n) =>
+      n.node_id === nodeId ? { ...n, locked: !n.locked } : n
     );
     setNodes(updatedNodes);
     setIsDirty(true);
@@ -463,23 +563,38 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
     if (editingNode) {
       // Edit mode
-      updatedNodes = nodes.map((n) =>
-        n.node_id === editingNode.node_id
-          ? {
+      updatedNodes = nodes.map((n) => {
+        if (n.node_id === editingNode.node_id) {
+          return {
+            ...n,
+            node_id: nodeIdInput.trim(),
+            name: nodeNameInput.trim(),
+            type: nodeTypeInput,
+            latitude: nodeLatInput,
+            longitude: nodeLngInput,
+            capacity: capacityNum,
+            splitter: splitterVal,
+            pppoe: pppoeVal,
+            serialnumber: snVal,
+            notes: nodeNotesInput.trim() || undefined,
+            locked: nodeLocked,
+          };
+        }
+
+        // Clean up duplicate customer references on other nodes
+        if (nodeTypeInput === "ont") {
+          const matchesPppoe = pppoeVal && n.pppoe === pppoeVal;
+          const matchesSn = snVal && n.serialnumber === snVal;
+          if (matchesPppoe || matchesSn) {
+            return {
               ...n,
-              node_id: nodeIdInput.trim(),
-              name: nodeNameInput.trim(),
-              type: nodeTypeInput,
-              latitude: nodeLatInput,
-              longitude: nodeLngInput,
-              capacity: capacityNum,
-              splitter: splitterVal,
-              pppoe: pppoeVal,
-              serialnumber: snVal,
-              notes: nodeNotesInput.trim() || undefined,
-            }
-          : n
-      );
+              pppoe: undefined,
+              serialnumber: undefined,
+            };
+          }
+        }
+        return n;
+      });
       // Update referencing edges if the node_id changed
       if (editingNode.node_id !== nodeIdInput.trim()) {
         updatedEdges = edges.map((edge) => {
@@ -508,8 +623,25 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         pppoe: pppoeVal,
         serialnumber: snVal,
         notes: nodeNotesInput.trim() || undefined,
+        locked: nodeLocked,
       };
-      updatedNodes = [...nodes, newNode];
+
+      // Clean up duplicate customer references on other nodes
+      const clearedNodes = nodes.map((n) => {
+        if (nodeTypeInput === "ont") {
+          const matchesPppoe = pppoeVal && n.pppoe === pppoeVal;
+          const matchesSn = snVal && n.serialnumber === snVal;
+          if (matchesPppoe || matchesSn) {
+            return {
+              ...n,
+              pppoe: undefined,
+              serialnumber: undefined,
+            };
+          }
+        }
+        return n;
+      });
+      updatedNodes = [...clearedNodes, newNode];
       pushSuccess("Node baru berhasil ditambahkan.");
     }
 
@@ -574,30 +706,39 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
   // Delete node
   const handleDeleteNode = (nodeId: string) => {
-    if (!confirm(`Hapus node "${nodeId}"? Semua kabel yang terhubung juga akan dihapus.`)) return;
-
-    const updatedNodes = nodes.filter((n) => n.node_id !== nodeId);
-    const updatedEdges = edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
-
-    setNodes(updatedNodes);
-    setEdges(updatedEdges);
-    setIsDirty(true);
-    pushSuccess("Node dihapus.");
-    void syncData(updatedNodes, updatedEdges);
+    setConfirmModal({
+      title: "Hapus Node",
+      message: `Hapus node "${nodeId}"? Semua kabel yang terhubung juga akan dihapus.`,
+      onConfirm: () => {
+        const updatedNodes = nodes.filter((n) => n.node_id !== nodeId);
+        const updatedEdges = edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+        setNodes(updatedNodes);
+        setEdges(updatedEdges);
+        setIsDirty(true);
+        pushSuccess("Node dihapus.");
+        void syncData(updatedNodes, updatedEdges);
+        setConfirmModal(null);
+      },
+    });
   };
 
   // Delete edge
   const handleDeleteEdge = (edgeId: string) => {
-    if (!confirm(`Hapus kabel "${edgeId}"?`)) return;
-
-    const updatedEdges = edges.filter((edge) => edge.edge_id !== edgeId);
-    setEdges(updatedEdges);
-    setIsDirty(true);
-    if (selectedEdgeForWaypoints?.edge_id === edgeId) {
-      setSelectedEdgeForWaypoints(null);
-    }
-    pushSuccess("Kabel dihapus.");
-    void syncData(nodes, updatedEdges);
+    setConfirmModal({
+      title: "Hapus Kabel",
+      message: `Hapus kabel "${edgeId}"?`,
+      onConfirm: () => {
+        const updatedEdges = edges.filter((edge) => edge.edge_id !== edgeId);
+        setEdges(updatedEdges);
+        setIsDirty(true);
+        if (selectedEdgeForWaypoints?.edge_id === edgeId) {
+          setSelectedEdgeForWaypoints(null);
+        }
+        pushSuccess("Kabel dihapus.");
+        void syncData(nodes, updatedEdges);
+        setConfirmModal(null);
+      },
+    });
   };
 
   const handleWaypointDragEnd = (edgeId: string, index: number, event: L.DragEndEvent) => {
@@ -662,14 +803,19 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   };
 
   const handleResetWaypoints = (edgeId: string) => {
-    if (!confirm("Hapus semua belokan di kabel ini?")) return;
-    const updatedEdges = edges.map((edge) =>
-      edge.edge_id === edgeId ? { ...edge, waypoints: [] } : edge
-    );
-
-    setEdges(updatedEdges);
-    setIsDirty(true);
-    void syncData(nodes, updatedEdges);
+    setConfirmModal({
+      title: "Reset Belokan",
+      message: "Hapus semua belokan di kabel ini?",
+      onConfirm: () => {
+        const updatedEdges = edges.map((edge) =>
+          edge.edge_id === edgeId ? { ...edge, waypoints: [] } : edge
+        );
+        setEdges(updatedEdges);
+        setIsDirty(true);
+        void syncData(nodes, updatedEdges);
+        setConfirmModal(null);
+      },
+    });
   };
 
   // Sync data to DB
@@ -678,17 +824,28 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     pushSuccess("Peta jaringan berhasil disinkronisasi ke server!");
   };
 
-  // Reset all mapping data on database
-  const handleResetAll = async () => {
-    if (!confirm("⚠️ Peringatan: Tindakan ini akan menghapus SELURUH node dan kabel di peta jaringan secara permanen. Lanjutkan?")) return;
+  // Reset all mapping data on database - triggers confirmation modal
+  const handleResetAll = () => {
+    setResetPasswordInput("");
+    setIsResetModalOpen(true);
+  };
+
+  const handleConfirmResetAll = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPasswordInput.trim()) {
+      pushError("Password wajib diisi.");
+      return;
+    }
 
     setSaving(true);
     try {
-      await resetMappingData();
+      await resetMappingData(resetPasswordInput);
       pushSuccess("Seluruh data peta jaringan berhasil direset.");
+      setIsResetModalOpen(false);
       void loadData();
-    } catch {
-      pushError("Gagal mereset data peta jaringan.");
+    } catch (err: any) {
+      console.error(err);
+      pushError(err.message || "Gagal mereset data peta jaringan.");
     } finally {
       setSaving(false);
     }
@@ -716,21 +873,27 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
   // Reset map settings to default
   const handleResetSettings = async () => {
-    if (!confirm("Reset pengaturan peta ke default Jakarta?")) return;
-    try {
-      const res = await resetMapSettings();
-      const settingsData = res && (res as any).data ? (res as any).data : res;
-      setSettings(settingsData);
-      setCenterLatInput(settingsData?.center_lat || "-6.2088");
-      setCenterLngInput(settingsData?.center_lng || "106.8456");
-      setDefaultZoomInput(settingsData?.default_zoom || "13");
-      setMaxZoomInInput(settingsData?.max_zoom_in || "18");
-      setMaxZoomOutInput(settingsData?.max_zoom_out || "5");
-      pushSuccess("Pengaturan peta direset ke default.");
-      setIsSettingsModalOpen(false);
-    } catch {
-      pushError("Gagal mereset pengaturan peta.");
-    }
+    setConfirmModal({
+      title: "Reset Pengaturan Peta",
+      message: "Reset pengaturan peta ke default Jakarta?",
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          const res = await resetMapSettings();
+          const settingsData = res && (res as any).data ? (res as any).data : res;
+          setSettings(settingsData);
+          setCenterLatInput(settingsData?.center_lat || "-6.2088");
+          setCenterLngInput(settingsData?.center_lng || "106.8456");
+          setDefaultZoomInput(settingsData?.default_zoom || "13");
+          setMaxZoomInInput(settingsData?.max_zoom_in || "18");
+          setMaxZoomOutInput(settingsData?.max_zoom_out || "5");
+          pushSuccess("Pengaturan peta direset ke default.");
+          setIsSettingsModalOpen(false);
+        } catch {
+          pushError("Gagal mereset pengaturan peta.");
+        }
+      },
+    });
   };
 
   // Custom marker icon creation with GACS SVG Leaflet Icons
@@ -1202,19 +1365,20 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
           {/* Render Infrastructure Markers (Nodes) */}
           {nodes.map((node) => {
             const isOffline = isNodeOffline(node);
+            const isLocked = node.locked === true;
             return (
               <Marker
                 key={node.node_id}
                 position={[parseLatitude(node.latitude), parseLongitude(node.longitude)]}
                 icon={createCustomIcon(node.type, node.name, isOffline)}
-                draggable={activeTool === "select"}
+                draggable={activeTool === "select" && !isLocked}
                 eventHandlers={{
                   click: () => handleNodeClick(node),
                   dragend: (e) => handleNodeDragEnd(node.node_id, e),
                 }}
               >
                 <Popup>
-                  <div className="p-1 text-slate-800 min-w-[200px] dark:text-slate-200">
+                  <div className="p-1 text-slate-800 min-w-[220px] dark:text-slate-200">
                     <div className="flex items-center justify-between mb-2">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${
                         node.type === "server"
@@ -1227,9 +1391,16 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                       }`}>
                         {node.type === "server" ? "🖥️ Server" : node.type === "odc" ? "📦 ODC" : node.type === "odp" ? "🔌 ODP" : "📡 ONT"}
                       </span>
-                      {node.type === "ont" && (
-                        <span className={`w-2.5 h-2.5 rounded-full ${isOffline ? "bg-red-500 animate-pulse" : "bg-emerald-500"}`} title={isOffline ? "Offline" : "Online"} />
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {isLocked && (
+                          <span className="inline-flex items-center gap-0.5 bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                            <Lock className="w-2.5 h-2.5" /> Terkunci
+                          </span>
+                        )}
+                        {node.type === "ont" && (
+                          <span className={`w-2.5 h-2.5 rounded-full ${isOffline ? "bg-red-500 animate-pulse" : "bg-emerald-500"}`} title={isOffline ? "Offline" : "Online"} />
+                        )}
+                      </div>
                     </div>
                     <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-2">{node.name}</h3>
                     
@@ -1270,7 +1441,20 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                       </p>
                     )}
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLock(node.node_id)}
+                        className={`flex-1 py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition ${
+                          isLocked
+                            ? "bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-200"
+                            : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-white"
+                        }`}
+                        title={isLocked ? "Klik untuk membuka kunci posisi" : "Klik untuk mengunci posisi node"}
+                      >
+                        {isLocked ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                        {isLocked ? "Buka Kunci" : "Kunci"}
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -1285,6 +1469,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                           setNodePppoeInput(node.pppoe || "");
                           setNodeSnInput(node.serialnumber || "");
                           setNodeNotesInput(node.notes || "");
+                          setNodeLocked(node.locked || false);
                           
                           setSearchQuery(node.pppoe || node.serialnumber || "");
                           setIdentifierType(node.pppoe ? "pppoe" : "serialnumber");
@@ -1300,6 +1485,14 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                           } else {
                             setSelectedCustomerId(null);
                           }
+
+                          // Link ODP if this is an ODP node
+                          if (node.type === "odp") {
+                            const odpIdMatch = node.node_id.match(/^odp-(\d+)$/);
+                            setLinkedOdpId(odpIdMatch ? parseInt(odpIdMatch[1], 10) : null);
+                          } else {
+                            setLinkedOdpId(null);
+                          }
                           
                           setIsNodeModalOpen(true);
                         }}
@@ -1310,7 +1503,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                       <button
                         type="button"
                         onClick={() => handleDeleteNode(node.node_id)}
-                        className="flex-1 bg-red-500 hover:bg-red-600 text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition shadow"
+                        disabled={isLocked}
+                        title={isLocked ? "Buka kunci terlebih dahulu sebelum menghapus" : "Hapus node dari peta"}
+                        className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-red-200 disabled:cursor-not-allowed text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition shadow"
                       >
                         <Trash2 className="w-3 h-3" /> Hapus
                       </button>
@@ -1408,6 +1603,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     onChange={(e) => {
                       const val = e.target.value as "server" | "odc" | "odp" | "ont";
                       setNodeTypeInput(val);
+                      setLinkedOdpId(null);
                       if (val === "server") {
                         setNodeCapacityInput("48");
                         setNodeSplitterInput("");
@@ -1462,11 +1658,26 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                       }}
                     >
                       <option value="">-- Pilih Pelanggan (Jika ada) --</option>
-                      {customers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} {c.user_pppoe ? `(PPPoE: ${c.user_pppoe})` : ""}
-                        </option>
-                      ))}
+                      {customers
+                        .filter((c) => {
+                          if (selectedCustomerId && c.id === selectedCustomerId) {
+                            return true;
+                          }
+                          const isAlreadyLinked = nodes.some(
+                            (n) =>
+                              n.type === "ont" &&
+                              n.node_id !== editingNode?.node_id && (
+                                (c.user_pppoe && n.pppoe === c.user_pppoe) ||
+                                (c.sn_ont && n.serialnumber === c.sn_ont)
+                              )
+                          );
+                          return !isAlreadyLinked;
+                        })
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} {c.user_pppoe ? `(PPPoE: ${c.user_pppoe})` : ""}
+                          </option>
+                        ))}
                     </select>
                   </div>
                   <div>
@@ -1568,6 +1779,53 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                       />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {nodeTypeInput === "odp" && existingOdps.length > 0 && (
+                <div className="border border-cyan-100 dark:border-cyan-900/40 rounded-xl p-3 bg-cyan-50/30 dark:bg-cyan-950/20 grid gap-2">
+                  <label className="block text-xs font-bold text-slate-500 mb-0">REFERENSIKAN KE DATA ODP (OPSIONAL)</label>
+                  <select
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+                    value={linkedOdpId || ""}
+                    onChange={(e) => {
+                      const id = Number(e.target.value) || null;
+                      setLinkedOdpId(id);
+                      if (id) {
+                        const odp = existingOdps.find(o => o.id === id);
+                        if (odp) {
+                          setNodeIdInput(`odp-${odp.id}`);
+                          setNodeNameInput(odp.nama);
+                          setNodeSplitterInput(odp.splitter_ratio || "1:8");
+                          setNodeCapacityInput(String(odp.ports || 8));
+                          setNodeNotesInput(odp.deskripsi || "");
+                          if (odp.latitude && odp.longitude) {
+                            setNodeLatInput(odp.latitude);
+                            setNodeLngInput(odp.longitude);
+                          }
+                        }
+                      }
+                    }}
+                  >
+                    <option value="">-- Buat ODP Baru (tanpa referensi) --</option>
+                    {existingOdps
+                      .filter(odp => {
+                        // Exclude ODPs already placed on the map (except the one currently being edited)
+                        const isOnMap = nodes.some(n =>
+                          n.node_id === `odp-${odp.id}` &&
+                          (!editingNode || n.node_id !== editingNode.node_id)
+                        );
+                        return !isOnMap;
+                      })
+                      .map((odp) => (
+                        <option key={odp.id} value={odp.id}>
+                          {odp.nama} — {odp.splitter_ratio || "1:8"} ({odp.customer_count}/{odp.ports} port)
+                        </option>
+                      ))}
+                  </select>
+                  <p className="text-[10px] text-cyan-700 dark:text-cyan-400 leading-snug">
+                    💡 Pilih ODP yang sudah terdaftar di manajemen ODP. ODP yang sudah ada di peta tidak ditampilkan.
+                  </p>
                 </div>
               )}
 
@@ -1673,6 +1931,28 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     ? "⚠️ Anda dapat memasukkan koordinat latitude/longitude secara manual."
                     : "ℹ️ Koordinat diisi otomatis sesuai letak marker pada peta."}
                 </div>
+              </div>
+
+              {/* Lock position toggle */}
+              <div className="flex items-center justify-between border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-900/20">
+                <div className="flex items-center gap-2">
+                  {nodeLocked ? <Lock className="w-3.5 h-3.5 text-amber-600" /> : <Unlock className="w-3.5 h-3.5 text-slate-400" />}
+                  <div>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{nodeLocked ? "Posisi Terkunci" : "Posisi Tidak Terkunci"}</p>
+                    <p className="text-[10px] text-slate-400 leading-snug">{nodeLocked ? "Node tidak bisa digeser di peta." : "Node bisa digeser bebas di peta."}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNodeLocked(v => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    nodeLocked ? "bg-amber-500" : "bg-slate-200 dark:bg-slate-700"
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    nodeLocked ? "translate-x-6" : "translate-x-1"
+                  }`} />
+                </button>
               </div>
 
               <div>
@@ -1935,6 +2215,108 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               </div>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* --- CONFIRM RESET ALL MODAL --- */}
+      {isResetModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <form
+            onSubmit={handleConfirmResetAll}
+            className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-md animate-in"
+          >
+            <div className="flex items-center justify-between border-b pb-3 mb-4">
+              <h3 className="text-base font-bold text-red-600 flex items-center gap-2">
+                <Trash2 className="w-5 h-5" />
+                Hapus Semua Data Peta
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsResetModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-3.5">
+              <div className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 p-3.5 rounded-xl text-xs flex gap-2 border border-red-100 dark:border-red-900/30">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold">PERINGATAN:</span> Tindakan ini akan menghapus <strong>SELURUH</strong> node infrastruktur dan kabel yang ada di peta jaringan secara permanen dari server. Tindakan ini tidak dapat dibatalkan.
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">PASSWORD ADMIN</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Masukkan password admin Anda"
+                  className="w-full text-sm px-3 py-2 border rounded-xl"
+                  value={resetPasswordInput}
+                  onChange={(e) => setResetPasswordInput(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t pt-4 mt-5">
+              <button
+                type="button"
+                onClick={() => setIsResetModalOpen(false)}
+                className="text-slate-600 hover:bg-slate-100 text-sm font-semibold py-2 px-4 rounded-xl transition"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-sm font-bold py-2 px-4 rounded-xl transition shadow"
+              >
+                {saving ? "Mereset..." : "Ya, Hapus Semua"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* --- CONFIRM MODAL (replaces window.confirm) --- */}
+      {confirmModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-sm animate-in">
+            <div className="flex items-center justify-between border-b pb-3 mb-4">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                {confirmModal.title}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+              {confirmModal.message}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold py-2 px-4 rounded-xl transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmModal.onConfirm()}
+                className="bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-xl transition shadow"
+              >
+                Konfirmasi
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>

@@ -1,0 +1,1 @@
+ALTER TABLE odp ADD COLUMN splitter_ratio TEXT NOT NULL DEFAULT '1:8';

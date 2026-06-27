@@ -12,6 +12,7 @@ type RegistrationPageProps = {
   waAccountId?: string;
   waApiKey?: string;
   packages?: PackageItem[];
+  customers?: any[];
   pushSuccess: (msg: string) => void;
   pushError: (msg: string) => void;
   withFeedback: (fn: () => Promise<void>, busyKey?: string) => Promise<void>;
@@ -23,6 +24,13 @@ type RegistrationPageProps = {
     ssid?: string;
     password?: string;
     referral?: string;
+    user_pppoe?: string;
+    password_pppoe?: string;
+    sn_ont?: string;
+    odp_id?: string;
+    odp_port?: string;
+    paket?: string;
+    due_day?: number;
   }) => void;
 };
 
@@ -34,12 +42,18 @@ type ManualRegistrationForm = {
   password: string;
   paket: string;
   referral: string;
+  user_pppoe: string;
+  password_pppoe: string;
+  sn_ont: string;
+  odp_id: string;
+  odp_port: string;
 };
 
 export function RegistrationPage({
   waGatewayUrl,
   waApiKey,
   packages = [],
+  customers = [],
   pushSuccess,
   pushError,
   withFeedback,
@@ -49,6 +63,28 @@ export function RegistrationPage({
   const [leads, setLeads] = useState<ContactForm[]>([]);
   const [loading, setLoading] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [convertPreview, setConvertPreview] = useState<ContactForm | null>(null);
+  const [convertForm, setConvertForm] = useState<{
+    name: string;
+    whatsapp: string;
+    address: string;
+    paket: string;
+    user_pppoe: string;
+    password_pppoe: string;
+    sn_ont: string;
+    odp_id: string;
+    odp_port: string;
+    ssid: string;
+    password: string;
+    referral: string;
+    due_day: number;
+  }>({
+    name: "", whatsapp: "", address: "", paket: "",
+    user_pppoe: "", password_pppoe: "", sn_ont: "",
+    odp_id: "", odp_port: "", ssid: "", password: "",
+    referral: "", due_day: 8,
+  });
+  const [convertErrors, setConvertErrors] = useState<Record<string, string>>({});
   const [manualForm, setManualForm] = useState<ManualRegistrationForm>({
     nama: "",
     phone: "",
@@ -57,12 +93,33 @@ export function RegistrationPage({
     password: "",
     paket: "",
     referral: "",
+    user_pppoe: "",
+    password_pppoe: "",
+    sn_ont: "",
+    odp_id: "",
+    odp_port: "",
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [odps, setOdps] = useState<any[]>([]);
 
   const gatewayUrl = waGatewayUrl?.trim() || "http://localhost:3001";
   const apiKey = waApiKey?.trim() || "";
+
+  const getOccupiedPortsForOdp = (odpId: string | number) => {
+    return customers
+      .filter((c) => String(c.odp_id) === String(odpId))
+      .map((c) => c.odp_port)
+      .filter(Boolean) as number[];
+  };
+
+  // Load ODP list for select input
+  useEffect(() => {
+    fetch("/api/v1/odps", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => setOdps(data.data || []))
+      .catch((err) => console.error("Gagal memuat ODP", err));
+  }, []);
 
   const loadLeads = async () => {
     setLoading(true);
@@ -70,7 +127,7 @@ export function RegistrationPage({
       const res = await getChatbotForms(gatewayUrl, apiKey, "registration", 100);
       setLeads(res.data);
     } catch (err: any) {
-      pushError(err.message || "Gagal memuat data pendaftaran dari WA");
+      pushError(err.message || "Gagal memuat data pendaftaran");
     } finally {
       setLoading(false);
     }
@@ -117,24 +174,112 @@ export function RegistrationPage({
 
   const handleConvert = (lead: ContactForm) => {
     const d = lead.data || {};
-    onConvert({
-      name: d.nama || d.name || "",
+    // Auto-generate PPPoE user from name if not provided
+    const rawName = d.nama || d.name || "";
+    let autoPppoe = d.user_pppoe || "";
+    if (!autoPppoe && rawName) {
+      autoPppoe = rawName.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 16);
+    }
+    const autoPass = d.password_pppoe || (autoPppoe ? Math.floor(10000000 + Math.random() * 90000000).toString() : "");
+
+    setConvertForm({
+      name: rawName,
       whatsapp: lead.phone || "",
       address: d.alamat || d.address || "",
+      paket: d.paket || d.package_choice || "",
+      user_pppoe: autoPppoe,
+      password_pppoe: autoPass,
+      sn_ont: d.sn_ont || "",
+      odp_id: d.odp_id || "",
+      odp_port: d.odp_port || "",
       ssid: d.ssid || d.wifi || "",
       password: d.password || d.wifi_password || "",
       referral: d.referral || d.referral_code || "",
+      due_day: 8,
     });
-    pushSuccess("Data pendaftaran berhasil dimuat ke formulir pelanggan baru!");
+    setConvertErrors({});
+    setConvertPreview(lead);
+  };
+
+  const handleConfirmConvert = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!convertPreview) return;
+
+    // Basic validation
+    const errs: Record<string, string> = {};
+    if (!convertForm.name.trim()) errs.name = "Nama wajib diisi";
+    if (!convertForm.user_pppoe.trim()) errs.user_pppoe = "User PPPoE wajib diisi";
+    if (!convertForm.password_pppoe.trim()) errs.password_pppoe = "Password PPPoE wajib diisi";
+    if (Object.keys(errs).length > 0) { setConvertErrors(errs); return; }
+
+    const lead = convertPreview;
+
+    await withFeedback(async () => {
+      try {
+        // 1. Save customer directly
+        await onConvert({
+          name: convertForm.name,
+          whatsapp: convertForm.whatsapp,
+          address: convertForm.address,
+          ssid: convertForm.ssid,
+          password: convertForm.password,
+          referral: convertForm.referral,
+          user_pppoe: convertForm.user_pppoe,
+          password_pppoe: convertForm.password_pppoe,
+          sn_ont: convertForm.sn_ont,
+          odp_id: convertForm.odp_id,
+          odp_port: convertForm.odp_port,
+          paket: convertForm.paket,
+          due_day: convertForm.due_day,
+        });
+
+        // 2. Mark lead as resolved
+        await updateChatbotForm(gatewayUrl, apiKey, lead.id, "resolved");
+
+        // 3. Reload lead list
+        await loadLeads();
+
+        setConvertPreview(null);
+        pushSuccess("Pelanggan berhasil ditambahkan!");
+      } catch (err: any) {
+        pushError(err.message || "Gagal melakukan konversi pelanggan");
+      }
+    });
+  };
+
+  const handleNamaChange = (namaVal: string) => {
+    setManualForm((prev) => {
+      const next = { ...prev, nama: namaVal };
+      if (!prev.user_pppoe) {
+        const cleanName = namaVal
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "")
+          .substring(0, 16);
+        if (cleanName) {
+          next.user_pppoe = cleanName;
+        }
+      }
+      if (!prev.password_pppoe && next.user_pppoe) {
+        next.password_pppoe = Math.floor(10000000 + Math.random() * 90000000).toString();
+      }
+      return next;
+    });
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: Record<string, string> = {};
     if (!manualForm.nama.trim()) errors.nama = "Nama lengkap wajib diisi";
+    
     if (!manualForm.phone.trim()) {
       errors.phone = "Nomor WhatsApp wajib diisi";
+    } else {
+      const cleanPhoneForValidation = manualForm.phone.replace(/[^\d]/g, "");
+      if (cleanPhoneForValidation.length < 10 || cleanPhoneForValidation.length > 13) {
+        errors.phone = "Nomor WhatsApp harus terdiri dari 10 sampai 13 digit angka";
+      }
     }
+    
     if (!manualForm.alamat.trim()) errors.alamat = "Alamat lengkap wajib diisi";
 
     if (Object.keys(errors).length > 0) {
@@ -161,6 +306,11 @@ export function RegistrationPage({
           password: manualForm.password,
           paket: manualForm.paket,
           referral: manualForm.referral,
+          user_pppoe: manualForm.user_pppoe,
+          password_pppoe: manualForm.password_pppoe,
+          sn_ont: manualForm.sn_ont,
+          odp_id: manualForm.odp_id,
+          odp_port: manualForm.odp_port,
           source: "manual",
         },
       });
@@ -174,6 +324,11 @@ export function RegistrationPage({
         password: "",
         paket: "",
         referral: "",
+        user_pppoe: "",
+        password_pppoe: "",
+        sn_ont: "",
+        odp_id: "",
+        odp_port: "",
       });
       setFormErrors({});
       setIsManualModalOpen(false);
@@ -183,6 +338,12 @@ export function RegistrationPage({
     } finally {
       setManualSubmitting(false);
     }
+  };
+
+  const getOdpName = (id: any) => {
+    if (!id) return null;
+    const odp = odps.find((o) => String(o.id) === String(id));
+    return odp ? odp.nama : `ODP ID ${id}`;
   };
 
   const pendingLeads = leads.filter(l => l.status === "pending").length;
@@ -209,6 +370,11 @@ export function RegistrationPage({
                 password: "",
                 paket: "",
                 referral: "",
+                user_pppoe: "",
+                password_pppoe: "",
+                sn_ont: "",
+                odp_id: "",
+                odp_port: "",
               });
               setFormErrors({});
               setIsManualModalOpen(true);
@@ -247,6 +413,7 @@ export function RegistrationPage({
                 <th className="px-6 py-4 font-semibold">Nama / WhatsApp</th>
                 <th className="px-6 py-4 font-semibold">Alamat</th>
                 <th className="px-6 py-4 font-semibold">SSID & Password</th>
+                <th className="px-6 py-4 font-semibold">PPPoE & Perangkat</th>
                 <th className="px-6 py-4 font-semibold">Paket / Ref</th>
                 <th className="px-6 py-4 font-semibold">Status</th>
                 <th className="px-6 py-4 font-semibold text-center">Aksi</th>
@@ -254,7 +421,7 @@ export function RegistrationPage({
             </thead>
             <tbody className="divide-y divide-gray-200">
               {leads.length === 0 ? (
-                <EmptyTableRow message={loading ? "Memuat pendaftaran..." : "Belum ada pendaftaran di database."} colSpan={7} />
+                <EmptyTableRow message={loading ? "Memuat pendaftaran..." : "Belum ada pendaftaran di database."} colSpan={8} />
               ) : (
                 leads.map((lead) => {
                   const d = lead.data || {};
@@ -286,11 +453,32 @@ export function RegistrationPage({
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                          SSID: <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">{d.ssid || d.wifi || "-"}</span>
+                          SSID: <span className="font-mono bg-slate-100 dark:bg-slate-850 px-1 rounded">{d.ssid || d.wifi || "-"}</span>
                         </div>
                         <div className="text-xs text-slate-500 mt-0.5">
-                          Pass: <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">{d.password || d.wifi_password || "-"}</span>
+                          Pass: <span className="font-mono bg-slate-100 dark:bg-slate-850 px-1 rounded">{d.password || d.wifi_password || "-"}</span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {d.user_pppoe ? (
+                          <>
+                            <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                              PPPoE: <span className="font-mono bg-indigo-50 text-indigo-700 px-1 rounded">{d.user_pppoe}</span>
+                            </div>
+                            {d.sn_ont && (
+                              <div className="text-[11px] text-slate-600 mt-0.5 font-mono">
+                                SN: {d.sn_ont}
+                              </div>
+                            )}
+                            {d.odp_id && (
+                              <div className="text-[10px] text-slate-500 font-medium">
+                                ODP: {getOdpName(d.odp_id)} (Port {d.odp_port || "-"})
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-400 font-sans italic">Belum dikonfigurasi</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -304,8 +492,8 @@ export function RegistrationPage({
                       </td>
                       <td className="px-6 py-4">
                         <StatusPill
-                          label={lead.status}
-                          tone={lead.status === "pending" ? "gold" : "green"}
+                           label={lead.status}
+                           tone={lead.status === "pending" ? "gold" : "green"}
                         />
                       </td>
                       <td className="px-6 py-4">
@@ -376,96 +564,518 @@ export function RegistrationPage({
             </>
           }
         >
-          <form id="manual-reg-form" onSubmit={handleManualSubmit} className="space-y-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Nama Lengkap *</span>
-              <input
-                type="text"
-                className={inputClassName(formErrors.nama)}
-                value={manualForm.nama}
-                onChange={(e) => setManualForm(prev => ({ ...prev, nama: e.target.value }))}
-                placeholder="Nama Lengkap Calon Pelanggan"
-              />
-              {renderInlineError(formErrors.nama)}
-            </label>
+          <form id="manual-reg-form" onSubmit={handleManualSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin">
+            {/* Section 1: Informasi Pelanggan */}
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Informasi Utama</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Nama Lengkap *</span>
+                  <input
+                    type="text"
+                    className={inputClassName(formErrors.nama)}
+                    value={manualForm.nama}
+                    onChange={(e) => handleNamaChange(e.target.value)}
+                    placeholder="Nama Lengkap Calon Pelanggan"
+                  />
+                  {renderInlineError(formErrors.nama)}
+                </label>
 
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Nomor WhatsApp *</span>
-              <input
-                type="text"
-                className={inputClassName(formErrors.phone)}
-                value={manualForm.phone}
-                onChange={(e) => setManualForm(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="Contoh: 08123456789 atau +628123456789"
-              />
-              {renderInlineError(formErrors.phone)}
-            </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Nomor WhatsApp *</span>
+                  <input
+                    type="text"
+                    className={inputClassName(formErrors.phone)}
+                    value={manualForm.phone}
+                    onChange={(e) => setManualForm(prev => ({ ...prev, phone: formatWhatsAppNumber(e.target.value) }))}
+                    placeholder="contoh: 0812-3456-7890 atau +62 812-3456-7890"
+                  />
+                  {renderInlineError(formErrors.phone)}
+                </label>
+              </div>
 
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Alamat Lengkap *</span>
-              <textarea
-                className={inputClassName(formErrors.alamat)}
-                rows={2}
-                value={manualForm.alamat}
-                onChange={(e) => setManualForm(prev => ({ ...prev, alamat: e.target.value }))}
-                placeholder="Alamat pemasangan lengkap"
-              />
-              {renderInlineError(formErrors.alamat)}
-            </label>
-
-            <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">SSID WiFi (Opsional)</span>
-                <input
-                  type="text"
-                  className={inputClassName()}
-                  value={manualForm.ssid}
-                  onChange={(e) => setManualForm(prev => ({ ...prev, ssid: e.target.value }))}
-                  placeholder="Nama WiFi yang diinginkan"
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Alamat Lengkap *</span>
+                <textarea
+                  className={inputClassName(formErrors.alamat)}
+                  rows={2}
+                  value={manualForm.alamat}
+                  onChange={(e) => setManualForm(prev => ({ ...prev, alamat: e.target.value }))}
+                  placeholder="Alamat pemasangan lengkap"
                 />
+                {renderInlineError(formErrors.alamat)}
               </label>
+            </div>
 
+            {/* Section 2: Paket & PPPoE */}
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Paket & Akun PPPoE</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1 col-span-full">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Pilihan Paket Internet</span>
+                  <select
+                    className={inputClassName()}
+                    value={manualForm.paket}
+                    onChange={(e) => setManualForm(prev => ({ ...prev, paket: e.target.value }))}
+                  >
+                    <option value="">Pilih paket internet</option>
+                    {packages.map((pkg) => (
+                      <option key={pkg.id} value={pkg.name}>
+                        {pkg.name} ({pkg.speed_mbps} Mbps)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">User PPPoE (Otomatis)</span>
+                  <input
+                    type="text"
+                    className={inputClassName()}
+                    value={manualForm.user_pppoe}
+                    onChange={(e) => setManualForm(prev => ({ ...prev, user_pppoe: e.target.value }))}
+                    placeholder="Username PPPoE"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Password PPPoE (Otomatis)</span>
+                  <input
+                    type="text"
+                    className={inputClassName()}
+                    value={manualForm.password_pppoe}
+                    onChange={(e) => setManualForm(prev => ({ ...prev, password_pppoe: e.target.value }))}
+                    placeholder="Password PPPoE"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Section 3: ONT & ODP */}
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Perangkat & ODP</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1 col-span-full">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-355">SN ONT (Serial Number)</span>
+                  <input
+                    type="text"
+                    className={inputClassName()}
+                    value={manualForm.sn_ont}
+                    onChange={(e) => setManualForm(prev => ({ ...prev, sn_ont: e.target.value }))}
+                    placeholder="Serial Number ONT"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Titik Distribusi ODP</span>
+                  <select
+                    className={inputClassName()}
+                    value={manualForm.odp_id}
+                    onChange={(e) => {
+                      const nextOdpId = e.target.value;
+                      let firstAvailablePort = "";
+                      if (nextOdpId) {
+                        const totalPorts = odps.find((o) => String(o.id) === String(nextOdpId))?.ports || 8;
+                        const taken = getOccupiedPortsForOdp(nextOdpId);
+                        for (let p = 1; p <= totalPorts; p++) {
+                          if (!taken.includes(p)) {
+                            firstAvailablePort = String(p);
+                            break;
+                          }
+                        }
+                      }
+                      setManualForm(prev => ({
+                        ...prev,
+                        odp_id: nextOdpId,
+                        odp_port: nextOdpId ? firstAvailablePort : ""
+                      }));
+                    }}
+                  >
+                    <option value="">Pilih ODP (Jika ada)</option>
+                    {odps.map((odp) => (
+                      <option key={odp.id} value={odp.id}>
+                        {odp.nama} - {odp.lokasi}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {manualForm.odp_id && (
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Port ODP</span>
+                    <select
+                      className={inputClassName()}
+                      value={manualForm.odp_port}
+                      onChange={(e) => setManualForm(prev => ({ ...prev, odp_port: e.target.value }))}
+                    >
+                      {Array.from(
+                        { length: odps.find((o) => String(o.id) === String(manualForm.odp_id))?.ports || 8 },
+                        (_, i) => i + 1
+                      )
+                        .filter((portNum) => {
+                          const taken = getOccupiedPortsForOdp(manualForm.odp_id);
+                          return !taken.includes(portNum);
+                        })
+                        .map((portNum) => (
+                          <option key={portNum} value={String(portNum)}>
+                            Port {portNum}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* Section 4: WiFi & Referral */}
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">SSID WiFi & Referral</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">SSID WiFi (Opsional)</span>
+                  <input
+                    type="text"
+                    className={inputClassName()}
+                    value={manualForm.ssid}
+                    onChange={(e) => setManualForm(prev => ({ ...prev, ssid: e.target.value }))}
+                    placeholder="Nama WiFi yang diinginkan"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">WiFi Password (Opsional)</span>
+                  <input
+                    type="text"
+                    className={inputClassName()}
+                    value={manualForm.password}
+                    onChange={(e) => setManualForm(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Password WiFi"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1 col-span-full">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Referral (Pemberi Saran - Opsional)</span>
+                  <input
+                    type="text"
+                    list="referral-list"
+                    className={inputClassName()}
+                    value={manualForm.referral}
+                    onChange={(e) => setManualForm(prev => ({ ...prev, referral: e.target.value }))}
+                    placeholder="Ketik nama atau kode referral untuk mencari..."
+                  />
+                  <datalist id="referral-list">
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.referral_code || c.name}>
+                        {c.name} {c.referral_code ? `(Ref: ${c.referral_code})` : ""} {c.whatsapp ? `(${c.whatsapp})` : ""}
+                      </option>
+                    ))}
+                  </datalist>
+                </label>
+              </div>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Convert Form Modal — full editable form pre-filled from lead */}
+      {convertPreview && (
+        <Modal
+          title="Konversi ke Pelanggan Baru"
+          onClose={() => setConvertPreview(null)}
+          actions={
+            <>
+              <button
+                type="button"
+                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer text-xs"
+                onClick={() => setConvertPreview(null)}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmConvert()}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer text-xs flex items-center gap-1.5"
+              >
+                <UserPlus size={13} />
+                Simpan & Konversi Pelanggan
+              </button>
+            </>
+          }
+        >
+          <form
+            id="convert-customer-form"
+            onSubmit={handleConfirmConvert}
+            className="space-y-4 max-h-[72vh] overflow-y-auto pr-1 scrollbar-thin"
+          >
+            {/* Info banner */}
+            <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2.5 text-xs text-indigo-800">
+              Data dari pendaftaran WhatsApp sudah diisi otomatis. Lengkapi atau ubah sesuai kebutuhan sebelum menekan simpan.
+            </div>
+
+            {/* Section: Identitas */}
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Identitas Pelanggan</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700">Nama Lengkap *</span>
+                  <input
+                    type="text"
+                    className={inputClassName(convertErrors.name)}
+                    value={convertForm.name}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setConvertForm(prev => {
+                        const next = { ...prev, name: v };
+                        // Auto-fill PPPoE user from name if it hasn't been manually edited
+                        const autoPppoe = v.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 16);
+                        if (!prev.user_pppoe || prev.user_pppoe === prev.name.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 16)) {
+                          next.user_pppoe = autoPppoe;
+                        }
+                        return next;
+                      });
+                    }}
+                    placeholder="Nama Lengkap"
+                  />
+                  {renderInlineError(convertErrors.name)}
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700">Nomor WhatsApp</span>
+                  <input
+                    type="text"
+                    className={inputClassName()}
+                    value={convertForm.whatsapp}
+                    onChange={(e) => setConvertForm(prev => ({ ...prev, whatsapp: e.target.value }))}
+                    placeholder="+62 812-3456-7890"
+                  />
+                </label>
+              </div>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">WiFi Password (Opsional)</span>
-                <input
-                  type="text"
+                <span className="text-xs font-bold text-slate-700">Alamat Pemasangan</span>
+                <textarea
+                  rows={2}
                   className={inputClassName()}
-                  value={manualForm.password}
-                  onChange={(e) => setManualForm(prev => ({ ...prev, password: e.target.value }))}
-                  placeholder="Password WiFi"
+                  value={convertForm.address}
+                  onChange={(e) => setConvertForm(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="Alamat lengkap lokasi pemasangan"
                 />
               </label>
             </div>
 
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pilihan Paket Internet (Opsional)</span>
-              <select
-                className={inputClassName()}
-                value={manualForm.paket}
-                onChange={(e) => setManualForm(prev => ({ ...prev, paket: e.target.value }))}
-              >
-                <option value="">Pilih paket internet</option>
-                {packages.map((pkg) => (
-                  <option key={pkg.id} value={pkg.name}>
-                    {pkg.name} ({pkg.speed_mbps} Mbps)
-                  </option>
-                ))}
-              </select>
-            </label>
+            {/* Section: Paket & PPPoE */}
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Paket & Akun PPPoE</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1 col-span-full">
+                  <span className="text-xs font-bold text-slate-700">Pilihan Paket Internet</span>
+                  <select
+                    className={inputClassName()}
+                    value={convertForm.paket}
+                    onChange={(e) => setConvertForm(prev => ({ ...prev, paket: e.target.value }))}
+                  >
+                    <option value="">Pilih paket internet</option>
+                    {packages.map((pkg) => (
+                      <option key={pkg.id} value={pkg.name}>
+                        {pkg.name} ({pkg.speed_mbps} Mbps)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700">User PPPoE *</span>
+                  <input
+                    type="text"
+                    className={inputClassName(convertErrors.user_pppoe)}
+                    value={convertForm.user_pppoe}
+                    onChange={(e) => setConvertForm(prev => ({ ...prev, user_pppoe: e.target.value }))}
+                    placeholder="Username PPPoE"
+                  />
+                  {renderInlineError(convertErrors.user_pppoe)}
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700">Password PPPoE *</span>
+                  <input
+                    type="text"
+                    className={inputClassName(convertErrors.password_pppoe)}
+                    value={convertForm.password_pppoe}
+                    onChange={(e) => setConvertForm(prev => ({ ...prev, password_pppoe: e.target.value }))}
+                    placeholder="Password PPPoE"
+                  />
+                  {renderInlineError(convertErrors.password_pppoe)}
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700">Tanggal Jatuh Tempo</span>
+                  <input
+                    type="number"
+                    min={1} max={31}
+                    className={inputClassName()}
+                    value={convertForm.due_day}
+                    onChange={(e) => setConvertForm(prev => ({ ...prev, due_day: Number(e.target.value) }))}
+                  />
+                </label>
+              </div>
+            </div>
 
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Referral (Kode / Nama - Opsional)</span>
-              <input
-                type="text"
-                className={inputClassName()}
-                value={manualForm.referral}
-                onChange={(e) => setManualForm(prev => ({ ...prev, referral: e.target.value }))}
-                placeholder="Kode referral atau nama pemberi saran"
-              />
-            </label>
+            {/* Section: Perangkat & ODP */}
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Perangkat & ODP</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1 col-span-full">
+                  <span className="text-xs font-bold text-slate-700">SN ONT (Serial Number)</span>
+                  <input
+                    type="text"
+                    className={inputClassName()}
+                    value={convertForm.sn_ont}
+                    onChange={(e) => setConvertForm(prev => ({ ...prev, sn_ont: e.target.value }))}
+                    placeholder="Serial Number ONT"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700">Titik Distribusi ODP</span>
+                  <select
+                    className={inputClassName()}
+                    value={convertForm.odp_id}
+                    onChange={(e) => {
+                      const nextOdpId = e.target.value;
+                      let firstAvailablePort = "";
+                      if (nextOdpId) {
+                        const totalPorts = odps.find((o) => String(o.id) === String(nextOdpId))?.ports || 8;
+                        const taken = getOccupiedPortsForOdp(nextOdpId);
+                        for (let p = 1; p <= totalPorts; p++) {
+                          if (!taken.includes(p)) {
+                            firstAvailablePort = String(p);
+                            break;
+                          }
+                        }
+                      }
+                      setConvertForm(prev => ({
+                        ...prev,
+                        odp_id: nextOdpId,
+                        odp_port: nextOdpId ? firstAvailablePort : ""
+                      }));
+                    }}
+                  >
+                    <option value="">Pilih ODP (Jika ada)</option>
+                    {odps.map((odp) => (
+                      <option key={odp.id} value={odp.id}>
+                        {odp.nama} - {odp.lokasi}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {convertForm.odp_id && (
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-700">Port ODP</span>
+                    <select
+                      className={inputClassName()}
+                      value={convertForm.odp_port}
+                      onChange={(e) => setConvertForm(prev => ({ ...prev, odp_port: e.target.value }))}
+                    >
+                      {Array.from(
+                        { length: odps.find(o => String(o.id) === String(convertForm.odp_id))?.ports || 8 },
+                        (_, i) => i + 1
+                      )
+                        .filter((portNum) => {
+                          const taken = getOccupiedPortsForOdp(convertForm.odp_id);
+                          return !taken.includes(portNum);
+                        })
+                        .map(p => (
+                          <option key={p} value={String(p)}>Port {p}</option>
+                        ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* Section: WiFi & Referral */}
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">WiFi & Referral</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700">SSID WiFi (Opsional)</span>
+                  <input
+                    type="text"
+                    className={inputClassName()}
+                    value={convertForm.ssid}
+                    onChange={(e) => setConvertForm(prev => ({ ...prev, ssid: e.target.value }))}
+                    placeholder="Nama WiFi"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-700">Password WiFi (Opsional)</span>
+                  <input
+                    type="text"
+                    className={inputClassName()}
+                    value={convertForm.password}
+                    onChange={(e) => setConvertForm(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Password WiFi"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 col-span-full">
+                  <span className="text-xs font-bold text-slate-700">Referral (Opsional)</span>
+                  <input
+                    type="text"
+                    list="convert-referral-list"
+                    className={inputClassName()}
+                    value={convertForm.referral}
+                    onChange={(e) => setConvertForm(prev => ({ ...prev, referral: e.target.value }))}
+                    placeholder="Nama atau kode referral"
+                  />
+                  <datalist id="convert-referral-list">
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.referral_code || c.name}>
+                        {c.name} {c.referral_code ? `(Ref: ${c.referral_code})` : ""}
+                      </option>
+                    ))}
+                  </datalist>
+                </label>
+              </div>
+            </div>
           </form>
         </Modal>
       )}
     </section>
   );
+}
+
+function formatWhatsAppNumber(val: string): string {
+  let clean = val.replace(/[^\d+]/g, "");
+  
+  if (clean.startsWith("+62")) {
+    clean = "62" + clean.slice(3);
+  }
+  
+  if (/^[89]/.test(clean)) {
+    clean = "0" + clean;
+  }
+
+  if (clean.startsWith("62")) {
+    const rest = clean.slice(2).replace(/\D/g, "");
+    let formatted = "+62";
+    if (rest.length > 0) {
+      formatted += " ";
+      if (rest.length <= 3) {
+        formatted += rest;
+      } else if (rest.length <= 7) {
+        formatted += `${rest.slice(0, 3)}-${rest.slice(3)}`;
+      } else {
+        formatted += `${rest.slice(0, 3)}-${rest.slice(3, 7)}-${rest.slice(7, 12)}`;
+      }
+    }
+    return formatted;
+  } else if (clean.startsWith("0")) {
+    const rest = clean.slice(1).replace(/\D/g, "");
+    let formatted = "0";
+    if (rest.length > 0) {
+      if (rest.length <= 3) {
+        formatted += rest;
+      } else if (rest.length <= 7) {
+        formatted += `${rest.slice(0, 3)}-${rest.slice(3)}`;
+      } else {
+        formatted += `${rest.slice(0, 3)}-${rest.slice(3, 7)}-${rest.slice(7, 12)}`;
+      }
+    }
+    return formatted;
+  }
+  return clean;
 }

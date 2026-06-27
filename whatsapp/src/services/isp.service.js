@@ -78,10 +78,16 @@ const findCustomerByID = async (id) => {
 const getActiveBill = async (customerId) => {
     try {
         const res = await client.get('/api/v1/bills', {
-            params: { customer_id: customerId, status: 'belum_bayar', limit: 1 },
+            params: { customer_id: customerId, status: 'belum_bayar_all', limit: 1 },
         });
         const data = res.data?.data;
-        if (Array.isArray(data) && data.length > 0) return data[0];
+        if (Array.isArray(data) && data.length > 0) {
+            const bill = data[0];
+            bill.periode = bill.period || bill.periode;
+            bill.nominal = bill.amount !== undefined ? bill.amount : bill.nominal;
+            bill.jatuh_tempo = bill.due_date || bill.jatuh_tempo;
+            return bill;
+        }
         return null;
     } catch (err) {
         logger.error(`[ISP] getActiveBill failed for customer ${customerId}:`, err.message);
@@ -277,6 +283,16 @@ const getActiveTicket = async (phone) => {
     }
 };
 
+const getTicket = async (ticketId) => {
+    try {
+        const res = await client.get(`/api/v1/tickets/${ticketId}`);
+        return res.data?.data ?? null;
+    } catch (err) {
+        logger.error(`[ISP] getTicket failed for ${ticketId}:`, err.message);
+        return null;
+    }
+};
+
 const replyToTicket = async (ticketId, senderType, message) => {
     try {
         const res = await client.post(`/api/v1/tickets/${ticketId}/messages`, {
@@ -331,6 +347,61 @@ const getCustomerVouchers = async (customerId) => {
     }
 };
 
+const getPendingConfirmation = async (billId) => {
+    try {
+        const res = await client.get(`/api/v1/bills/${billId}/pending-confirmation`);
+        return res.data?.data ?? null;
+    } catch (err) {
+        logger.error(`[ISP] getPendingConfirmation failed for bill ${billId}:`, err.message);
+        return null;
+    }
+};
+
+const uploadProofBase64 = async (base64Data, mimetype, filename) => {
+    try {
+        const res = await client.post('/api/v1/bills/confirmations/upload-base64', {
+            base64_data: base64Data,
+            mimetype,
+            filename
+        });
+        return res.data;
+    } catch (err) {
+        logger.error(`[ISP] uploadProofBase64 failed:`, err.message);
+        throw new Error(err.response?.data?.error || err.message);
+    }
+};
+
+const createPaymentConfirmation = async (tagihanId, pelangganId, buktiTransfer, catatan) => {
+    try {
+        const res = await client.post('/api/v1/chatbot/confirmations', {
+            tagihan_id: tagihanId,
+            pelanggan_id: pelangganId,
+            bukti_transfer: buktiTransfer,
+            catatan
+        });
+        return res.data;
+    } catch (err) {
+        logger.error(`[ISP] createPaymentConfirmation failed:`, err.message);
+        throw new Error(err.response?.data?.error || err.message);
+    }
+};
+
+const saveChatbotFormToBackend = async (type, phone, accountId, data) => {
+    try {
+        const cleanPhone = phone.replace(/@(c\.us|lid)$/, '').replace(/^0/, '62');
+        const res = await client.post('/api/v1/chatbot/forms', {
+            type,
+            phone: cleanPhone,
+            account_id: accountId,
+            data
+        });
+        return res.data?.data?.id ?? null;
+    } catch (err) {
+        logger.error(`[ISP] saveChatbotFormToBackend failed for ${phone}: ${err.message}`);
+        return null;
+    }
+};
+
 module.exports = {
     findCustomerByPhone,
     findCustomersByPhone,
@@ -347,9 +418,14 @@ module.exports = {
     withdrawReferral,
     convertReferralToVoucher,
     getActiveTicket,
+    getTicket,
     replyToTicket,
     updateCustomerWifi,
     claimVoucher,
     toggleAutoApplyVoucher,
     getCustomerVouchers,
+    saveChatbotFormToBackend,
+    getPendingConfirmation,
+    uploadProofBase64,
+    createPaymentConfirmation,
 };

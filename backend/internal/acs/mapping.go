@@ -32,6 +32,7 @@ type MappingNode struct {
 	Pppoe        *string `json:"pppoe,omitempty"`
 	SerialNumber *string `json:"serialnumber,omitempty"`
 	Notes        *string `json:"notes,omitempty"`
+	Locked       bool    `json:"locked"`
 	CreatedAt    string  `json:"created_at,omitempty"`
 	UpdatedAt    string  `json:"updated_at,omitempty"`
 }
@@ -111,7 +112,7 @@ func ResetMapSettings(ctx context.Context, db *sql.DB) (*MapSettings, error) {
 
 // GetNodes gets all mapping nodes.
 func GetNodes(ctx context.Context, db *sql.DB) ([]MappingNode, error) {
-	rows, err := db.QueryContext(ctx, "SELECT id, node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes, created_at, updated_at FROM mapping_nodes ORDER BY created_at DESC")
+	rows, err := db.QueryContext(ctx, "SELECT id, node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes, locked, created_at, updated_at FROM mapping_nodes ORDER BY created_at DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -120,10 +121,12 @@ func GetNodes(ctx context.Context, db *sql.DB) ([]MappingNode, error) {
 	var nodes []MappingNode
 	for rows.Next() {
 		var n MappingNode
-		err = rows.Scan(&n.ID, &n.NodeID, &n.Type, &n.Name, &n.Latitude, &n.Longitude, &n.Capacity, &n.Splitter, &n.Pppoe, &n.SerialNumber, &n.Notes, &n.CreatedAt, &n.UpdatedAt)
+		var lockedInt int
+		err = rows.Scan(&n.ID, &n.NodeID, &n.Type, &n.Name, &n.Latitude, &n.Longitude, &n.Capacity, &n.Splitter, &n.Pppoe, &n.SerialNumber, &n.Notes, &lockedInt, &n.CreatedAt, &n.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
+		n.Locked = lockedInt == 1
 		nodes = append(nodes, n)
 	}
 	return nodes, nil
@@ -131,24 +134,30 @@ func GetNodes(ctx context.Context, db *sql.DB) ([]MappingNode, error) {
 
 // GetNode gets a single node by node ID.
 func GetNode(ctx context.Context, db *sql.DB, nodeID string) (*MappingNode, error) {
-	row := db.QueryRowContext(ctx, "SELECT id, node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes, created_at, updated_at FROM mapping_nodes WHERE node_id = ?", nodeID)
+	row := db.QueryRowContext(ctx, "SELECT id, node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes, locked, created_at, updated_at FROM mapping_nodes WHERE node_id = ?", nodeID)
 	var n MappingNode
-	err := row.Scan(&n.ID, &n.NodeID, &n.Type, &n.Name, &n.Latitude, &n.Longitude, &n.Capacity, &n.Splitter, &n.Pppoe, &n.SerialNumber, &n.Notes, &n.CreatedAt, &n.UpdatedAt)
+	var lockedInt int
+	err := row.Scan(&n.ID, &n.NodeID, &n.Type, &n.Name, &n.Latitude, &n.Longitude, &n.Capacity, &n.Splitter, &n.Pppoe, &n.SerialNumber, &n.Notes, &lockedInt, &n.CreatedAt, &n.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
+	n.Locked = lockedInt == 1
 	return &n, nil
 }
 
 // CreateNode inserts a new mapping node.
 func CreateNode(ctx context.Context, db *sql.DB, n *MappingNode) error {
+	lockedInt := 0
+	if n.Locked {
+		lockedInt = 1
+	}
 	res, err := db.ExecContext(ctx, `
-		INSERT INTO mapping_nodes (node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		n.NodeID, n.Type, n.Name, n.Latitude, n.Longitude, n.Capacity, n.Splitter, n.Pppoe, n.SerialNumber, n.Notes,
+		INSERT INTO mapping_nodes (node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes, locked)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.NodeID, n.Type, n.Name, n.Latitude, n.Longitude, n.Capacity, n.Splitter, n.Pppoe, n.SerialNumber, n.Notes, lockedInt,
 	)
 	if err != nil {
 		return err
@@ -162,6 +171,10 @@ func CreateNode(ctx context.Context, db *sql.DB, n *MappingNode) error {
 
 // UpdateNode updates an existing mapping node.
 func UpdateNode(ctx context.Context, db *sql.DB, nodeID string, n *MappingNode) error {
+	lockedInt := 0
+	if n.Locked {
+		lockedInt = 1
+	}
 	res, err := db.ExecContext(ctx, `
 		UPDATE mapping_nodes SET
 			name = COALESCE(?, name),
@@ -172,9 +185,10 @@ func UpdateNode(ctx context.Context, db *sql.DB, nodeID string, n *MappingNode) 
 			pppoe = COALESCE(?, pppoe),
 			serialnumber = COALESCE(?, serialnumber),
 			notes = COALESCE(?, notes),
+			locked = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE node_id = ?`,
-		n.Name, n.Latitude, n.Longitude, n.Capacity, n.Splitter, n.Pppoe, n.SerialNumber, n.Notes, nodeID,
+		n.Name, n.Latitude, n.Longitude, n.Capacity, n.Splitter, n.Pppoe, n.SerialNumber, n.Notes, lockedInt, nodeID,
 	)
 	if err != nil {
 		return err
@@ -405,46 +419,8 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 	}
 	defer tx.Rollback()
 
-	// Query existing ODPs from the database first
-	rows, err := tx.QueryContext(ctx, "SELECT id, nama FROM odp")
-	if err != nil {
-		return fmt.Errorf("query existing odps: %w", err)
-	}
-	dbOdps := make(map[string]int64)
-	for rows.Next() {
-		var id int64
-		var nama string
-		if err := rows.Scan(&id, &nama); err == nil {
-			dbOdps[nama] = id
-		}
-	}
-	rows.Close()
-
-	// Validate and delete ODPs that are no longer present on the map
-	for dbOdpName, dbOdpID := range dbOdps {
-		matched := false
-		expectedNodeID := fmt.Sprintf("odp-%d", dbOdpID)
-		for _, n := range nodes {
-			if n.Type == "odp" && (n.NodeID == expectedNodeID || n.Name == dbOdpName) {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			var count int
-			err := tx.QueryRowContext(ctx, "SELECT COUNT(1) FROM pelanggan WHERE odp_id = ?", dbOdpID).Scan(&count)
-			if err != nil {
-				return fmt.Errorf("check customer count for ODP '%s': %w", dbOdpName, err)
-			}
-			if count > 0 {
-				return fmt.Errorf("ODP '%s' masih digunakan oleh pelanggan dan tidak dapat dihapus", dbOdpName)
-			}
-			_, err = tx.ExecContext(ctx, "DELETE FROM odp WHERE id = ?", dbOdpID)
-			if err != nil {
-				return fmt.Errorf("delete ODP '%s' from odp table: %w", dbOdpName, err)
-			}
-		}
-	}
+	// NOTE: Removing an ODP node from the map does NOT delete the ODP record.
+	// ODP management (create/delete from odp table) is done exclusively via the ODP management page.
 
 	// Clear tables
 	_, err = tx.ExecContext(ctx, "DELETE FROM mapping_edges")
@@ -456,22 +432,9 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 		return err
 	}
 
-	// Insert nodes
-	nodeStmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO mapping_nodes (node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-	)
-	if err != nil {
-		return err
-	}
-	defer nodeStmt.Close()
-
-	for _, n := range nodes {
-		_, err = nodeStmt.ExecContext(ctx, n.NodeID, n.Type, n.Name, n.Latitude, n.Longitude, n.Capacity, n.Splitter, n.Pppoe, n.SerialNumber, n.Notes)
-		if err != nil {
-			return err
-		}
-
+	// 1. Process ODP nodes first to assign correct node IDs and build redirection map
+	oldNodeIDToNewNodeID := make(map[string]string)
+	for i, n := range nodes {
 		if n.Type == "odp" {
 			loc := fmt.Sprintf("%f, %f", n.Latitude, n.Longitude)
 			desc := ""
@@ -483,7 +446,6 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 				ports = *n.Capacity
 			}
 
-			// Try to parse ID from NodeID (e.g. "odp-123")
 			var odpID int64
 			var hasOdpID bool
 			if strings.HasPrefix(n.NodeID, "odp-") {
@@ -505,26 +467,69 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 					odpID, n.Name, loc, desc, ports,
 					n.Name, loc, desc, ports,
 				)
+				if err != nil {
+					return fmt.Errorf("sync odp node '%s' (ID %d) to odp table: %w", n.Name, odpID, err)
+				}
 			} else {
-				_, err = tx.ExecContext(ctx, `
-					INSERT INTO odp (nama, lokasi, deskripsi, ports, updated_at)
-					VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-					ON CONFLICT(nama) DO UPDATE SET
-						lokasi = ?,
-						deskripsi = ?,
-						ports = ?,
-						updated_at = CURRENT_TIMESTAMP`,
-					n.Name, loc, desc, ports,
-					loc, desc, ports,
-				)
-			}
-			if err != nil {
-				return fmt.Errorf("sync odp node '%s' to odp table: %w", n.Name, err)
+				// Check if an ODP with this name already exists to avoid duplicate names and grab its ID
+				var existingID int64
+				err := tx.QueryRowContext(ctx, "SELECT id FROM odp WHERE nama = ?", n.Name).Scan(&existingID)
+				if err == nil {
+					// Exists: update it
+					_, err = tx.ExecContext(ctx, `
+						UPDATE odp SET lokasi = ?, deskripsi = ?, ports = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+						loc, desc, ports, existingID,
+					)
+					if err != nil {
+						return fmt.Errorf("update existing odp '%s': %w", n.Name, err)
+					}
+					odpID = existingID
+				} else {
+					// Does not exist: insert new
+					res, err := tx.ExecContext(ctx, `
+						INSERT INTO odp (nama, lokasi, deskripsi, ports, updated_at)
+						VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+						n.Name, loc, desc, ports,
+					)
+					if err != nil {
+						return fmt.Errorf("insert new odp '%s': %w", n.Name, err)
+					}
+					odpID, err = res.LastInsertId()
+					if err != nil {
+						return fmt.Errorf("get new odp last insert ID: %w", err)
+					}
+				}
+				
+				// Update n.NodeID and map old ID to new ID
+				newNodeID := fmt.Sprintf("odp-%d", odpID)
+				oldNodeIDToNewNodeID[n.NodeID] = newNodeID
+				nodes[i].NodeID = newNodeID
 			}
 		}
 	}
 
-	// Insert edges
+	// 2. Insert nodes
+	nodeStmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO mapping_nodes (node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes, locked)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	)
+	if err != nil {
+		return err
+	}
+	defer nodeStmt.Close()
+
+	for _, n := range nodes {
+		lockedInt := 0
+		if n.Locked {
+			lockedInt = 1
+		}
+		_, err = nodeStmt.ExecContext(ctx, n.NodeID, n.Type, n.Name, n.Latitude, n.Longitude, n.Capacity, n.Splitter, n.Pppoe, n.SerialNumber, n.Notes, lockedInt)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 3. Insert edges
 	edgeStmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO mapping_edges (edge_id, source, target, fiber_type, distance, waypoints, notes)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -540,7 +545,15 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 			str := string(e.Waypoints)
 			waypointsStr = &str
 		}
-		_, err = edgeStmt.ExecContext(ctx, e.EdgeID, e.Source, e.Target, e.FiberType, e.Distance, waypointsStr, e.Notes)
+		source := e.Source
+		if newVal, exists := oldNodeIDToNewNodeID[source]; exists {
+			source = newVal
+		}
+		target := e.Target
+		if newVal, exists := oldNodeIDToNewNodeID[target]; exists {
+			target = newVal
+		}
+		_, err = edgeStmt.ExecContext(ctx, e.EdgeID, source, target, e.FiberType, e.Distance, waypointsStr, e.Notes)
 		if err != nil {
 			return err
 		}
@@ -556,7 +569,7 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 	}
 
 	// 2. Query all ODPs from the database to map their Name to their ID
-	rows, err = tx.QueryContext(ctx, "SELECT id, nama FROM odp")
+	rows, err := tx.QueryContext(ctx, "SELECT id, nama FROM odp")
 	if err != nil {
 		return fmt.Errorf("query odp table: %w", err)
 	}

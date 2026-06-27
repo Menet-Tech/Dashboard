@@ -33,11 +33,13 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("api", "worker", "frontend", "whatsapp", "bot", "test", "watch", "check", "setup-env", "clean", "reset", "help", $null)]
+    [ValidateSet("api", "worker", "frontend", "whatsapp", "bot", "test", "watch", "check", "setup-env", "clean", "reset", "help", "seed", $null)]
     [string]$Command = "",
 
     [Parameter(Position = 1)]
-    [switch]$Force
+    [switch]$Force,
+
+    [switch]$Dummy
 )
 
 # Handle null/empty command
@@ -58,13 +60,13 @@ $storagePath = Join-Path -Path $repoRoot -ChildPath "storage"
 $whatsappPath = Join-Path -Path $repoRoot -ChildPath "whatsapp"
 
 $script:Config = @{
-    RepoRoot      = $repoRoot
-    BackendDir    = $backendPath
-    FrontendDir   = $frontendPath
-    WhatsAppDir   = $whatsappPath
-    EnvFile       = "$backendPath\.env"
-    DbPath        = "$storagePath\dashboard.db"
-    StorageDir    = $storagePath
+    RepoRoot    = $repoRoot
+    BackendDir  = $backendPath
+    FrontendDir = $frontendPath
+    WhatsAppDir = $whatsappPath
+    EnvFile     = "$backendPath\.env"
+    DbPath      = "$storagePath\dashboard.db"
+    StorageDir  = $storagePath
 }
 
 # Colors
@@ -144,7 +146,7 @@ SESSION_TTL_HOURS=24
 LOGIN_MAX_ATTEMPTS=5
 LOGIN_WINDOW_MINUTES=15
 BOOTSTRAP_ADMIN_USERNAME=admin
-BOOTSTRAP_ADMIN_PASSWORD=admin123
+BOOTSTRAP_ADMIN_PASSWORD=password
 MIKROTIK_HOST=
 MIKROTIK_USER=
 MIKROTIK_PASS=
@@ -164,7 +166,7 @@ DASHBOARD_INTERNAL_API_KEY=change-me-secret
     Set-Content -Path $script:Config.EnvFile -Value $envContent -Encoding UTF8
     
     Write-Log ".env file created: $($script:Config.EnvFile)" -Type Success
-    Write-Log "Default password: admin123 (ubah jika perlu)" -Type Warning
+    Write-Log "Default password: password (ubah jika perlu)" -Type Warning
 }
 Set-Alias -Name Setup-EnvFile -Value Initialize-EnvFile
 
@@ -286,7 +288,8 @@ function Invoke-StartFrontend {
         if ($Force) {
             Write-Log "Forcing Vite dependency re-optimization..." -Type Info
             & npm run dev -- --force
-        } else {
+        }
+        else {
             & npm run dev
         }
     }
@@ -345,17 +348,17 @@ function Invoke-StartGateway {
         }
         
         # Load env vars from backend/.env so the gateway can read them
-        $waPort      = Get-EnvValue -Key "WA_GATEWAY_PORT"            -Default "3001"
-        $apiUrl      = Get-EnvValue -Key "DASHBOARD_API_URL"          -Default "http://localhost:8080"
-        $apiKey      = Get-EnvValue -Key "DASHBOARD_INTERNAL_API_KEY" -Default ""
-        $discordUrl  = Get-EnvValue -Key "DISCORD_WEBHOOK_URL"        -Default ""
+        $waPort = Get-EnvValue -Key "WA_GATEWAY_PORT"            -Default "3001"
+        $apiUrl = Get-EnvValue -Key "DASHBOARD_API_URL"          -Default "http://localhost:8080"
+        $apiKey = Get-EnvValue -Key "DASHBOARD_INTERNAL_API_KEY" -Default ""
+        $discordUrl = Get-EnvValue -Key "DISCORD_WEBHOOK_URL"        -Default ""
         
-        $env:PORT                        = $waPort
-        $env:DASHBOARD_API_URL           = $apiUrl
-        $env:DASHBOARD_INTERNAL_API_KEY  = $apiKey
-        $env:API_KEY                     = $apiKey
+        $env:PORT = $waPort
+        $env:DASHBOARD_API_URL = $apiUrl
+        $env:DASHBOARD_INTERNAL_API_KEY = $apiKey
+        $env:API_KEY = $apiKey
         if ($discordUrl) {
-            $env:DISCORD_WEBHOOK_URL     = $discordUrl
+            $env:DISCORD_WEBHOOK_URL = $discordUrl
         }
         
         Write-Host ""
@@ -455,7 +458,8 @@ function Invoke-StartAll {
         Write-Host "  -- atau --" -ForegroundColor DarkGray
         Write-Host "  .\deploy\go-dev\quickstart-windows.ps1 whatsapp" -ForegroundColor Gray
         Write-Host ""
-    } else {
+    }
+    else {
         Write-Log "WhatsApp Gateway: DISABLED (set ENABLE_WHATSAPP=true di backend/.env untuk mengaktifkan)" -Type Warning
         Write-Host ""
     }
@@ -516,23 +520,23 @@ function Invoke-Clean {
 function Invoke-Reset {
     Write-Header "FULL RESET - Hapus Semua Data dan State"
 
-    $waDir      = $script:Config.WhatsAppDir
+    $waDir = $script:Config.WhatsAppDir
     # DB default ada di whatsapp/storage/ (lihat database.js)
-    $waDbDir    = Join-Path $waDir "storage"
-    $waDbPath   = Join-Path $waDbDir "wa_gateway.db"
-    $waDbShm    = Join-Path $waDbDir "wa_gateway.db-shm"
-    $waDbWal    = Join-Path $waDbDir "wa_gateway.db-wal"
+    $waDbDir = Join-Path $waDir "storage"
+    $waDbPath = Join-Path $waDbDir "wa_gateway.db"
+    $waDbShm = Join-Path $waDbDir "wa_gateway.db-shm"
+    $waDbWal = Join-Path $waDbDir "wa_gateway.db-wal"
     # Legacy path (root whatsapp/) - hapus juga kalau ada
     $waDbLegacy = Join-Path $waDir "wa_gateway.db"
-    $waStorage  = Join-Path $waDir "storage"
+    $waStorage = Join-Path $waDir "storage"
     $waSessions = Join-Path $waDir "src\whatsapp\sessions"
-    $waWwebjs   = Join-Path $waDir ".wwebjs_cache"
-    $waTemp     = Join-Path $waDir "temp"
+    $waWwebjs = Join-Path $waDir ".wwebjs_cache"
+    $waTemp = Join-Path $waDir "temp"
     $backendEnv = $script:Config.EnvFile
-    $waEnv      = Join-Path $waDir ".env"
-    $dbPath     = $script:Config.DbPath
-    $dbShm      = $dbPath -replace '\.db$', '.db-shm'
-    $dbWal      = $dbPath -replace '\.db$', '.db-wal'
+    $waEnv = Join-Path $waDir ".env"
+    $dbPath = $script:Config.DbPath
+    $dbShm = $dbPath -replace '\.db$', '.db-shm'
+    $dbWal = $dbPath -replace '\.db$', '.db-wal'
 
     Write-Host ""
     Write-Host "  Yang akan DIHAPUS:" -ForegroundColor Red
@@ -579,7 +583,7 @@ function Invoke-Reset {
     # 2. WA Gateway SQLite DB
     Write-Log "[2/7] Menghapus WhatsApp Gateway database..." -Type Info
     foreach ($f in @($waDbPath, $waDbShm, $waDbWal, $waDbLegacy,
-                     ($waDbLegacy + "-wal"), ($waDbLegacy + "-shm"))) {
+            ($waDbLegacy + "-wal"), ($waDbLegacy + "-shm"))) {
         if (Test-Path $f) {
             Remove-Item -Path $f -Force -ErrorAction SilentlyContinue
             Write-Log "      Deleted: $f" -Type Success
@@ -630,18 +634,22 @@ function Invoke-Reset {
         $ErrorActionPreference = $prevPref
         if ($LASTEXITCODE -eq 0) {
             Write-Log "      Go cache cleared" -Type Success
-        } else {
+        }
+        else {
             Write-Log "      Go cache: sebagian tidak bisa dihapus (proses backend mungkin masih berjalan - tidak apa-apa)" -Type Warning
         }
-    } catch {
+    }
+    catch {
         Write-Log "      Go cache: skip (pastikan backend sudah dihentikan sebelum reset untuk hasil terbaik)" -Type Warning
-    } finally { Pop-Location }
+    }
+    finally { Pop-Location }
 
     Push-Location $script:Config.FrontendDir
     try {
         Remove-Item -Path @("dist", "node_modules\.vite") -Recurse -Force -ErrorAction SilentlyContinue
         Write-Log "      Frontend vite cache cleared" -Type Success
-    } finally { Pop-Location }
+    }
+    finally { Pop-Location }
 
 
     Write-Host ""
@@ -679,6 +687,7 @@ COMMANDS:
   watch         Run backend tests (re-run 5x)
   check         Verify prerequisites
   setup-env     Setup .env file
+  seed          Seed database dengan data dummy
   clean         Bersihkan temp files & caches
   reset         Reset TOTAL: hapus semua DB, WA sessions, .env, cache
   help          Show help message (ini)
@@ -691,14 +700,17 @@ EXAMPLES:
   # Backend only
   .\quickstart-windows.ps1 api
 
+  # Backend and seed dummy data automatically
+  .\quickstart-windows.ps1 api -Dummy
+
   # Frontend only
   .\quickstart-windows.ps1 frontend
 
-  # Frontend only with forced dependency optimization (fixes outdated/504 dependencies cache)
-  .\quickstart-windows.ps1 frontend -Force
-
   # Run tests
   .\quickstart-windows.ps1 test
+
+  # Seed database manually
+  .\quickstart-windows.ps1 seed
 
   # Setup .env
   .\quickstart-windows.ps1 setup-env
@@ -732,7 +744,7 @@ WORKFLOW TYPICAL:
 
   7. Login dengan credentials:
      Username: admin
-     Password: admin123
+     Password: password
 
 TROUBLESHOOTING:
 
@@ -801,6 +813,23 @@ function Main {
         }
         Import-EnvFile
     }
+
+    # Auto-seed dummy data if -Dummy flag is set
+    if ($Dummy) {
+        Write-Log "Seeding dummy data (flag -Dummy aktif)..." -Type Warning
+        Push-Location $script:Config.BackendDir
+        try {
+            & go run ./cmd/api seed
+            Write-Log "Seeding data dummy selesai!" -Type Success
+        }
+        catch {
+            Write-Log "Gagal seeding data dummy: $_" -Type Error
+            exit 1
+        }
+        finally {
+            Pop-Location
+        }
+    }
     
     # Route command
     switch ($Command) {
@@ -812,6 +841,17 @@ function Main {
         }
         "frontend" {
             Invoke-StartFrontend
+        }
+        "seed" {
+            Write-Header "Seeding Dummy Data"
+            Push-Location $script:Config.BackendDir
+            try {
+                & go run ./cmd/api seed
+                Write-Log "Database successfully seeded with dummy data!" -Type Success
+            }
+            finally {
+                Pop-Location
+            }
         }
         "whatsapp" {
             $waEnabled = Get-EnvValue -Key "ENABLE_WHATSAPP" -Default "false"

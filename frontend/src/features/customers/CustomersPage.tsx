@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Loader2, Plus, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
+import { Loader2, Plus, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw } from "lucide-react";
 import { StatusPill, EmptyTableRow } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
 import type { CustomerItem, PackageItem, User, OdpItem } from "../../types";
@@ -13,6 +13,7 @@ import { bulkUpdateCustomerStatus } from "../../lib/api";
 import { CustomerFormCard } from "./components/CustomerFormCard";
 import { BroadcastModal } from "./components/BroadcastModal";
 import { CustomerDetailModal } from "./components/CustomerDetailModal";
+import { MikrotikSyncModal } from "./components/MikrotikSyncModal";
 
 export type CustomerFormState = {
   name: string;
@@ -77,6 +78,7 @@ type CustomersPageProps = {
   onDeleteBulk: (ids: number[]) => void;
   isFormOpen: boolean;
   onSetFormOpen: (open: boolean) => void;
+  onEndTrial?: (id: number) => void;
 };
 
 export function CustomersPage({
@@ -104,10 +106,25 @@ export function CustomersPage({
   onDeleteBulk,
   isFormOpen,
   onSetFormOpen,
+  onEndTrial,
 }: CustomersPageProps) {
   const [selectedIds, setSelectedIds] = useState<Record<number, boolean>>({});
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const [detailedCustomer, setDetailedCustomer] = useState<CustomerItem | null>(null);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+
+  const handleSelectSecret = (name: string, password: string, guessedPackageId: number) => {
+    onCancelEdit();
+    onFormChange((curr) => ({
+      ...curr,
+      name: name,
+      user_pppoe: name,
+      password_pppoe: password,
+      package_id: guessedPackageId,
+    }));
+    setIsSyncModalOpen(false);
+    onSetFormOpen(true);
+  };
 
   const [sortField, setSortField] = useState<string | null>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -316,11 +333,21 @@ export function CustomersPage({
             {user?.role !== "viewer" && (
               <button
                 type="button"
+                onClick={() => setIsSyncModalOpen(true)}
+                className="bg-white border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw size={14} />
+                Sync dari MikroTik
+              </button>
+            )}
+            {user?.role !== "viewer" && (
+              <button
+                type="button"
                 onClick={() => {
                   onCancelEdit();
                   onSetFormOpen(true);
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus size={14} />
                 Tambah Pelanggan
@@ -588,6 +615,14 @@ export function CustomersPage({
         </Modal>
       )}
 
+      {/* MikroTik Sync Modal */}
+      <MikrotikSyncModal
+        isOpen={isSyncModalOpen}
+        onClose={() => setIsSyncModalOpen(false)}
+        packages={packages}
+        onSelectSecret={handleSelectSecret}
+      />
+
       {/* Standalone Customer Details Modal */}
       {detailedCustomer && (
         <CustomerDetailModal
@@ -599,8 +634,10 @@ export function CustomersPage({
           pushSuccess={pushSuccess}
           pushError={pushError}
           onRefresh={onRefresh}
+          onEndTrial={onEndTrial}
         />
       )}
+
 
       {/* Bulk Edit Modal */}
       {isBulkEditOpen && (

@@ -20,6 +20,7 @@ import type {
   VoucherItem,
   CustomerVoucherItem,
   VoucherUsageLogItem,
+  PaymentConfirmationItem,
 } from "../types";
 
 let csrfToken = "";
@@ -136,7 +137,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const isFormData = options.body instanceof FormData;
   const response = await fetch(path, {
     credentials: "include",
@@ -178,8 +179,8 @@ export function fetchHealth() {
 }
 
 export async function fetchSummary(): Promise<SummaryPayload> {
-  const res = await request<SummaryPayload>("/api/v1/dashboard/summary");
-  return res;
+  const res = await request<{ data: SummaryPayload }>("/api/v1/dashboard/summary");
+  return res.data;
 }
 
 export async function fetchRevenue(): Promise<{ data: RevenueItem[] }> {
@@ -271,6 +272,13 @@ export function updateCustomerStatus(id: number, status: CustomerItem["status"])
   });
 }
 
+export function endCustomerTrial(id: number) {
+  return request<{ message: string }>(`/api/v1/customers/${id}/end-trial`, {
+    method: "POST",
+  });
+}
+
+
 export function bulkUpdateCustomerStatus(
   ids: number[],
   status?: CustomerItem["status"],
@@ -353,6 +361,19 @@ export function uploadBillProof(id: number, file: File) {
     body: formData,
   });
 }
+
+export function grantBillExtension(id: number) {
+  return request<{ message: string }>(`/api/v1/bills/${id}/extend`, {
+    method: "POST",
+  });
+}
+
+export function cancelPendingBillAction(id: number) {
+  return request<{ message: string }>(`/api/v1/bills/${id}/cancel-pending`, {
+    method: "POST",
+  });
+}
+
 
 export function fetchTemplates() {
   return request<{ data: TemplateItem[] }>("/api/v1/templates");
@@ -465,6 +486,77 @@ export function checkIntegrations() {
 
 export function getBackupDownloadUrl(filename: string) {
   return `/api/v1/backups/${encodeURIComponent(filename)}/download`;
+}
+
+export type VendorItem = {
+  id: number;
+  name: string;
+  manufacturer_patterns: string[];
+  product_patterns: string[];
+  parameter_prefix: string;
+  service_list_path: string;
+  lan_binding_path: string;
+  vlan_id_path: string;
+  http_wan_enable_path: string;
+  firewall_level_path: string;
+  priority: number;
+  enabled: number;
+  description: string;
+};
+
+export type WifiSecurityItem = {
+  id: number;
+  product_class: string;
+  security_types: string[];
+  password_param_path: string;
+};
+
+export function fetchVendors() {
+  return request<{ data: VendorItem[] }>("/api/vendor-management/vendors");
+}
+
+export function createVendor(payload: Partial<VendorItem>) {
+  return request<{ success: boolean; message: string; id?: number }>("/api/vendor-management/vendors", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateVendor(id: number, payload: Partial<VendorItem>) {
+  return request<{ success: boolean; message: string }>(`/api/vendor-management/vendors/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteVendor(id: number) {
+  return request<{ success: boolean; message: string }>(`/api/vendor-management/vendors/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchWifiSecurities() {
+  return request<{ data: WifiSecurityItem[] }>("/api/vendor-management/wifi-security");
+}
+
+export function createWifiSecurity(payload: Partial<WifiSecurityItem>) {
+  return request<{ success: boolean; message: string; id?: number }>("/api/vendor-management/wifi-security", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateWifiSecurity(id: number, payload: Partial<WifiSecurityItem>) {
+  return request<{ success: boolean; message: string }>(`/api/vendor-management/wifi-security/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteWifiSecurity(id: number) {
+  return request<{ success: boolean; message: string }>(`/api/vendor-management/wifi-security/${id}`, {
+    method: "DELETE",
+  });
 }
 
 export function fetchUsers() {
@@ -591,12 +683,150 @@ export type GacsDevice = {
   };
 };
 
+export type VPValue = {
+  path: string;
+  value: any;
+};
+
+export type DetailedDeviceInfo = {
+  productclass: string;
+  serialNumber: string;
+  manufacturer: string;
+  oui: string;
+  hardwareVersion: string;
+  softwareVersion: string;
+  upTime: string;
+  macAddress: string;
+};
+
+export type ConnectionInfo = {
+  _lastInform: string;
+  _lastBoot: string;
+  _registered: string;
+};
+
+export type WANConnectionParsed = {
+  type: string;
+  path: string;
+  wanDeviceIndex: string;
+  connDeviceIndex: string;
+  index: string;
+  enable: VPValue;
+  connectionStatus: VPValue;
+  externalIPAddress: VPValue;
+  subnetMask?: VPValue;
+  defaultGateway?: VPValue;
+  username?: string;
+  dnsServers?: VPValue;
+  connectionType?: VPValue;
+  name?: VPValue;
+  natEnabled?: VPValue;
+  addressingType?: VPValue;
+  lastConnectionError?: VPValue;
+  serviceList?: {
+    serviceList: VPValue;
+  };
+  lanBinding?: {
+    path: string;
+    wanInterface: string;
+    normalized: {
+      lan1: boolean;
+      lan2: boolean;
+      lan3: boolean;
+      lan4: boolean;
+      ssid1: boolean;
+      ssid2: boolean;
+      ssid3: boolean;
+      ssid4: boolean;
+      ssid5: boolean;
+      ssid6: boolean;
+      ssid7: boolean;
+      ssid8: boolean;
+    };
+    raw?: {
+      path?: string;
+      type: string;
+      vendor: string;
+      data: string;
+      parsed: string[];
+      bindingIndex?: string;
+    };
+  };
+  vlanInfo?: {
+    path: string;
+    value: any;
+  };
+};
+
+export type WANConnections = {
+  wanIPConnections: WANConnectionParsed[] | null;
+  wanPPPConnections: WANConnectionParsed[] | null;
+  totalConnections: number;
+  totalIPConnections: number;
+  totalPPPConnections: number;
+};
+
+export type WlanAP = {
+  enabled: VPValue;
+  ssid: VPValue;
+  password: VPValue;
+  security: {
+    path: string;
+    rawValue: string;
+    normalizedValue: string;
+  };
+  stations: VPValue;
+  channel: VPValue;
+};
+
+export type WiFiClient = {
+  index: string;
+  hostname: string;
+  ip: string;
+  mac: string;
+};
+
 export type GacsDeviceDetail = {
-  success: boolean;
-  data: Record<string, unknown>;
-  vendor?: {
+  _id: string;
+  tags: string[] | null;
+  vendor: string;
+  deviceInfo: DetailedDeviceInfo;
+  connectionInfo: ConnectionInfo;
+  wanConnections: WANConnections;
+  wifiInfo: Record<string, WlanAP>;
+  wifiClients: WiFiClient[];
+  virtualParameters: Record<string, VPValue>;
+  securityInfo?: Record<string, VPValue>;
+  vendorDetection: {
+    vendor: string;
+    vendorId: number;
+    vendorName: string;
+    parameterPrefix: string;
+  };
+  faults: GacsFault[] | null;
+  customer?: {
+    id: number;
     name: string;
-    parameter_prefix: string;
+    user_pppoe: string;
+    sn_ont: string;
+    status: string;
+    whatsapp: string;
+    address: string;
+  };
+  mikrotikSecret?: {
+    username: string;
+    password?: string;
+    profile: string;
+    disabled: boolean;
+    last_logged_out?: string;
+    last_caller_id?: string;
+    last_disconnect_reason?: string;
+  };
+  mikrotikActiveConn?: {
+    active: boolean;
+    address: string;
+    uptime: string;
+    caller_id: string;
   };
 };
 
@@ -767,9 +997,10 @@ export function syncMappingData(data: { nodes: MapNode[]; edges: MapEdge[] }) {
 }
 
 // Reset mapping data
-export function resetMappingData() {
+export function resetMappingData(password: string) {
   return request<{ success: boolean }>("/api/v1/mapping-data/reset", {
     method: "DELETE",
+    body: JSON.stringify({ password }),
   });
 }
 
@@ -933,6 +1164,23 @@ export function testSMTP(payload: SMTPTestPayload) {
 export function deleteSetting(key: string) {
   return request<{ message: string }>(`/api/v1/settings/${key}`, {
     method: "DELETE",
+  });
+}
+
+// Payment Confirmations API
+export function fetchPendingConfirmations() {
+  return request<{ data: PaymentConfirmationItem[] }>("/api/v1/bills/confirmations/pending");
+}
+
+export function approveConfirmation(id: number) {
+  return request<{ message: string }>(`/api/v1/bills/confirmations/${id}/approve`, {
+    method: "POST",
+  });
+}
+
+export function rejectConfirmation(id: number) {
+  return request<{ message: string }>(`/api/v1/bills/confirmations/${id}/reject`, {
+    method: "POST",
   });
 }
 

@@ -1,3 +1,5 @@
+import { request } from "./api";
+
 export type GatewayAccount = {
   accountId: string;
   ready: boolean;
@@ -156,9 +158,7 @@ export function getChatbotForms(
   limit = 50
 ) {
   const typeParam = type ? `&type=${type}` : "";
-  return gatewayRequest<{ data: ContactForm[] }>(
-    url,
-    apiKey,
+  return request<{ status: string; count: number; data: ContactForm[] }>(
     `/api/v1/chatbot/forms?limit=${limit}${typeParam}`
   );
 }
@@ -228,9 +228,7 @@ export function updateChatbotForm(
   id: string,
   status: "pending" | "resolved"
 ) {
-  return gatewayRequest<{ data: ContactForm }>(
-    url,
-    apiKey,
+  return request<{ data: ContactForm }>(
     `/api/v1/chatbot/forms/${id}`,
     {
       method: "PATCH",
@@ -249,16 +247,14 @@ export function createChatbotForm(
     data: Record<string, any>;
   }
 ) {
-  return gatewayRequest<{ data: { id: string } }>(url, apiKey, "/api/v1/chatbot/forms", {
+  return request<{ data: { id: string } }>("/api/v1/chatbot/forms", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export function deleteChatbotForm(url: string, apiKey: string, id: string) {
-  return gatewayRequest<{ message: string }>(
-    url,
-    apiKey,
+  return request<{ message: string }>(
     `/api/v1/chatbot/forms/${id}`,
     { method: "DELETE" }
   );

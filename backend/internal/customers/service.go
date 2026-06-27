@@ -106,7 +106,11 @@ func (s Service) Create(ctx context.Context, customer Customer) (Customer, error
 		return Customer{}, err
 	}
 
-	_ = s.SyncToMikrotik(ctx, created)
+	go func(c Customer) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = s.SyncToMikrotik(bgCtx, c)
+	}(created)
 
 	return created, nil
 }
@@ -121,7 +125,11 @@ func (s Service) Update(ctx context.Context, id int64, customer Customer) (Custo
 		return Customer{}, err
 	}
 
-	_ = s.SyncToMikrotik(ctx, updated)
+	go func(c Customer) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = s.SyncToMikrotik(bgCtx, c)
+	}(updated)
 
 	return updated, nil
 }
@@ -137,7 +145,11 @@ func (s Service) UpdateStatus(ctx context.Context, id int64, status string) erro
 
 	customer, err := s.FindByID(ctx, id)
 	if err == nil {
-		_ = s.SyncToMikrotik(ctx, customer)
+		go func(c Customer) {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_ = s.SyncToMikrotik(bgCtx, c)
+		}(customer)
 	}
 
 	return nil
@@ -149,8 +161,12 @@ func (s Service) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 
-	// Delete from Mikrotik first (or try to, log warning if fails)
-	_ = s.DeleteFromMikrotik(ctx, customer)
+	// Delete from Mikrotik asynchronously
+	go func(c Customer) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = s.DeleteFromMikrotik(bgCtx, c)
+	}(customer)
 
 	// Delete from local database
 	return s.Repository.Delete(ctx, id)

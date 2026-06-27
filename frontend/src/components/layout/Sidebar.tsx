@@ -18,6 +18,7 @@ import {
   BadgePercent,
   Network,
   Cpu,
+  ClipboardCheck,
   Map,
   ChevronDown,
   TrendingUp,
@@ -61,6 +62,7 @@ const iconMap: Record<ViewKey, React.ComponentType<{ className?: string }>> = {
   odp: Network,
   devices: Cpu,
   "network-map": Map,
+  "payment-confirmations": ClipboardCheck,
 };
 
 const groups = [
@@ -69,7 +71,7 @@ const groups = [
     title: "Utama & Billing",
     icon: FolderOpen,
     gradient: "from-blue-600/10 via-indigo-600/5 to-transparent dark:from-blue-500/20 dark:via-indigo-500/10",
-    keys: ["dashboard", "bills", "customers", "packages", "discounts"] as ViewKey[],
+    keys: ["dashboard", "bills", "payment-confirmations", "customers", "packages", "discounts"] as ViewKey[],
   },
   {
     id: "infrastruktur",

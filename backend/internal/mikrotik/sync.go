@@ -84,8 +84,10 @@ func (s *RouterService) SyncMainToSlaves(ctx context.Context) (*SyncResult, erro
 
 			// Sync PPP Profiles
 			for _, profile := range profiles {
-				// We don't sync built-in profiles like "default" and "default-encryption" if they trigger read-only issues,
-				// but RouterOS allows modifying them, and standard custom profiles are synced.
+				// We don't sync built-in profiles like "default" and "default-encryption" to avoid conflicts or read-only/missing pool errors.
+				if profile.Name == "default" || profile.Name == "default-encryption" {
+					continue
+				}
 				if err := slaveClient.SyncPPPProfile(ctx, profile.Name, profile.LocalAddress, profile.RemoteAddress, profile.RateLimit); err != nil {
 					return fmt.Errorf("failed to sync ppp profile %q: %w", profile.Name, err)
 				}

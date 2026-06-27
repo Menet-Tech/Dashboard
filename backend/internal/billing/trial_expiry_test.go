@@ -27,6 +27,10 @@ func (m *mockTrialWhatsAppSender) SendTemplate(ctx context.Context, payload noti
 	return nil
 }
 
+func (m *mockTrialWhatsAppSender) SendDirectMessage(ctx context.Context, accountID, toNumber, body string) error {
+	return nil
+}
+
 func (m *mockDiscordSender) SendAlert(ctx context.Context, msg string) error {
 	m.messages = append(m.messages, msg)
 	return nil
@@ -104,8 +108,8 @@ func TestProcessTrialExpiryGeneratesBillsForExpiredTrials(t *testing.T) {
 
 	select {
 	case payload := <-mockWA.payloads:
-		if payload.TriggerKey != "jatuh_tempo" {
-			t.Fatalf("expected jatuh_tempo trigger, got %q", payload.TriggerKey)
+		if payload.TriggerKey != "trial_expired" {
+			t.Fatalf("expected trial_expired trigger, got %q", payload.TriggerKey)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected 1 whatsapp payload, got none")
@@ -335,7 +339,7 @@ func TestProcessTrialExpiryDoesNotDuplicateExistingBill(t *testing.T) {
 	}
 }
 
-func TestProcessTrialExpirySkipsNotificationBeforeReminderWindow(t *testing.T) {
+func TestProcessTrialExpirySendsNotificationOnExpiry(t *testing.T) {
 	db := trialTestDB(t)
 	settingsService := settings.Service{Repository: settings.Repository{DB: db}}
 	customersService := customers.Service{Repository: customers.Repository{DB: db}}
@@ -369,10 +373,14 @@ func TestProcessTrialExpirySkipsNotificationBeforeReminderWindow(t *testing.T) {
 
 	select {
 	case payload := <-mockWA.payloads:
-		t.Fatalf("expected no whatsapp notification before reminder window, got %q", payload.TriggerKey)
-	case <-time.After(300 * time.Millisecond):
+		if payload.TriggerKey != "trial_expired" {
+			t.Fatalf("expected trial_expired notification, got %q", payload.TriggerKey)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected whatsapp notification, got none")
 	}
 }
+
 
 func TestProcessTrialExpiryUsesReminderTriggerInsideReminderWindow(t *testing.T) {
 	db := trialTestDB(t)
@@ -408,12 +416,13 @@ func TestProcessTrialExpiryUsesReminderTriggerInsideReminderWindow(t *testing.T)
 
 	select {
 	case payload := <-mockWA.payloads:
-		if payload.TriggerKey != "reminder_custom" {
-			t.Fatalf("expected reminder_custom trigger, got %q", payload.TriggerKey)
+		if payload.TriggerKey != "trial_expired" {
+			t.Fatalf("expected trial_expired trigger, got %q", payload.TriggerKey)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("expected reminder_custom notification, got none")
+		t.Fatal("expected trial_expired notification, got none")
 	}
+
 }
 
 func trialTestDB(t *testing.T) *sql.DB {

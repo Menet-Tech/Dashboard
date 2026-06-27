@@ -261,7 +261,7 @@ export function EmailTemplatesPage({
                 className={inputClassName(templateErrors.trigger_key)}
                 value={templateForm.trigger_key}
                 onChange={(e) => setTemplateForm((curr) => ({ ...curr, trigger_key: e.target.value }))}
-                placeholder="contoh: reminder_custom"
+                placeholder="contoh: reminder-h5"
                 required
                 disabled={editingTemplateId !== null}
               />

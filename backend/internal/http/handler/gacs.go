@@ -113,6 +113,54 @@ func (h GacsHandler) GetDevices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Automatically attach devices to matching customers/nodes
+	ctx := r.Context()
+	for _, dev := range devices {
+		sn, _ := dev["SerialNumber"].(string)
+		pppoe, _ := dev["pppoe"].(string)
+
+		sn = strings.TrimSpace(sn)
+		pppoe = strings.TrimSpace(pppoe)
+
+		if sn == "" || pppoe == "" {
+			continue
+		}
+
+		// 1. Sync pelanggan (customer) table
+		// If customer has this PPPoE, sync Serial Number
+		_, _ = h.DB.ExecContext(ctx, `
+			UPDATE pelanggan 
+			SET sn_ont = ?, updated_at = CURRENT_TIMESTAMP 
+			WHERE user_pppoe = ? AND (sn_ont IS NULL OR sn_ont = '')`,
+			sn, pppoe,
+		)
+
+		// If customer has this Serial Number, sync PPPoE username
+		_, _ = h.DB.ExecContext(ctx, `
+			UPDATE pelanggan 
+			SET user_pppoe = ?, updated_at = CURRENT_TIMESTAMP 
+			WHERE sn_ont = ? AND (user_pppoe IS NULL OR user_pppoe = '')`,
+			pppoe, sn,
+		)
+
+		// 2. Sync mapping_nodes table
+		// If node has this PPPoE, sync Serial Number
+		_, _ = h.DB.ExecContext(ctx, `
+			UPDATE mapping_nodes 
+			SET serialnumber = ?, updated_at = CURRENT_TIMESTAMP 
+			WHERE type = 'ont' AND pppoe = ? AND (serialnumber IS NULL OR serialnumber = '')`,
+			sn, pppoe,
+		)
+
+		// If node has this Serial Number, sync PPPoE username
+		_, _ = h.DB.ExecContext(ctx, `
+			UPDATE mapping_nodes 
+			SET pppoe = ?, updated_at = CURRENT_TIMESTAMP 
+			WHERE type = 'ont' AND serialnumber = ? AND (pppoe IS NULL OR pppoe = '')`,
+			pppoe, sn,
+		)
+	}
+
 	WriteJSON(w, http.StatusOK, devices)
 }
 
@@ -1251,7 +1299,7 @@ func (h GacsHandler) ResetMappingData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := decodeJSON(r, &payload); err != nil || payload.Password == "" {
-		WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "message": "Password is required"})
+		WriteError(w, http.StatusBadRequest, "Password is required")
 		return
 	}
 
@@ -1259,13 +1307,13 @@ func (h GacsHandler) ResetMappingData(w http.ResponseWriter, r *http.Request) {
 	var hashedPwd string
 	err := h.DB.QueryRowContext(r.Context(), "SELECT password_hash FROM users WHERE role = 'admin' LIMIT 1").Scan(&hashedPwd)
 	if err != nil {
-		WriteJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "message": "Failed to verify admin password"})
+		WriteError(w, http.StatusInternalServerError, "Failed to verify admin password")
 		return
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(hashedPwd), []byte(payload.Password)) != nil {
 		// Use 400 Bad Request to prevent UI logouts on invalid password
-		WriteJSON(w, http.StatusBadRequest, map[string]any{"success": false, "message": "Invalid password. Please try again."})
+		WriteError(w, http.StatusBadRequest, "Invalid password. Please try again.")
 		return
 	}
 
@@ -1434,7 +1482,16 @@ func (h GacsHandler) UpdateVendor(w http.ResponseWriter, r *http.Request) {
 	// Retrieve existing vendor
 	var v acs.Vendor
 	var mfrRaw, prodRaw string
-	err = h.DB.QueryRowContext(r.Context(), "SELECT name, manufacturer_patterns, product_patterns, parameter_prefix, service_list_path, lan_binding_path, vlan_id_path, http_wan_enable_path, firewall_level_path, priority, enabled, COALESCE(description,'') FROM vendors WHERE id = ?", id).Scan(
+	err = h.DB.QueryRowContext(r.Context(), `
+		SELECT name, manufacturer_patterns, product_patterns, 
+		       COALESCE(parameter_prefix, ''), 
+		       COALESCE(service_list_path, ''), 
+		       COALESCE(lan_binding_path, ''), 
+		       COALESCE(vlan_id_path, ''), 
+		       COALESCE(http_wan_enable_path, ''), 
+		       COALESCE(firewall_level_path, ''), 
+		       priority, enabled, COALESCE(description, '') 
+		FROM vendors WHERE id = ?`, id).Scan(
 		&v.Name, &mfrRaw, &prodRaw, &v.ParameterPrefix, &v.ServiceListPath, &v.LanBindingPath, &v.VlanIDPath, &v.HTTPWanEnablePath, &v.FirewallLevelPath, &v.Priority, &v.Enabled, &v.Description,
 	)
 	if err != nil {
@@ -2632,5 +2689,174 @@ func (h GacsHandler) PortalValidateAccessCode(w http.ResponseWriter, r *http.Req
 		"success": true,
 		"device":  devices[0],
 	})
+}
+
+// GET /api/v1/vendor-management/wifi-security
+func (h GacsHandler) GetWifiSecurities(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.DB.QueryContext(r.Context(), "SELECT id, product_class, security_types, password_param_path FROM wifi_security_config ORDER BY product_class ASC")
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type WifiSecOutput struct {
+		ID                int64    `json:"id"`
+		ProductClass      string   `json:"product_class"`
+		SecurityTypes     []string `json:"security_types"`
+		PasswordParamPath string   `json:"password_param_path"`
+	}
+
+	var list []WifiSecOutput
+	for rows.Next() {
+		var w WifiSecOutput
+		var typesRaw string
+		if err := rows.Scan(&w.ID, &w.ProductClass, &typesRaw, &w.PasswordParamPath); err == nil {
+			parts := strings.Split(typesRaw, ",")
+			for i, val := range parts {
+				parts[i] = strings.TrimSpace(val)
+			}
+			w.SecurityTypes = parts
+			list = append(list, w)
+		}
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "data": list})
+}
+
+// POST /api/v1/vendor-management/wifi-security
+func (h GacsHandler) CreateWifiSecurity(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		ProductClass      string `json:"product_class"`
+		SecurityTypes     any    `json:"security_types"` // slice or string
+		PasswordParamPath string `json:"password_param_path"`
+	}
+	if err := decodeJSON(r, &payload); err != nil || payload.ProductClass == "" || payload.PasswordParamPath == "" {
+		WriteError(w, http.StatusBadRequest, "product_class and password_param_path are required")
+		return
+	}
+
+	typesStr := ""
+	if slice, ok := payload.SecurityTypes.([]any); ok {
+		var parts []string
+		for _, item := range slice {
+			if s, ok := item.(string); ok {
+				parts = append(parts, strings.TrimSpace(s))
+			}
+		}
+		typesStr = strings.Join(parts, ",")
+	} else if str, ok := payload.SecurityTypes.(string); ok {
+		var parts []string
+		for _, s := range strings.Split(str, ",") {
+			parts = append(parts, strings.TrimSpace(s))
+		}
+		typesStr = strings.Join(parts, ",")
+	}
+
+	res, err := h.DB.ExecContext(r.Context(), `
+		INSERT INTO wifi_security_config (product_class, security_types, password_param_path)
+		VALUES (?, ?, ?)`,
+		payload.ProductClass, typesStr, payload.PasswordParamPath,
+	)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	lastID, _ := res.LastInsertId()
+	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "WiFi security configuration created successfully", "id": lastID})
+}
+
+// PUT /api/v1/vendor-management/wifi-security/{id}
+func (h GacsHandler) UpdateWifiSecurity(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "Invalid ID")
+		return
+	}
+
+	var payload struct {
+		ProductClass      *string `json:"product_class"`
+		SecurityTypes     any     `json:"security_types"` // slice or string
+		PasswordParamPath *string `json:"password_param_path"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Retrieve existing
+	var currentClass, currentTypes, currentPath string
+	err = h.DB.QueryRowContext(r.Context(), "SELECT product_class, security_types, password_param_path FROM wifi_security_config WHERE id = ?", id).Scan(&currentClass, &currentTypes, &currentPath)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "message": "WiFi configuration not found"})
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if payload.ProductClass != nil {
+		currentClass = *payload.ProductClass
+	}
+	if payload.PasswordParamPath != nil {
+		currentPath = *payload.PasswordParamPath
+	}
+	if payload.SecurityTypes != nil {
+		if slice, ok := payload.SecurityTypes.([]any); ok {
+			var parts []string
+			for _, item := range slice {
+				if s, ok := item.(string); ok {
+					parts = append(parts, strings.TrimSpace(s))
+				}
+			}
+			currentTypes = strings.Join(parts, ",")
+		} else if str, ok := payload.SecurityTypes.(string); ok {
+			var parts []string
+			for _, s := range strings.Split(str, ",") {
+				parts = append(parts, strings.TrimSpace(s))
+			}
+			currentTypes = strings.Join(parts, ",")
+		}
+	}
+
+	_, err = h.DB.ExecContext(r.Context(), `
+		UPDATE wifi_security_config SET 
+			product_class = ?, security_types = ?, password_param_path = ?,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?`,
+		currentClass, currentTypes, currentPath, id,
+	)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "WiFi security configuration updated successfully"})
+}
+
+// DELETE /api/v1/vendor-management/wifi-security/{id}
+func (h GacsHandler) DeleteWifiSecurity(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "Invalid ID")
+		return
+	}
+
+	res, err := h.DB.ExecContext(r.Context(), "DELETE FROM wifi_security_config WHERE id = ?", id)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		WriteJSON(w, http.StatusNotFound, map[string]any{"success": false, "message": "WiFi configuration not found"})
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "WiFi security configuration deleted successfully"})
 }
 

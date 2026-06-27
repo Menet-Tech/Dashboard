@@ -1,5 +1,8 @@
-export function inputClassName(error?: string) {
-  const base = "block w-full rounded-lg border px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-1 transition-all duration-200";
+export function inputClassName(error?: string, disabled?: boolean) {
+  const base = "block w-full rounded-lg border px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-1 transition-all duration-200 disabled:cursor-not-allowed";
+  if (disabled) {
+    return `${base} border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-800/80 dark:bg-slate-950/40 dark:text-slate-500`;
+  }
   if (error) {
     return `${base} border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-500 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400 dark:focus:border-red-550`;
   }

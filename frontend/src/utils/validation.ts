@@ -73,7 +73,7 @@ export function validateManagedUser(form: { username: string; password: string }
   return errors;
 }
 
-export function validateSettings(form: Record<string, string>): FieldErrors {
+export function validateSettings(form: Record<string, string | undefined>): FieldErrors {
   const errors: FieldErrors = {};
   if (!/^\d+$/.test(form["billing_generate_day"] ?? "1"))
     errors.billing_generate_day = "Tanggal generate harus berupa angka.";

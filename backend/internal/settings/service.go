@@ -76,7 +76,7 @@ var defaults = map[string]string{
 	KeyReminderDays:          "3",
 	KeyLimitDays:             "5",
 	KeyMenunggakDays:         "30",
-	KeyTrialGraceDays:        "7",
+	KeyTrialGraceDays:        "4",
 	KeyTrialPeriodDays:       "3",
 	KeyTrialAutoGenerate:     "1",
 	KeyTrialEnabled:          "1",
@@ -132,6 +132,19 @@ var defaults = map[string]string{
 	KeySMTPEnabled:           "0",
 	KeyWAGatewayEnabled:      "0",
 	KeyDiscordBotEnabled:     "0",
+	"appName":                 "Menet-Tech Dashboard Go",
+	"portalApiKey":            "",
+	"vpPppoeUsername":         "VirtualParameters.pppoeUsername",
+	"vpWanBridge":             "VirtualParameters.wanBridge",
+	"vpRxPower":               "VirtualParameters.RXPower",
+	"vpTemperature":           "VirtualParameters.gettemp",
+	"vpActiveDevices":         "VirtualParameters.activedevices",
+	"vpSuperAdmin":            "VirtualParameters.superAdmin",
+	"vpSuperPassword":         "VirtualParameters.superPassword",
+	"vpUserAdmin":             "VirtualParameters.userAdmin",
+	"vpUserPassword":          "VirtualParameters.userPassword",
+	"rxPowerThresholds":       "{}",
+	"autoRefreshIntervals":    "{}",
 }
 
 func IsAllowedKey(key string) bool {

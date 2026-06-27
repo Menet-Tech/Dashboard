@@ -32,6 +32,12 @@ export function displayStatusLabel(status: BillItem["display_status"]): string {
       return "menunggak";
     case "jatuh_tempo":
       return "jatuh tempo";
+    case "perpanjangan":
+      return "perpanjangan";
+    case "pending_lunas":
+      return "proses lunas";
+    case "pending_perpanjangan":
+      return "proses perpanjang";
     default:
       return "belum bayar";
   }
@@ -44,6 +50,11 @@ export function displayStatusTone(status: BillItem["display_status"]): StatusTon
     case "menunggak":
       return "red";
     case "jatuh_tempo":
+      return "gold";
+    case "perpanjangan":
+      return "gold";
+    case "pending_lunas":
+    case "pending_perpanjangan":
       return "gold";
     default:
       return "slate";

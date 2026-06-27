@@ -183,10 +183,25 @@ export function CustomerFormCard({
             value={customerForm.odp_id || 0}
             onChange={(e) => {
               const nextOdpId = Number(e.target.value) || 0;
+              // Find the first available port for this ODP
+              let firstAvailablePort = 1;
+              if (nextOdpId > 0) {
+                const totalPorts = odps.find((o) => o.id === nextOdpId)?.ports || 8;
+                const taken = customers
+                  .filter((c) => c.odp_id === nextOdpId && c.id !== editingCustomerId)
+                  .map((c) => c.odp_port)
+                  .filter(Boolean) as number[];
+                for (let p = 1; p <= totalPorts; p++) {
+                  if (!taken.includes(p)) {
+                    firstAvailablePort = p;
+                    break;
+                  }
+                }
+              }
               onFormChange((curr) => ({
                 ...curr,
                 odp_id: nextOdpId,
-                odp_port: nextOdpId > 0 ? 1 : undefined,
+                odp_port: nextOdpId > 0 ? firstAvailablePort : undefined,
               }));
             }}
           >
@@ -215,11 +230,19 @@ export function CustomerFormCard({
               {Array.from(
                 { length: odps.find((o) => o.id === customerForm.odp_id)?.ports || 8 },
                 (_, i) => i + 1
-              ).map((portNum) => (
-                <option key={portNum} value={portNum}>
-                  Port {portNum}
-                </option>
-              ))}
+              )
+                .filter((portNum) => {
+                  // Only show ports that are not occupied by other customers (exclude current editing customer)
+                  const isOccupied = customers.some(
+                    (c) => c.odp_id === customerForm.odp_id && c.odp_port === portNum && c.id !== editingCustomerId
+                  );
+                  return !isOccupied;
+                })
+                .map((portNum) => (
+                  <option key={portNum} value={portNum}>
+                    Port {portNum}
+                  </option>
+                ))}
             </select>
           </label>
         )}

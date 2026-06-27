@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
-import { Plus } from "lucide-react";
+import { Plus, FileText, MessageSquare, Bot } from "lucide-react";
 import type { TemplateItem, User } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
 import type { ConfirmDialogState } from "../../hooks/types";
@@ -255,34 +255,37 @@ export function TemplatesPage({
         <button
           onClick={() => setActiveTab("templates")}
           type="button"
-          className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+          className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
             activeTab === "templates"
-              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold"
-              : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900"
+              ? "border-indigo-600 text-indigo-605 dark:text-indigo-400 font-bold"
+              : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           }`}
         >
+          <FileText size={16} />
           Template Pesan
         </button>
         <button
           onClick={() => setActiveTab("autoreply")}
           type="button"
-          className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+          className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
             activeTab === "autoreply"
-              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold"
-              : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900"
+              ? "border-indigo-600 text-indigo-605 dark:text-indigo-400 font-bold"
+              : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           }`}
         >
+          <MessageSquare size={16} />
           Auto-Response Custom
         </button>
         <button
           onClick={() => setActiveTab("sessions")}
           type="button"
-          className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+          className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
             activeTab === "sessions"
-              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold"
-              : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900"
+              ? "border-indigo-600 text-indigo-605 dark:text-indigo-400 font-bold"
+              : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           }`}
         >
+          <Bot size={16} />
           Sesi & Pendaftaran Chatbot ({contactForms.length})
         </button>
       </nav>
@@ -472,7 +475,7 @@ export function TemplatesPage({
           </article>
 
           {/* Placeholders Guide */}
-          <article className="bg-white border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+          <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-sans mb-3">Panduan Placeholders</h4>
             <p className="text-xs text-slate-500 mb-4">
               Anda dapat menggunakan tag placeholder kurung kurawal di bawah ini agar data dinamis pelanggan terisi otomatis saat pesan dikirim:
@@ -545,7 +548,7 @@ export function TemplatesPage({
             <>
               <button
                 type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer"
+                className="bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer"
                 onClick={handleCloseForm}
               >
                 Batal

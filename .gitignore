@@ -29,3 +29,5 @@ GACS-dashboard
 graphify-out
 api.exe
 storage
+*.exe
+cover*

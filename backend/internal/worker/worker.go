@@ -195,6 +195,11 @@ func (s Service) RunOnce(ctx context.Context) error {
 		s.Logger.Error("trial expiry processing failed", "error", err)
 	}
 
+	// Process delayed paid/extension actions (cancelable within 10 minutes)
+	if err := s.Billing.ProcessDelayedActions(ctx); err != nil {
+		s.Logger.Error("processing delayed actions failed", "error", err)
+	}
+
 	// Integration status pooling
 	if err := s.runIntegrationPooling(ctx, now); err != nil {
 		s.Logger.Error("integration status pooling failed", "error", err)

@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"menettech/dashboard/backend/internal/mikrotik"
 )
 
 // DeviceStatus represents GPON ONT status fetched from GenieACS.
@@ -28,6 +30,7 @@ type DeviceStatus struct {
 	RxOpticalPower  string    `json:"rx_optical_power"` // e.g. "-18.5 dBm"
 	TxOpticalPower  string    `json:"tx_optical_power"` // e.g. "2.1 dBm"
 	LastInformTime  time.Time `json:"last_inform_time"`
+	PPPoEUsername   string    `json:"pppoe_username,omitempty"`
 }
 
 // Client is a GenieACS API Client.
@@ -137,15 +140,17 @@ func parseDeviceMap(dev map[string]any, serialNumber string) DeviceStatus {
 		curr := dev
 		for i, key := range keys {
 			if i == len(keys)-1 {
-				if m, ok := curr[key].(map[string]any); ok {
-					if v, ok := m["_value"]; ok {
-						return fmt.Sprintf("%v", v)
+				v, ok := curr[key]
+				if !ok || v == nil {
+					return ""
+				}
+				if m, ok := v.(map[string]any); ok {
+					if val, ok := m["_value"]; ok && val != nil {
+						return fmt.Sprintf("%v", val)
 					}
+					return "" // It is a node object, not a leaf value
 				}
-				if v, ok := curr[key]; ok {
-					return fmt.Sprintf("%v", v)
-				}
-				return ""
+				return fmt.Sprintf("%v", v)
 			}
 			if next, ok := curr[key].(map[string]any); ok {
 				curr = next
@@ -184,17 +189,26 @@ func parseDeviceMap(dev map[string]any, serialNumber string) DeviceStatus {
 		status.Uptime = formatUptime(val)
 	}
 
-	// IP Address from WANPPPConnection
-	if val := getVal("InternetGatewayDevice", "WANDevice", "1", "WANConnectionDevice", "1", "WANPPPConnection", "1", "ExternalIPAddress"); val != "" {
-		status.IPAddress = val
-	} else if val := getVal("Device", "PPP", "Interface", "1", "IPAddress"); val != "" {
-		status.IPAddress = val
+	// PPPoE Username lookup
+	status.PPPoEUsername = findPPPUsername(dev)
+
+	// IP Address from WAN Connection lookup
+	if ip := findIPAddress(dev); ip != "" {
+		status.IPAddress = ip
 	}
 
-	// Optical Power Rx/Tx
-	rxVal := getVal("InternetGatewayDevice", "WANDevice", "1", "WANDiskInterfaceConfig", "OpticalPower")
-	if rxVal != "" {
-		status.RxOpticalPower = rxVal + " dBm"
+	// Optical Power Rx/Tx lookup
+	if rx := findOpticalPower(dev, false); rx != "" {
+		status.RxOpticalPower = rx
+		if !strings.HasSuffix(rx, "dBm") {
+			status.RxOpticalPower += " dBm"
+		}
+	}
+	if tx := findOpticalPower(dev, true); tx != "" {
+		status.TxOpticalPower = tx
+		if !strings.HasSuffix(tx, "dBm") {
+			status.TxOpticalPower += " dBm"
+		}
 	}
 
 	return status
@@ -528,6 +542,33 @@ func (c *Client) SetWifiConfig(ctx context.Context, serialNumber, ssid, password
 // EXTENDED PORTED GET DETAIL DEVICE AND SUMMON LOGIC
 // -------------------------------------------------------------
 
+type CustomerShort struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	UserPPPoE string `json:"user_pppoe"`
+	SNOnt     string `json:"sn_ont"`
+	Status    string `json:"status"`
+	WhatsApp  string `json:"whatsapp"`
+	Address   string `json:"address"`
+}
+
+type MikrotikSecret struct {
+	Username             string `json:"username"`
+	Password             string `json:"password"`
+	Profile              string `json:"profile"`
+	Disabled             bool   `json:"disabled"`
+	LastLoggedOut        string `json:"last_logged_out"`
+	LastCallerID         string `json:"last_caller_id"`
+	LastDisconnectReason string `json:"last_disconnect_reason"`
+}
+
+type MikrotikActive struct {
+	Active   bool   `json:"active"`
+	Address  string `json:"address"`
+	Uptime   string `json:"uptime"`
+	CallerID string `json:"caller_id"`
+}
+
 type DetailedDevice struct {
 	ID                string             `json:"_id"`
 	Tags              []string           `json:"tags"`
@@ -541,6 +582,9 @@ type DetailedDevice struct {
 	SecurityInfo      map[string]VPValue `json:"securityInfo,omitempty"`
 	VendorDetection   VendorDetection    `json:"vendorDetection"`
 	Faults            []DeviceFault      `json:"faults"`
+	Customer           *CustomerShort  `json:"customer,omitempty"`
+	MikrotikSecret     *MikrotikSecret `json:"mikrotikSecret,omitempty"`
+	MikrotikActiveConn *MikrotikActive `json:"mikrotikActiveConn,omitempty"`
 }
 
 type DetailedDeviceInfo struct {
@@ -1119,6 +1163,126 @@ func (c *Client) GetDetailedDevice(ctx context.Context, db *sql.DB, deviceID str
 		}
 	}
 
+	// ─── Customer Database lookup ───
+	var cust CustomerShort
+	var custFound bool
+
+	// Find the username from virtualParameters or fallback search
+	pppoeUsername := ""
+	if vps, ok := item["VirtualParameters"].(map[string]any); ok {
+		if valMap, ok := vps["pppoeUsername"].(map[string]any); ok {
+			if val, ok := valMap["_value"]; ok && val != nil {
+				pppoeUsername = strings.TrimSpace(fmt.Sprintf("%v", val))
+			}
+		}
+	}
+	if pppoeUsername == "" {
+		pppoeUsername = findPPPUsername(item)
+	}
+
+	if db != nil {
+		err = db.QueryRowContext(ctx, `
+			SELECT id, nama, COALESCE(user_pppoe, ''), COALESCE(sn_ont, ''), status, COALESCE(nomor_wa, ''), COALESCE(alamat, '')
+			FROM pelanggan
+			WHERE sn_ont = ? OR (user_pppoe = ? AND user_pppoe != '')
+			LIMIT 1`,
+			serialNumber, pppoeUsername).Scan(
+				&cust.ID,
+				&cust.Name,
+				&cust.UserPPPoE,
+				&cust.SNOnt,
+				&cust.Status,
+				&cust.WhatsApp,
+				&cust.Address,
+			)
+		if err == nil {
+			custFound = true
+			if pppoeUsername == "" && cust.UserPPPoE != "" {
+				pppoeUsername = cust.UserPPPoE
+			}
+		}
+	}
+
+	// ─── MikroTik Integration lookup ───
+	var mkSecret *MikrotikSecret
+	var mkActive *MikrotikActive
+
+	if pppoeUsername != "" && db != nil {
+		routerSvc := mikrotik.NewRouterService(db)
+		routers, err := routerSvc.ListActive(ctx)
+		if err == nil && len(routers) > 0 {
+			// Query the active routers
+			for _, r := range routers {
+				c := mikrotik.NewClient(r.Host, r.Username, r.Password)
+				if err := c.Connect(ctx); err == nil {
+					secret, errSec := c.GetSecret(ctx, pppoeUsername)
+					if errSec == nil && secret != nil {
+						mkSecret = &MikrotikSecret{
+							Username:             secret.Name,
+							Password:             secret.Password,
+							Profile:              secret.Profile,
+							Disabled:             secret.Disabled,
+							LastLoggedOut:        secret.LastLoggedOut,
+							LastCallerID:         secret.LastCallerID,
+							LastDisconnectReason: secret.LastDisconnectReason,
+						}
+					}
+					active, errAct := c.GetActiveConnection(ctx, pppoeUsername)
+					if errAct == nil && active != nil {
+						mkActive = &MikrotikActive{
+							Active:   true,
+							Address:  active.Address,
+							Uptime:   active.Uptime,
+							CallerID: active.CallerID,
+						}
+					}
+					c.Close()
+					if mkSecret != nil || mkActive != nil {
+						break // Found on this router, stop querying others
+					}
+				}
+			}
+		} else {
+			// Fallback to legacy single router if list is empty or fails
+			var host, user, pass string
+			_ = db.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = ? LIMIT 1", "mikrotik_host").Scan(&host)
+			_ = db.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = ? LIMIT 1", "mikrotik_user").Scan(&user)
+			_ = db.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = ? LIMIT 1", "mikrotik_pass").Scan(&pass)
+			if strings.TrimSpace(host) != "" && strings.TrimSpace(user) != "" {
+				c := mikrotik.NewClient(host, user, pass)
+				if err := c.Connect(ctx); err == nil {
+					secret, errSec := c.GetSecret(ctx, pppoeUsername)
+					if errSec == nil && secret != nil {
+						mkSecret = &MikrotikSecret{
+							Username:             secret.Name,
+							Password:             secret.Password,
+							Profile:              secret.Profile,
+							Disabled:             secret.Disabled,
+							LastLoggedOut:        secret.LastLoggedOut,
+							LastCallerID:         secret.LastCallerID,
+							LastDisconnectReason: secret.LastDisconnectReason,
+						}
+					}
+					active, errAct := c.GetActiveConnection(ctx, pppoeUsername)
+					if errAct == nil && active != nil {
+						mkActive = &MikrotikActive{
+							Active:   true,
+							Address:  active.Address,
+							Uptime:   active.Uptime,
+							CallerID: active.CallerID,
+						}
+					}
+					c.Close()
+				}
+			}
+		}
+	}
+
+	var customerPtr *CustomerShort
+	if custFound {
+		customerPtr = &cust
+	}
+
 	return &DetailedDevice{
 		ID:     deviceID,
 		Tags:   tags,
@@ -1148,7 +1312,15 @@ func (c *Client) GetDetailedDevice(ctx context.Context, db *sql.DB, deviceID str
 		WifiInfo:    wifiInfo,
 		WifiClients: wifiClients,
 		VirtualParameters: map[string]VPValue{
-			"pppoeUsername": getVP(vpPppoeUsername),
+			"pppoeUsername": func() VPValue {
+				vp := getVP(vpPppoeUsername)
+				if vp.Value == nil || fmt.Sprintf("%v", vp.Value) == "" || fmt.Sprintf("%v", vp.Value) == "<nil>" {
+					if fallback := findPPPUsername(item); fallback != "" {
+						vp.Value = fallback
+					}
+				}
+				return vp
+			}(),
 			"wanBridge":     getVP(vpWanBridge),
 			"rxpower":       getVP(vpRxPower),
 			"temperature":   getVP(vpTemperature),
@@ -1165,7 +1337,10 @@ func (c *Client) GetDetailedDevice(ctx context.Context, db *sql.DB, deviceID str
 			VendorName:      vendorName,
 			ParameterPrefix: prefix,
 		},
-		Faults: deviceFaults,
+		Faults:             deviceFaults,
+		Customer:           customerPtr,
+		MikrotikSecret:     mkSecret,
+		MikrotikActiveConn: mkActive,
 	}, nil
 }
 
@@ -1557,6 +1732,217 @@ func parseVlanField(conn map[string]any, connDevice map[string]any, basePath str
 	return nil
 }
 
+func findPPPUsername(item map[string]any) string {
+	igdVal, ok := item["InternetGatewayDevice"]
+	if !ok {
+		return ""
+	}
+	igd, ok := igdVal.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	wanDeviceVal, ok := igd["WANDevice"]
+	if !ok {
+		return ""
+	}
+	wanDevice, ok := wanDeviceVal.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	for _, wanDeviceRaw := range wanDevice {
+		wanDeviceMap, ok := wanDeviceRaw.(map[string]any)
+		if !ok {
+			continue
+		}
+		wanConnDevsVal, ok := wanDeviceMap["WANConnectionDevice"]
+		if !ok {
+			continue
+		}
+		wanConnDevs, ok := wanConnDevsVal.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		for _, connDeviceRaw := range wanConnDevs {
+			connDevice, ok := connDeviceRaw.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			pppConnsVal, ok := connDevice["WANPPPConnection"]
+			if !ok {
+				continue
+			}
+			pppConns, ok := pppConnsVal.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			for _, connRaw := range pppConns {
+				conn, ok := connRaw.(map[string]any)
+				if !ok {
+					continue
+				}
+				if usernameVal, ok := conn["Username"]; ok {
+					if usernameMap, ok := usernameVal.(map[string]any); ok {
+						if val, ok := usernameMap["_value"]; ok && val != nil {
+							if valStr := strings.TrimSpace(fmt.Sprintf("%v", val)); valStr != "" {
+								return valStr
+							}
+						}
+					} else if usernameStr, ok := usernameVal.(string); ok {
+						if valStr := strings.TrimSpace(usernameStr); valStr != "" {
+							return valStr
+						}
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func findIPAddress(item map[string]any) string {
+	igdVal, ok := item["InternetGatewayDevice"]
+	if !ok {
+		return ""
+	}
+	igd, ok := igdVal.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	wanDeviceVal, ok := igd["WANDevice"]
+	if !ok {
+		return ""
+	}
+	wanDevice, ok := wanDeviceVal.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	for _, wanDeviceRaw := range wanDevice {
+		wanDeviceMap, ok := wanDeviceRaw.(map[string]any)
+		if !ok {
+			continue
+		}
+		wanConnDevsVal, ok := wanDeviceMap["WANConnectionDevice"]
+		if !ok {
+			continue
+		}
+		wanConnDevs, ok := wanConnDevsVal.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		for _, connDeviceRaw := range wanConnDevs {
+			connDevice, ok := connDeviceRaw.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			// Check PPP Connections
+			if pppConnsVal, ok := connDevice["WANPPPConnection"]; ok {
+				if pppConns, ok := pppConnsVal.(map[string]any); ok {
+					for _, connRaw := range pppConns {
+						conn, ok := connRaw.(map[string]any)
+						if !ok {
+							continue
+						}
+						if ipVal, ok := conn["ExternalIPAddress"]; ok {
+							if ipMap, ok := ipVal.(map[string]any); ok {
+								if val, ok := ipMap["_value"]; ok && val != nil {
+									valStr := strings.TrimSpace(fmt.Sprintf("%v", val))
+									if valStr != "" && valStr != "0.0.0.0" {
+										return valStr
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// Check IP Connections
+			if ipConnsVal, ok := connDevice["WANIPConnection"]; ok {
+				if ipConns, ok := ipConnsVal.(map[string]any); ok {
+					for _, connRaw := range ipConns {
+						conn, ok := connRaw.(map[string]any)
+						if !ok {
+							continue
+						}
+						if ipVal, ok := conn["ExternalIPAddress"]; ok {
+							if ipMap, ok := ipVal.(map[string]any); ok {
+								if val, ok := ipMap["_value"]; ok && val != nil {
+									valStr := strings.TrimSpace(fmt.Sprintf("%v", val))
+									if valStr != "" && valStr != "0.0.0.0" {
+										return valStr
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func findOpticalPower(item map[string]any, isTx bool) string {
+	var searchKeys []string
+	if isTx {
+		searchKeys = []string{"txpower", "txopticalpower", "opticalpower"}
+	} else {
+		searchKeys = []string{"rxpower", "rxopticalpower", "opticalpower"}
+	}
+
+	var foundValue string
+	var traverse func(any)
+	traverse = func(curr any) {
+		if foundValue != "" {
+			return
+		}
+		m, ok := curr.(map[string]any)
+		if !ok {
+			return
+		}
+		for k, v := range m {
+			kLower := strings.ToLower(k)
+			// Check if key matches our search term
+			matched := false
+			for _, sk := range searchKeys {
+				if strings.Contains(kLower, sk) {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				// If it's a leaf node/value map
+				if valMap, ok := v.(map[string]any); ok {
+					if val, ok := valMap["_value"]; ok && val != nil {
+						valStr := strings.TrimSpace(fmt.Sprintf("%v", val))
+						if valStr != "" && valStr != "<nil>" && !strings.Contains(valStr, "map[") {
+							foundValue = valStr
+							return
+						}
+					}
+				}
+			}
+			// Traverse deeper
+			traverse(v)
+		}
+	}
+	
+	// Start traverse from InternetGatewayDevice
+	if igd, ok := item["InternetGatewayDevice"]; ok {
+		traverse(igd)
+	}
+	return foundValue
+}
+
 func getStringFromMap(m map[string]any, k string) string {
 	if v, ok := m[k].(string); ok {
 		return v
@@ -1639,6 +2025,7 @@ func (c *Client) GetDevicesSummary(ctx context.Context, db *sql.DB) ([]map[strin
 		vpRxPower,
 		vpTemperature,
 		vpActiveDevices,
+		"InternetGatewayDevice.WANDevice",
 		"InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID",
 		"InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.SSID",
 		"InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.SSID",
@@ -1774,7 +2161,15 @@ func (c *Client) GetDevicesSummary(ctx context.Context, db *sql.DB) ([]map[strin
 			"SerialNumber":  serialNumber,
 			"productclass":  productClass,
 			"tags":          tags,
-			"pppoe":         getNestedVal(item, vpPppoeUsername),
+			"pppoe": func() any {
+				val := getNestedVal(item, vpPppoeUsername)
+				if val == nil || fmt.Sprintf("%v", val) == "" || fmt.Sprintf("%v", val) == "<nil>" {
+					if fallback := findPPPUsername(item); fallback != "" {
+						return fallback
+					}
+				}
+				return val
+			}(),
 			"wanbridge":     getNestedVal(item, vpWanBridge),
 			"rxpower":       getNestedVal(item, vpRxPower),
 			"temperature":   getNestedVal(item, vpTemperature),
