@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -40,6 +41,8 @@ func (r Repository) List(ctx context.Context, menunggakDays int, now time.Time, 
 		case "belum_bayar":
 			conds = append(conds, "t.status = 'belum_bayar' AND CAST(julianday(?) - julianday(t.jatuh_tempo) AS INTEGER) <= 0")
 			args = append(args, now.Format("2006-01-02"))
+		case "belum_bayar_all":
+			conds = append(conds, "t.status = 'belum_bayar'")
 		case "jatuh_tempo":
 			conds = append(conds, "t.status = 'belum_bayar' AND CAST(julianday(?) - julianday(t.jatuh_tempo) AS INTEGER) > 0 AND CAST(julianday(?) - julianday(t.jatuh_tempo) AS INTEGER) < ?")
 			args = append(args, now.Format("2006-01-02"), now.Format("2006-01-02"), menunggakDays)
@@ -73,7 +76,7 @@ func (r Repository) List(ctx context.Context, menunggakDays int, now time.Time, 
 	selectQuery := fmt.Sprintf(`
 		SELECT t.id, t.pelanggan_id, c.nama, COALESCE(c.nomor_wa, ''), t.paket_id, p.nama, p.kecepatan_mbps,
 		       t.periode, t.invoice_number, t.nominal, t.jatuh_tempo, t.status, t.paid_at,
-		       COALESCE(t.payment_method, ''), t.proof_path, t.diskon, t.diskon_referral
+		       COALESCE(t.payment_method, ''), t.proof_path, t.diskon, t.diskon_referral, c.status
 		FROM tagihan t
 		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
 		INNER JOIN paket p ON p.id = t.paket_id
@@ -157,6 +160,9 @@ func (r Repository) FindByID(ctx context.Context, billID int64, menunggakDays in
 		item.ProofPath = &proofPath.String
 	}
 	item.DisplayStatus = computeDisplayStatus(item.Status, item.DueDate, menunggakDays, now)
+	if item.Status == "belum_bayar" && item.CustomerStatus == "pending" {
+		item.DisplayStatus = "perpanjangan"
+	}
 
 	paymentHistory, err := r.paymentHistory(ctx, billID)
 	if err != nil {
@@ -377,8 +383,31 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 		return Bill{}, false, fmt.Errorf("begin single bill generation tx: %w", err)
 	}
 
-	dueDate := resolveDueDate(periodTime, candidate.DueDay)
+	var dueDate time.Time
+	if candidate.IsTrial && candidate.TrialStartedAt != "" {
+		trialStart, parseErr := time.Parse(time.RFC3339, candidate.TrialStartedAt)
+		if parseErr != nil {
+			trialStart, parseErr = time.Parse("2006-01-02 15:04:05", candidate.TrialStartedAt)
+		}
+		if parseErr == nil {
+			trialGraceDays := 4 // default
+			var graceStr string
+			_ = tx.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = 'trial_overdue_grace_days'").Scan(&graceStr)
+			if graceStr != "" {
+				if val, convErr := strconv.Atoi(graceStr); convErr == nil {
+					trialGraceDays = val
+				}
+			}
+			dueDate = trialStart.AddDate(0, 0, candidate.TrialDays+trialGraceDays)
+		} else {
+			dueDate = resolveDueDate(periodTime, candidate.DueDay)
+		}
+	} else {
+		dueDate = resolveDueDate(periodTime, candidate.DueDay)
+	}
+
 	serial, err := billSerial(ctx, tx, candidate.CustomerID)
+
 	if err != nil {
 		_ = tx.Rollback()
 		return Bill{}, false, err
@@ -675,7 +704,7 @@ func (r Repository) AutomationCandidates(ctx context.Context) ([]automationCandi
 		SELECT t.id, t.pelanggan_id, c.nama, COALESCE(c.nomor_wa, ''), t.paket_id, p.nama, p.kecepatan_mbps,
 		       t.periode, t.invoice_number, t.nominal, t.jatuh_tempo, t.status, t.paid_at,
 		       COALESCE(t.payment_method, ''), t.proof_path, c.status, COALESCE(c.trial_started_at, ''), COALESCE(c.trial_days, 0),
-		       t.diskon, t.diskon_referral
+		       t.diskon, t.diskon_referral, (c.odp_id IS NOT NULL) AS has_odp
 		FROM tagihan t
 		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
 		INNER JOIN paket p ON p.id = t.paket_id
@@ -714,6 +743,7 @@ func (r Repository) AutomationCandidates(ctx context.Context) ([]automationCandi
 			&item.TrialDays,
 			&item.Diskon,
 			&item.DiskonReferral,
+			&item.HasODP,
 		); err != nil {
 			return nil, fmt.Errorf("scan automation candidate: %w", err)
 		}
@@ -747,7 +777,8 @@ func (r Repository) UpdateCustomerStatus(ctx context.Context, customerID int64, 
 func (r Repository) findCandidates(ctx context.Context, period string) ([]billCandidate, error) {
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo,
-		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.voucher_discount, c.status
+		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.voucher_discount, c.status,
+		       c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		WHERE c.status IN ('active', 'limit', 'pending')
@@ -781,6 +812,9 @@ func (r Repository) findCandidates(ctx context.Context, period string) ([]billCa
 			&item.TipeDiskon,
 			&item.VoucherDiscount,
 			&item.CustomerStatus,
+			&item.IsTrial,
+			&item.TrialStartedAt,
+			&item.TrialDays,
 		); err != nil {
 			return nil, fmt.Errorf("scan bill candidate: %w", err)
 		}
@@ -790,10 +824,12 @@ func (r Repository) findCandidates(ctx context.Context, period string) ([]billCa
 	return items, rows.Err()
 }
 
+
 func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int64, period string) (billCandidate, bool, error) {
 	row := r.DB.QueryRowContext(ctx, `
 		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo,
-		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.voucher_discount, c.status
+		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.voucher_discount, c.status,
+		       c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		WHERE c.id = ?
@@ -821,6 +857,9 @@ func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int
 		&item.TipeDiskon,
 		&item.VoucherDiscount,
 		&item.CustomerStatus,
+		&item.IsTrial,
+		&item.TrialStartedAt,
+		&item.TrialDays,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return billCandidate{}, false, nil
@@ -831,11 +870,12 @@ func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int
 	return item, true, nil
 }
 
+
 func (r Repository) FindByCustomerAndPeriod(ctx context.Context, customerID int64, period string, menunggakDays int, now time.Time) (Bill, error) {
 	row := r.DB.QueryRowContext(ctx, `
 		SELECT t.id, t.pelanggan_id, c.nama, COALESCE(c.nomor_wa, ''), t.paket_id, p.nama, p.kecepatan_mbps,
 		       t.periode, t.invoice_number, t.nominal, t.jatuh_tempo, t.status, t.paid_at,
-		       COALESCE(t.payment_method, ''), t.proof_path, t.diskon, t.diskon_referral
+		       COALESCE(t.payment_method, ''), t.proof_path, t.diskon, t.diskon_referral, c.status
 		FROM tagihan t
 		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
 		INNER JOIN paket p ON p.id = t.paket_id
@@ -897,6 +937,7 @@ func scanBill(scanner interface {
 	var item Bill
 	var paidAt sql.NullString
 	var proofPath sql.NullString
+	var customerStatus string
 	if err := scanner.Scan(
 		&item.ID,
 		&item.CustomerID,
@@ -915,6 +956,7 @@ func scanBill(scanner interface {
 		&proofPath,
 		&item.Diskon,
 		&item.DiskonReferral,
+		&customerStatus,
 	); err != nil {
 		return Bill{}, fmt.Errorf("scan bill: %w", err)
 	}
@@ -925,6 +967,9 @@ func scanBill(scanner interface {
 		item.ProofPath = &proofPath.String
 	}
 	item.DisplayStatus = computeDisplayStatus(item.Status, item.DueDate, menunggakDays, now)
+	if item.Status == "belum_bayar" && customerStatus == "pending" {
+		item.DisplayStatus = "perpanjangan"
+	}
 	return item, nil
 }
 
@@ -969,3 +1014,82 @@ func unpaidCountForCustomer(ctx context.Context, tx *sql.Tx, customerID int64) (
 
 	return count, nil
 }
+
+func (r Repository) PrepareMarkPaid(ctx context.Context, billID int64, method string, userID int64) error {
+	_, err := r.DB.ExecContext(ctx, `
+		UPDATE tagihan
+		SET status = 'pending_paid', payment_method = ?, paid_by_user_id = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND status = 'belum_bayar'
+	`, method, userID, billID)
+	if err != nil {
+		return fmt.Errorf("prepare mark paid: %w", err)
+	}
+	return nil
+}
+
+func (r Repository) PrepareExtension(ctx context.Context, billID int64) error {
+	_, err := r.DB.ExecContext(ctx, `
+		UPDATE tagihan
+		SET status = 'pending_extension', updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND status = 'belum_bayar'
+	`, billID)
+	if err != nil {
+		return fmt.Errorf("prepare extension: %w", err)
+	}
+	return nil
+}
+
+func (r Repository) CancelPendingAction(ctx context.Context, billID int64) error {
+	_, err := r.DB.ExecContext(ctx, `
+		UPDATE tagihan
+		SET status = 'belum_bayar', payment_method = '', paid_by_user_id = NULL, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND status IN ('pending_paid', 'pending_extension')
+	`, billID)
+	if err != nil {
+		return fmt.Errorf("cancel pending action: %w", err)
+	}
+	return nil
+}
+
+type DelayedBill struct {
+	ID             int64
+	Status         string
+	PaymentMethod  string
+	PaidByUserID   int64
+	UpdatedAt      string
+}
+
+func (r Repository) ListDelayedActions(ctx context.Context) ([]DelayedBill, error) {
+	rows, err := r.DB.QueryContext(ctx, `
+		SELECT id, status, COALESCE(payment_method, ''), COALESCE(paid_by_user_id, 0), updated_at
+		FROM tagihan
+		WHERE status IN ('pending_paid', 'pending_extension')
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list delayed actions: %w", err)
+	}
+	defer rows.Close()
+
+	var list []DelayedBill
+	for rows.Next() {
+		var b DelayedBill
+		if err := rows.Scan(&b.ID, &b.Status, &b.PaymentMethod, &b.PaidByUserID, &b.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, b)
+	}
+	return list, nil
+}
+
+func (r Repository) SetBillStatus(ctx context.Context, billID int64, status string) error {
+	_, err := r.DB.ExecContext(ctx, `
+		UPDATE tagihan
+		SET status = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, status, billID)
+	if err != nil {
+		return fmt.Errorf("set bill status: %w", err)
+	}
+	return nil
+}
+

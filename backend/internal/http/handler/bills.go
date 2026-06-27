@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"html/template"
@@ -126,7 +127,7 @@ func (h BillHandler) Pay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Service.MarkPaid(r.Context(), id, payload.Method, user.ID); err != nil {
+	if err := h.Service.PrepareMarkPaid(r.Context(), id, payload.Method, user.ID); err != nil {
 		if errors.Is(err, billing.ErrBillNotFound) {
 			WriteError(w, http.StatusNotFound, "bill not found")
 			return
@@ -136,9 +137,242 @@ func (h BillHandler) Pay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	WriteJSON(w, http.StatusOK, map[string]any{
-		"message": "bill marked as paid",
+		"message": "pembayaran tagihan diproses, dapat dibatalkan dalam waktu 10 menit",
 	})
 }
+
+func (h BillHandler) Extend(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid bill id")
+		return
+	}
+
+	if err := h.Service.PrepareExtension(r.Context(), id); err != nil {
+		if errors.Is(err, billing.ErrBillNotFound) {
+			WriteError(w, http.StatusNotFound, "bill not found")
+			return
+		}
+		WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"message": "perpanjangan diproses, dapat dibatalkan dalam waktu 10 menit",
+	})
+}
+
+func (h BillHandler) CancelPendingAction(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid bill id")
+		return
+	}
+
+	if err := h.Service.CancelPendingAction(r.Context(), id); err != nil {
+		if errors.Is(err, billing.ErrBillNotFound) {
+			WriteError(w, http.StatusNotFound, "bill not found")
+			return
+		}
+		WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"message": "pending action cancelled",
+	})
+}
+
+func (h BillHandler) ListPendingConfirmations(w http.ResponseWriter, r *http.Request) {
+	list, err := h.Service.ListPendingConfirmations(r.Context())
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"data": list,
+	})
+}
+
+func (h BillHandler) ApprovePaymentConfirmation(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid confirmation id")
+		return
+	}
+
+	user, err := currentUser(r)
+	if err != nil {
+		WriteError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	if err := h.Service.ApprovePaymentConfirmation(r.Context(), id, user.ID); err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"message": "pembayaran disetujui",
+	})
+}
+
+func (h BillHandler) RejectPaymentConfirmation(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid confirmation id")
+		return
+	}
+
+	if err := h.Service.RejectPaymentConfirmation(r.Context(), id); err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"message": "pembayaran ditolak",
+	})
+}
+
+type createConfirmationPayload struct {
+	TagihanID     int64   `json:"tagihan_id"`
+	PelangganID   int64   `json:"pelanggan_id"`
+	BuktiTransfer *string `json:"bukti_transfer"`
+	Catatan       string  `json:"catatan"`
+}
+
+func (h BillHandler) CreatePaymentConfirmation(w http.ResponseWriter, r *http.Request) {
+	var payload createConfirmationPayload
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+
+	if payload.TagihanID == 0 || payload.PelangganID == 0 {
+		WriteError(w, http.StatusBadRequest, "tagihan_id and pelanggan_id are required")
+		return
+	}
+
+	id, err := h.Service.CreatePaymentConfirmation(r.Context(), payload.TagihanID, payload.PelangganID, payload.BuktiTransfer, payload.Catatan)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusCreated, map[string]any{
+		"id":      id,
+		"message": "payment confirmation created",
+	})
+}
+
+func (h BillHandler) GetPendingConfirmation(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid bill id")
+		return
+	}
+
+	pc, err := h.Service.GetPendingConfirmationForBill(r.Context(), id)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if pc == nil {
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"data": nil,
+		})
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"data": pc,
+	})
+}
+
+type uploadBase64Payload struct {
+	Base64Data string `json:"base64_data"`
+	Mimetype   string `json:"mimetype"`
+	Filename   string `json:"filename"`
+}
+
+func (h BillHandler) UploadConfirmationProofBase64(w http.ResponseWriter, r *http.Request) {
+	var payload uploadBase64Payload
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+
+	if payload.Base64Data == "" || payload.Filename == "" {
+		WriteError(w, http.StatusBadRequest, "base64_data and filename are required")
+		return
+	}
+
+	// Clean/validate filename
+	filename := filepath.Base(payload.Filename)
+
+	// Decode base64
+	data, err := base64.StdEncoding.DecodeString(payload.Base64Data)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid base64 encoding")
+		return
+	}
+
+	const maxUploadSize = 5 << 20 // 5 MB limit
+	if int64(len(data)) > maxUploadSize {
+		WriteError(w, http.StatusBadRequest, "file size exceeds limit of 5MB")
+		return
+	}
+
+	// Validate content type
+	mimetype := payload.Mimetype
+	if mimetype == "" {
+		mimetype = http.DetectContentType(data)
+	}
+
+	directory := filepath.Join(h.StoragePath, "uploads", "payment-proofs")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to create directory")
+		return
+	}
+
+	safeExt := getSafeExtension(mimetype, filename)
+	if !allowedProofContentType(safeExt) {
+		WriteError(w, http.StatusBadRequest, "file type is not allowed")
+		return
+	}
+
+	newFilename := fmt.Sprintf("%d%s", time.Now().UnixNano(), safeExt)
+	targetPath := filepath.Join(directory, newFilename)
+
+	// Path traversal check
+	absDir, err := filepath.Abs(directory)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to resolve directory")
+		return
+	}
+	absTarget, err := filepath.Abs(targetPath)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to resolve target path")
+		return
+	}
+	if !strings.HasPrefix(absTarget, absDir+string(filepath.Separator)) && absTarget != absDir {
+		WriteError(w, http.StatusBadRequest, "invalid path traversal attempt")
+		return
+	}
+
+	if err := os.WriteFile(targetPath, data, 0o644); err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to write file")
+		return
+	}
+
+	proofPath := "/uploads/payment-proofs/" + newFilename
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"proof_path": proofPath,
+	})
+}
+
 
 type billNotifyPayload struct {
 	TriggerKey string `json:"trigger_key"`
@@ -271,11 +505,12 @@ func (h BillHandler) storeProofFile(source io.Reader, originalName string, maxSi
 		return "", err
 	}
 
-	extension := filepath.Ext(originalName)
-	if !allowedProofContentType(http.DetectContentType(data), safeExtension(extension)) {
+	contentType := http.DetectContentType(data)
+	safeExt := getSafeExtension(contentType, originalName)
+	if !allowedProofContentType(safeExt) {
 		return "", errUploadTypeNotAllowed
 	}
-	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), safeExtension(extension))
+	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), safeExt)
 	targetPath := filepath.Join(directory, filename)
 
 	// Bug #10: absolute path comparison validation
@@ -298,26 +533,30 @@ func (h BillHandler) storeProofFile(source io.Reader, originalName string, maxSi
 	return "/uploads/payment-proofs/" + filename, nil
 }
 
-func allowedProofContentType(contentType, extension string) bool {
-	switch extension {
-	case ".jpg", ".jpeg":
-		return strings.HasPrefix(contentType, "image/jpeg")
-	case ".png":
-		return strings.HasPrefix(contentType, "image/png")
-	case ".webp":
-		return strings.HasPrefix(contentType, "image/webp")
-	case ".pdf":
-		return contentType == "application/pdf" || contentType == "application/octet-stream"
-	default:
-		return false
-	}
+func allowedProofContentType(extension string) bool {
+	return extension == ".jpg" || extension == ".jpeg" || extension == ".png" || extension == ".pdf" || extension == ".webp"
 }
 
-func safeExtension(value string) string {
-	value = strings.ToLower(strings.TrimSpace(value))
-	switch value {
+func getSafeExtension(contentType, filename string) string {
+	ext := strings.ToLower(strings.TrimSpace(filepath.Ext(filename)))
+	// If extension is empty or a generic binary, detect from mime type
+	if ext == "" || ext == ".bin" {
+		if strings.Contains(contentType, "image/jpeg") || strings.Contains(contentType, "image/jpg") {
+			return ".jpg"
+		}
+		if strings.Contains(contentType, "image/png") {
+			return ".png"
+		}
+		if strings.Contains(contentType, "image/webp") {
+			return ".webp"
+		}
+		if strings.Contains(contentType, "application/pdf") {
+			return ".pdf"
+		}
+	}
+	switch ext {
 	case ".jpg", ".jpeg", ".png", ".pdf", ".webp":
-		return value
+		return ext
 	default:
 		return ".bin"
 	}

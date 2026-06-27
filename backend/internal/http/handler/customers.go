@@ -443,8 +443,85 @@ func (h CustomerHandler) ONTStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ─── MikroTik Integration lookup ───
+	var mkSecret *mikrotik.PPPoESecret
+	var mkActive *mikrotik.PPPActive
+
+	pppoeUsername := strings.TrimSpace(status.PPPoEUsername)
+	if pppoeUsername == "" {
+		pppoeUsername = strings.TrimSpace(item.UserPPPoE)
+	}
+
+	if pppoeUsername != "" {
+		routerSvc := mikrotik.NewRouterService(h.Service.Repository.DB)
+		routers, err := routerSvc.ListActive(r.Context())
+		if err == nil && len(routers) > 0 {
+			// Query the active routers
+			for _, router := range routers {
+				c := mikrotik.NewClient(router.Host, router.Username, router.Password)
+				if err := c.Connect(r.Context()); err == nil {
+					secret, errSec := c.GetSecret(r.Context(), pppoeUsername)
+					if errSec == nil && secret != nil {
+						mkSecret = secret
+					}
+					active, errAct := c.GetActiveConnection(r.Context(), pppoeUsername)
+					if errAct == nil && active != nil {
+						mkActive = active
+					}
+					c.Close()
+					if mkSecret != nil || mkActive != nil {
+						break // Found on this router, stop querying others
+					}
+				}
+			}
+		} else {
+			// Fallback to legacy single router if list is empty or fails
+			host, _ := h.Service.Settings.GetString(r.Context(), settings.KeyMikrotikHost)
+			user, _ := h.Service.Settings.GetString(r.Context(), settings.KeyMikrotikUser)
+			pass, _ := h.Service.Settings.GetString(r.Context(), settings.KeyMikrotikPass)
+			if strings.TrimSpace(host) != "" && strings.TrimSpace(user) != "" {
+				c := mikrotik.NewClient(host, user, pass)
+				if err := c.Connect(r.Context()); err == nil {
+					secret, errSec := c.GetSecret(r.Context(), pppoeUsername)
+					if errSec == nil && secret != nil {
+						mkSecret = secret
+					}
+					active, errAct := c.GetActiveConnection(r.Context(), pppoeUsername)
+					if errAct == nil && active != nil {
+						mkActive = active
+					}
+					c.Close()
+				}
+			}
+		}
+	}
+
 	WriteJSON(w, http.StatusOK, map[string]any{
-		"data": status,
+		"data": map[string]any{
+			"id":               status.ID,
+			"serial_number":    status.SerialNumber,
+			"model":            status.Model,
+			"status":           status.Status,
+			"ip_address":       status.IPAddress,
+			"uptime":           status.Uptime,
+			"hardware_version": status.HardwareVersion,
+			"software_version": status.SoftwareVersion,
+			"rx_optical_power": status.RxOpticalPower,
+			"tx_optical_power": status.TxOpticalPower,
+			"last_inform_time": status.LastInformTime,
+			"pppoe_username":   pppoeUsername,
+			"customer": map[string]any{
+				"id":         item.ID,
+				"name":       item.Name,
+				"user_pppoe": item.UserPPPoE,
+				"sn_ont":     item.SNOnt,
+				"whatsapp":   item.WhatsApp,
+				"status":     item.Status,
+				"address":    item.Address,
+			},
+			"mikrotik_secret":    mkSecret,
+			"mikrotik_active":    mkActive,
+		},
 	})
 }
 
@@ -799,5 +876,48 @@ func (h CustomerHandler) ConvertReferralToVoucher(w http.ResponseWriter, r *http
 		"message": "berhasil mengubah saldo menjadi voucher diskon",
 	})
 }
+
+func (h CustomerHandler) EndTrial(w http.ResponseWriter, r *http.Request) {
+	user, err := currentUser(r)
+	if err != nil {
+		WriteError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid customer id")
+		return
+	}
+
+	// Fetch customer first for audit log before ending trial
+	cust, err := h.Service.FindByID(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, customers.ErrCustomerNotFound) {
+			WriteError(w, http.StatusNotFound, "customer not found")
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, "failed to load customer")
+		return
+	}
+
+	ip := r.RemoteAddr
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+
+	if err := h.Service.EndTrial(r.Context(), id); err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &id, "customer.end_trial", fmt.Sprintf("Trial pelanggan %s berhasil diberhentikan secara manual", cust.Name), ip)
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"message": "customer trial terminated successfully",
+	})
+}
+
 
 

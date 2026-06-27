@@ -16,8 +16,8 @@ const setupEvents = (client, accountId) => {
     });
 
     client.on('message', async (message) => {
-        // Abaikan pesan dari grup, broadcast, status, dan pesan kosong
-        if (!message.from || message.from.includes('@g.us') || message.from.includes('@broadcast') || !message.body) {
+        // Abaikan pesan dari grup, broadcast, status, dan pesan kosong (kecuali jika ada media seperti bukti transfer)
+        if (!message.from || message.from.includes('@g.us') || message.from.includes('@broadcast') || (!message.body && !message.hasMedia)) {
             return;
         }
 
@@ -90,10 +90,11 @@ const setupEvents = (client, accountId) => {
         try {
             await handleMessage(
                 realFrom,
-                message.body,
+                message.body || '',
                 accountId,
                 sendTextMessage,
-                contactName
+                contactName,
+                message
             );
         } catch (err) {
             logger.error(`[${accountId}] Chatbot error: ${err.message}`);

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -81,7 +82,111 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 		accountID = "default"
 	}
 
-	renderedText := templates.Render(tpl.Content, payload.MessageData)
+	var renderedText string
+
+	switch payload.TriggerKey {
+	case "lunas":
+		var period string
+		_ = s.Logs.DB.QueryRowContext(ctx, "SELECT periode FROM tagihan WHERE id = ?", payload.BillID).Scan(&period)
+		if period != "" {
+			type BillInfo struct {
+				Period   string
+				Nominal  float64
+				CustName string
+			}
+			var bills []BillInfo
+			rows, err := s.Logs.DB.QueryContext(ctx, `
+				SELECT t.periode, t.nominal, p.name
+				FROM tagihan t
+				JOIN pelanggan p ON t.pelanggan_id = p.id
+				WHERE p.whatsapp = ? AND t.status = 'lunas' AND t.periode = ?
+				ORDER BY t.id ASC
+			`, payload.PhoneNumber, period)
+			if err == nil {
+				for rows.Next() {
+					var b BillInfo
+					if err := rows.Scan(&b.Period, &b.Nominal, &b.CustName); err == nil {
+						bills = append(bills, b)
+					}
+				}
+				rows.Close()
+			}
+
+			if len(bills) > 1 {
+				primaryName := bills[0].CustName
+				var builder strings.Builder
+				builder.WriteString(fmt.Sprintf("Pelanggan Yth,\nBapak/Ibu %s,\n\nTerimakasih Atas pembayaran Tagihan anda.\n", primaryName))
+				for i, b := range bills {
+					priceStr := fmt.Sprintf("Rp. %s", formatThousandSeparator(int(b.Nominal)))
+					if i < len(bills)-1 {
+						builder.WriteString(fmt.Sprintf("Tagihan periode %s sebesar %s atas nama %s,\n", b.Period, priceStr, b.CustName))
+					} else {
+						builder.WriteString(fmt.Sprintf("Tagihan periode %s sebesar %s atas nama %s. Sudah Kami Terima.\n", b.Period, priceStr, b.CustName))
+					}
+				}
+				builder.WriteString("\nUntuk Pengaduan kendala dapat menghubungi kami melalui nomor berikut.\n")
+				builder.WriteString("087782297657 - Menet CS\n")
+				builder.WriteString("08987700897 - Elam\n")
+				builder.WriteString("089621743796 - Ipong\n\n")
+				builder.WriteString("Atas perhatian dan kerja samanya, kami ucapkan terima kasih.\n")
+				builder.WriteString("Hormat kami,\n")
+				builder.WriteString("Tim Billing — Menet Tech")
+				renderedText = builder.String()
+			}
+		}
+	case "trial_expired":
+		var period string
+		_ = s.Logs.DB.QueryRowContext(ctx, "SELECT periode FROM tagihan WHERE id = ?", payload.BillID).Scan(&period)
+		if period != "" {
+			type TrialInfo struct {
+				Period   string
+				Nominal  float64
+				CustName string
+				Invoice  string
+				DueDate  string
+			}
+			var trials []TrialInfo
+			rows, err := s.Logs.DB.QueryContext(ctx, `
+				SELECT t.periode, t.nominal, p.name, t.invoice_number, t.jatuh_tempo
+				FROM tagihan t
+				JOIN pelanggan p ON t.pelanggan_id = p.id
+				WHERE p.whatsapp = ? AND t.status = 'belum_bayar' AND t.periode = ?
+				ORDER BY t.id ASC
+			`, payload.PhoneNumber, period)
+			if err == nil {
+				for rows.Next() {
+					var t TrialInfo
+					if err := rows.Scan(&t.Period, &t.Nominal, &t.CustName, &t.Invoice, &t.DueDate); err == nil {
+						trials = append(trials, t)
+					}
+				}
+				rows.Close()
+			}
+
+			if len(trials) > 1 {
+				primaryName := trials[0].CustName
+				dueDateFormatted := formatDateLabel(trials[0].DueDate)
+				var builder strings.Builder
+				builder.WriteString(fmt.Sprintf("Pelanggan Yth,\nBapak/Ibu %s,\n\nMasa trial Anda telah berakhir.\n", primaryName))
+				for i, t := range trials {
+					priceStr := fmt.Sprintf("Rp. %s", formatThousandSeparator(int(t.Nominal)))
+					if i < len(trials)-1 {
+						builder.WriteString(fmt.Sprintf("Tagihan pertama periode %s sebesar %s atas nama %s dengan invoice %s,\n", t.Period, priceStr, t.CustName, t.Invoice))
+					} else {
+						builder.WriteString(fmt.Sprintf("Tagihan pertama periode %s sebesar %s atas nama %s dengan invoice %s. Sudah Kami Buat.\n", t.Period, priceStr, t.CustName, t.Invoice))
+					}
+				}
+				builder.WriteString(fmt.Sprintf("\nMohon lakukan pembayaran sebelum tanggal %s untuk menghindari pembatasan layanan.\n\n", dueDateFormatted))
+				builder.WriteString("Hormat kami,\n")
+				builder.WriteString("Tim Billing — Menet Tech")
+				renderedText = builder.String()
+			}
+		}
+	}
+
+	if renderedText == "" {
+		renderedText = templates.Render(tpl.Content, payload.MessageData)
+	}
 
 	return s.QueueMessage(ctx, accountID, payload.PhoneNumber, renderedText, payload.BillID, payload.TriggerKey)
 }
@@ -188,6 +293,8 @@ func (s WhatsAppService) ProcessQueue(ctx context.Context) (bool, error) {
 
 func (s WhatsAppService) sendDirect(ctx context.Context, msg QueuedMessage) error {
 	url, err := s.Settings.GetString(ctx, settings.KeyWAGatewayURL)
+
+
 	if err != nil {
 		return err
 	}
@@ -259,7 +366,7 @@ func (s WhatsAppService) sendDirect(ctx context.Context, msg QueuedMessage) erro
 func (s WhatsAppService) accountIDForTrigger(ctx context.Context, triggerKey string) (string, error) {
 	settingKey := settings.KeyWAAccountID
 	switch triggerKey {
-	case "reminder_custom":
+	case "reminder-h5":
 		settingKey = settings.KeyWAReminderAccountID
 	case "jatuh_tempo", "trial_expired":
 		settingKey = settings.KeyWADueAccountID
@@ -338,3 +445,37 @@ func (r NotificationLogRepository) FindLogs(ctx context.Context, billID int64) (
 	}
 	return items, rows.Err()
 }
+
+func formatThousandSeparator(amount int) string {
+	value := strconv.Itoa(amount)
+	if len(value) <= 3 {
+		return value
+	}
+
+	parts := []byte{}
+	offset := len(value) % 3
+	if offset > 0 {
+		parts = append(parts, value[:offset]...)
+		if len(value) > offset {
+			parts = append(parts, '.')
+		}
+	}
+
+	for i := offset; i < len(value); i += 3 {
+		parts = append(parts, value[i:i+3]...)
+		if i+3 < len(value) {
+			parts = append(parts, '.')
+		}
+	}
+
+	return string(parts)
+}
+
+func formatDateLabel(raw string) string {
+	value, err := time.Parse("2006-01-02", raw)
+	if err != nil {
+		return raw
+	}
+	return value.Format("02-01-2006")
+}
+

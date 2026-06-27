@@ -121,8 +121,14 @@ func (s Service) AddTicketMessage(ctx context.Context, ticketID int64, senderTyp
 			targetPhone = targetPhone + "@c.us"
 		}
 		
+		// Resolve the configured account ID
+		accountID, err := s.WhatsApp.Settings.GetString(ctx, "wa_account_id")
+		if err != nil || strings.TrimSpace(accountID) == "" {
+			accountID = "default"
+		}
+		
 		// Send reply via WA directly
-		err = s.WhatsApp.SendDirectMessage(ctx, "default", targetPhone, message)
+		err = s.WhatsApp.SendDirectMessage(ctx, accountID, targetPhone, message)
 		if err != nil {
 			// Don't rollback message creation, just log error
 			fmt.Printf("failed to send ticket reply to whatsapp: %v\n", err)

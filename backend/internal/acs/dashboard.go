@@ -94,7 +94,11 @@ func (c *Client) GetDashboardData(ctx context.Context, db *sql.DB) (*DashboardDa
 			var m map[string]any
 			if json.Unmarshal([]byte(intervalsStr), &m) == nil {
 				if t, ok := m["deviceOnlineThreshold"].(float64); ok {
-					deviceOnlineThreshold = int(t)
+					if t > 1000 {
+						deviceOnlineThreshold = int(t)
+					} else {
+						deviceOnlineThreshold = int(t * 60000)
+					}
 				}
 			}
 		}

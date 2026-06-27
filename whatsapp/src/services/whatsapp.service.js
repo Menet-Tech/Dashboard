@@ -49,6 +49,7 @@ const sendTextMessage = async (accountId, to, text, quotedMessageId = null) => {
     }
 };
 
+
 const sendMediaMessage = async (accountId, to, filePath, caption = '', quotedMessageId = null) => {
     const client = getClient(accountId);
     const chatId = formatPhoneNumber(to);
@@ -98,6 +99,7 @@ const sendListMessage = async (accountId, to, body, buttonText, sections, title,
         throw new WhatsAppError('Gagal mengirim pesan list: ' + err.message);
     }
 };
+
 
 const getContacts = async (accountId) => {
     const client = getClient(accountId);

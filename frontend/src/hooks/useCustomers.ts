@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from "react";
-import { fetchCustomers, createCustomer, updateCustomer, updateCustomerStatus, deleteCustomer, bulkDeleteCustomers } from "../lib/api";
+import { fetchCustomers, createCustomer, updateCustomer, updateCustomerStatus, deleteCustomer, bulkDeleteCustomers, endCustomerTrial } from "../lib/api";
 import { validateCustomer, type FieldErrors } from "../utils/validation";
 import { readCustomerLifecycleFilter } from "../lib/lifecycle";
 import type { CustomerItem } from "../types";
@@ -15,7 +15,7 @@ export type CustomerLifecycleFilter =
   | "menunggak"
   | "lunas";
 
-export function useCustomers({ withFeedback, onSuccess }: Pick<HookDeps, "withFeedback" | "onSuccess">) {
+export function useCustomers({ withFeedback, askForConfirmation, onSuccess }: Pick<HookDeps, "withFeedback" | "askForConfirmation" | "onSuccess">) {
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [customerForm, setCustomerForm] = useState<CustomerFormState>(defaultCustomerForm());
   const [editingCustomerId, setEditingCustomerId] = useState<number | null>(null);
@@ -63,12 +63,19 @@ export function useCustomers({ withFeedback, onSuccess }: Pick<HookDeps, "withFe
   }
 
   async function handleCustomerDelete(id: number) {
-    if (!window.confirm("Apakah Anda yakin ingin menghapus pelanggan ini? (PPP secret di MikroTik juga akan dihapus)")) return;
-    await withFeedback(async () => {
-      await deleteCustomer(id);
-      onSuccess("Pelanggan berhasil dihapus.");
-      await refreshCustomers();
-    }, "delete-customer");
+    askForConfirmation({
+      title: "Hapus Pelanggan?",
+      body: "Apakah Anda yakin ingin menghapus pelanggan ini? (PPP secret di MikroTik juga akan dihapus secara permanen).",
+      confirmLabel: "Hapus Pelanggan",
+      tone: "danger",
+      onConfirm: async () => {
+        await withFeedback(async () => {
+          await deleteCustomer(id);
+          onSuccess("Pelanggan berhasil dihapus.");
+          await refreshCustomers();
+        }, "delete-customer");
+      },
+    });
   }
 
   async function handleBulkDelete(ids: number[]) {
@@ -77,6 +84,23 @@ export function useCustomers({ withFeedback, onSuccess }: Pick<HookDeps, "withFe
       onSuccess(`Berhasil menghapus ${ids.length} pelanggan secara massal.`);
       await refreshCustomers();
     }, "bulk-delete-customers");
+  }
+
+
+  async function handleEndTrial(id: number) {
+    askForConfirmation({
+      title: "Hentikan Masa Trial?",
+      body: "Apakah Anda yakin ingin memberhentikan masa trial pelanggan ini? Pelanggan akan dialihkan menjadi pelanggan reguler.",
+      confirmLabel: "Hentikan Trial",
+      tone: "danger",
+      onConfirm: async () => {
+        await withFeedback(async () => {
+          await endCustomerTrial(id);
+          onSuccess("Masa trial pelanggan berhasil diberhentikan.");
+          await refreshCustomers();
+        }, "end-customer-trial");
+      },
+    });
   }
 
 
@@ -94,6 +118,8 @@ export function useCustomers({ withFeedback, onSuccess }: Pick<HookDeps, "withFe
       handleCustomerDelete,
       handleBulkDelete,
       setIsFormOpen,
+      handleEndTrial,
     },
   };
 }
+

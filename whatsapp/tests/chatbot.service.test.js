@@ -47,6 +47,10 @@ jest.mock('../src/services/isp.service', () => ({
         chatbot_trigger_faq: '4',
         chatbot_trigger_admin: '5',
     }),
+    getPendingConfirmation: jest.fn().mockResolvedValue(null),
+    saveChatbotFormToBackend: jest.fn().mockResolvedValue(1),
+    uploadProofBase64: jest.fn().mockResolvedValue({ proof_path: '/uploads/payment-proofs/test.png' }),
+    createPaymentConfirmation: jest.fn().mockResolvedValue({ id: 1 }),
 }));
 
 const database = require('../src/utils/database');
@@ -237,6 +241,150 @@ describe('Chatbot ISP state machine', () => {
             form_data: { customerId: 5, customerName: 'Budi' },
         });
         await handleMessage(phone, 'salah-input', 'billing', sendFn);
-        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('Menu premium: ketik tagihan, billing, cek untuk tagihan.'));
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('ketik 1 untuk cek tagihan anda'));
+    });
+
+    it('REG_MENU transitions to WAITING_PROOF on "oke" message with active bill', async () => {
+        mockFindCustomersByPhone.mockResolvedValue([{ id: 5, name: 'Budi', address: 'Jl. Mawar' }]);
+        mockSessions.set(phone, {
+            phone,
+            account_id: 'billing',
+            state: 'REG_MENU',
+            form_data: { customerId: 5, customerName: 'Budi' },
+        });
+        mockGetActiveBill.mockResolvedValue({
+            id: 10,
+            status: 'belum_bayar',
+            periode: '2026-06',
+            nominal: 150000,
+            jatuh_tempo: '2026-06-30',
+            invoice_number: 'INV-1',
+        });
+
+        await handleMessage(phone, 'oke', 'billing', sendFn);
+
+        expect(database.upsertSession).toHaveBeenCalledWith(phone, 'billing', 'WAITING_PROOF', expect.objectContaining({
+            unpaidBills: [{ billId: 10, customerId: 5 }]
+        }));
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('bukti transfer'));
+    });
+
+    it('WAITING_PROOF processes "ya saya sudah bayar" text input successfully', async () => {
+        mockSessions.set(phone, {
+            phone,
+            account_id: 'billing',
+            state: 'WAITING_PROOF',
+            form_data: {
+                customerId: 5,
+                customerName: 'Budi',
+                unpaidBills: [{ billId: 10, customerId: 5 }]
+            },
+        });
+
+        const { createPaymentConfirmation } = require('../src/services/isp.service');
+
+        await handleMessage(phone, 'ya saya sudah bayar', 'billing', sendFn);
+
+        expect(createPaymentConfirmation).toHaveBeenCalledWith(10, 5, null, 'ya saya sudah bayar');
+        expect(database.upsertSession).toHaveBeenCalledWith(phone, 'billing', 'REG_MENU', expect.any(Object));
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('proses pengecekan'));
+    });
+
+    it('WAITING_PROOF processes image media attachment successfully', async () => {
+        mockSessions.set(phone, {
+            phone,
+            account_id: 'billing',
+            state: 'WAITING_PROOF',
+            form_data: {
+                customerId: 5,
+                customerName: 'Budi',
+                unpaidBills: [{ billId: 10, customerId: 5 }]
+            },
+        });
+
+        const rawMsg = {
+            hasMedia: true,
+            type: 'image',
+            downloadMedia: jest.fn().mockResolvedValue({
+                data: 'base64imgdata',
+                mimetype: 'image/png',
+                filename: 'proof.png'
+            })
+        };
+
+        const { uploadProofBase64, createPaymentConfirmation } = require('../src/services/isp.service');
+
+        await handleMessage(phone, '', 'billing', sendFn, 'Budi', rawMsg);
+
+        expect(rawMsg.downloadMedia).toHaveBeenCalled();
+        expect(uploadProofBase64).toHaveBeenCalledWith('base64imgdata', 'image/png', 'proof.png');
+        expect(createPaymentConfirmation).toHaveBeenCalledWith(10, 5, '/uploads/payment-proofs/test.png', 'Diunggah via chatbot WA');
+        expect(database.upsertSession).toHaveBeenCalledWith(phone, 'billing', 'REG_MENU', expect.any(Object));
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('verifikasi (pending)'));
+    });
+
+    it('REG_MENU handles option 2 triggers and transitions to WAITING_PAYMENT_METHOD', async () => {
+        mockFindCustomersByPhone.mockResolvedValue([{ id: 5, name: 'Budi', address: 'Jl. Mawar' }]);
+        mockSessions.set(phone, {
+            phone,
+            account_id: 'billing',
+            state: 'REG_MENU',
+            form_data: { customerId: 5, customerName: 'Budi' },
+        });
+        mockGetActiveBill.mockResolvedValue({
+            id: 10,
+            status: 'belum_bayar',
+            periode: '2026-06',
+            nominal: 150000,
+            jatuh_tempo: '2026-06-30',
+            invoice_number: 'INV-1',
+        });
+
+        await handleMessage(phone, '2', 'billing', sendFn);
+
+        expect(database.upsertSession).toHaveBeenCalledWith(phone, 'billing', 'WAITING_PAYMENT_METHOD', expect.objectContaining({
+            unpaidBills: [{ billId: 10, customerId: 5 }]
+        }));
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('Bayar pake apa ?'));
+    });
+
+    it('WAITING_PAYMENT_METHOD option 1 transitions to WAITING_PROOF', async () => {
+        mockSessions.set(phone, {
+            phone,
+            account_id: 'billing',
+            state: 'WAITING_PAYMENT_METHOD',
+            form_data: {
+                customerId: 5,
+                customerName: 'Budi',
+                unpaidBills: [{ billId: 10, customerId: 5 }]
+            },
+        });
+
+        await handleMessage(phone, '1', 'billing', sendFn);
+
+        expect(database.upsertSession).toHaveBeenCalledWith(phone, 'billing', 'WAITING_PROOF', expect.any(Object));
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('bukti pembayaran'));
+    });
+
+    it('WAITING_PAYMENT_METHOD option 2 records cash payment and replies "baik, akan kami konfirmasi"', async () => {
+        mockSessions.set(phone, {
+            phone,
+            account_id: 'billing',
+            state: 'WAITING_PAYMENT_METHOD',
+            form_data: {
+                customerId: 5,
+                customerName: 'Budi',
+                unpaidBills: [{ billId: 10, customerId: 5 }]
+            },
+        });
+
+        const { createPaymentConfirmation } = require('../src/services/isp.service');
+
+        await handleMessage(phone, '2', 'billing', sendFn);
+
+        expect(createPaymentConfirmation).toHaveBeenCalledWith(10, 5, null, 'Cash');
+        expect(database.upsertSession).toHaveBeenCalledWith(phone, 'billing', 'REG_MENU', expect.any(Object));
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, 'baik, akan kami konfirmasi');
     });
 });
+

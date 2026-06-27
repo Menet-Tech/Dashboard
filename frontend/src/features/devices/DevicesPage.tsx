@@ -2,6 +2,24 @@ import { useEffect, useState, useCallback } from "react";
 import { apiRequest, checkWAN, checkGponEpon, type GacsDevice, type GacsDeviceDetail, type GacsFault } from "../../lib/api";
 import { formatDateTime } from "../../utils/format";
 import { Modal } from "../../components/ui/Modal";
+import {
+  Cpu,
+  Activity,
+  Wifi,
+  WifiOff,
+  HelpCircle,
+  Search,
+  RefreshCw,
+  User,
+  Shield,
+  Lock,
+  Unlock,
+  AlertTriangle,
+  MapPin,
+  MessageSquare,
+  Globe,
+  Database
+} from "lucide-react";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -50,7 +68,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
   const [loading, setLoading] = useState(true);
   const [summoning, setSummoning] = useState(false);
   const [rebooting, setRebooting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"info" | "wan" | "params">("info");
+  const [activeTab, setActiveTab] = useState<"info" | "wan" | "mikrotik" | "params">("info");
 
   // WAN and Mode info states
   const [wanLoading, setWanLoading] = useState(false);
@@ -135,30 +153,142 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
     }
   };
 
-  // Flatten raw device params for display
-  const flatParams = detail?.data
-    ? Object.entries(detail.data).flatMap(([k, v]) => {
-        if (typeof v === "object" && v !== null && "_value" in (v as object)) {
-          const param = v as { _value?: unknown; _type?: string };
-          return [{ path: k, value: String(param._value ?? ""), type: param._type ?? "" }];
-        }
-        return [];
-      }).slice(0, 200)
-    : [];
+  const getFlatParams = (obj: any): { path: string; value: string; type: string }[] => {
+    const list: { path: string; value: string; type: string }[] = [];
+    const seenPaths = new Set<string>();
 
-  // Extract key info from raw data
+    if (!obj) return list;
+
+    // Manually push deviceInfo fields
+    if (obj.deviceInfo) {
+      const info = obj.deviceInfo;
+      const paths: Record<string, string> = {
+        manufacturer: "InternetGatewayDevice.DeviceInfo.Manufacturer",
+        productclass: "InternetGatewayDevice.DeviceInfo.ProductClass",
+        serialNumber: "InternetGatewayDevice.DeviceInfo.SerialNumber",
+        oui: "InternetGatewayDevice.DeviceInfo.OUI",
+        hardwareVersion: "InternetGatewayDevice.DeviceInfo.HardwareVersion",
+        softwareVersion: "InternetGatewayDevice.DeviceInfo.SoftwareVersion",
+        upTime: "InternetGatewayDevice.DeviceInfo.UpTime",
+        macAddress: "InternetGatewayDevice.DeviceInfo.MacAddress"
+      };
+      for (const [key, path] of Object.entries(paths)) {
+        const val = info[key];
+        if (val !== undefined && val !== null) {
+          list.push({ path, value: String(val), type: "string" });
+          seenPaths.add(path.toLowerCase());
+        }
+      }
+    }
+
+    // Manually push connectionInfo fields
+    if (obj.connectionInfo) {
+      const conn = obj.connectionInfo;
+      const paths: Record<string, string> = {
+        _lastInform: "_lastInform",
+        _lastBoot: "_lastBoot",
+        _registered: "_registered"
+      };
+      for (const [key, path] of Object.entries(paths)) {
+        const val = conn[key];
+        if (val !== undefined && val !== null) {
+          list.push({ path, value: String(val), type: "string" });
+          seenPaths.add(path.toLowerCase());
+        }
+      }
+    }
+
+    const traverse = (current: any) => {
+      if (!current || typeof current !== "object") return;
+
+      // If it looks like a parameter node
+      if (
+        "path" in current &&
+        ( "value" in current || "rawValue" in current || "normalizedValue" in current )
+      ) {
+        if (typeof current.path === "string" && current.path) {
+          const pathLower = current.path.toLowerCase();
+          if (!seenPaths.has(pathLower)) {
+            seenPaths.add(pathLower);
+            let val = current.value;
+            if (val === undefined || val === null) {
+              val = current.rawValue !== undefined ? current.rawValue : current.normalizedValue;
+            }
+            list.push({
+              path: current.path,
+              value: val === null || val === undefined ? "—" : String(val),
+              type: current.type || typeof val,
+            });
+          }
+        }
+      }
+
+      // Recursively traverse
+      if (Array.isArray(current)) {
+        for (const item of current) {
+          traverse(item);
+        }
+      } else {
+        for (const key of Object.keys(current)) {
+          if (key === "path" || key === "value") continue;
+          traverse(current[key]);
+        }
+      }
+    };
+
+    traverse(obj);
+    return list.sort((a, b) => a.path.localeCompare(b.path));
+  };
+
+  const allParams = detail ? getFlatParams(detail) : [];
+  const flatParams = allParams.slice(0, 500);
+
   const getRaw = (path: string): string => {
-    const parts = path.split(".");
-    let cur: unknown = detail?.data;
-    for (const p of parts) {
-      if (cur && typeof cur === "object" && p in (cur as object)) {
-        cur = (cur as Record<string, unknown>)[p];
-      } else return "";
+    const found = allParams.find(p => p.path.toLowerCase() === path.toLowerCase());
+    return found ? found.value : "";
+  };
+
+  const getExternalIp = () => {
+    if (!detail) return "";
+    const pppConns = detail.wanConnections?.wanPPPConnections || [];
+    for (const c of pppConns) {
+      if (c.externalIPAddress?.value) return String(c.externalIPAddress.value);
     }
-    if (cur && typeof cur === "object" && "_value" in (cur as object)) {
-      return String((cur as { _value: unknown })._value ?? "");
+    const ipConns = detail.wanConnections?.wanIPConnections || [];
+    for (const c of ipConns) {
+      if (c.externalIPAddress?.value) return String(c.externalIPAddress.value);
     }
-    return String(cur ?? "");
+    return "";
+  };
+
+  const getDnsServers = () => {
+    if (!detail) return "";
+    const pppConns = detail.wanConnections?.wanPPPConnections || [];
+    for (const c of pppConns) {
+      if (c.dnsServers?.value) return String(c.dnsServers.value);
+    }
+    const ipConns = detail.wanConnections?.wanIPConnections || [];
+    for (const c of ipConns) {
+      if (c.dnsServers?.value) return String(c.dnsServers.value);
+    }
+    return "";
+  };
+
+  const getRxPower = () => {
+    if (!detail) return "";
+    const rx = detail.virtualParameters?.rxpower?.value;
+    if (rx !== undefined && rx !== null && rx !== "") {
+      return `${rx} dBm`;
+    }
+    const rawRx = getRaw("InternetGatewayDevice.WANDevice.1.X_GponInterafceConfig.RXPower") || 
+                  getRaw("InternetGatewayDevice.X_CMCC_ONU_INFO.RxOpticalPower");
+    return rawRx ? `${rawRx} dBm` : "";
+  };
+
+  const getTxPower = () => {
+    if (!detail) return "";
+    const tx = getRaw("InternetGatewayDevice.WANDevice.1.X_GponInterafceConfig.TXPower");
+    return tx ? `${tx} dBm` : "";
   };
 
   return (
@@ -204,18 +334,18 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
           </div>
         ) : (
           <>
-            {detail.vendor && (
+            {detail.vendorDetection && detail.vendorDetection.vendorName && (
               <div className="mb-4 px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-700 font-medium">
-                Vendor: <strong>{detail.vendor.name}</strong>
-                {detail.vendor.parameter_prefix && (
-                  <span className="ml-2 text-indigo-500 font-mono text-xs">({detail.vendor.parameter_prefix})</span>
+                Vendor: <strong>{detail.vendorDetection.vendorName}</strong>
+                {detail.vendorDetection.parameterPrefix && (
+                  <span className="ml-2 text-indigo-500 font-mono text-xs">({detail.vendorDetection.parameterPrefix})</span>
                 )}
               </div>
             )}
 
             {/* Tab switcher */}
-            <div className="flex gap-1 mb-5 border-b border-slate-100">
-              {(["info", "wan", "params"] as const).map((tab) => (
+            <div className="flex gap-1 mb-5 border-b border-slate-150">
+              {(["info", "wan", "mikrotik", "params"] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -226,31 +356,192 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                       : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  {tab === "info" ? "Informasi Utama" : tab === "wan" ? "Status WAN & Mode" : "Semua Parameter"}
+                  {tab === "info" ? "Informasi Utama" : tab === "wan" ? "Status WAN & Mode" : tab === "mikrotik" ? "Pelanggan & MikroTik" : "Semua Parameter"}
                 </button>
               ))}
             </div>
 
             {activeTab === "info" && (
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm animate-in fade-in duration-200">
                 {[
-                  ["Manufacturer", getRaw("InternetGatewayDevice.DeviceInfo.Manufacturer") || getRaw("Device.DeviceInfo.Manufacturer")],
-                  ["Product Class", getRaw("InternetGatewayDevice.DeviceInfo.ProductClass") || getRaw("Device.DeviceInfo.ProductClass")],
-                  ["Serial Number", getRaw("InternetGatewayDevice.DeviceInfo.SerialNumber") || getRaw("Device.DeviceInfo.SerialNumber")],
-                  ["Hardware Version", getRaw("InternetGatewayDevice.DeviceInfo.HardwareVersion") || getRaw("Device.DeviceInfo.HardwareVersion")],
-                  ["Software Version", getRaw("InternetGatewayDevice.DeviceInfo.SoftwareVersion") || getRaw("Device.DeviceInfo.SoftwareVersion")],
-                  ["Uptime", getRaw("InternetGatewayDevice.DeviceInfo.UpTime") || getRaw("Device.DeviceInfo.UpTime")],
-                  ["External IP", getRaw("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress")],
-                  ["DNS Servers", getRaw("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.DNSServers")],
-                  ["RX Power", getRaw("InternetGatewayDevice.WANDevice.1.X_GponInterafceConfig.RXPower") || getRaw("InternetGatewayDevice.X_CMCC_ONU_INFO.RxOpticalPower")],
-                  ["TX Power", getRaw("InternetGatewayDevice.WANDevice.1.X_GponInterafceConfig.TXPower")],
+                  ["Manufacturer", detail.deviceInfo?.manufacturer || getRaw("InternetGatewayDevice.DeviceInfo.Manufacturer") || getRaw("Device.DeviceInfo.Manufacturer")],
+                  ["Product Class", detail.deviceInfo?.productclass || getRaw("InternetGatewayDevice.DeviceInfo.ProductClass") || getRaw("Device.DeviceInfo.ProductClass")],
+                  ["Serial Number", detail.deviceInfo?.serialNumber || getRaw("InternetGatewayDevice.DeviceInfo.SerialNumber") || getRaw("Device.DeviceInfo.SerialNumber")],
+                  ["Hardware Version", detail.deviceInfo?.hardwareVersion || getRaw("InternetGatewayDevice.DeviceInfo.HardwareVersion") || getRaw("Device.DeviceInfo.HardwareVersion")],
+                  ["Software Version", detail.deviceInfo?.softwareVersion || getRaw("InternetGatewayDevice.DeviceInfo.SoftwareVersion") || getRaw("Device.DeviceInfo.SoftwareVersion")],
+                  ["Uptime", detail.deviceInfo?.upTime ? `${detail.deviceInfo.upTime}s` : ""],
+                  ["MAC Address", detail.deviceInfo?.macAddress],
+                  ["External IP", getExternalIp()],
+                  ["DNS Servers", getDnsServers()],
+                  ["RX Power", getRxPower()],
+                  ["TX Power", getTxPower()],
+                  ["Temperature", detail.virtualParameters?.temperature?.value ? `${detail.virtualParameters.temperature.value} °C` : ""],
                 ].filter(([, v]) => v).map(([label, value]) => (
-                  <div key={label} className="py-2 border-b border-slate-50">
+                  <div key={label} className="py-2 border-b border-slate-100">
                     <dt className="text-slate-500 font-medium mb-0.5">{label}</dt>
                     <dd className="text-slate-900 font-semibold font-mono text-xs break-all">{value}</dd>
                   </div>
                 ))}
               </dl>
+            )}
+
+            {activeTab === "mikrotik" && (
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* 1. Customer Database Matching */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 border-b border-slate-200 pb-2">
+                    <User size={18} className="text-indigo-500" />
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Database Pelanggan
+                    </h4>
+                  </div>
+                  {detail.customer ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Nama Lengkap</span>
+                        <strong className="text-slate-800 text-sm mt-0.5 block">{detail.customer.name}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Status Pelanggan</span>
+                        <span className="mt-1 block">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            detail.customer.status === "active" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                            detail.customer.status === "limit" ? "bg-rose-50 text-rose-700 border border-rose-200" :
+                            "bg-slate-100 text-slate-650"
+                          }`}>
+                            {detail.customer.status}
+                          </span>
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Username PPPoE</span>
+                        <code className="text-indigo-600 font-mono text-xs font-semibold bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 block mt-0.5 w-max">
+                          {detail.customer.user_pppoe || "-"}
+                        </code>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Nomor WhatsApp</span>
+                        {detail.customer.whatsapp ? (
+                          <a
+                            href={`https://wa.me/+${detail.customer.whatsapp.replace(/[+\-\s]/g, "").replace(/^0/, "62")}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-indigo-600 hover:underline font-semibold block mt-0.5"
+                          >
+                            {detail.customer.whatsapp}
+                          </a>
+                        ) : "-"}
+                      </div>
+                      <div className="sm:col-span-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Alamat</span>
+                        <p className="text-slate-600 mt-1 leading-relaxed bg-white border border-slate-150 p-2.5 rounded-xl">{detail.customer.address || "Belum ada alamat."}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs">
+                      <AlertTriangle size={16} className="shrink-0 text-amber-600" />
+                      <span>CPE ini belum dihubungkan dengan pelanggan terdaftar di database lokal.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. MikroTik Router PPP Secret details */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 border-b border-slate-200 pb-2">
+                    <Shield size={18} className="text-indigo-500" />
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      MikroTik PPP Secret
+                    </h4>
+                  </div>
+                  {detail.mikrotikSecret ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">PPP Secret Username</span>
+                        <strong className="text-slate-800 font-mono block mt-0.5">{detail.mikrotikSecret.username}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Profile Paket</span>
+                        <span className="bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 border border-indigo-150 rounded block mt-0.5 w-max">
+                          {detail.mikrotikSecret.profile}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Status Akun (Disabled)</span>
+                        <span className="mt-1 block">
+                          {detail.mikrotikSecret.disabled ? (
+                            <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 w-max">
+                              <Lock size={12} />
+                              Disabled / Isolir
+                            </span>
+                          ) : (
+                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 w-max">
+                              <Unlock size={12} />
+                              Active / Enabled
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Last Caller ID (MAC)</span>
+                        <code className="text-slate-700 font-mono block mt-0.5">{detail.mikrotikSecret.last_caller_id || "-"}</code>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Last Logged Out</span>
+                        <span className="text-slate-750 block mt-0.5">{detail.mikrotikSecret.last_logged_out || "-"}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Last Disconnect Reason</span>
+                        <span className="text-slate-750 font-medium block mt-0.5">{detail.mikrotikSecret.last_disconnect_reason || "-"}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs">
+                      <AlertTriangle size={16} className="shrink-0 text-red-600" />
+                      <span>Username PPPoE tidak terdaftar di MikroTik Secrets.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. MikroTik Router PPP Active Session details */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 border-b border-slate-200 pb-2">
+                    <Activity size={18} className="text-indigo-500" />
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Sesi Aktif PPP MikroTik
+                    </h4>
+                  </div>
+                  {detail.mikrotikActiveConn ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Status Sesi PPPoE</span>
+                        <span className="mt-1 block">
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-250 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1.5 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Online / Connected
+                          </span>
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Alamat IP Sesi</span>
+                        <code className="text-slate-700 font-mono text-xs font-semibold block mt-0.5">{detail.mikrotikActiveConn.address}</code>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Uptime Sesi</span>
+                        <strong className="text-slate-800 font-semibold block mt-0.5">{detail.mikrotikActiveConn.uptime}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Active Caller ID</span>
+                        <code className="text-slate-700 font-mono block mt-0.5">{detail.mikrotikActiveConn.caller_id || "-"}</code>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-slate-100 border border-slate-200 text-slate-600 rounded-xl text-xs">
+                      <WifiOff size={16} className="shrink-0 text-slate-400" />
+                      <span>Pelanggan ini sedang tidak memiliki sesi aktif di MikroTik (Offline).</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
 
             {activeTab === "wan" && (
@@ -463,8 +754,42 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
   const loadDevices = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiRequest<{ success: boolean; data: GacsDevice[] }>("/api/getdevice?limit=200");
-      setDevices(res.data ?? []);
+      const res = await apiRequest<any>("/api/getdevice?limit=200");
+      let rawList: any[] = [];
+      if (Array.isArray(res)) {
+        rawList = res;
+      } else if (res && typeof res === "object" && Array.isArray(res.data)) {
+        rawList = res.data;
+      }
+
+      const mapped = rawList.map((d: any) => {
+        if (d && typeof d === "object" && d._deviceId) {
+          return d as GacsDevice;
+        }
+
+        const manufacturer = d.productclass ? d.productclass.split("-")[0].split(" ")[0] : "CIOT";
+        const serial = d.SerialNumber || d._id?.split("-").pop() || "";
+        const oui = d._id?.split("-")[0] || "";
+
+        return {
+          _id: d._id || "",
+          _deviceId: {
+            _Manufacturer: manufacturer,
+            _ProductClass: d.productclass || "Unknown",
+            _SerialNumber: serial,
+            _OUI: oui,
+          },
+          _lastInform: d._lastInform,
+          _tag: d.tags || [],
+          _summary: {
+            ssid: d.ssid1 || undefined,
+            pppoe_username: d.pppoe || undefined,
+            rx_power: d.rxpower ? `${d.rxpower} dBm` : undefined,
+          }
+        } as GacsDevice;
+      });
+
+      setDevices(mapped);
     } catch {
       pushError("Gagal memuat daftar perangkat ONT. Pastikan GenieACS terhubung di Pengaturan.");
     } finally {
@@ -491,33 +816,38 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
   const offlineCount = devices.filter((d) => onlineStatus(d._lastInform) === "offline").length;
 
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-6 animate-in fade-in duration-300">
       {/* Header Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Perangkat", value: devices.length, color: "text-slate-900", bg: "bg-white" },
-          { label: "Online", value: onlineCount, color: "text-emerald-700", bg: "bg-emerald-50" },
-          { label: "Offline", value: offlineCount, color: "text-red-700", bg: "bg-red-50" },
-          { label: "Tidak Diketahui", value: devices.length - onlineCount - offlineCount, color: "text-slate-500", bg: "bg-slate-50" },
-        ].map(({ label, value, color, bg }) => (
-          <article key={label} className={`${bg} border border-slate-200 rounded-2xl p-5 shadow-sm`}>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
-            <p className={`text-3xl font-bold ${color}`}>{loading ? "—" : value}</p>
+          { label: "Total Perangkat", value: devices.length, color: "text-slate-800", icon: <Cpu className="text-indigo-500 shrink-0" size={20} /> },
+          { label: "Online", value: onlineCount, color: "text-emerald-700", icon: <Activity className="text-emerald-500 shrink-0" size={20} /> },
+          { label: "Offline", value: offlineCount, color: "text-rose-700", icon: <WifiOff className="text-rose-500 shrink-0" size={20} /> },
+          { label: "Tidak Diketahui", value: devices.length - onlineCount - offlineCount, color: "text-slate-500", icon: <HelpCircle className="text-slate-400 shrink-0" size={20} /> },
+        ].map(({ label, value, color, icon }) => (
+          <article key={label} className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm flex items-center justify-between hover:shadow-md hover:border-slate-200 transition-all duration-300">
+            <div className="space-y-1">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
+              <p className={`text-2xl font-black ${color}`}>{loading ? "—" : value}</p>
+            </div>
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+              {icon}
+            </div>
           </article>
         ))}
       </div>
 
       {/* Main Card */}
-      <article className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+      <article className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         {/* Tabs & Actions */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-slate-100">
+        <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-slate-150 bg-slate-50/50">
           <div className="flex gap-1">
             {(["devices", "faults"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
-                className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
                   activeTab === tab
                     ? "border-indigo-600 text-indigo-700"
                     : "border-transparent text-slate-500 hover:text-slate-700"
@@ -529,89 +859,111 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
           </div>
           <button
             type="button"
-            className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-50 pb-3"
+            className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-50 pb-3 flex items-center gap-1.5 cursor-pointer transition-colors"
             onClick={() => void loadDevices()}
             disabled={loading}
           >
-            {loading ? "Memuat..." : "⟳ Refresh"}
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            {loading ? "Refreshing..." : "Refresh Perangkat"}
           </button>
         </div>
 
         <div className="p-6">
           {activeTab === "devices" && (
             <>
-              <div className="mb-5">
+              <div className="mb-5 relative w-full md:w-96">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="search"
-                  className="w-full md:w-96 border border-slate-200 rounded-xl px-4 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition"
-                  placeholder="Cari SN, Manufacturer, SSID, PPPoE username..."
+                  className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition"
+                  placeholder="Cari SN, ProductClass, SSID, PPPoE username..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
 
               {loading ? (
-                <div className="flex items-center justify-center h-48 text-slate-400 text-sm animate-pulse">
-                  Memuat perangkat dari GenieACS...
+                <div className="flex flex-col items-center justify-center h-48 text-slate-400 text-sm gap-2">
+                  <RefreshCw className="animate-spin text-indigo-600" size={24} />
+                  <p className="animate-pulse font-medium">Sinkronisasi perangkat dengan GenieACS...</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto border border-gray-100 rounded-2xl">
-                  <table className="w-full text-left border-collapse text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
+                <div className="overflow-x-auto border border-slate-150 rounded-xl">
+                  <table className="compact-table w-full text-xs">
+                    <thead className="bg-slate-50 text-slate-650 font-semibold border-b border-slate-200">
                       <tr>
-                        <th className="px-5 py-3 font-medium">Perangkat</th>
-                        <th className="px-5 py-3 font-medium">Serial Number</th>
-                        <th className="px-5 py-3 font-medium">Status</th>
-                        <th className="px-5 py-3 font-medium">Last Inform</th>
-                        <th className="px-5 py-3 font-medium">SSID / PPPoE</th>
-                        <th className="px-5 py-3 font-medium">RX Power</th>
-                        <th className="px-5 py-3 font-medium">Tag</th>
-                        <th className="px-5 py-3 font-medium">Aksi</th>
+                        <th className="px-5 py-3 text-left">Perangkat</th>
+                        <th className="px-5 py-3 text-left">Serial Number</th>
+                        <th className="px-5 py-3 text-left">Status</th>
+                        <th className="px-5 py-3 text-left">Last Inform</th>
+                        <th className="px-5 py-3 text-left">SSID / PPPoE</th>
+                        <th className="px-5 py-3 text-left">RX Power</th>
+                        <th className="px-5 py-3 text-left">Tag</th>
+                        <th className="px-5 py-3 text-left">Aksi</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-slate-250 bg-white">
                       {filtered.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="px-5 py-10 text-center text-slate-400">
+                          <td colSpan={8} className="px-5 py-12 text-center text-slate-400 font-medium">
                             {search ? "Tidak ada perangkat yang cocok." : "Tidak ada perangkat terdaftar di GenieACS."}
                           </td>
                         </tr>
                       ) : (
                         filtered.map((d) => {
                           const status = onlineStatus(d._lastInform);
+                          const rxPowerFloat = parseFloat(d._summary?.rx_power ?? "");
+                          const rxPowerColor = isNaN(rxPowerFloat) ? "text-slate-400" :
+                                               rxPowerFloat < -27 ? "text-rose-600 bg-rose-50 border border-rose-100 font-extrabold" :
+                                               rxPowerFloat < -25 ? "text-amber-600 bg-amber-50 border border-amber-100 font-extrabold" :
+                                               "text-emerald-600 bg-emerald-50 border border-emerald-100 font-extrabold";
                           return (
-                            <tr key={d._id} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-5 py-3">
-                                <p className="font-semibold text-slate-800">{deviceLabel(d)}</p>
-                                <p className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-[180px]">{d._id}</p>
+                            <tr key={d._id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-5 py-3.5">
+                                <p className="font-bold text-slate-800">{deviceLabel(d)}</p>
+                                <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[180px]" title={d._id}>{d._id}</p>
                               </td>
-                              <td className="px-5 py-3 font-mono text-xs text-slate-600">{d._deviceId._SerialNumber ?? "—"}</td>
-                              <td className="px-5 py-3">
+                              <td className="px-5 py-3.5 font-mono text-slate-600 font-semibold">{d._deviceId._SerialNumber ?? "—"}</td>
+                              <td className="px-5 py-3.5">
                                 <StatusBadge status={status} />
                               </td>
-                              <td className="px-5 py-3 text-slate-500 text-xs">{formatDateTime(d._lastInform)}</td>
-                              <td className="px-5 py-3 text-xs">
-                                {d._summary?.ssid && <p className="font-semibold text-slate-700">📶 {d._summary.ssid}</p>}
-                                {d._summary?.pppoe_username && <p className="text-slate-500">👤 {d._summary.pppoe_username}</p>}
+                              <td className="px-5 py-3.5 text-slate-500 font-medium">{formatDateTime(d._lastInform)}</td>
+                              <td className="px-5 py-3.5">
+                                {d._summary?.ssid && (
+                                  <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded font-medium mb-1">
+                                    📶 {d._summary.ssid}
+                                  </span>
+                                )}
+                                {d._summary?.pppoe_username && (
+                                  <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-100 px-1.5 py-0.5 rounded font-mono font-semibold block w-max">
+                                    👤 {d._summary.pppoe_username}
+                                  </span>
+                                )}
                                 {!d._summary?.ssid && !d._summary?.pppoe_username && <span className="text-slate-400">—</span>}
                               </td>
-                              <td className="px-5 py-3 text-xs font-mono text-slate-700">
-                                {d._summary?.rx_power ?? "—"}
+                              <td className="px-5 py-3.5">
+                                {d._summary?.rx_power ? (
+                                  <span className={`px-2 py-0.5 rounded ${rxPowerColor}`}>
+                                    {d._summary.rx_power}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">—</span>
+                                )}
                               </td>
-                              <td className="px-5 py-3">
+                              <td className="px-5 py-3.5">
                                 <div className="flex flex-wrap gap-1">
                                   {(d._tag ?? []).map((tag) => (
-                                    <span key={tag} className="bg-indigo-50 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full border border-indigo-100">
+                                    <span key={tag} className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-100">
                                       {tag}
                                     </span>
                                   ))}
                                   {!(d._tag ?? []).length && <span className="text-slate-400 text-xs">—</span>}
                                 </div>
                               </td>
-                              <td className="px-5 py-3">
+                              <td className="px-5 py-3.5">
                                 <button
                                   type="button"
-                                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors shadow-sm"
+                                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-xl transition-colors shadow-sm cursor-pointer"
                                   onClick={() => setDetailId(d._id)}
                                 >
                                   Detail
@@ -625,7 +977,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                   </table>
                 </div>
               )}
-              <p className="mt-3 text-xs text-slate-400">{filtered.length} dari {devices.length} perangkat ditampilkan</p>
+              <p className="mt-3 text-[11px] text-slate-400 font-medium">{filtered.length} dari {devices.length} perangkat terdeteksi</p>
             </>
           )}
 

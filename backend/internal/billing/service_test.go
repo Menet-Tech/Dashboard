@@ -76,6 +76,10 @@ func (m *mockWhatsAppSender) SendTemplate(ctx context.Context, payload notificat
 	return nil
 }
 
+func (m *mockWhatsAppSender) SendDirectMessage(ctx context.Context, accountID, toNumber, body string) error {
+	return nil
+}
+
 func TestServiceMarkPaidCreatesHistoryAndRestoresCustomerStatus(t *testing.T) {
 	db := billingTestDB(t)
 	waSender := &mockWhatsAppSender{payloads: make(chan notifications.BillMessagePayload, 1)}

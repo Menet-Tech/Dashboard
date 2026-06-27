@@ -20,6 +20,7 @@ type CustomerDetailModalProps = {
   pushSuccess: (msg: string) => void;
   pushError: (msg: string) => void;
   onRefresh?: () => void;
+  onEndTrial?: (id: number) => void;
 };
 
 export function CustomerDetailModal({
@@ -31,6 +32,7 @@ export function CustomerDetailModal({
   pushSuccess,
   pushError,
   onRefresh,
+  onEndTrial,
 }: CustomerDetailModalProps) {
   const [customerBills, setCustomerBills] = useState<BillItem[]>([]);
   const [loadingBills, setLoadingBills] = useState(false);
@@ -260,6 +262,36 @@ export function CustomerDetailModal({
 
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          {customer.is_trial && (
+            <div className="bg-amber-50 border border-amber-250 dark:bg-slate-900/60 dark:border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-250 dark:border-amber-500/20">
+                  Masa Trial Aktif
+                </span>
+                <p className="text-xs text-amber-900 dark:text-amber-250 mt-1.5 leading-relaxed">
+                  Pelanggan ini sedang dalam masa trial. Masa trial dimulai pada{" "}
+                  <strong className="font-semibold text-amber-950 dark:text-amber-100">
+                    {customer.trial_started_at ? new Date(customer.trial_started_at).toLocaleDateString("id-ID", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    }) : "-"}
+                  </strong>{" "}
+                  selama {customer.trial_days || 0} hari.
+                </p>
+              </div>
+              {user?.role !== "viewer" && onEndTrial && (
+                <button
+                  type="button"
+                  onClick={() => onEndTrial(customer.id)}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors cursor-pointer w-full sm:w-auto text-center whitespace-nowrap"
+                >
+                  Hentikan Trial & Jadikan Reguler
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Profile Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50 p-5 rounded-2xl border border-slate-150">
             <div>
@@ -428,63 +460,139 @@ export function CustomerDetailModal({
                 )}
 
                 {ontStatus && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
-                    <div>
-                      <span className="text-[10px] font-semibold text-slate-400 block">Status ONT</span>
-                      <span className="mt-1 block">
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-400 block">Status ONT</span>
+                        <span className="mt-1 block">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              ontStatus.status === "online"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-red-50 text-red-700 border border-red-200"
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                ontStatus.status === "online" ? "bg-emerald-500" : "bg-red-500"
+                              }`}
+                            ></span>
+                            {ontStatus.status === "online" ? "Online" : "Offline"}
+                          </span>
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-400 block">Model ONT</span>
+                        <strong className="text-slate-800 text-xs mt-0.5 block">
+                          {ontStatus.model} ({ontStatus.hardware_version})
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-400 block">IP Address CPE</span>
+                        <code className="text-slate-700 font-mono text-xs mt-0.5 block">{ontStatus.ip_address}</code>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-400 block">Uptime ONT</span>
+                        <strong className="text-slate-800 text-xs mt-0.5 block">{ontStatus.uptime || "-"}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-400 block">Rx Optical Power</span>
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            ontStatus.status === "online"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : "bg-red-50 text-red-700 border border-red-200"
+                          className={`text-xs font-bold mt-0.5 block ${
+                            parseFloat(ontStatus.rx_optical_power) < -27
+                              ? "text-red-655"
+                              : parseFloat(ontStatus.rx_optical_power) < -25
+                              ? "text-amber-655"
+                              : "text-emerald-655"
                           }`}
                         >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              ontStatus.status === "online" ? "bg-emerald-500" : "bg-red-500"
-                            }`}
-                          ></span>
-                          {ontStatus.status === "online" ? "Online" : "Offline"}
+                          {ontStatus.rx_optical_power}
                         </span>
-                      </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-400 block">Tx Optical Power</span>
+                        <strong className="text-slate-700 text-xs mt-0.5 block">{ontStatus.tx_optical_power}</strong>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-[10px] font-semibold text-slate-400 block">Last Inform / Connect</span>
+                        <span className="text-slate-650 text-xs mt-0.5 block">
+                          {ontStatus.last_inform_time ? new Date(ontStatus.last_inform_time).toLocaleString("id-ID") : "-"}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-semibold text-slate-400 block">Model ONT</span>
-                      <strong className="text-slate-800 text-xs mt-0.5 block">
-                        {ontStatus.model} ({ontStatus.hardware_version})
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold text-slate-400 block">IP Address CPE</span>
-                      <code className="text-slate-700 font-mono text-xs mt-0.5 block">{ontStatus.ip_address}</code>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold text-slate-400 block">Uptime ONT</span>
-                      <strong className="text-slate-800 text-xs mt-0.5 block">{ontStatus.uptime || "-"}</strong>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold text-slate-400 block">Rx Optical Power</span>
-                      <span
-                        className={`text-xs font-bold mt-0.5 block ${
-                          parseFloat(ontStatus.rx_optical_power) < -27
-                            ? "text-red-655"
-                            : parseFloat(ontStatus.rx_optical_power) < -25
-                            ? "text-amber-655"
-                            : "text-emerald-655"
-                        }`}
-                      >
-                        {ontStatus.rx_optical_power}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold text-slate-400 block">Tx Optical Power</span>
-                      <strong className="text-slate-700 text-xs mt-0.5 block">{ontStatus.tx_optical_power}</strong>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-[10px] font-semibold text-slate-400 block">Last Inform / Connect</span>
-                      <span className="text-slate-650 text-xs mt-0.5 block">
-                        {ontStatus.last_inform_time ? new Date(ontStatus.last_inform_time).toLocaleString("id-ID") : "-"}
-                      </span>
+
+                    {/* MikroTik PPP details */}
+                    <div className="border-t border-slate-200 pt-4 mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Secret Details */}
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-2.5">
+                        <strong className="text-slate-800 uppercase text-[10px] tracking-wider block border-b pb-1.5 font-sans font-bold">
+                          MikroTik PPP Secret info
+                        </strong>
+                        {ontStatus.mikrotik_secret ? (
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                              <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Profile Paket</span>
+                              <strong className="text-indigo-600 font-semibold bg-indigo-50 border border-indigo-100 rounded px-1 py-0.5 block w-max mt-0.5">
+                                {ontStatus.mikrotik_secret.profile}
+                              </strong>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Status PPP</span>
+                              {ontStatus.mikrotik_secret.disabled ? (
+                                <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[10px] font-bold block w-max mt-0.5">Disabled / Terisolir</span>
+                              ) : (
+                                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-bold block w-max mt-0.5">Active / Enabled</span>
+                              )}
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Last Caller ID (MAC)</span>
+                              <code className="text-slate-600 font-mono font-semibold block mt-0.5">{ontStatus.mikrotik_secret.last_caller_id || "-"}</code>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Last Logged Out</span>
+                              <span className="text-slate-700 font-medium block mt-0.5">{ontStatus.mikrotik_secret.last_logged_out || "-"}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Disconnect Reason</span>
+                              <span className="text-slate-700 font-semibold block mt-0.5 leading-relaxed">{ontStatus.mikrotik_secret.last_disconnect_reason || "-"}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-slate-400 italic font-medium py-2">Data PPP Secret tidak ditemukan di MikroTik.</p>
+                        )}
+                      </div>
+
+                      {/* Active Connection Details */}
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-2.5">
+                        <strong className="text-slate-800 uppercase text-[10px] tracking-wider block border-b pb-1.5 font-sans font-bold">
+                          Sesi Aktif PPP MikroTik
+                        </strong>
+                        {ontStatus.mikrotik_active ? (
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                              <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Status Koneksi</span>
+                              <span className="inline-flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 border border-emerald-250 px-2 py-0.5 rounded-full mt-0.5 animate-pulse">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Connected
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">IP Address Sesi</span>
+                              <code className="text-indigo-600 font-mono font-semibold block mt-0.5">{ontStatus.mikrotik_active.address}</code>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Uptime Sesi</span>
+                              <strong className="text-slate-700 block mt-0.5 font-semibold">{ontStatus.mikrotik_active.uptime}</strong>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Caller ID Sesi</span>
+                              <code className="text-slate-600 font-mono block mt-0.5">{ontStatus.mikrotik_active.caller_id || "-"}</code>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-slate-500 italic font-medium py-2">Sesi PPPoE saat ini sedang offline (tidak ada koneksi aktif).</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

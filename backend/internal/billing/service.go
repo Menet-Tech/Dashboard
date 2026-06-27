@@ -81,6 +81,7 @@ type AutomationOptions struct {
 
 type WhatsAppSender interface {
 	SendTemplate(ctx context.Context, payload notifications.BillMessagePayload) error
+	SendDirectMessage(ctx context.Context, accountID, toNumber, body string) error
 }
 
 type Service struct {
@@ -287,7 +288,7 @@ func (s Service) QueueEmailForTrigger(ctx context.Context, billID int64, trigger
 	} else {
 		// Fallback to hardcoded defaults
 		switch triggerKey {
-		case "reminder_custom":
+		case "reminder-h5":
 			subject = fmt.Sprintf("Pengingat Tagihan Internet %s", templateData["invoice_number"])
 			body = fmt.Sprintf("Yth. %s,\n\n"+
 				"Ini adalah pengingat bahwa tagihan internet Anda periode %s dengan nomor invoice %s sebesar %s akan jatuh tempo pada tanggal %s.\n\n"+
@@ -348,6 +349,26 @@ func (s Service) AttachProof(ctx context.Context, billID int64, proofPath string
 	return s.Repository.AttachProof(ctx, billID, proofPath)
 }
 
+// GrantExtension marks an active bill as "pending extension" and sets the
+// customer status to "pending". On next billing generation, this causes the
+// previous unpaid bill to be written off as "perpanjangan" and the new bill
+// to carry double the nominal (current + carried-over month).
+func (s Service) GrantExtension(ctx context.Context, billID int64) error {
+	detail, err := s.FindByID(ctx, billID)
+	if err != nil {
+		return err
+	}
+	if detail.Status == "lunas" {
+		return errors.New("bill sudah lunas, tidak bisa diperpanjang")
+	}
+	// Set customer to pending so next Generate picks it up as perpanjangan
+	if err := s.Customers.UpdateStatus(ctx, detail.CustomerID, "pending"); err != nil {
+		return fmt.Errorf("grant extension: update customer status: %w", err)
+	}
+	slog.Info("extension granted", "bill_id", billID, "customer_id", detail.CustomerID)
+	return nil
+}
+
 func (s Service) ProcessAutomation(ctx context.Context, options AutomationOptions) error {
 	if options.Now.IsZero() {
 		options.Now = time.Now()
@@ -389,7 +410,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 
 	// Process billing notifications (reminder_custom and jatuh_tempo) per phone number group
 	for phone, group := range phoneGroups {
-		// Process reminder_custom trigger
+		// Process reminder-h5 trigger
 		var reminderUnsent []automationCandidate
 		for _, item := range group {
 			dueDate, err := time.Parse("2006-01-02", item.DueDate)
@@ -397,7 +418,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 				continue
 			}
 			if sameDate(dueDate, options.Now.AddDate(0, 0, options.ReminderDays)) {
-				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "reminder_custom")
+				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "reminder-h5")
 				if err == nil && !sent {
 					reminderUnsent = append(reminderUnsent, item)
 				}
@@ -405,7 +426,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		}
 
 		if len(reminderUnsent) == 1 {
-			waErr := sendAutomationMessage(ctx, options, reminderUnsent[0], "reminder_custom")
+			waErr := sendAutomationMessage(ctx, options, reminderUnsent[0], "reminder-h5")
 			if waErr != nil {
 				slog.Error("automation: send reminder WA failed, continuing",
 					"bill_id", reminderUnsent[0].ID, "customer", reminderUnsent[0].CustomerName, "error", waErr)
@@ -424,28 +445,36 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		} else if len(reminderUnsent) > 1 {
 			// Send combined reminder
 			var totalAmount int
-			var totalDiscount int
 			var detailBlock strings.Builder
 			var billIDs []int64
 
 			for _, c := range reminderUnsent {
 				totalAmount += c.Amount
-				totalDiscount += (c.Diskon + c.DiskonReferral)
 				pkgPrice := c.Amount + c.Diskon + c.DiskonReferral
-				detailBlock.WriteString(fmt.Sprintf("Paket: %s untuk Bapak/Ibu %s\nHarga: %s\n\n", c.PackageName, c.CustomerName, formatIDRCurrency(pkgPrice)))
+				
+				detailBlock.WriteString(fmt.Sprintf("Nama : %s\n", c.CustomerName))
+				detailBlock.WriteString(fmt.Sprintf("> Paket: %s\n", c.PackageName))
+				detailBlock.WriteString(fmt.Sprintf("> Harga: %s.\n", formatIDRCurrency(pkgPrice)))
+				
+				totalDisc := c.Diskon + c.DiskonReferral
+				if totalDisc > 0 {
+					if c.HasODP {
+						percent := (totalDisc * 100) / pkgPrice
+						detailBlock.WriteString(fmt.Sprintf("> Diskon: %d%%\n", percent))
+					} else {
+						detailBlock.WriteString(fmt.Sprintf("> Diskon: %s.\n", formatIDRCurrency(totalDisc)))
+					}
+				}
+				detailBlock.WriteString("\n")
 				billIDs = append(billIDs, c.ID)
 			}
 
 			var sb strings.Builder
-			sb.WriteString("Pelanggan Yth,\n")
-			sb.WriteString(fmt.Sprintf("Bapak/Ibu %s,\n\n", reminderUnsent[0].CustomerName))
-			sb.WriteString(fmt.Sprintf("Tagihan Anda periode %s sebesar %s, dengan detail berikut:\n\n", reminderUnsent[0].Period, formatIDRCurrency(totalAmount)))
+			sb.WriteString(fmt.Sprintf("Tagihan Anda periode %s sebesar %s., dengan detail berikut\n\n", reminderUnsent[0].Period, formatIDRCurrency(totalAmount)))
 			sb.WriteString(detailBlock.String())
-			if totalDiscount > 0 {
-				sb.WriteString(fmt.Sprintf("Diskon: %s\n\n", formatIDRCurrency(totalDiscount)))
-			}
-			sb.WriteString(fmt.Sprintf("Total Tagihan: %s\n\n", formatIDRCurrency(totalAmount)))
+			sb.WriteString(fmt.Sprintf("Total Tagihan: %s.\n\n", formatIDRCurrency(totalAmount)))
 			sb.WriteString(fmt.Sprintf("Mohon lakukan pembayaran sebelum tanggal %s agar terhindar dari Pembatasan Layanan.\n\n", formatDateLabel(reminderUnsent[0].DueDate)))
+			sb.WriteString("jika sudah melakukan pembayaran, kamu dapat memberikan bukti transfer ke sini atau balas dengan \"ya saya sudah bayar\" jika kamu membayar dengan cash\n\n")
 			sb.WriteString("Rekening Pembayaran:\n")
 			sb.WriteString("Bank Mandiri\n1570006636691\n\n")
 			sb.WriteString("Shopeepay, gopay\n089621743796\n\n")
@@ -462,7 +491,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 			waErr := options.SendWhatsApp(ctx, AutomationMessage{
 				BillID:       reminderUnsent[0].ID,
 				GroupBillIDs: billIDs,
-				TriggerKey:   "reminder_custom",
+				TriggerKey:   "reminder-h5",
 				PhoneNumber:  phone,
 				CustomBody:   sb.String(),
 			})
@@ -514,27 +543,34 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		} else if len(jatuhTempoUnsent) > 1 {
 			// Send combined jatuh tempo
 			var totalAmount int
-			var totalDiscount int
 			var detailBlock strings.Builder
 			var billIDs []int64
 
 			for _, c := range jatuhTempoUnsent {
 				totalAmount += c.Amount
-				totalDiscount += (c.Diskon + c.DiskonReferral)
 				pkgPrice := c.Amount + c.Diskon + c.DiskonReferral
-				detailBlock.WriteString(fmt.Sprintf("Paket: %s untuk Bapak/Ibu %s\nHarga: %s\n\n", c.PackageName, c.CustomerName, formatIDRCurrency(pkgPrice)))
+				
+				detailBlock.WriteString(fmt.Sprintf("Nama : %s\n", c.CustomerName))
+				detailBlock.WriteString(fmt.Sprintf("> Paket: %s\n", c.PackageName))
+				detailBlock.WriteString(fmt.Sprintf("> Harga: %s.\n", formatIDRCurrency(pkgPrice)))
+				
+				totalDisc := c.Diskon + c.DiskonReferral
+				if totalDisc > 0 {
+					if c.HasODP {
+						percent := (totalDisc * 100) / pkgPrice
+						detailBlock.WriteString(fmt.Sprintf("> Diskon: %d%%\n", percent))
+					} else {
+						detailBlock.WriteString(fmt.Sprintf("> Diskon: %s.\n", formatIDRCurrency(totalDisc)))
+					}
+				}
+				detailBlock.WriteString("\n")
 				billIDs = append(billIDs, c.ID)
 			}
 
 			var sb strings.Builder
-			sb.WriteString("Pelanggan Yth,\n")
-			sb.WriteString(fmt.Sprintf("Bapak/Ibu %s,\n\n", jatuhTempoUnsent[0].CustomerName))
-			sb.WriteString(fmt.Sprintf("Tagihan Anda periode %s sebesar %s, dengan detail berikut:\n\n", jatuhTempoUnsent[0].Period, formatIDRCurrency(totalAmount)))
+			sb.WriteString(fmt.Sprintf("Tagihan Anda periode %s sebesar %s., dengan detail berikut\n\n", jatuhTempoUnsent[0].Period, formatIDRCurrency(totalAmount)))
 			sb.WriteString(detailBlock.String())
-			if totalDiscount > 0 {
-				sb.WriteString(fmt.Sprintf("Diskon: %s\n\n", formatIDRCurrency(totalDiscount)))
-			}
-			sb.WriteString(fmt.Sprintf("Total Tagihan: %s\n\n", formatIDRCurrency(totalAmount)))
+			sb.WriteString(fmt.Sprintf("Total Tagihan: %s.\n\n", formatIDRCurrency(totalAmount)))
 			sb.WriteString(fmt.Sprintf("Mohon lakukan pembayaran sebelum tanggal %s agar terhindar dari Pembatasan Layanan.\n\n", formatDateLabel(jatuhTempoUnsent[0].DueDate)))
 			sb.WriteString("Rekening Pembayaran:\n")
 			sb.WriteString("Bank Mandiri\n1570006636691\n\n")
@@ -577,9 +613,9 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 			continue
 		}
 		if sameDate(dueDate, options.Now.AddDate(0, 0, options.ReminderDays)) {
-			sent, err := s.Notifications.AlreadySent(ctx, item.ID, "reminder_custom")
+			sent, err := s.Notifications.AlreadySent(ctx, item.ID, "reminder-h5")
 			if err == nil && !sent {
-				waErr := sendAutomationMessage(ctx, options, item, "reminder_custom")
+				waErr := sendAutomationMessage(ctx, options, item, "reminder-h5")
 				if waErr != nil {
 					slog.Error("automation: send reminder WA failed, continuing",
 						"bill_id", item.ID, "customer", item.CustomerName, "error", waErr)
@@ -761,18 +797,29 @@ type billCandidate struct {
 	TipeDiskon      string
 	VoucherDiscount int
 	CustomerStatus  string
+	IsTrial         bool
+	TrialStartedAt  string
+	TrialDays       int
 }
+
 
 type automationCandidate struct {
 	Bill
 	CustomerStatus string
 	TrialStartedAt *string
 	TrialDays      int
+	HasODP         bool
 }
 
 func computeDisplayStatus(status string, dueDateRaw string, menunggakDays int, now time.Time) string {
 	if status == "lunas" {
 		return "lunas"
+	}
+	if status == "pending_paid" {
+		return "pending_lunas"
+	}
+	if status == "pending_extension" {
+		return "pending_perpanjangan"
 	}
 
 	dueDate, err := time.Parse("2006-01-02", dueDateRaw)
@@ -822,6 +869,18 @@ func sendAutomationMessage(ctx context.Context, options AutomationOptions, item 
 		return nil
 	}
 
+	pkgPrice := item.Amount + item.Diskon + item.DiskonReferral
+	totalDisc := item.Diskon + item.DiskonReferral
+	diskonVal := ""
+	if totalDisc > 0 {
+		if item.HasODP {
+			percent := (totalDisc * 100) / pkgPrice
+			diskonVal = fmt.Sprintf("Diskon: %d%%", percent)
+		} else {
+			diskonVal = fmt.Sprintf("Diskon: %s.", formatIDRCurrency(totalDisc))
+		}
+	}
+
 	return options.SendWhatsApp(ctx, AutomationMessage{
 		BillID:      item.ID,
 		TriggerKey:  triggerKey,
@@ -830,8 +889,11 @@ func sendAutomationMessage(ctx context.Context, options AutomationOptions, item 
 			"nama":              item.CustomerName,
 			"periode":           item.Period,
 			"jatuh_tempo":       formatDateLabel(item.DueDate),
+			"tgl_jatuh_tempo":   formatDateLabel(item.DueDate),
 			"invoice_number":    item.InvoiceNumber,
 			"nominal":           formatIDRCurrency(item.Amount),
+			"harga_paket":       formatIDRCurrency(pkgPrice),
+			"diskon":            diskonVal,
 			"status_pembayaran": item.Status,
 			"hari_limit":        strconv.Itoa(options.LimitDays),
 			"paket":             item.PackageName,
@@ -840,24 +902,10 @@ func sendAutomationMessage(ctx context.Context, options AutomationOptions, item 
 	})
 }
 
-func trialExpiryTrigger(customer customers.Customer, bill Bill, reminderDays int) (string, bool) {
-	trialEndedAt, ok := resolveTrialEndedAt(customer.TrialStartedAt, customer.TrialDays)
-	if !ok {
-		return "trial_expired", true
-	}
-	dueDate, err := time.Parse("2006-01-02", bill.DueDate)
-	if err != nil {
-		return "trial_expired", true
-	}
-	reminderDate := dateOnly(dueDate).AddDate(0, 0, -reminderDays)
-	if trialEndedAt.Before(reminderDate) {
-		return "", false
-	}
-	if dateOnly(trialEndedAt).Before(dateOnly(dueDate)) {
-		return "reminder_custom", true
-	}
-	return "jatuh_tempo", true
+func trialExpiryTrigger(_ customers.Customer, _ Bill, _ int) (string, bool) {
+	return "trial_expired", true
 }
+
 
 func resolveTrialEndedAt(trialStartedAt *string, trialDays int) (time.Time, bool) {
 	if trialStartedAt == nil || strings.TrimSpace(*trialStartedAt) == "" || trialDays <= 0 {
@@ -915,4 +963,101 @@ func formatIDRCurrency(amount int) string {
 	}
 
 	return "Rp " + string(parts)
+}
+
+func (s Service) PrepareMarkPaid(ctx context.Context, billID int64, method string, userID int64) error {
+	return s.Repository.PrepareMarkPaid(ctx, billID, method, userID)
+}
+
+func (s Service) PrepareExtension(ctx context.Context, billID int64) error {
+	return s.Repository.PrepareExtension(ctx, billID)
+}
+
+func (s Service) CancelPendingAction(ctx context.Context, billID int64) error {
+	return s.Repository.CancelPendingAction(ctx, billID)
+}
+
+func (s Service) CommitExtension(ctx context.Context, billID int64) error {
+	detail, err := s.FindByID(ctx, billID)
+	if err != nil {
+		return err
+	}
+
+	// 1. Revert bill status to belum_bayar from pending_extension
+	if err := s.Repository.SetBillStatus(ctx, billID, "belum_bayar"); err != nil {
+		return err
+	}
+
+	// 2. Set customer status to pending (so next generation picks it up)
+	if err := s.Customers.UpdateStatus(ctx, detail.CustomerID, "pending"); err != nil {
+		return fmt.Errorf("commit extension: update customer status: %w", err)
+	}
+
+	slog.Info("extension committed", "bill_id", billID, "customer_id", detail.CustomerID)
+
+	// 3. Send WhatsApp and Email notification
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		detail, err := s.FindByID(bgCtx, billID)
+		if err != nil {
+			return
+		}
+		templateData := map[string]string{
+			"nama":           detail.CustomerName,
+			"periode":        detail.Period,
+			"jatuh_tempo":    formatDateLabel(detail.DueDate),
+			"nominal":        formatIDRCurrency(detail.Amount),
+			"harga":          formatIDRCurrency(detail.Amount),
+			"invoice_number": detail.InvoiceNumber,
+			"paket":          detail.PackageName,
+		}
+		if s.WhatsApp != nil {
+			_ = s.WhatsApp.SendTemplate(bgCtx, notifications.BillMessagePayload{
+				BillID:      billID,
+				TriggerKey:  "perpanjangan",
+				PhoneNumber: detail.CustomerPhone,
+				MessageData: templateData,
+			})
+		}
+		s.QueueEmailForTrigger(bgCtx, billID, "perpanjangan", templateData)
+	}()
+
+	return nil
+}
+
+func (s Service) ProcessDelayedActions(ctx context.Context) error {
+	list, err := s.Repository.ListDelayedActions(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, b := range list {
+		// SQLite CURRENT_TIMESTAMP is in UTC. Format is "2006-01-02 15:04:05"
+		updatedAt, err := time.ParseInLocation("2006-01-02 15:04:05", b.UpdatedAt, time.UTC)
+		if err != nil {
+			slog.Error("failed to parse delayed bill updated_at time", "bill_id", b.ID, "updated_at", b.UpdatedAt, "error", err)
+			continue
+		}
+
+		if time.Now().UTC().Sub(updatedAt) >= 10*time.Minute {
+			slog.Info("processing delayed billing action", "bill_id", b.ID, "status", b.Status)
+			if b.Status == "pending_paid" {
+				// Revert status to belum_bayar first so that s.MarkPaid check is clean
+				if err := s.Repository.SetBillStatus(ctx, b.ID, "belum_bayar"); err != nil {
+					slog.Error("failed to revert bill status to check mark paid", "bill_id", b.ID, "error", err)
+					continue
+				}
+				if err := s.MarkPaid(ctx, b.ID, b.PaymentMethod, b.PaidByUserID); err != nil {
+					slog.Error("failed to execute delayed mark paid", "bill_id", b.ID, "error", err)
+				}
+			} else if b.Status == "pending_extension" {
+				if err := s.CommitExtension(ctx, b.ID); err != nil {
+					slog.Error("failed to execute delayed extension", "bill_id", b.ID, "error", err)
+				}
+			}
+		}
+	}
+
+	return nil
 }

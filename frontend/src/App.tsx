@@ -11,6 +11,7 @@ import {
   login,
   logout,
   registerOnUnauthorized,
+  createCustomer,
   type SummaryPayload,
 } from "./lib/api";
 import type {
@@ -98,6 +99,10 @@ const RegistrationPage = lazy(() =>
 const WhatsAppPage = lazy(() =>
   import("./features/whatsapp/WhatsAppPage").then((module) => ({ default: module.WhatsAppPage }))
 );
+const PaymentConfirmationsPage = lazy(() =>
+  import("./features/bills/PaymentConfirmationsPage").then((module) => ({ default: module.PaymentConfirmationsPage }))
+);
+
 const TrafficPage = lazy(() =>
   import("./features/traffic/TrafficPage").then((module) => ({ default: module.TrafficPage }))
 );
@@ -112,6 +117,7 @@ const navItems: NavItem[] = [
   // === Utama ===
   { key: "dashboard", label: "Dashboard", caption: "Overview & metrik" },
   { key: "bills", label: "Tagihan", caption: "Generate & bukti bayar" },
+  { key: "payment-confirmations", label: "Konfirmasi Bayar", caption: "Review bukti transfer WA" },
   { key: "customers", label: "Pelanggan", caption: "Data & status isolir" },
   { key: "packages", label: "Paket Internet", caption: "Kecepatan & harga" },
   { key: "discounts", label: "Diskon & Referral", caption: "MGM & voucher khusus" },
@@ -178,7 +184,7 @@ export default function App() {
   const [loadFailure, setLoadFailure] = useState<string | null>(null);
 
   const monitoringHook = useMonitoring({ withFeedback: feedback.withFeedback, askForConfirmation: feedback.askForConfirmation, onSuccess: feedback.pushSuccess, userRole: user?.role, setAuditLogs });
-  const customersHook = useCustomers({ withFeedback: feedback.withFeedback, onSuccess: feedback.pushSuccess });
+  const customersHook = useCustomers({ withFeedback: feedback.withFeedback, askForConfirmation: feedback.askForConfirmation, onSuccess: feedback.pushSuccess });
   const billsHook = useBills({ withFeedback: feedback.withFeedback, askForConfirmation: feedback.askForConfirmation, onSuccess: feedback.pushSuccess, onError: feedback.pushError });
   const packagesHook = usePackages({ withFeedback: feedback.withFeedback, askForConfirmation: feedback.askForConfirmation, onSuccess: feedback.pushSuccess });
   const templatesHook = useTemplates({ withFeedback: feedback.withFeedback, askForConfirmation: feedback.askForConfirmation, onSuccess: feedback.pushSuccess });
@@ -259,7 +265,7 @@ export default function App() {
         if (["reports", "audit", "users", "settings", "packages", "templates", "email-templates"].includes(item.key)) {
           return user?.role === "admin";
         }
-        if (["devices", "traffic"].includes(item.key)) {
+        if (["devices", "traffic", "payment-confirmations"].includes(item.key)) {
           return user?.role === "admin" || user?.role === "petugas";
         }
         return true;
@@ -505,8 +511,10 @@ export default function App() {
               onRefresh={reloadProtectedData}
               onDelete={(id) => void customersHook.handlers.handleCustomerDelete(id)}
               onDeleteBulk={(ids) => void customersHook.handlers.handleBulkDelete(ids)}
+              onEndTrial={(id) => void customersHook.handlers.handleEndTrial(id)}
             />
           ) : null}
+
 
           {view === "discounts" ? (
             <DiscountsPage
@@ -523,8 +531,10 @@ export default function App() {
               user={user}
               pushSuccess={feedback.pushSuccess}
               pushError={feedback.pushError}
+              onEndTrial={(id) => void customersHook.handlers.handleEndTrial(id)}
             />
           ) : null}
+
 
           {view === "devices" ? (
             <DevicesPage
@@ -583,7 +593,21 @@ export default function App() {
               pushSuccess={feedback.pushSuccess}
               pushError={feedback.pushError}
               onShowCustomerDetails={handleShowCustomerDetails}
+              onGrantExtension={(id) => void billsHook.handlers.handleGrantExtension(id)}
+              onCancelPendingAction={(id) => void billsHook.handlers.handleCancelPendingAction(id)}
+              askForConfirmation={feedback.askForConfirmation}
             />
+
+          ) : null}
+
+          {view === "payment-confirmations" ? (
+            <Suspense fallback={<SkeletonCard />}>
+              <PaymentConfirmationsPage
+                pushSuccess={feedback.pushSuccess}
+                pushError={feedback.pushError}
+                withFeedback={feedback.withFeedback}
+              />
+            </Suspense>
           ) : null}
 
           {view === "templates" ? (
@@ -719,11 +743,12 @@ export default function App() {
                 waAccountId={settingsHook.state.settingsForm.wa_account_id}
                 waApiKey={settingsHook.state.settingsForm.wa_api_key}
                 packages={packagesHook.state.packages}
+                customers={customersHook.state.customers}
                 pushSuccess={feedback.pushSuccess}
                 pushError={feedback.pushError}
                 withFeedback={feedback.withFeedback}
                 askForConfirmation={feedback.askForConfirmation}
-                onConvert={(leadData) => {
+                onConvert={async (leadData) => {
                   const notes = [];
                   if (leadData.ssid) notes.push(`WiFi: ${leadData.ssid}`);
                   if (leadData.password) notes.push(`Pass: ${leadData.password}`);
@@ -743,27 +768,38 @@ export default function App() {
                     }
                   }
 
-                  customersHook.handlers.setEditingCustomerId(null);
-                  customersHook.handlers.setCustomerErrors({});
-                  customersHook.handlers.setCustomerForm({
+                  // Find matched package ID by name
+                  let pkgId = 0;
+                  if (leadData.paket) {
+                    const matchedPkg = packagesHook.state.packages.find(
+                      (p) => p.name.trim().toLowerCase() === leadData.paket?.trim().toLowerCase()
+                    );
+                    if (matchedPkg) {
+                      pkgId = matchedPkg.id;
+                    }
+                  }
+
+                  const customerInput = {
                     name: leadData.name || "",
-                    package_id: 0,
-                    user_pppoe: "",
-                    password_pppoe: "",
+                    package_id: pkgId,
+                    user_pppoe: leadData.user_pppoe || "",
+                    password_pppoe: leadData.password_pppoe || "",
                     whatsapp: leadData.whatsapp || "",
                     email: "",
-                    sn_ont: "",
-                    due_day: 8,
-                    status: "active",
+                    sn_ont: leadData.sn_ont || "",
+                    due_day: leadData.due_day !== undefined ? leadData.due_day : 8,
+                    status: "active" as const,
                     address: (leadData.address || "") + extra,
                     diskon: 0,
-                    tipe_diskon: "flat",
+                    tipe_diskon: "flat" as const,
                     referred_by_id: referredById,
                     referral_balance: 0,
-                    odp_id: 0,
-                    odp_port: undefined,
-                  });
-                  customersHook.handlers.setIsFormOpen(true);
+                    odp_id: leadData.odp_id ? Number(leadData.odp_id) : 0,
+                    odp_port: leadData.odp_port ? Number(leadData.odp_port) : undefined,
+                  };
+
+                  await createCustomer(customerInput);
+                  await customersHook.handlers.refreshCustomers();
                   switchView("customers");
                 }}
               />
@@ -862,8 +898,10 @@ export default function App() {
           pushSuccess={feedback.pushSuccess}
           pushError={feedback.pushError}
           onRefresh={reloadProtectedData}
+          onEndTrial={(id) => void customersHook.handlers.handleEndTrial(id)}
         />
       )}
+
 
     </main>
   );

@@ -91,6 +91,13 @@ func main() {
 		runWorker(cfg, logger, db)
 	case "import":
 		runImport(cfg, logger, db)
+	case "seed":
+		logger.Info("seeding dummy data...")
+		if err := database.Seed(db); err != nil {
+			logger.Error("failed to seed database", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("database seeded successfully")
 	default:
 		logger.Error("unknown command", "command", command)
 		os.Exit(1)
