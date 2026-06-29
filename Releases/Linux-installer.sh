@@ -51,9 +51,12 @@ else
     log_info "Node.js sudah terpasang: $(node -v)"
 fi
 
-# Install Puppeteer system dependencies
+# Install Puppeteer system dependencies (compatible with Ubuntu 20.04/22.04/24.04)
 log_info "Menginstal dependensi grafis untuk headless Chromium (Puppeteer)..."
-apt-get install -y libxss1 libasound2 libatk1.0-0 libatk-bridge2.0-0 libgconf-2-4 libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev libnss3
+# libasound2 renamed to libasound2t64 on Ubuntu 24.04+; libgconf-2-4 removed on 22.04+
+apt-get install -y libxss1 libatk1.0-0 libatk-bridge2.0-0 libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev libnss3 libdrm2 libxcomposite1 libxdamage1 libxrandr2 libxfixes3 libxkbcommon0 || true
+# Try both package names for libasound
+apt-get install -y libasound2 2>/dev/null || apt-get install -y libasound2t64 2>/dev/null || true
 log_success "Seluruh dependensi sistem berhasil diinstal!"
 
 # 2. Setup User & Group
@@ -100,9 +103,10 @@ fi
 
 # Frontend
 if [[ -d "./frontend" ]]; then
-    cp -r ./frontend/* "${INSTALL_DIR}/frontend/"
+    # Use find+cp to avoid nullglob issue with set -e when folder is empty
+    find ./frontend -maxdepth 1 -mindepth 1 -exec cp -r {} "${INSTALL_DIR}/frontend/" \;
 elif [[ -d "./Frontend/frontend" ]]; then
-    cp -r ./Frontend/frontend/* "${INSTALL_DIR}/frontend/"
+    find ./Frontend/frontend -maxdepth 1 -mindepth 1 -exec cp -r {} "${INSTALL_DIR}/frontend/" \;
 fi
 
 # Integration
@@ -144,7 +148,13 @@ log_info "Menginstall Node dependencies untuk WhatsApp Gateway..."
 (
     cd "${INSTALL_DIR}/integration/whatsapp"
     if command -v npm &> /dev/null; then
-        npm install --production || npm ci --production
+        # npm ci requires package-lock.json (deterministic); fallback to npm install
+        # --omit=dev is the modern replacement for --production (npm v7+)
+        if [[ -f "package-lock.json" ]]; then
+            npm ci --omit=dev
+        else
+            npm install --omit=dev
+        fi
     else
         log_error "npm tidak ditemukan. Silakan jalankan npm install manual di ${INSTALL_DIR}/integration/whatsapp setelah instalasi selesai."
     fi
