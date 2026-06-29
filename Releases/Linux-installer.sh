@@ -19,11 +19,23 @@ NC='\033[0m'
 INSTALL_DIR="/opt/menettech-go"
 SERVICE_USER="menettech"
 SERVICE_GROUP="menettech"
+LOG_FILE="$(pwd)/installation.log"
 
-log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
+log_info()    { echo -e "${BLUE}[INFO]${NC} $*"; }
 log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
-log_warn() { echo -e "${YELLOW}[!]${NC} $*"; }
-log_error() { echo -e "${RED}[✗]${NC} $*"; }
+log_warn()    { echo -e "${YELLOW}[!]${NC} $*"; }
+log_error()   { echo -e "${RED}[✗]${NC} $*"; }
+
+# ── Redirect ALL output (stdout + stderr) ke terminal DAN log file ──────────
+exec > >(tee -a "${LOG_FILE}") 2>&1
+
+# ── Trap: cetak baris yang gagal ke log jika set -e memicu exit ─────────────
+trap 'echo -e "\n[FATAL] Instalasi GAGAL pada baris ${LINENO}. Periksa ${LOG_FILE} untuk detail." >&2' ERR
+
+echo "================================================================" 
+echo " Menet-Tech Linux Installer - $(date '+%Y-%m-%d %H:%M:%S %Z')" 
+echo " Log disimpan di: ${LOG_FILE}"
+echo "================================================================"
 
 # 1. Validation & Dependency Installation
 if [[ $EUID -ne 0 ]]; then
@@ -226,4 +238,10 @@ echo "--------------------------------------------------------"
 echo "Untuk melihat log aktivitas secara langsung:"
 echo "👉 journalctl -u menettech-api.service -f"
 echo "👉 journalctl -u menettech-whatsapp.service -f"
+echo "👉 cat ${LOG_FILE}"
 echo "--------------------------------------------------------"
+echo ""
+echo "================================================================"
+echo " Instalasi selesai pada: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+echo " Log lengkap tersimpan di: ${LOG_FILE}"
+echo "================================================================"
