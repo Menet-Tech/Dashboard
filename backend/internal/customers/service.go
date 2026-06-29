@@ -975,43 +975,48 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 	return item, nil
 }
 
-// WithdrawReferral deducts referral balance points for cash withdrawal.
-func (s Service) WithdrawReferral(ctx context.Context, id int64, amount int) error {
-	if amount <= 0 {
-		return errors.New("amount must be greater than zero")
-	}
+// ReferralWithdrawal represents a referral cash-out transaction request
+type ReferralWithdrawal struct {
+	ID            int64   `json:"id"`
+	CustomerID    int64   `json:"customer_id"`
+	CustomerName  string  `json:"customer_name"`
+	CustomerPhone string  `json:"customer_phone"`
+	Amount        int     `json:"amount"`
+	Method        string  `json:"method"`
+	PaymentTarget string  `json:"payment_target"`
+	Status        string  `json:"status"`
+	ProofPath     *string `json:"proof_path,omitempty"`
+	Notes         string  `json:"notes"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
+}
 
-	tx, err := s.Repository.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin withdraw tx: %w", err)
-	}
-	defer tx.Rollback()
+// WithdrawReferral deducts referral balance points for cash withdrawal and records a pending request.
+func (s Service) WithdrawReferral(ctx context.Context, id int64, amount int, method string, paymentTarget string) (int64, error) {
+	return s.Repository.WithdrawReferral(ctx, id, amount, method, paymentTarget)
+}
 
-	var balance int
-	err = tx.QueryRowContext(ctx, "SELECT referral_balance FROM pelanggan WHERE id = ?", id).Scan(&balance)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return ErrCustomerNotFound
-		}
-		return err
-	}
+// ListReferralWithdrawals retrieves referral withdrawal requests.
+func (s Service) ListReferralWithdrawals(ctx context.Context, status string) ([]ReferralWithdrawal, error) {
+	return s.Repository.ListReferralWithdrawals(ctx, status)
+}
 
-	if balance < amount {
-		return errors.New("insufficient referral balance")
-	}
+// CompleteReferralWithdrawal marks a withdrawal request as completed with a proof image path.
+func (s Service) CompleteReferralWithdrawal(ctx context.Context, id int64, proofPath string, notes string) error {
+	return s.Repository.CompleteReferralWithdrawal(ctx, id, proofPath, notes)
+}
 
-	_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET referral_balance = referral_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", amount, id)
-	if err != nil {
-		return fmt.Errorf("update referral balance: %w", err)
-	}
-
-	return tx.Commit()
+// RejectReferralWithdrawal rejects the withdrawal and refunds the balance.
+func (s Service) RejectReferralWithdrawal(ctx context.Context, id int64, notes string) error {
+	return s.Repository.RejectReferralWithdrawal(ctx, id, notes)
 }
 
 // ConvertReferralToVoucher converts referral balance points to a one-time billing voucher discount.
+// Business rule: amount must be exactly 50,000 and no withdrawal must exist for the current billing period.
 func (s Service) ConvertReferralToVoucher(ctx context.Context, id int64, amount int) error {
-	if amount <= 0 {
-		return errors.New("amount must be greater than zero")
+	const fixedAmount = 50000
+	if amount != fixedAmount {
+		return fmt.Errorf("jumlah penukaran harus tepat Rp %d", fixedAmount)
 	}
 
 	tx, err := s.Repository.DB.BeginTx(ctx, nil)
@@ -1021,7 +1026,8 @@ func (s Service) ConvertReferralToVoucher(ctx context.Context, id int64, amount 
 	defer tx.Rollback()
 
 	var balance int
-	err = tx.QueryRowContext(ctx, "SELECT referral_balance FROM pelanggan WHERE id = ?", id).Scan(&balance)
+	var diskon int
+	err = tx.QueryRowContext(ctx, "SELECT referral_balance, diskon FROM pelanggan WHERE id = ?", id).Scan(&balance, &diskon)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return ErrCustomerNotFound
@@ -1029,13 +1035,227 @@ func (s Service) ConvertReferralToVoucher(ctx context.Context, id int64, amount 
 		return err
 	}
 
+	if diskon > 0 {
+		return errors.New("pelanggan khusus tidak dapat menukarkan saldo referral menjadi voucher, hanya diperbolehkan menarik tunai")
+	}
+
 	if balance < amount {
-		return errors.New("insufficient referral balance")
+		return errors.New("saldo referral tidak mencukupi")
+	}
+
+	// Mutual exclusion check: cannot use voucher if a withdrawal (pending/completed) already exists for current period
+	currentPeriod := time.Now().Format("2006-01")
+	var existingWithdrawal int
+	err = tx.QueryRowContext(ctx, `
+		SELECT COUNT(1) FROM referral_withdrawals
+		WHERE pelanggan_id = ? AND period = ? AND status IN ('pending', 'completed')
+	`, id, currentPeriod).Scan(&existingWithdrawal)
+	if err != nil {
+		return fmt.Errorf("check existing withdrawal: %w", err)
+	}
+	if existingWithdrawal > 0 {
+		return errors.New("tidak dapat menukar voucher: sudah ada penarikan tunai referral di periode ini. Penukaran voucher bisa dilakukan mulai periode berikutnya")
 	}
 
 	_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET referral_balance = referral_balance - ?, voucher_discount = voucher_discount + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", amount, amount, id)
 	if err != nil {
 		return fmt.Errorf("update referral and voucher balance: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+// WithdrawReferral deducts referral balance and inserts a pending withdrawal record.
+// Business rule: amount must be exactly 50,000 and no referral voucher (diskon_referral) must have been
+// applied to a bill in the current billing period.
+func (r Repository) WithdrawReferral(ctx context.Context, id int64, amount int, method string, paymentTarget string) (int64, error) {
+	const fixedAmount = 50000
+	if amount != fixedAmount {
+		return 0, fmt.Errorf("jumlah penarikan harus tepat Rp %d", fixedAmount)
+	}
+	if method != "cash" && method != "transfer" {
+		return 0, errors.New("metode penarikan tidak valid")
+	}
+
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("begin withdraw tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	var balance int
+	err = tx.QueryRowContext(ctx, "SELECT referral_balance FROM pelanggan WHERE id = ?", id).Scan(&balance)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, ErrCustomerNotFound
+		}
+		return 0, err
+	}
+
+	if balance < amount {
+		return 0, errors.New("saldo referral tidak mencukupi")
+	}
+
+	// Mutual exclusion check: cannot withdraw if a referral voucher was already applied to a bill in current period
+	currentPeriod := time.Now().Format("2006-01")
+	var voucherUsed int
+	err = tx.QueryRowContext(ctx, `
+		SELECT COUNT(1) FROM tagihan
+		WHERE pelanggan_id = ? AND periode = ? AND diskon_referral > 0
+	`, id, currentPeriod).Scan(&voucherUsed)
+	if err != nil {
+		return 0, fmt.Errorf("check voucher usage: %w", err)
+	}
+	if voucherUsed > 0 {
+		return 0, errors.New("tidak dapat menarik tunai: voucher referral sudah digunakan untuk tagihan di periode ini. Penarikan tunai bisa dilakukan mulai periode berikutnya")
+	}
+
+	_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET referral_balance = referral_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", amount, id)
+	if err != nil {
+		return 0, fmt.Errorf("update referral balance: %w", err)
+	}
+
+	res, err := tx.ExecContext(ctx, `
+		INSERT INTO referral_withdrawals (pelanggan_id, amount, method, payment_target, period, status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+	`, id, amount, method, paymentTarget, currentPeriod)
+	if err != nil {
+		return 0, fmt.Errorf("insert referral withdrawal request: %w", err)
+	}
+
+	withdrawID, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+
+	return withdrawID, nil
+}
+
+// ListReferralWithdrawals returns referral withdrawal requests.
+func (r Repository) ListReferralWithdrawals(ctx context.Context, status string) ([]ReferralWithdrawal, error) {
+	query := `
+		SELECT rw.id, rw.pelanggan_id, c.nama, COALESCE(c.nomor_wa, ''),
+		       rw.amount, rw.method, COALESCE(rw.payment_target, ''), rw.status,
+		       rw.proof_path, COALESCE(rw.notes, ''), rw.created_at, rw.updated_at
+		FROM referral_withdrawals rw
+		INNER JOIN pelanggan c ON c.id = rw.pelanggan_id
+	`
+	var rows *sql.Rows
+	var err error
+	if status != "" {
+		query += " WHERE rw.status = ? ORDER BY rw.id DESC"
+		rows, err = r.DB.QueryContext(ctx, query, status)
+	} else {
+		query += " ORDER BY rw.id DESC"
+		rows, err = r.DB.QueryContext(ctx, query)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("query withdrawals: %w", err)
+	}
+	defer rows.Close()
+
+	items := []ReferralWithdrawal{}
+	for rows.Next() {
+		var item ReferralWithdrawal
+		var proof sql.NullString
+		if err := rows.Scan(
+			&item.ID,
+			&item.CustomerID,
+			&item.CustomerName,
+			&item.CustomerPhone,
+			&item.Amount,
+			&item.Method,
+			&item.PaymentTarget,
+			&item.Status,
+			&proof,
+			&item.Notes,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if proof.Valid {
+			pStr := proof.String
+			item.ProofPath = &pStr
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+// CompleteReferralWithdrawal completes a pending withdrawal request with proof of payout.
+func (r Repository) CompleteReferralWithdrawal(ctx context.Context, id int64, proofPath string, notes string) error {
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var currentStatus string
+	err = tx.QueryRowContext(ctx, "SELECT status FROM referral_withdrawals WHERE id = ?", id).Scan(&currentStatus)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return errors.New("withdrawal request not found")
+		}
+		return err
+	}
+
+	if currentStatus != "pending" {
+		return fmt.Errorf("cannot complete a withdrawal request with status: %s", currentStatus)
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		UPDATE referral_withdrawals
+		SET status = 'completed', proof_path = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, proofPath, notes, id)
+	if err != nil {
+		return fmt.Errorf("update withdrawal complete: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+// RejectReferralWithdrawal rejects a withdrawal request and refunds balance.
+func (r Repository) RejectReferralWithdrawal(ctx context.Context, id int64, notes string) error {
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var customerID int64
+	var amount int
+	var currentStatus string
+	err = tx.QueryRowContext(ctx, "SELECT pelanggan_id, amount, status FROM referral_withdrawals WHERE id = ?", id).Scan(&customerID, &amount, &currentStatus)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return errors.New("withdrawal request not found")
+		}
+		return err
+	}
+
+	if currentStatus != "pending" {
+		return fmt.Errorf("cannot reject a withdrawal request with status: %s", currentStatus)
+	}
+
+	// Refund balance
+	_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET referral_balance = referral_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", amount, customerID)
+	if err != nil {
+		return fmt.Errorf("refund referral balance: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		UPDATE referral_withdrawals
+		SET status = 'rejected', notes = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, notes, id)
+	if err != nil {
+		return fmt.Errorf("update withdrawal rejected: %w", err)
 	}
 
 	return tx.Commit()

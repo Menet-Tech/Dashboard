@@ -4,6 +4,7 @@ const mockFindCustomerByPhone = jest.fn();
 const mockFindCustomersByPhone = jest.fn();
 const mockFindCustomerByID = jest.fn();
 const mockGetActiveBill = jest.fn();
+const mockGetLatestBill = jest.fn();
 const mockGetPackageList = jest.fn();
 const mockNotifyAdminViaWA = jest.fn();
 const mockNotifyAdminViaDiscord = jest.fn();
@@ -33,6 +34,7 @@ jest.mock('../src/services/isp.service', () => ({
     findCustomersByPhone: mockFindCustomersByPhone,
     findCustomerByID: mockFindCustomerByID,
     getActiveBill: mockGetActiveBill,
+    getLatestBill: mockGetLatestBill,
     getPackageList: mockGetPackageList,
     notifyAdminViaWA: mockNotifyAdminViaWA,
     notifyAdminViaDiscord: mockNotifyAdminViaDiscord,
@@ -66,6 +68,7 @@ describe('Chatbot ISP state machine', () => {
         sendFn = jest.fn().mockResolvedValue(undefined);
         mockFindCustomersByPhone.mockResolvedValue([]);
         mockFindCustomerByID.mockResolvedValue({ id: 5, name: 'Budi', is_trial: false });
+        mockGetLatestBill.mockResolvedValue(null);
     });
 
     it('IDLE pelanggan tidak terdaftar masuk menu unregistered', async () => {
@@ -101,7 +104,7 @@ describe('Chatbot ISP state machine', () => {
             state: 'REG_MENU',
             form_data: { customerId: 5, customerName: 'Budi' },
         });
-        mockGetActiveBill.mockResolvedValue({
+        mockGetLatestBill.mockResolvedValue({
             periode: '2026-06',
             nominal: 150000,
             jatuh_tempo: '2026-06-30',
@@ -110,8 +113,8 @@ describe('Chatbot ISP state machine', () => {
 
         await handleMessage(phone, '1', 'billing', sendFn);
 
-        expect(mockGetActiveBill).toHaveBeenCalledWith(5);
-        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('nominal sebesar'));
+        expect(mockGetLatestBill).toHaveBeenCalledWith(5);
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('Nominal:'));
     });
 
     it('menu unregistered opsi paket menampilkan daftar paket', async () => {
@@ -220,7 +223,7 @@ describe('Chatbot ISP state machine', () => {
             form_data: { customerId: 5, customerName: 'Budi' },
         });
 
-        mockGetActiveBill.mockResolvedValue({
+        mockGetLatestBill.mockResolvedValue({
             periode: '2026-06',
             nominal: 150000,
             jatuh_tempo: '2026-06-30',
@@ -230,8 +233,8 @@ describe('Chatbot ISP state machine', () => {
         // Test custom trigger match (case-insensitive and trimmed)
         await handleMessage(phone, ' TAGIHAN ', 'billing', sendFn);
 
-        expect(mockGetActiveBill).toHaveBeenCalledWith(5);
-        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('nominal sebesar'));
+        expect(mockGetLatestBill).toHaveBeenCalledWith(5);
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('Nominal:'));
 
         // Test custom template fallback message
         mockSessions.set(phone, {
@@ -244,7 +247,7 @@ describe('Chatbot ISP state machine', () => {
         expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('ketik 1 untuk cek tagihan anda'));
     });
 
-    it('REG_MENU transitions to WAITING_PROOF on "oke" message with active bill', async () => {
+    it('REG_MENU transitions to WAITING_PROOF on "sudah" message with active bill', async () => {
         mockFindCustomersByPhone.mockResolvedValue([{ id: 5, name: 'Budi', address: 'Jl. Mawar' }]);
         mockSessions.set(phone, {
             phone,
@@ -261,12 +264,33 @@ describe('Chatbot ISP state machine', () => {
             invoice_number: 'INV-1',
         });
 
-        await handleMessage(phone, 'oke', 'billing', sendFn);
+        await handleMessage(phone, 'sudah', 'billing', sendFn);
 
         expect(database.upsertSession).toHaveBeenCalledWith(phone, 'billing', 'WAITING_PROOF', expect.objectContaining({
             unpaidBills: [{ billId: 10, customerId: 5 }]
         }));
         expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('bukti transfer'));
+    });
+
+    it('REG_MENU handles "oke" reminder acknowledgment and stays in REG_MENU', async () => {
+        mockFindCustomersByPhone.mockResolvedValue([{ id: 5, name: 'Budi', address: 'Jl. Mawar' }]);
+        mockSessions.set(phone, {
+            phone,
+            account_id: 'billing',
+            state: 'REG_MENU',
+            form_data: { customerId: 5, customerName: 'Budi' },
+        });
+        mockGetActiveBill.mockResolvedValue({
+            id: 10,
+            status: 'belum_bayar',
+            periode: '2026-06',
+            nominal: 150000,
+            jatuh_tempo: '2026-06-30',
+        });
+
+        await handleMessage(phone, 'oke', 'billing', sendFn);
+
+        expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('akan kami tunggu pembayaraanya'));
     });
 
     it('WAITING_PROOF processes "ya saya sudah bayar" text input successfully', async () => {

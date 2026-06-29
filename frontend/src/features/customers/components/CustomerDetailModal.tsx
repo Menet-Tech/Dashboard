@@ -10,6 +10,7 @@ import {
   kickMikrotikSession,
   updateONTWifi,
 } from "../../../lib/api";
+import { useDialog } from "../../../context/DialogContext";
 
 type CustomerDetailModalProps = {
   customer: CustomerItem;
@@ -35,6 +36,7 @@ export function CustomerDetailModal({
   onEndTrial,
 }: CustomerDetailModalProps) {
   const [customerBills, setCustomerBills] = useState<BillItem[]>([]);
+  const { showAlert, showConfirm } = useDialog();
   const [loadingBills, setLoadingBills] = useState(false);
   const [ontStatus, setOntStatus] = useState<any | null>(null);
   const [loadingOnt, setLoadingOnt] = useState(false);
@@ -95,7 +97,7 @@ export function CustomerDetailModal({
   };
 
   const handleRebootOnt = async () => {
-    if (!window.confirm("Apakah Anda yakin ingin mem-reboot ONT pelanggan ini?")) return;
+    if (!(await showConfirm("Apakah Anda yakin ingin mem-reboot ONT pelanggan ini?"))) return;
     setRebootingOnt(true);
     try {
       const res = await rebootONT(customer.id);
@@ -110,9 +112,9 @@ export function CustomerDetailModal({
 
   const handleFactoryResetOnt = async () => {
     if (
-      !window.confirm(
+      !(await showConfirm(
         "PERINGATAN: Apakah Anda yakin ingin mengembalikan ONT ke pengaturan pabrik (Factory Reset)? Ini akan menghapus konfigurasi ONT."
-      )
+      ))
     )
       return;
     setResettingOnt(true);
@@ -129,9 +131,9 @@ export function CustomerDetailModal({
 
   const handleKickMikrotik = async () => {
     if (
-      !window.confirm(
+      !(await showConfirm(
         "Apakah Anda yakin ingin memutuskan sesi PPPoE pelanggan ini untuk memaksa koneksi ulang?"
-      )
+      ))
     )
       return;
     setKickingMikrotik(true);
@@ -151,7 +153,7 @@ export function CustomerDetailModal({
     if (ssid === null) return;
     const cleanSsid = ssid.trim();
     if (!cleanSsid) {
-      alert("SSID tidak boleh kosong.");
+      await showAlert("SSID tidak boleh kosong.");
       return;
     }
 
@@ -159,7 +161,7 @@ export function CustomerDetailModal({
     if (password === null) return;
     const cleanPassword = password.trim();
     if (cleanPassword.length < 8) {
-      alert("Password WiFi minimal harus 8 karakter.");
+      await showAlert("Password WiFi minimal harus 8 karakter.");
       return;
     }
 
@@ -175,31 +177,26 @@ export function CustomerDetailModal({
     }
   };
 
+  const REFERRAL_FIXED = 50_000;
+
   const handleWithdrawReferral = async () => {
-    const amountStr = window.prompt(
-      `Masukkan nominal penarikan tunai saldo referral untuk ${
-        customer.name
-      } (Maksimal: Rp ${customer.referral_balance.toLocaleString("id-ID")}):`
+    if (customer.referral_balance < REFERRAL_FIXED) {
+      await showAlert(`Saldo referral tidak mencukupi. Dibutuhkan minimal Rp ${REFERRAL_FIXED.toLocaleString("id-ID")} untuk menarik tunai.`);
+      return;
+    }
+    const confirmed = await showConfirm(
+      `Tarik tunai saldo referral ${customer.name} sebesar Rp ${REFERRAL_FIXED.toLocaleString("id-ID")}?\n\nCatatan: Jika di periode ini sudah menggunakan voucher referral untuk tagihan, penarikan tidak dapat dilakukan.`
     );
-    if (amountStr === null) return;
-    const amount = parseInt(amountStr.replace(/[^0-9]/g, ""), 10);
-    if (isNaN(amount) || amount <= 0) {
-      alert("Nominal penarikan tidak valid.");
-      return;
-    }
-    if (amount > customer.referral_balance) {
-      alert("Saldo referral tidak mencukupi.");
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       const { withdrawReferral } = await import("../../../lib/api");
-      const res = await withdrawReferral(customer.id, amount);
-      pushSuccess(res.message || "Penarikan tunai referral berhasil.");
+      const res = await withdrawReferral(customer.id);
+      pushSuccess(res.message || "Penarikan tunai referral berhasil diajukan.");
       if (onRefresh) {
         onRefresh();
       }
-      onClose(); // close modal to force refresh
+      onClose();
     } catch (err: any) {
       console.error(err);
       pushError(err.message || String(err));
@@ -207,30 +204,23 @@ export function CustomerDetailModal({
   };
 
   const handleConvertVoucher = async () => {
-    const amountStr = window.prompt(
-      `Masukkan nominal saldo referral yang ingin ditukarkan menjadi voucher diskon untuk ${
-        customer.name
-      } (Maksimal: Rp ${customer.referral_balance.toLocaleString("id-ID")}):`
+    if (customer.referral_balance < REFERRAL_FIXED) {
+      await showAlert(`Saldo referral tidak mencukupi. Dibutuhkan minimal Rp ${REFERRAL_FIXED.toLocaleString("id-ID")} untuk menukar voucher.`);
+      return;
+    }
+    const confirmed = await showConfirm(
+      `Tukarkan Rp ${REFERRAL_FIXED.toLocaleString("id-ID")} saldo referral ${customer.name} menjadi voucher diskon tagihan?\n\nCatatan: Jika di periode ini sudah mengajukan penarikan tunai referral, penukaran tidak dapat dilakukan.`
     );
-    if (amountStr === null) return;
-    const amount = parseInt(amountStr.replace(/[^0-9]/g, ""), 10);
-    if (isNaN(amount) || amount <= 0) {
-      alert("Nominal penukaran tidak valid.");
-      return;
-    }
-    if (amount > customer.referral_balance) {
-      alert("Saldo referral tidak mencukupi.");
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       const { convertReferralToVoucher } = await import("../../../lib/api");
-      const res = await convertReferralToVoucher(customer.id, amount);
+      const res = await convertReferralToVoucher(customer.id);
       pushSuccess(res.message || "Saldo berhasil ditukarkan menjadi voucher diskon.");
       if (onRefresh) {
         onRefresh();
       }
-      onClose(); // close modal to force refresh
+      onClose();
     } catch (err: any) {
       console.error(err);
       pushError(err.message || String(err));

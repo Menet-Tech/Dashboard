@@ -1,10 +1,18 @@
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, FormEvent, useRef, useCallback } from "react";
 import { fetchTickets, fetchTicketDetail, addTicketMessage, closeTicket } from "../../lib/api";
 import type { TicketItem, TicketDetailItem } from "../../types";
 import { StatusPill } from "../../components/ui/StatusPill";
 import { toErrorMessage } from "../../utils/format";
+import { useDialog } from "../../context/DialogContext";
+import { useWhatsAppGateway } from "../../hooks/useWhatsAppGateway";
 
-export function TicketsPage() {
+interface TicketsPageProps {
+  waGatewayUrl?: string;
+  waApiKey?: string;
+}
+
+export function TicketsPage({ waGatewayUrl, waApiKey }: TicketsPageProps) {
+  const { showConfirm } = useDialog();
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [detail, setDetail] = useState<TicketDetailItem | null>(null);
@@ -15,44 +23,78 @@ export function TicketsPage() {
   const [error, setError] = useState<string | null>(null);
   const [replyError, setReplyError] = useState<string | null>(null);
 
-  // Load tickets list
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
   useEffect(() => {
-    async function loadTickets() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetchTickets(statusFilter);
-        setTickets(res.data);
-      } catch (err) {
-        setError(toErrorMessage(err));
-      } finally {
-        setLoading(false);
-      }
+    scrollToBottom();
+  }, [detail?.messages]);
+
+  // Load tickets list
+  const loadTickets = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError(null);
+    try {
+      const res = await fetchTickets(statusFilter);
+      setTickets(res.data);
+    } catch (err) {
+      setError(toErrorMessage(err));
+    } finally {
+      if (!silent) setLoading(false);
     }
-    void loadTickets();
   }, [statusFilter]);
 
   // Load ticket details when selected
+  const loadDetail = useCallback(async (ticketId: number, silent = false) => {
+    if (!silent) setDetailLoading(true);
+    setReplyError(null);
+    try {
+      const res = await fetchTicketDetail(ticketId);
+      setDetail(res.data);
+    } catch (err) {
+      setReplyError(toErrorMessage(err));
+    } finally {
+      if (!silent) setDetailLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTickets();
+  }, [loadTickets]);
+
   useEffect(() => {
     if (selectedTicketId === null) {
       setDetail(null);
       return;
     }
+    void loadDetail(selectedTicketId);
+  }, [selectedTicketId, loadDetail]);
 
-    async function loadDetail() {
-      setDetailLoading(true);
-      setReplyError(null);
-      try {
-        const res = await fetchTicketDetail(selectedTicketId!);
-        setDetail(res.data);
-      } catch (err) {
-        setReplyError(toErrorMessage(err));
-      } finally {
-        setDetailLoading(false);
+  // Connect to WhatsApp Gateway Socket.io for real-time messages
+  const gatewayUrl = waGatewayUrl?.trim() || "http://localhost:3001";
+  const apiKey = waApiKey?.trim() || "";
+
+  useWhatsAppGateway({
+    gatewayUrl,
+    apiKey,
+    onChatMessage: (msg) => {
+      // 1. Silent reload ticket list to reflect new message previews / status updates
+      void loadTickets(true);
+
+      // 2. If the message belongs to the active ticket, reload its detail silently
+      if (selectedTicketId && detail) {
+        const cleanPhone = (p: string | null | undefined) => (p || "").replace(/@(c\.us|lid)$/, "").replace(/^0/, "62");
+        const activePhone = cleanPhone(detail.no_hp);
+        const msgPhone = cleanPhone(msg.direction === "inbound" ? msg.from_number : msg.to_number);
+        if (activePhone && msgPhone === activePhone) {
+          void loadDetail(selectedTicketId, true);
+        }
       }
-    }
-    void loadDetail();
-  }, [selectedTicketId]);
+    },
+  });
 
   async function handleSendReply(e: FormEvent) {
     e.preventDefault();
@@ -76,7 +118,7 @@ export function TicketsPage() {
 
   async function handleClose() {
     if (!selectedTicketId || !detail) return;
-    if (!confirm("Apakah Anda yakin ingin menutup tiket ini?")) return;
+    if (!(await showConfirm("Apakah Anda yakin ingin menutup tiket ini?"))) return;
 
     setReplyError(null);
     try {
@@ -262,6 +304,7 @@ export function TicketsPage() {
                   );
                 })
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Chat Input panel */}

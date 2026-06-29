@@ -10,6 +10,7 @@ export type CustomerLifecycleFilter =
   | "exclude_inactive"
   | "all"
   | "trial"
+  | "perpanjangan"
   | "tertagih"
   | "jatuh_tempo"
   | "menunggak"

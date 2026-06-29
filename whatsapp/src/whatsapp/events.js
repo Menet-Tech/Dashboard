@@ -11,11 +11,18 @@ const accountMatchesSetting = (settingValue, accountId) => {
 };
 
 const setupEvents = (client, accountId) => {
+    const setupTime = Math.floor(Date.now() / 1000);
+
     client.on('auth_failure', (msg) => {
         logger.error(`[${accountId}] Authentication failed: ${msg}`);
     });
 
     client.on('message', async (message) => {
+        // Abaikan pesan lama yang diterima saat bot baru menyala/reconnect (historical/offline messages)
+        if (message.timestamp && message.timestamp < setupTime) {
+            return;
+        }
+
         // Abaikan pesan dari grup, broadcast, status, dan pesan kosong (kecuali jika ada media seperti bukti transfer)
         if (!message.from || message.from.includes('@g.us') || message.from.includes('@broadcast') || (!message.body && !message.hasMedia)) {
             return;

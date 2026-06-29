@@ -16,6 +16,16 @@ jest.mock('../src/whatsapp/client', () => ({
     scheduleReconnect: jest.fn(),
 }));
 
+jest.mock('../src/services/whatsapp.service', () => ({
+    sendTextMessage: jest.fn().mockResolvedValue({ id: { id: 'msg-id' } }),
+}));
+
+jest.mock('../src/services/isp.service', () => ({
+    findCustomersByPhone: jest.fn().mockResolvedValue([]),
+    getAllTemplates: jest.fn().mockResolvedValue([]),
+    getTemplateByTrigger: jest.fn().mockResolvedValue(null),
+}));
+
 let app;
 let tempDir;
 let database;
@@ -155,6 +165,25 @@ describe('🤖 Chatbot API Routes — Integration Tests', () => {
             expect(res.body.status).toBe('success');
             expect(res.body.data.chatbot_account_id).toBe('test-account-id');
             expect(database.getGatewaySetting('chatbot_account_id')).toBe('test-account-id');
+        });
+    });
+
+    describe('POST /api/v1/chatbot/sessions/:phone/resolve', () => {
+        it('POST /sessions/:phone/resolve harus menghapus session dan mengirim menu utama', async () => {
+            database.upsertSession('628555@c.us', 'default', 'WAITING_ADMIN', { activeTicketId: 10 });
+            
+            const res = await request(app)
+                .post('/api/v1/chatbot/sessions/628555%40c.us/resolve')
+                .set('X-API-Key', API_KEY)
+                .send({ accountId: 'default' });
+
+            expect(res.statusCode).toBe(200);
+            expect(res.body.status).toBe('success');
+            
+            // Cek di DB bahwa state direset ke UNREG_MENU
+            const session = database.getSession('628555@c.us');
+            expect(session).not.toBeNull();
+            expect(session.state).toBe('UNREG_MENU');
         });
     });
 });

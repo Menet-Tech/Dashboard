@@ -10,6 +10,7 @@ import {
   updateEmailTemplate,
   deleteEmailTemplate,
 } from "../../lib/api";
+import { useDialog } from "../../context/DialogContext";
 
 export type EmailTemplateFormState = {
   name: string;
@@ -39,6 +40,7 @@ export function EmailTemplatesPage({
   withFeedback,
 }: EmailTemplatesPageProps) {
   const [templates, setTemplates] = useState<EmailTemplateItem[]>([]);
+  const { showConfirm } = useDialog();
   const [templateForm, setTemplateForm] = useState<EmailTemplateFormState>(defaultEmailTemplateForm());
   const [templateErrors, setTemplateErrors] = useState<FieldErrors>({});
   const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
@@ -113,7 +115,7 @@ export function EmailTemplatesPage({
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus template email ini?")) return;
+    if (!(await showConfirm("Apakah Anda yakin ingin menghapus template email ini?"))) return;
     await withFeedback(async () => {
       try {
         await deleteEmailTemplate(id);

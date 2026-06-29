@@ -10,10 +10,15 @@ import {
   fetchVoucherUsageLogs,
   fetchCustomerVouchers,
   claimCustomerVoucher,
-  toggleCustomerVoucherAutoApply
+  toggleCustomerVoucherAutoApply,
+  fetchReferralWithdrawals,
+  completeReferralWithdrawal,
+  rejectReferralWithdrawal,
+  type ReferralWithdrawalItem
 } from "../../lib/api";
 import { formatCurrency } from "../../utils/format";
-import { Info, ArrowUpRight, ArrowDownLeft, Gift, Percent, Search, Trash2, Edit3, Plus, X, Ticket, Settings, Clock } from "lucide-react";
+import { Info, ArrowUpRight, ArrowDownLeft, Gift, Percent, Search, Trash2, Edit3, Plus, X, Ticket, Settings, Clock, CheckCircle, XCircle, FileText, Camera } from "lucide-react";
+import { useDialog } from "../../context/DialogContext";
 
 type DiscountsPageProps = {
   user: User | null;
@@ -43,9 +48,25 @@ export function DiscountsPage({
   pushError,
   onRefresh,
 }: DiscountsPageProps) {
-  const [activeTab, setActiveTab] = useState<"discounts" | "referrals" | "vouchers">("discounts");
+  const [activeTab, setActiveTab] = useState<"discounts" | "referrals" | "vouchers" | "withdrawals">("discounts");
+  const { showAlert, showConfirm } = useDialog();
   const [searchQuery, setSearchQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Referral Withdrawals state
+  const [withdrawalsList, setWithdrawalsList] = useState<ReferralWithdrawalItem[]>([]);
+  const [loadingWithdrawals, setLoadingWithdrawals] = useState(false);
+
+  // Complete Payout modal state
+  const [isCompleteWithdrawOpen, setIsCompleteWithdrawOpen] = useState(false);
+  const [selectedWithdrawForComplete, setSelectedWithdrawForComplete] = useState<ReferralWithdrawalItem | null>(null);
+  const [completeProofFile, setCompleteProofFile] = useState<File | null>(null);
+  const [completeNotes, setCompleteNotes] = useState("");
+
+  // Reject Payout modal state
+  const [isRejectWithdrawOpen, setIsRejectWithdrawOpen] = useState(false);
+  const [selectedWithdrawForReject, setSelectedWithdrawForReject] = useState<ReferralWithdrawalItem | null>(null);
+  const [rejectNotes, setRejectNotes] = useState("");
 
   // Vouchers state
   const [vouchersList, setVouchersList] = useState<VoucherItem[]>([]);
@@ -84,9 +105,23 @@ export function DiscountsPage({
     }
   };
 
+  const loadWithdrawalsData = async () => {
+    setLoadingWithdrawals(true);
+    try {
+      const res = await fetchReferralWithdrawals();
+      setWithdrawalsList(res.data || []);
+    } catch (err: any) {
+      pushError(err.message || "Gagal memuat data penarikan referral.");
+    } finally {
+      setLoadingWithdrawals(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === "vouchers") {
       void loadVouchersData();
+    } else if (activeTab === "withdrawals") {
+      void loadWithdrawalsData();
     }
   }, [activeTab]);
 
@@ -168,7 +203,7 @@ export function DiscountsPage({
   };
 
   const handleDeleteDiscount = async (customer: CustomerItem) => {
-    if (!window.confirm(`Apakah Anda yakin ingin menghapus diskon khusus untuk ${customer.name}?`)) {
+    if (!(await showConfirm(`Apakah Anda yakin ingin menghapus diskon khusus untuk ${customer.name}?`))) {
       return;
     }
     setSubmitting(true);
@@ -241,7 +276,7 @@ export function DiscountsPage({
   };
 
   const handleDeleteReferral = async (customer: CustomerItem) => {
-    if (!window.confirm(`Apakah Anda yakin ingin me-reset (hapus) data referral untuk ${customer.name}?`)) {
+    if (!(await showConfirm(`Apakah Anda yakin ingin me-reset (hapus) data referral untuk ${customer.name}?`))) {
       return;
     }
     setSubmitting(true);
@@ -273,25 +308,21 @@ export function DiscountsPage({
   };
 
   // === REDEEM FLOWS ===
-  const handleWithdraw = async (customer: CustomerItem) => {
-    const amountStr = window.prompt(
-      `Masukkan nominal penarikan tunai saldo referral untuk ${customer.name} (Maks: ${formatCurrency(customer.referral_balance)}):`
-    );
-    if (!amountStr) return;
+  const REFERRAL_FIXED = 50_000;
 
-    const amount = parseInt(amountStr, 10);
-    if (isNaN(amount) || amount <= 0) {
-      alert("Nominal penarikan tidak valid.");
+  const handleWithdraw = async (customer: CustomerItem) => {
+    if (customer.referral_balance < REFERRAL_FIXED) {
+      await showAlert(`Saldo referral tidak mencukupi. Minimal Rp ${REFERRAL_FIXED.toLocaleString("id-ID")} untuk menarik tunai.`);
       return;
     }
-    if (amount > customer.referral_balance) {
-      alert("Saldo referral tidak mencukupi.");
-      return;
-    }
+    const confirmed = await showConfirm(
+      `Tarik tunai saldo referral ${customer.name} sebesar Rp ${REFERRAL_FIXED.toLocaleString("id-ID")}?\n\nCatatan: Jika periode ini sudah menggunakan voucher referral untuk tagihan, penarikan tidak dapat dilakukan.`
+    );
+    if (!confirmed) return;
 
     try {
-      await withdrawReferral(customer.id, amount);
-      pushSuccess(`Berhasil mencatat penarikan saldo referral sebesar ${formatCurrency(amount)} untuk ${customer.name}.`);
+      await withdrawReferral(customer.id);
+      pushSuccess(`Berhasil mencatat penarikan saldo referral sebesar ${formatCurrency(REFERRAL_FIXED)} untuk ${customer.name}.`);
       await onRefresh();
     } catch (err: any) {
       pushError(err.message || "Gagal mencatat penarikan.");
@@ -299,24 +330,18 @@ export function DiscountsPage({
   };
 
   const handleConvertToVoucher = async (customer: CustomerItem) => {
-    const amountStr = window.prompt(
-      `Masukkan nominal saldo referral yang ingin ditukarkan menjadi voucher diskon untuk ${customer.name} (Maks: ${formatCurrency(customer.referral_balance)}):`
+    if (customer.referral_balance < REFERRAL_FIXED) {
+      await showAlert(`Saldo referral tidak mencukupi. Minimal Rp ${REFERRAL_FIXED.toLocaleString("id-ID")} untuk menukar voucher.`);
+      return;
+    }
+    const confirmed = await showConfirm(
+      `Tukarkan Rp ${REFERRAL_FIXED.toLocaleString("id-ID")} saldo referral ${customer.name} menjadi voucher diskon tagihan?\n\nCatatan: Jika periode ini sudah mengajukan penarikan tunai referral, penukaran tidak dapat dilakukan.`
     );
-    if (!amountStr) return;
-
-    const amount = parseInt(amountStr, 10);
-    if (isNaN(amount) || amount <= 0) {
-      alert("Nominal penukaran tidak valid.");
-      return;
-    }
-    if (amount > customer.referral_balance) {
-      alert("Saldo referral tidak mencukupi.");
-      return;
-    }
+    if (!confirmed) return;
 
     try {
-      await convertReferralToVoucher(customer.id, amount);
-      pushSuccess(`Berhasil menukarkan saldo referral menjadi voucher diskon sebesar ${formatCurrency(amount)} untuk ${customer.name}.`);
+      await convertReferralToVoucher(customer.id);
+      pushSuccess(`Berhasil menukarkan saldo referral menjadi voucher diskon sebesar ${formatCurrency(REFERRAL_FIXED)} untuk ${customer.name}.`);
       await onRefresh();
     } catch (err: any) {
       pushError(err.message || "Gagal menukarkan voucher.");
@@ -328,7 +353,7 @@ export function DiscountsPage({
     if (!newVoucherCode.trim()) return;
     const amt = parseFormattedNumber(newVoucherAmount);
     if (amt <= 0) {
-      alert("Nominal diskon harus lebih dari 0.");
+      await showAlert("Nominal diskon harus lebih dari 0.");
       return;
     }
     setSubmitting(true);
@@ -356,7 +381,7 @@ export function DiscountsPage({
   };
 
   const handleDeleteVoucher = async (id: number, code: string) => {
-    if (!window.confirm(`Apakah Anda yakin ingin menghapus voucher template ${code}? Pelanggan yang sudah mengklaim voucher ini tidak akan terpengaruh, namun kode tidak bisa diklaim lagi.`)) {
+    if (!(await showConfirm(`Apakah Anda yakin ingin menghapus voucher template ${code}? Pelanggan yang sudah mengklaim voucher ini tidak akan terpengaruh, namun kode tidak bisa diklaim lagi.`))) {
       return;
     }
     setSubmitting(true);
@@ -374,7 +399,7 @@ export function DiscountsPage({
   const handleAssignVoucher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedCustomerForVoucher <= 0 || selectedVoucherTemplate <= 0) {
-      alert("Pilih pelanggan dan voucher template terlebih dahulu.");
+      await showAlert("Pilih pelanggan dan voucher template terlebih dahulu.");
       return;
     }
     const code = vouchersList.find(v => v.id === selectedVoucherTemplate)?.code;
@@ -468,6 +493,20 @@ export function DiscountsPage({
             <Ticket size={14} />
             Voucher & Promosi
           </button>
+          <button
+            onClick={() => {
+              setActiveTab("withdrawals");
+              setSearchQuery("");
+            }}
+            className={`px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+              activeTab === "withdrawals"
+                ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
+          >
+            <Clock size={14} />
+            Penarikan Referral ({withdrawalsList.filter(w => w.status === "pending").length})
+          </button>
         </div>
       </div>
 
@@ -483,6 +522,10 @@ export function DiscountsPage({
           ) : activeTab === "referrals" ? (
             <p>
               Program Member-Get-Member memberikan saldo reward sebesar Rp 50.000 kepada pengajak ketika mengajak orang baru memasang internet. Saldo ini dapat dicairkan tunai atau ditukarkan menjadi voucher diskon tagihan via Dashboard ini maupun via WhatsApp Chatbot.
+            </p>
+          ) : activeTab === "withdrawals" ? (
+            <p>
+              Kelola pencairan/penarikan saldo referral pelanggan. Penarikan tunai (Cash) memerlukan penyerahan manual ke rumah pelanggan dan pendokumentasian foto serah terima. Penarikan via Transfer memerlukan pengunggahan bukti transfer ke bank/e-wallet pelanggan sebagai arsip penyelesaian.
             </p>
           ) : (
             <p>
@@ -503,6 +546,8 @@ export function DiscountsPage({
                 ? "Cari nama pelanggan..."
                 : activeTab === "referrals"
                 ? "Cari nama atau kode referral..."
+                : activeTab === "withdrawals"
+                ? "Cari nama pelanggan..."
                 : "Cari data voucher..."
             }
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 transition-all"
@@ -523,7 +568,7 @@ export function DiscountsPage({
               </button>
             ) : activeTab === "referrals" ? (
               <button
-                onClick={() => {
+                onClick={async () => {
                   // Find first customer with no code to edit referral
                   const firstWithoutRef = customers.find(c => !c.referral_code);
                   if (firstWithoutRef) {
@@ -531,7 +576,7 @@ export function DiscountsPage({
                   } else if (customers.length > 0) {
                     handleOpenEditReferral(customers[0]);
                   } else {
-                    alert("Belum ada pelanggan terdaftar.");
+                    await showAlert("Belum ada pelanggan terdaftar.");
                   }
                 }}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-2xl transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
@@ -539,7 +584,7 @@ export function DiscountsPage({
                 <Plus size={14} />
                 Atur Referral Baru
               </button>
-            ) : (
+            ) : activeTab === "vouchers" ? (
               <>
                 <button
                   onClick={() => setIsCreateVoucherOpen(true)}
@@ -556,7 +601,7 @@ export function DiscountsPage({
                   Beri Voucher ke Pelanggan
                 </button>
               </>
-            )}
+            ) : null}
           </div>
         )}
       </div>
@@ -755,7 +800,7 @@ export function DiscountsPage({
               </tbody>
             </table>
           </div>
-        ) : (
+        ) : activeTab === "vouchers" ? (
           // === TAB SYSTEM VOUCHER & PROMOSI ===
           <div className="p-6 space-y-8">
             {/* 1. Voucher Templates Grid */}
@@ -956,6 +1001,142 @@ export function DiscountsPage({
               </div>
             </div>
           </div>
+        ) : (
+          // === TAB REFERRAL WITHDRAWALS ===
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
+                <tr>
+                  <th className="px-6 py-4 font-semibold">Pelanggan</th>
+                  <th className="px-6 py-4 font-semibold">Nominal</th>
+                  <th className="px-6 py-4 font-semibold">Metode</th>
+                  <th className="px-6 py-4 font-semibold">Tujuan / Rekening</th>
+                  <th className="px-6 py-4 font-semibold">Status</th>
+                  <th className="px-6 py-4 font-semibold">Tanggal</th>
+                  <th className="px-6 py-4 font-semibold">Catatan / Bukti</th>
+                  {!isViewer && <th className="px-6 py-4 font-semibold text-center">Aksi</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
+                {withdrawalsList.length === 0 ? (
+                  <tr>
+                    <td colSpan={isViewer ? 7 : 8} className="px-6 py-10 text-center text-slate-400">
+                      Tidak ada permintaan penarikan saldo referral.
+                    </td>
+                  </tr>
+                ) : (
+                  withdrawalsList
+                    .filter((w) =>
+                      w.customer_name.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map((w) => {
+                      return (
+                        <tr key={w.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
+                          <td className="px-6 py-4">
+                            <strong className="block text-slate-900 dark:text-slate-100 font-semibold">{w.customer_name}</strong>
+                            <span className="text-xs text-slate-400 font-mono">{w.customer_phone || "-"}</span>
+                          </td>
+                          <td className="px-6 py-4 font-mono text-xs font-semibold text-slate-900 dark:text-slate-200">
+                            {formatCurrency(w.amount)}
+                          </td>
+                          <td className="px-6 py-4">
+                            {w.method === "transfer" ? (
+                              <span className="bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-md text-xs font-semibold">
+                                Transfer
+                              </span>
+                            ) : (
+                              <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-md text-xs font-semibold">
+                                Cash
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-xs font-mono text-slate-600 dark:text-slate-300">
+                            {w.payment_target || <span className="text-slate-400 italic">Serah terima tunai</span>}
+                          </td>
+                          <td className="px-6 py-4">
+                            {w.status === "pending" && (
+                              <span className="bg-amber-50 dark:bg-amber-950/45 text-amber-800 dark:text-amber-400 px-2 py-1 rounded-full text-xs font-semibold">
+                                Pending
+                              </span>
+                            )}
+                            {w.status === "completed" && (
+                              <span className="bg-green-50 dark:bg-green-950/45 text-green-800 dark:text-green-400 px-2 py-1 rounded-full text-xs font-semibold">
+                                Selesai
+                              </span>
+                            )}
+                            {w.status === "rejected" && (
+                              <span className="bg-red-50 dark:bg-red-950/45 text-red-800 dark:text-red-400 px-2 py-1 rounded-full text-xs font-semibold">
+                                Ditolak
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-xs text-slate-500">
+                            {new Date(w.created_at).toLocaleString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </td>
+                          <td className="px-6 py-4 text-xs">
+                            {w.notes && <div className="text-slate-600 dark:text-slate-400 italic mb-1">"{w.notes}"</div>}
+                            {w.proof_path ? (
+                              <a
+                                href={w.proof_path}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold flex items-center gap-1"
+                              >
+                                <Camera size={12} />
+                                Lihat Bukti
+                              </a>
+                            ) : (
+                              <span className="text-slate-400 italic">Belum ada bukti</span>
+                            )}
+                          </td>
+                          {!isViewer && (
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-center gap-2">
+                                {w.status === "pending" ? (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedWithdrawForComplete(w);
+                                        setCompleteNotes("");
+                                        setCompleteProofFile(null);
+                                        setIsCompleteWithdrawOpen(true);
+                                      }}
+                                      className="bg-green-600 hover:bg-green-700 text-white text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-all shadow-sm shadow-green-600/25"
+                                    >
+                                      <CheckCircle size={12} />
+                                      Selesai
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedWithdrawForReject(w);
+                                        setRejectNotes("");
+                                        setIsRejectWithdrawOpen(true);
+                                      }}
+                                      className="bg-red-50 hover:bg-red-100 text-red-655 dark:bg-red-950/20 dark:hover:bg-red-950/55 dark:text-red-400 text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-all"
+                                    >
+                                      <XCircle size={12} />
+                                      Tolak
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-slate-400 italic text-xs">No Action</span>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -983,13 +1164,13 @@ export function DiscountsPage({
             </p>
 
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 const targetCust = customers.find((c) => c.id === selectedCustomerForNewDiscount);
                 if (targetCust) {
                   void handleSaveDiscount(e, targetCust, parseFormattedNumber(discountValueInput), discountTypeInput);
                 } else {
                   e.preventDefault();
-                  alert("Pilih pelanggan terlebih dahulu.");
+                  await showAlert("Pilih pelanggan terlebih dahulu.");
                 }
               }}
               className="space-y-4"
@@ -1552,6 +1733,197 @@ export function DiscountsPage({
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20"
                 >
                   {submitting ? "Menyimpan..." : "Simpan Data"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2.1: Complete Withdrawal */}
+      {isCompleteWithdrawOpen && selectedWithdrawForComplete && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
+            <button
+              onClick={() => {
+                setIsCompleteWithdrawOpen(false);
+                setSelectedWithdrawForComplete(null);
+                setCompleteProofFile(null);
+                setCompleteNotes("");
+              }}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-1.5">
+              <CheckCircle size={18} className="text-green-600" />
+              Selesaikan Penarikan
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">
+              Konfirmasi penyelesaian pencairan saldo sebesar <strong>{formatCurrency(selectedWithdrawForComplete.amount)}</strong> untuk <strong>{selectedWithdrawForComplete.customer_name}</strong> ({selectedWithdrawForComplete.method === "cash" ? "Cash/Tunai" : "Transfer"}).
+            </p>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!completeProofFile) {
+                  await showAlert("Foto bukti serah terima atau bukti transfer wajib diunggah.");
+                  return;
+                }
+                setSubmitting(true);
+                try {
+                  await completeReferralWithdrawal(selectedWithdrawForComplete.id, completeProofFile, completeNotes);
+                  pushSuccess("Pencairan referral berhasil ditandai selesai.");
+                  setIsCompleteWithdrawOpen(false);
+                  setSelectedWithdrawForComplete(null);
+                  setCompleteProofFile(null);
+                  setCompleteNotes("");
+                  void loadWithdrawalsData();
+                  void onRefresh();
+                } catch (err: any) {
+                  pushError(err.message || "Gagal memproses penyelesaian penarikan.");
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                  Foto Bukti (Wajib)
+                </label>
+                <input
+                  type="file"
+                  required
+                  accept="image/*,application/pdf"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      setCompleteProofFile(e.target.files[0]);
+                    }
+                  }}
+                  className="w-full text-xs text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 dark:file:bg-indigo-950/40 dark:file:text-indigo-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                  Catatan Pembayaran
+                </label>
+                <textarea
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 h-20 resize-none"
+                  value={completeNotes}
+                  onChange={(e) => setCompleteNotes(e.target.value)}
+                  placeholder="Misal: Uang diserahkan tunai di rumah pelanggan / Ditransfer via SeaBank"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCompleteWithdrawOpen(false);
+                    setSelectedWithdrawForComplete(null);
+                    setCompleteProofFile(null);
+                    setCompleteNotes("");
+                  }}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-355 font-bold rounded-xl text-xs transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-green-600/25"
+                >
+                  {submitting ? "Memproses..." : "Selesaikan Penarikan"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2.2: Reject Withdrawal */}
+      {isRejectWithdrawOpen && selectedWithdrawForReject && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
+            <button
+              onClick={() => {
+                setIsRejectWithdrawOpen(false);
+                setSelectedWithdrawForReject(null);
+                setRejectNotes("");
+              }}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-1.5">
+              <XCircle size={18} className="text-red-600" />
+              Tolak Penarikan
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">
+              Konfirmasi penolakan permintaan penarikan saldo sebesar <strong>{formatCurrency(selectedWithdrawForReject.amount)}</strong> untuk <strong>{selectedWithdrawForReject.customer_name}</strong>. Saldo akan otomatis dikembalikan ke pelanggan.
+            </p>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!rejectNotes.trim()) {
+                  await showAlert("Alasan penolakan wajib diisi.");
+                  return;
+                }
+                setSubmitting(true);
+                try {
+                  await rejectReferralWithdrawal(selectedWithdrawForReject.id, rejectNotes);
+                  pushSuccess("Permintaan penarikan referral berhasil ditolak dan saldo dikembalikan.");
+                  setIsRejectWithdrawOpen(false);
+                  setSelectedWithdrawForReject(null);
+                  setRejectNotes("");
+                  void loadWithdrawalsData();
+                  void onRefresh();
+                } catch (err: any) {
+                  pushError(err.message || "Gagal menolak permintaan penarikan.");
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                  Alasan Penolakan (Wajib)
+                </label>
+                <textarea
+                  required
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 h-24 resize-none"
+                  value={rejectNotes}
+                  onChange={(e) => setRejectNotes(e.target.value)}
+                  placeholder="Masukkan alasan penolakan agar pelanggan mengetahui penyebabnya..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRejectWithdrawOpen(false);
+                    setSelectedWithdrawForReject(null);
+                    setRejectNotes("");
+                  }}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-355 font-bold rounded-xl text-xs transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-red-600/25"
+                >
+                  {submitting ? "Menolak..." : "Tolak Penarikan"}
                 </button>
               </div>
             </form>

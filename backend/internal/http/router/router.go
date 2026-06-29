@@ -72,7 +72,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	customerHandler := handler.NewCustomerHandler(customers.Service{
 		Repository: customers.Repository{DB: db},
 		Settings:   settingsService,
-	}, auditService)
+	}, auditService, cfg.StoragePath)
 	odpHandler := handler.NewOdpHandler(odp.Service{
 		Repository: odp.Repository{DB: db},
 	})
@@ -331,6 +331,9 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				staff.Post("/customers/{id}/end-trial", customerHandler.EndTrial)
 				staff.Post("/customers/{id}/referral/withdraw", customerHandler.WithdrawReferral)
 				staff.Post("/customers/{id}/referral/convert-voucher", customerHandler.ConvertReferralToVoucher)
+				staff.Get("/referral/withdrawals", customerHandler.ListReferralWithdrawals)
+				staff.Post("/referral/withdrawals/{id}/complete", customerHandler.CompleteReferralWithdrawal)
+				staff.Post("/referral/withdrawals/{id}/reject", customerHandler.RejectReferralWithdrawal)
 				staff.Post("/customers/{id}/vouchers/claim", voucherHandler.Claim)
 				staff.Post("/customers/{id}/vouchers/toggle-auto-apply", voucherHandler.ToggleAutoApply)
 				staff.Post("/bills/generate", billHandler.Generate)

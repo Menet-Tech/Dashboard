@@ -3,6 +3,7 @@ import { fetchPendingConfirmations, approveConfirmation, rejectConfirmation } fr
 import type { PaymentConfirmationItem } from "../../types";
 import { formatCurrency } from "../../utils/format";
 import { Check, X, Eye, FileText, AlertCircle } from "lucide-react";
+import { useDialog } from "../../context/DialogContext";
 
 type PaymentConfirmationsPageProps = {
   pushSuccess: (msg: string) => void;
@@ -16,6 +17,7 @@ export function PaymentConfirmationsPage({
   withFeedback,
 }: PaymentConfirmationsPageProps) {
   const [confirmations, setConfirmations] = useState<PaymentConfirmationItem[]>([]);
+  const { showConfirm } = useDialog();
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -52,7 +54,7 @@ export function PaymentConfirmationsPage({
   };
 
   const handleReject = async (id: number) => {
-    if (!confirm("Apakah Anda yakin ingin menolak konfirmasi pembayaran ini?")) return;
+    if (!(await showConfirm("Apakah Anda yakin ingin menolak konfirmasi pembayaran ini?"))) return;
     setBusyId(id);
     try {
       await withFeedback(async () => {

@@ -139,7 +139,27 @@ func (s Service) AddTicketMessage(ctx context.Context, ticketID int64, senderTyp
 }
 
 func (s Service) CloseTicket(ctx context.Context, id int64) error {
-	return s.Repository.Close(ctx, id)
+	detail, err := s.Repository.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if err := s.Repository.Close(ctx, id); err != nil {
+		return err
+	}
+
+	if detail.NoHP != "" {
+		// Asynchronously or synchronously call chatbot resolve session
+		go func() {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := s.WhatsApp.ResolveChatbotSession(bgCtx, detail.NoHP, "default"); err != nil {
+				fmt.Printf("failed to resolve chatbot session for %s: %v\n", detail.NoHP, err)
+			}
+		}()
+	}
+
+	return nil
 }
 
 // Repository implementation

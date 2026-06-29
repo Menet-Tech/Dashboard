@@ -3,9 +3,13 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -17,8 +21,9 @@ import (
 )
 
 type CustomerHandler struct {
-	Service customers.Service
-	Audit   audit.Service
+	Service     customers.Service
+	Audit       audit.Service
+	StoragePath string
 }
 
 type statusPayload struct {
@@ -33,8 +38,8 @@ type bulkStatusPayload struct {
 	ReferredByID *int64  `json:"referred_by_id,omitempty"`
 }
 
-func NewCustomerHandler(service customers.Service, auditService audit.Service) CustomerHandler {
-	return CustomerHandler{Service: service, Audit: auditService}
+func NewCustomerHandler(service customers.Service, auditService audit.Service, storagePath string) CustomerHandler {
+	return CustomerHandler{Service: service, Audit: auditService, StoragePath: storagePath}
 }
 
 func (h CustomerHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -772,7 +777,9 @@ func (h CustomerHandler) MikrotikKick(w http.ResponseWriter, r *http.Request) {
 }
 
 type referralActionPayload struct {
-	Amount int `json:"amount"`
+	Amount        int    `json:"amount"`
+	Method        string `json:"method"`
+	PaymentTarget string `json:"payment_target"`
 }
 
 func (h CustomerHandler) WithdrawReferral(w http.ResponseWriter, r *http.Request) {
@@ -794,9 +801,11 @@ func (h CustomerHandler) WithdrawReferral(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if payload.Amount <= 0 {
-		WriteError(w, http.StatusBadRequest, "jumlah harus lebih besar dari 0")
-		return
+	const fixedReferralAmount = 50000
+	payload.Amount = fixedReferralAmount // always force 50k regardless of what was sent
+
+	if payload.Method == "" {
+		payload.Method = "cash"
 	}
 
 	customer, err := h.Service.FindByID(r.Context(), id)
@@ -809,7 +818,7 @@ func (h CustomerHandler) WithdrawReferral(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = h.Service.WithdrawReferral(r.Context(), id, payload.Amount)
+	withdrawID, err := h.Service.WithdrawReferral(r.Context(), id, payload.Amount, payload.Method, payload.PaymentTarget)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -819,10 +828,11 @@ func (h CustomerHandler) WithdrawReferral(w http.ResponseWriter, r *http.Request
 	if idx := strings.LastIndex(ip, ":"); idx != -1 {
 		ip = ip[:idx]
 	}
-	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &customer.ID, "customer.referral_withdraw", fmt.Sprintf("Tarik tunai referral saldo pelanggan %s sebesar Rp %d berhasil", customer.Name, payload.Amount), ip)
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &customer.ID, "customer.referral_withdraw", fmt.Sprintf("Tarik tunai referral (%s) saldo pelanggan %s sebesar Rp %d diajukan", payload.Method, customer.Name, payload.Amount), ip)
 
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"message": "berhasil melakukan penarikan tunai",
+		"id":      withdrawID,
 	})
 }
 
@@ -845,10 +855,8 @@ func (h CustomerHandler) ConvertReferralToVoucher(w http.ResponseWriter, r *http
 		return
 	}
 
-	if payload.Amount <= 0 {
-		WriteError(w, http.StatusBadRequest, "jumlah harus lebih besar dari 0")
-		return
-	}
+	const fixedReferralAmount = 50000
+	payload.Amount = fixedReferralAmount // always force 50k regardless of what was sent
 
 	customer, err := h.Service.FindByID(r.Context(), id)
 	if err != nil {
@@ -917,6 +925,168 @@ func (h CustomerHandler) EndTrial(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"message": "customer trial terminated successfully",
 	})
+}
+
+func (h CustomerHandler) ListReferralWithdrawals(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status")
+	withdrawals, err := h.Service.ListReferralWithdrawals(r.Context(), status)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"data": withdrawals,
+	})
+}
+
+func (h CustomerHandler) CompleteReferralWithdrawal(w http.ResponseWriter, r *http.Request) {
+	user, err := currentUser(r)
+	if err != nil {
+		WriteError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid request id")
+		return
+	}
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid multipart form")
+		return
+	}
+
+	file, header, err := r.FormFile("proof")
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "proof file is required")
+		return
+	}
+	defer file.Close()
+
+	const maxUploadSize = 5 << 20 // 5 MB limit
+	if header.Size > maxUploadSize {
+		WriteError(w, http.StatusBadRequest, "file size exceeds limit of 5MB")
+		return
+	}
+
+	proofPath, err := h.storeProofFile(file, header.Filename, maxUploadSize)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	notes := r.FormValue("notes")
+	if err := h.Service.CompleteReferralWithdrawal(r.Context(), id, proofPath, notes); err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	ip := r.RemoteAddr
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, nil, "referral_withdraw.complete", fmt.Sprintf("Penarikan referral ID %d selesai diproses dengan bukti %s", id, proofPath), ip)
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"message":    "payout completed successfully",
+		"proof_path": proofPath,
+	})
+}
+
+func (h CustomerHandler) RejectReferralWithdrawal(w http.ResponseWriter, r *http.Request) {
+	user, err := currentUser(r)
+	if err != nil {
+		WriteError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid request id")
+		return
+	}
+
+	var payload struct {
+		Notes string `json:"notes"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+
+	if err := h.Service.RejectReferralWithdrawal(r.Context(), id, payload.Notes); err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	ip := r.RemoteAddr
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, nil, "referral_withdraw.reject", fmt.Sprintf("Penarikan referral ID %d ditolak. Alasan: %s", id, payload.Notes), ip)
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"message": "payout request rejected successfully",
+	})
+}
+
+func (h CustomerHandler) storeProofFile(source io.Reader, originalName string, maxSize int64) (string, error) {
+	originalName = filepath.Base(originalName)
+
+	data, err := io.ReadAll(io.LimitReader(source, maxSize+1))
+	if err != nil {
+		return "", err
+	}
+	if int64(len(data)) > maxSize {
+		return "", errors.New("file size exceeds limit of 5MB")
+	}
+
+	directory := filepath.Join(h.StoragePath, "uploads", "payment-proofs")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return "", err
+	}
+
+	contentType := http.DetectContentType(data)
+	ext := strings.ToLower(strings.TrimSpace(filepath.Ext(originalName)))
+	if ext == "" || ext == ".bin" {
+		if strings.Contains(contentType, "image/jpeg") || strings.Contains(contentType, "image/jpg") {
+			ext = ".jpg"
+		} else if strings.Contains(contentType, "image/png") {
+			ext = ".png"
+		} else if strings.Contains(contentType, "image/webp") {
+			ext = ".webp"
+		} else if strings.Contains(contentType, "application/pdf") {
+			ext = ".pdf"
+		} else {
+			ext = ".jpg" // fallback
+		}
+	}
+
+	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".pdf" && ext != ".webp" {
+		return "", errors.New("file type is not allowed")
+	}
+
+	filename := fmt.Sprintf("ref_withdraw_%d%s", time.Now().UnixNano(), ext)
+	targetPath := filepath.Join(directory, filename)
+
+	absDir, err := filepath.Abs(directory)
+	if err != nil {
+		return "", fmt.Errorf("resolve uploads dir: %w", err)
+	}
+	absTarget, err := filepath.Abs(targetPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve target path: %w", err)
+	}
+	if !strings.HasPrefix(absTarget, absDir+string(filepath.Separator)) && absTarget != absDir {
+		return "", fmt.Errorf("invalid path traversal attempt")
+	}
+
+	if err := os.WriteFile(targetPath, data, 0o644); err != nil {
+		return "", err
+	}
+
+	return "/uploads/payment-proofs/" + filename, nil
 }
 
 

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { apiRequest, checkWAN, checkGponEpon, type GacsDevice, type GacsDeviceDetail, type GacsFault } from "../../lib/api";
 import { formatDateTime } from "../../utils/format";
 import { Modal } from "../../components/ui/Modal";
+import { useDialog } from "../../context/DialogContext";
 import {
   Cpu,
   Activity,
@@ -64,11 +65,12 @@ type DeviceDetailModalProps = {
 };
 
 function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: DeviceDetailModalProps) {
+  const { showConfirm } = useDialog();
   const [detail, setDetail] = useState<GacsDeviceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [summoning, setSummoning] = useState(false);
   const [rebooting, setRebooting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"info" | "wan" | "mikrotik" | "params">("info");
+  const [activeTab, setActiveTab] = useState<"info" | "wan" | "wifi" | "mikrotik" | "params">("info");
 
   // WAN and Mode info states
   const [wanLoading, setWanLoading] = useState(false);
@@ -137,7 +139,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
   };
 
   const handleReboot = async () => {
-    if (!confirm("Yakin ingin me-reboot perangkat ini?")) return;
+    if (!(await showConfirm("Yakin ingin me-reboot perangkat ini?"))) return;
     setRebooting(true);
     try {
       await apiRequest(`/api/reboot-device`, {
@@ -276,13 +278,49 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
 
   const getRxPower = () => {
     if (!detail) return "";
+    
+    // 1. Try normalized rxpower virtual parameter
     const rx = detail.virtualParameters?.rxpower?.value;
-    if (rx !== undefined && rx !== null && rx !== "") {
+    if (rx !== undefined && rx !== null && rx !== "" && rx !== "0" && rx !== 0) {
       return `${rx} dBm`;
     }
+
+    // 2. Try raw virtual parameters keys in case the name is slightly different (e.g. getRX)
+    const possibleVpKeys = ["getRX", "getrx", "getRx", "rxPower", "rxpower", "getRXPower", "rx_power"];
+    for (const key of possibleVpKeys) {
+      const v = detail.virtualParameters?.[key]?.value;
+      if (v !== undefined && v !== null && v !== "" && v !== "0" && v !== 0) {
+        return `${v} dBm`;
+      }
+    }
+
+    // 3. Common raw paths
     const rawRx = getRaw("InternetGatewayDevice.WANDevice.1.X_GponInterafceConfig.RXPower") || 
-                  getRaw("InternetGatewayDevice.X_CMCC_ONU_INFO.RxOpticalPower");
-    return rawRx ? `${rawRx} dBm` : "";
+                  getRaw("InternetGatewayDevice.X_CMCC_ONU_INFO.RxOpticalPower") ||
+                  getRaw("InternetGatewayDevice.WANDevice.1.X_GponInterafceConfig.RxPower") ||
+                  getRaw("InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_CT-COM_RxPower") ||
+                  getRaw("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_CT-COM_RxOpticalPower");
+    if (rawRx) {
+      return `${rawRx} dBm`;
+    }
+
+    // 4. Case-insensitive search on all parameters list
+    const foundPower = allParams.find(p => {
+      const pathLower = p.path.toLowerCase();
+      return (pathLower.includes("rxpower") || 
+              pathLower.includes("rxoptical") || 
+              pathLower.includes("opticalpower") || 
+              pathLower.endsWith(".rx") || 
+              pathLower.endsWith(".getrx")) && 
+             p.value && 
+             p.value !== "—" && 
+             p.value !== "0";
+    });
+    if (foundPower) {
+      return `${foundPower.value} dBm`;
+    }
+
+    return "";
   };
 
   const getTxPower = () => {
@@ -345,18 +383,22 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
 
             {/* Tab switcher */}
             <div className="flex gap-1 mb-5 border-b border-slate-150">
-              {(["info", "wan", "mikrotik", "params"] as const).map((tab) => (
+              {(["info", "wan", "wifi", "mikrotik", "params"] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
                   className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
                     activeTab === tab
-                      ? "border-indigo-600 text-indigo-700"
-                      : "border-transparent text-slate-500 hover:text-slate-700"
+                      ? "border-indigo-600 text-indigo-750"
+                      : "border-transparent text-slate-500 hover:text-slate-705"
                   }`}
                 >
-                  {tab === "info" ? "Informasi Utama" : tab === "wan" ? "Status WAN & Mode" : tab === "mikrotik" ? "Pelanggan & MikroTik" : "Semua Parameter"}
+                  {tab === "info" ? "Informasi Utama" 
+                    : tab === "wan" ? "Status WAN & Mode" 
+                    : tab === "wifi" ? "WiFi & Klien"
+                    : tab === "mikrotik" ? "Pelanggan & MikroTik" 
+                    : "Semua Parameter"}
                 </button>
               ))}
             </div>
@@ -404,12 +446,23 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 uppercase block">Status Pelanggan</span>
                         <span className="mt-1 block">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            detail.customer.status === "active" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
-                            detail.customer.status === "limit" ? "bg-rose-50 text-rose-700 border border-rose-200" :
-                            "bg-slate-100 text-slate-650"
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                            detail.customer.status === "active"  ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                            detail.customer.status === "limit"   ? "bg-rose-50 text-rose-700 border border-rose-200" :
+                            detail.customer.status === "pending" ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                            "bg-slate-100 text-slate-650 border border-slate-200"
                           }`}>
-                            {detail.customer.status}
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              detail.customer.status === "active"  ? "bg-emerald-500" :
+                              detail.customer.status === "limit"   ? "bg-rose-500" :
+                              detail.customer.status === "pending" ? "bg-amber-500" :
+                              "bg-slate-400"
+                            }`} />
+                            {detail.customer.status === "active"   ? "Aktif" :
+                             detail.customer.status === "limit"    ? "Isolir" :
+                             detail.customer.status === "pending"  ? "Perpanjangan" :
+                             detail.customer.status === "inactive" ? "Nonaktif" :
+                             detail.customer.status}
                           </span>
                         </span>
                       </div>
@@ -545,79 +598,254 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
             )}
 
             {activeTab === "wan" && (
-              <div className="space-y-4">
-                <div className="bg-slate-50 border rounded-2xl p-4">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Mode Sambungan Serat</h4>
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* 1. Fiber Mode */}
+                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
+                    <Activity size={18} className="text-indigo-500" />
+                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Mode Sambungan GPON/EPON
+                    </h4>
+                  </div>
                   {modeLoading ? (
                     <div className="text-slate-400 text-xs animate-pulse">Mendeteksi GPON/EPON...</div>
                   ) : (
-                    <p className="text-slate-900 font-bold text-sm">
-                      Mode ONT:{" "}
-                      <span className={`px-2 py-0.5 rounded text-xs ${
-                        deviceMode === "GPON" ? "bg-indigo-100 text-indigo-700" :
-                        deviceMode === "EPON" ? "bg-amber-100 text-amber-700" :
-                        "bg-slate-100 text-slate-700"
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-slate-500">Mode Deteksi ONT:</span>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                        deviceMode === "GPON" ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400" :
+                        deviceMode === "EPON" ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" :
+                        "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400"
                       }`}>
                         {deviceMode || "UNKNOWN"}
                       </span>
-                    </p>
+                    </div>
                   )}
                 </div>
 
-                <div className="bg-white border rounded-2xl p-4 space-y-4">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase">Koneksi WAN Aktif</h4>
-                  {wanLoading ? (
-                    <div className="text-slate-400 text-xs animate-pulse">Memeriksa status WAN...</div>
-                  ) : !wanData ? (
-                    <div className="text-slate-400 text-xs">Gagal memuat status WAN.</div>
+                {/* 2. WAN Connection Details */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-1">
+                    Detail Koneksi WAN
+                  </h4>
+
+                  {detail.wanConnections && 
+                   ((detail.wanConnections.wanPPPConnections?.length || 0) > 0 || 
+                    (detail.wanConnections.wanIPConnections?.length || 0) > 0) ? (
+                    <div className="grid grid-cols-1 gap-4">
+                      {[
+                        ...(detail.wanConnections.wanPPPConnections || []),
+                        ...(detail.wanConnections.wanIPConnections || [])
+                      ].map((conn, idx) => {
+                        const isPPP = conn.type === "WANPPPConnection";
+                        const connStatus = conn.connectionStatus?.value || "Disconnected";
+                        const isActive = connStatus === "Connected";
+                        
+                        return (
+                          <div 
+                            key={`${conn.path}-${idx}`} 
+                            className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden"
+                          >
+                            <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600" />
+                            
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-3 mb-4">
+                              <div>
+                                <h5 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+                                  {conn.name?.value || "Connection"} 
+                                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded font-mono font-medium">
+                                    {isPPP ? "PPP" : "IP"}
+                                  </span>
+                                </h5>
+                                <span className="text-[10px] text-slate-400 font-mono block mt-0.5 truncate max-w-xs sm:max-w-md">
+                                  {conn.path}
+                                </span>
+                              </div>
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold w-max ${
+                                isActive ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60" :
+                                "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60"
+                              }`}>
+                                {connStatus}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-xs mb-4">
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase block">IP Address WAN</span>
+                                <code className="text-slate-700 dark:text-slate-300 font-mono font-semibold block mt-0.5">
+                                  {conn.externalIPAddress?.value || "—"}
+                                </code>
+                              </div>
+                              {isPPP && (
+                                <div>
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Username PPPoE</span>
+                                  <code className="text-indigo-600 dark:text-indigo-400 font-mono font-semibold block mt-0.5">
+                                    {conn.username || "—"}
+                                  </code>
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase block">DNS Servers</span>
+                                <code className="text-slate-700 dark:text-slate-300 font-mono block mt-0.5 truncate">
+                                  {conn.dnsServers?.value || "—"}
+                                </code>
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase block">VLAN ID</span>
+                                <code className="text-slate-700 dark:text-slate-300 font-mono block mt-0.5">
+                                  {conn.vlanInfo?.value !== undefined && conn.vlanInfo?.value !== null ? String(conn.vlanInfo.value) : "Untagged / None"}
+                                </code>
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase block">Service List</span>
+                                <span className="text-slate-800 dark:text-slate-200 font-medium block mt-0.5">
+                                  {conn.serviceList?.serviceList?.value || "—"}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase block">NAT Status</span>
+                                <span className="text-slate-800 dark:text-slate-200 font-medium block mt-0.5">
+                                  {conn.natEnabled?.value !== undefined ? (conn.natEnabled.value ? "Enabled" : "Disabled") : "—"}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* LAN Port / SSID Bindings */}
+                            {conn.lanBinding?.normalized && (
+                              <div className="bg-white dark:bg-slate-950 p-3 rounded-xl border border-slate-150 dark:border-slate-800/60">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Interface Port Bindings</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {Object.entries(conn.lanBinding.normalized).map(([key, enabled]) => (
+                                    <span 
+                                      key={key} 
+                                      className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono font-bold ${
+                                        enabled 
+                                          ? "bg-indigo-650 text-indigo-100" 
+                                          : "bg-slate-150 text-slate-400 dark:bg-slate-850 dark:text-slate-600"
+                                      }`}
+                                    >
+                                      {key}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : (
-                    <div className="space-y-3">
-                      <div>
-                        <h5 className="text-[11px] font-bold text-slate-400 uppercase mb-1">IP Connection</h5>
-                        {wanData.wanIPConnections.length === 0 ? (
-                          <p className="text-slate-500 text-xs">Tidak ada koneksi IP WAN aktif.</p>
-                        ) : (
-                          <ul className="list-disc list-inside space-y-0.5">
-                            {wanData.wanIPConnections.map((conn) => (
-                              <li key={conn} className="font-mono text-xs text-slate-700 truncate" title={conn}>
-                                {conn.split("WANConnectionDevice.").pop()}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-
-                      <div className="border-t pt-3">
-                        <h5 className="text-[11px] font-bold text-slate-400 uppercase mb-1">PPP Connection</h5>
-                        {wanData.wanPPPConnections.length === 0 ? (
-                          <p className="text-slate-500 text-xs">Tidak ada koneksi PPP WAN aktif.</p>
-                        ) : (
-                          <ul className="list-disc list-inside space-y-0.5">
-                            {wanData.wanPPPConnections.map((conn) => (
-                              <li key={conn} className="font-mono text-xs text-slate-700 truncate" title={conn}>
-                                {conn.split("WANConnectionDevice.").pop()}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-
-                      <div className="border-t pt-3 bg-slate-50/50 p-2.5 rounded-xl">
-                        <h5 className="text-[11px] font-bold text-slate-400 uppercase mb-1">Slot PPPoE Tersedia</h5>
-                        {wanData.availableSlots?.wanPPPConnections?.length > 0 ? (
-                          <ul className="list-disc list-inside space-y-0.5 text-xs text-indigo-600">
-                            {wanData.availableSlots.wanPPPConnections.slice(0, 2).map((slot) => (
-                              <li key={slot} className="font-mono text-[10px] truncate" title={slot}>
-                                {slot.split("InternetGatewayDevice.").pop()}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-slate-500 text-xs">Tidak ada slot koneksi baru yang terdeteksi.</p>
-                        )}
-                      </div>
+                    <div className="p-8 text-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed">
+                      Tidak ada koneksi WAN aktif.
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "wifi" && (
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* WiFi SSIDs configuration list */}
+                <div>
+                  <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 px-1 flex items-center gap-1.5">
+                    <Wifi size={14} className="text-indigo-500" />
+                    Konfigurasi SSID nirkabel (Wireless)
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {detail.wifiInfo && Object.keys(detail.wifiInfo).length > 0 ? (
+                      Object.entries(detail.wifiInfo)
+                        .filter(([, config]) => config.ssid?.value || config.enabled?.value)
+                        .map(([wlanKey, config]) => {
+                          const isEnabled = config.enabled?.value === true || config.enabled?.value === "true" || config.enabled?.value === "1";
+                          return (
+                            <div 
+                              key={wlanKey} 
+                              className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm relative overflow-hidden"
+                            >
+                              <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-2.5 mb-3">
+                                <div>
+                                  <strong className="text-slate-800 dark:text-slate-200 text-sm font-bold">
+                                    {config.ssid?.value || "Unknown SSID"}
+                                  </strong>
+                                  <span className="text-[10px] text-slate-400 font-mono block mt-0.5 uppercase">
+                                    Interface {wlanKey}
+                                  </span>
+                                </div>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  isEnabled 
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" 
+                                    : "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-500"
+                                }`}>
+                                  {isEnabled ? "Aktif" : "Nonaktif"}
+                                </span>
+                              </div>
+
+                              <div className="space-y-1.5 text-xs">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Keamanan (Security)</span>
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                    {config.security?.normalizedValue || config.security?.rawValue || "Open/None"}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Jumlah Client Terkoneksi</span>
+                                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                                    {config.stations?.value !== undefined && config.stations?.value !== null ? String(config.stations.value) : "0"}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Kanal (Channel)</span>
+                                  <span className="font-mono text-slate-700 dark:text-slate-355">
+                                    {config.channel?.value !== undefined && config.channel?.value !== null ? String(config.channel.value) : "Auto"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                    ) : (
+                      <div className="col-span-2 p-8 text-center text-slate-400 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed">
+                        Informasi WiFi tidak tersedia.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* WiFi / LAN Connected Client list (Hosts) */}
+                <div>
+                  <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 px-1 flex items-center gap-1.5">
+                    <Database size={14} className="text-indigo-500" />
+                    Klien Terhubung (Daftar Host Aktif)
+                  </h4>
+                  <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-250 dark:border-slate-850 text-slate-500 dark:text-slate-400">
+                        <tr>
+                          <th className="px-4 py-2.5 font-semibold">Nama Host (Device)</th>
+                          <th className="px-4 py-2.5 font-semibold font-mono">Alamat IP</th>
+                          <th className="px-4 py-2.5 font-semibold font-mono">Alamat MAC</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
+                        {detail.wifiClients && detail.wifiClients.length > 0 ? (
+                          detail.wifiClients.map((client, idx) => (
+                            <tr key={`${client.mac}-${idx}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
+                              <td className="px-4 py-2 font-semibold text-slate-800 dark:text-slate-200">
+                                {client.hostname || <span className="text-slate-400 italic">No Hostname</span>}
+                              </td>
+                              <td className="px-4 py-2 font-mono">{client.ip || "—"}</td>
+                              <td className="px-4 py-2 font-mono text-slate-500">{client.mac || "—"}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={3} className="px-4 py-6 text-center text-slate-400 dark:text-slate-500 italic">
+                              Tidak ada host/klien aktif yang terdeteksi.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -748,7 +976,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
   const [devices, setDevices] = useState<GacsDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"devices" | "faults">("devices");
+  const [activeTab, setActiveTab] = useState<"registered" | "all" | "faults">("registered");
   const [detailId, setDetailId] = useState<string | null>(null);
 
   const loadDevices = useCallback(async () => {
@@ -763,30 +991,36 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
       }
 
       const mapped = rawList.map((d: any) => {
-        if (d && typeof d === "object" && d._deviceId) {
-          return d as GacsDevice;
-        }
-
-        const manufacturer = d.productclass ? d.productclass.split("-")[0].split(" ")[0] : "CIOT";
-        const serial = d.SerialNumber || d._id?.split("-").pop() || "";
-        const oui = d._id?.split("-")[0] || "";
+        const baseDevice = d && typeof d === "object" && d._deviceId
+          ? (d as GacsDevice)
+          : (() => {
+              const manufacturer = d.productclass ? d.productclass.split("-")[0].split(" ")[0] : "CIOT";
+              const serial = d.SerialNumber || d._id?.split("-").pop() || "";
+              const oui = d._id?.split("-")[0] || "";
+              return {
+                _id: d._id || "",
+                _deviceId: {
+                  _Manufacturer: manufacturer,
+                  _ProductClass: d.productclass || "Unknown",
+                  _SerialNumber: serial,
+                  _OUI: oui,
+                },
+                _lastInform: d._lastInform,
+                _tag: d.tags || [],
+                _summary: {
+                  ssid: d.ssid1 || undefined,
+                  pppoe_username: d.pppoe || undefined,
+                  rx_power: d.rxpower ? `${d.rxpower} dBm` : undefined,
+                }
+              } as GacsDevice;
+            })();
 
         return {
-          _id: d._id || "",
-          _deviceId: {
-            _Manufacturer: manufacturer,
-            _ProductClass: d.productclass || "Unknown",
-            _SerialNumber: serial,
-            _OUI: oui,
-          },
-          _lastInform: d._lastInform,
-          _tag: d.tags || [],
-          _summary: {
-            ssid: d.ssid1 || undefined,
-            pppoe_username: d.pppoe || undefined,
-            rx_power: d.rxpower ? `${d.rxpower} dBm` : undefined,
-          }
-        } as GacsDevice;
+          ...baseDevice,
+          customer_id: d.customer_id,
+          customer_name: d.customer_name,
+          is_registered: d.is_registered === true || d.is_registered === "true"
+        };
       });
 
       setDevices(mapped);
@@ -800,6 +1034,10 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
   useEffect(() => { void loadDevices(); }, [loadDevices]);
 
   const filtered = devices.filter((d) => {
+    // Tab filtering: Only show registered ONTs if activeTab is registered
+    if (activeTab === "registered" && !d.is_registered) return false;
+
+    // Search filtering
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -808,7 +1046,8 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
       d._deviceId._ProductClass?.toLowerCase().includes(q) ||
       d._deviceId._SerialNumber?.toLowerCase().includes(q) ||
       d._summary?.ssid?.toLowerCase().includes(q) ||
-      d._summary?.pppoe_username?.toLowerCase().includes(q)
+      d._summary?.pppoe_username?.toLowerCase().includes(q) ||
+      d.customer_name?.toLowerCase().includes(q)
     );
   });
 
@@ -842,18 +1081,18 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
         {/* Tabs & Actions */}
         <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-slate-150 bg-slate-50/50">
           <div className="flex gap-1">
-            {(["devices", "faults"] as const).map((tab) => (
+            {(["registered", "all", "faults"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
                 className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
                   activeTab === tab
-                    ? "border-indigo-600 text-indigo-700"
-                    : "border-transparent text-slate-500 hover:text-slate-700"
+                    ? "border-indigo-600 text-indigo-750"
+                    : "border-transparent text-slate-500 hover:text-slate-705"
                 }`}
               >
-                {tab === "devices" ? "Daftar Perangkat" : "Fault Log"}
+                {tab === "registered" ? "Perangkat Terdaftar" : tab === "all" ? "Seluruh Perangkat" : "Fault Log"}
               </button>
             ))}
           </div>
@@ -869,7 +1108,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
         </div>
 
         <div className="p-6">
-          {activeTab === "devices" && (
+          {(activeTab === "registered" || activeTab === "all") && (
             <>
               <div className="mb-5 relative w-full md:w-96">
                 <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -922,6 +1161,15 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                               <td className="px-5 py-3.5">
                                 <p className="font-bold text-slate-800">{deviceLabel(d)}</p>
                                 <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[180px]" title={d._id}>{d._id}</p>
+                                {d.customer_name ? (
+                                  <span className="inline-flex items-center gap-1 mt-1.5 bg-indigo-55 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                    👤 {d.customer_name}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 mt-1.5 bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full text-[10px] font-medium">
+                                    Belum Terhubung
+                                  </span>
+                                )}
                               </td>
                               <td className="px-5 py-3.5 font-mono text-slate-600 font-semibold">{d._deviceId._SerialNumber ?? "—"}</td>
                               <td className="px-5 py-3.5">

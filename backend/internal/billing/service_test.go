@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -349,3 +350,113 @@ func TestServiceGenerateAppliesPerpanjangan(t *testing.T) {
 		t.Errorf("expected customer status to be 'active', got %q", custStatus)
 	}
 }
+
+func TestServiceProcessAutomationNewRules(t *testing.T) {
+	db := billingTestDB(t)
+
+	// Create tables if they do not exist
+	mustBillingExec(t, db, `CREATE TABLE IF NOT EXISTS payment_confirmations (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		tagihan_id INTEGER NOT NULL,
+		pelanggan_id INTEGER NOT NULL,
+		bukti_transfer TEXT,
+		status TEXT NOT NULL DEFAULT 'pending_review',
+		catatan TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`)
+
+	mustBillingExec(t, db, `INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Home 20 Mbps', 20, 250000)`)
+
+	// Customer 1: H-7 tagihan-h7 check (due on 2026-04-21, now is 2026-04-14)
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (1, 'CustH7', 1, 21, 'active')`)
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (1, 1, 1, '2026-04', 'INV-1', 250000, '2026-04-21', 'belum_bayar')`)
+
+	// Customer 2: H-3 reminder-h3 check (due on 2026-04-17, now is 2026-04-14)
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (2, 'CustH3', 1, 17, 'active')`)
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (2, 2, 1, '2026-04', 'INV-2', 250000, '2026-04-17', 'belum_bayar')`)
+
+	// Customer 3: H-3 reminder-h3 check but has pending confirmation (due on 2026-04-17, now is 2026-04-14)
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (3, 'CustH3Pending', 1, 17, 'active')`)
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (3, 3, 1, '2026-04', 'INV-3', 250000, '2026-04-17', 'belum_bayar')`)
+	mustBillingExec(t, db, `INSERT INTO payment_confirmations (tagihan_id, pelanggan_id, status) VALUES (3, 3, 'pending_review')`)
+
+	// Customer 4: H-3 reminder-h3 check but customer status is pending (perpanjangan) (due on 2026-04-17, now is 2026-04-14)
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (4, 'CustH3Extend', 1, 17, 'pending')`)
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (4, 4, 1, '2026-04', 'INV-4', 250000, '2026-04-17', 'belum_bayar')`)
+
+	// Customer 5: H-3 reminder-h3 check but has rejected confirmation (should get reminder!) (due on 2026-04-17, now is 2026-04-14)
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (5, 'CustH3Rejected', 1, 17, 'active')`)
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (5, 5, 1, '2026-04', 'INV-5', 250000, '2026-04-17', 'belum_bayar')`)
+	mustBillingExec(t, db, `INSERT INTO payment_confirmations (tagihan_id, pelanggan_id, status) VALUES (5, 5, 'rejected')`)
+
+	// Customer 6: Overdue H+20 (limit_days + 15) complete isolir check (due on 2026-03-25, limit is 5 days, now is 2026-04-14 - so 20 days overdue)
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (6, 'CustOverdue20', 1, 25, 'limit')`)
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (6, 6, 1, '2026-03', 'INV-6', 250000, '2026-03-25', 'belum_bayar')`)
+
+	service := Service{
+		Repository:    Repository{DB: db},
+		Customers:     customers.Service{Repository: customers.Repository{DB: db}},
+		Notifications: notifications.NotificationLogRepository{DB: db},
+	}
+
+	waCalls := make(map[string]int)
+	now := time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC)
+
+	options := AutomationOptions{
+		Now:            now,
+		ReminderDays:   3,
+		LimitDays:      5,
+		TrialGraceDays: 7,
+		SendWhatsApp: func(ctx context.Context, msg AutomationMessage) error {
+			key := fmt.Sprintf("%d-%s", msg.BillID, msg.TriggerKey)
+			waCalls[key]++
+			return nil
+		},
+	}
+
+	err := service.ProcessAutomation(context.Background(), options)
+	if err != nil {
+		t.Fatalf("ProcessAutomation failed: %v", err)
+	}
+
+	// Verify Customer 1 got tagihan-h7
+	if waCalls["1-tagihan-h7"] != 1 {
+		t.Errorf("expected tagihan-h7 for customer 1, got %d", waCalls["1-tagihan-h7"])
+	}
+
+	// Verify Customer 2 got reminder-h3
+	if waCalls["2-reminder-h3"] != 1 {
+		t.Errorf("expected reminder-h3 for customer 2, got %d", waCalls["2-reminder-h3"])
+	}
+
+	// Verify Customer 3 (pending confirmation) did not get reminder-h3
+	if waCalls["3-reminder-h3"] != 0 {
+		t.Errorf("expected no reminder-h3 for customer 3 (pending review), got %d", waCalls["3-reminder-h3"])
+	}
+
+	// Verify Customer 4 (customer pending status) did not get reminder-h3
+	if waCalls["4-reminder-h3"] != 0 {
+		t.Errorf("expected no reminder-h3 for customer 4 (pending customer status), got %d", waCalls["4-reminder-h3"])
+	}
+
+	// Verify Customer 5 (rejected confirmation) got reminder-h3
+	if waCalls["5-reminder-h3"] != 1 {
+		t.Errorf("expected reminder-h3 for customer 5 (rejected confirmation), got %d", waCalls["5-reminder-h3"])
+	}
+
+	// Verify Customer 6 status updated to inactive (complete isolir)
+	var status6 string
+	if err := db.QueryRow(`SELECT status FROM pelanggan WHERE id = 6`).Scan(&status6); err != nil {
+		t.Fatalf("failed to query status for customer 6: %v", err)
+	}
+	if status6 != "inactive" {
+		t.Errorf("expected customer 6 status to transition to 'inactive', got %q", status6)
+	}
+
+	// Verify Customer 6 got isolir_20hari message
+	if waCalls["6-isolir_20hari"] != 1 {
+		t.Errorf("expected isolir_20hari for customer 6, got %d", waCalls["6-isolir_20hari"])
+	}
+}
+
