@@ -19,23 +19,11 @@ NC='\033[0m'
 INSTALL_DIR="/opt/menettech-go"
 SERVICE_USER="menettech"
 SERVICE_GROUP="menettech"
-LOG_FILE="$(pwd)/installation.log"
 
-log_info()    { echo -e "${BLUE}[INFO]${NC} $*"; }
+log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
 log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
-log_warn()    { echo -e "${YELLOW}[!]${NC} $*"; }
-log_error()   { echo -e "${RED}[✗]${NC} $*"; }
-
-# ── Redirect ALL output (stdout + stderr) ke terminal DAN log file ──────────
-exec > >(tee -a "${LOG_FILE}") 2>&1
-
-# ── Trap: cetak baris yang gagal ke log jika set -e memicu exit ─────────────
-trap 'echo -e "\n[FATAL] Instalasi GAGAL pada baris ${LINENO}. Periksa ${LOG_FILE} untuk detail." >&2' ERR
-
-echo "================================================================" 
-echo " Menet-Tech Linux Installer - $(date '+%Y-%m-%d %H:%M:%S %Z')" 
-echo " Log disimpan di: ${LOG_FILE}"
-echo "================================================================"
+log_warn() { echo -e "${YELLOW}[!]${NC} $*"; }
+log_error() { echo -e "${RED}[✗]${NC} $*"; }
 
 # 1. Validation & Dependency Installation
 if [[ $EUID -ne 0 ]]; then
@@ -63,12 +51,9 @@ else
     log_info "Node.js sudah terpasang: $(node -v)"
 fi
 
-# Install Puppeteer system dependencies (compatible with Ubuntu 20.04/22.04/24.04)
+# Install Puppeteer system dependencies
 log_info "Menginstal dependensi grafis untuk headless Chromium (Puppeteer)..."
-# libasound2 renamed to libasound2t64 on Ubuntu 24.04+; libgconf-2-4 removed on 22.04+
-apt-get install -y libxss1 libatk1.0-0 libatk-bridge2.0-0 libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev libnss3 libdrm2 libxcomposite1 libxdamage1 libxrandr2 libxfixes3 libxkbcommon0 || true
-# Try both package names for libasound
-apt-get install -y libasound2 2>/dev/null || apt-get install -y libasound2t64 2>/dev/null || true
+apt-get install -y libxss1 libasound2 libatk1.0-0 libatk-bridge2.0-0 libgconf-2-4 libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev libnss3
 log_success "Seluruh dependensi sistem berhasil diinstal!"
 
 # 2. Setup User & Group
@@ -115,10 +100,9 @@ fi
 
 # Frontend
 if [[ -d "./frontend" ]]; then
-    # Use find+cp to avoid nullglob issue with set -e when folder is empty
-    find ./frontend -maxdepth 1 -mindepth 1 -exec cp -r {} "${INSTALL_DIR}/frontend/" \;
+    cp -r ./frontend/* "${INSTALL_DIR}/frontend/"
 elif [[ -d "./Frontend/frontend" ]]; then
-    find ./Frontend/frontend -maxdepth 1 -mindepth 1 -exec cp -r {} "${INSTALL_DIR}/frontend/" \;
+    cp -r ./Frontend/frontend/* "${INSTALL_DIR}/frontend/"
 fi
 
 # Integration
@@ -160,13 +144,22 @@ log_info "Menginstall Node dependencies untuk WhatsApp Gateway..."
 (
     cd "${INSTALL_DIR}/integration/whatsapp"
     if command -v npm &> /dev/null; then
-        # npm ci requires package-lock.json (deterministic); fallback to npm install
-        # --omit=dev is the modern replacement for --production (npm v7+)
+        # Ensure correct folder ownership before running npm as service user
+        chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
+        
+        # Run npm install as the service user to avoid root permission issues
         if [[ -f "package-lock.json" ]]; then
-            npm ci --omit=dev
+            sudo -u "${SERVICE_USER}" npm ci --omit=dev
         else
-            npm install --omit=dev
+            sudo -u "${SERVICE_USER}" npm install --omit=dev
         fi
+
+        # Download the specific Chrome binary required by Puppeteer under the service user
+        log_info "Mengunduh Chrome binary resmi untuk Puppeteer..."
+        sudo -u "${SERVICE_USER}" npx puppeteer browsers install chrome || {
+            log_warn "Gagal mengunduh Chrome dengan user ${SERVICE_USER}. Mencoba sebagai root..."
+            npx puppeteer browsers install chrome || true
+        }
     else
         log_error "npm tidak ditemukan. Silakan jalankan npm install manual di ${INSTALL_DIR}/integration/whatsapp setelah instalasi selesai."
     fi
@@ -238,10 +231,4 @@ echo "--------------------------------------------------------"
 echo "Untuk melihat log aktivitas secara langsung:"
 echo "👉 journalctl -u menettech-api.service -f"
 echo "👉 journalctl -u menettech-whatsapp.service -f"
-echo "👉 cat ${LOG_FILE}"
 echo "--------------------------------------------------------"
-echo ""
-echo "================================================================"
-echo " Instalasi selesai pada: $(date '+%Y-%m-%d %H:%M:%S %Z')"
-echo " Log lengkap tersimpan di: ${LOG_FILE}"
-echo "================================================================"

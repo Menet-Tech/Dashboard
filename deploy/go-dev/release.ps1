@@ -118,16 +118,28 @@ finally {
 
 # ─── Step 4: Copy .env.example ───────────────────────────────────────────────
 Write-Step 4 $TOTAL_STEPS "Menyalin .env.example..."
+
+# Backend
 $backendEnvExample = Join-Path $repoRoot "backend\.env.example"
 if (Test-Path $backendEnvExample) {
     Copy-Item -Path $backendEnvExample -Destination (Join-Path $releasesDir "backend\.env.example") -Force
-    Copy-Item -Path $backendEnvExample -Destination (Join-Path $releasesDir "integration\.env.example") -Force
-    Write-OK ".env.example disalin ke backend/ dan integration/"
+    Write-OK ".env.example disalin ke backend/"
 }
 else {
     Write-Warn "backend\.env.example tidak ditemukan, dilewati."
 }
 
+# Discord Bot (menggunakan template khusus, bukan backend .env)
+$discordEnvExample = Join-Path $scriptDir "..\production\discord.env.example"
+if (Test-Path $discordEnvExample) {
+    Copy-Item -Path $discordEnvExample -Destination (Join-Path $releasesDir "integration\.env.example") -Force
+    Write-OK ".env.example disalin ke integration/ (discord bot config)"
+}
+else {
+    Write-Warn "discord.env.example tidak ditemukan di deploy\production\, dilewati."
+}
+
+# WhatsApp Gateway
 $waEnvExample = Join-Path $repoRoot "whatsapp\.env.example"
 if (Test-Path $waEnvExample) {
     Copy-Item -Path $waEnvExample -Destination (Join-Path $releasesDir "integration\whatsapp\.env.example") -Force

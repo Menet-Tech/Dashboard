@@ -42,6 +42,7 @@ const initWhatsAppClient = (accountId = 'default') => {
             dataPath: resolveSessionPath(accountId)
         }),
         puppeteer: {
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
             args: process.env.PUPPETEER_ARGS ? process.env.PUPPETEER_ARGS.split(',') : ['--no-sandbox', '--disable-setuid-sandbox']
         }
     });

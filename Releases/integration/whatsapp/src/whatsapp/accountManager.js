@@ -8,7 +8,10 @@ const createAccount = (accountId) => {
     if (clients.has(accountId)) return clients.get(accountId);
     const client = new Client({
         authStrategy: new LocalAuth({ dataPath: `./src/whatsapp/sessions/${accountId}` }),
-        puppeteer: { args: process.env.PUPPETEER_ARGS ? process.env.PUPPETEER_ARGS.split(',') : ['--no-sandbox', '--disable-setuid-sandbox'] }
+        puppeteer: { 
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+            args: process.env.PUPPETEER_ARGS ? process.env.PUPPETEER_ARGS.split(',') : ['--no-sandbox', '--disable-setuid-sandbox'] 
+        }
     });
     setupEvents(client, (ready) => {
         // Bisa tambahkan logika per-account

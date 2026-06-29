@@ -144,7 +144,22 @@ log_info "Menginstall Node dependencies untuk WhatsApp Gateway..."
 (
     cd "${INSTALL_DIR}/integration/whatsapp"
     if command -v npm &> /dev/null; then
-        npm install --production || npm ci --production
+        # Ensure correct folder ownership before running npm as service user
+        chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
+        
+        # Run npm install as the service user to avoid root permission issues
+        if [[ -f "package-lock.json" ]]; then
+            sudo -u "${SERVICE_USER}" npm ci --omit=dev
+        else
+            sudo -u "${SERVICE_USER}" npm install --omit=dev
+        fi
+
+        # Download the specific Chrome binary required by Puppeteer under the service user
+        log_info "Mengunduh Chrome binary resmi untuk Puppeteer..."
+        sudo -u "${SERVICE_USER}" npx puppeteer browsers install chrome || {
+            log_warn "Gagal mengunduh Chrome dengan user ${SERVICE_USER}. Mencoba sebagai root..."
+            npx puppeteer browsers install chrome || true
+        }
     else
         log_error "npm tidak ditemukan. Silakan jalankan npm install manual di ${INSTALL_DIR}/integration/whatsapp setelah instalasi selesai."
     fi

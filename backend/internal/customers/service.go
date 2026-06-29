@@ -250,14 +250,15 @@ func (s Service) SyncToMikrotik(ctx context.Context, customer Customer) error {
 		profileName = "default"
 	}
 
-	if customer.Status == "limit" {
+	switch customer.Status {
+	case "limit":
 		isolirProfile, err := s.Settings.GetString(ctx, settings.KeyMikrotikIsolirProfile)
 		if err == nil && strings.TrimSpace(isolirProfile) != "" {
 			profileName = strings.TrimSpace(isolirProfile)
 		} else {
 			profileName = "isolir"
 		}
-	} else if customer.Status == "inactive" {
+	case "inactive":
 		inactiveProfile, err := s.Settings.GetString(ctx, settings.KeyMikrotikInactiveProfile)
 		if err == nil && strings.TrimSpace(inactiveProfile) != "" {
 			profileName = strings.TrimSpace(inactiveProfile)
