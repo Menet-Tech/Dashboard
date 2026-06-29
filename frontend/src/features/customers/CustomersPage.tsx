@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Loader2, Plus, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw } from "lucide-react";
 import { StatusPill, EmptyTableRow } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
@@ -114,6 +114,7 @@ export function CustomersPage({
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const [detailedCustomer, setDetailedCustomer] = useState<CustomerItem | null>(null);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleSelectSecret = (name: string, password: string, guessedPackageId: number) => {
     onCancelEdit();
@@ -140,7 +141,19 @@ export function CustomersPage({
     }
   };
 
-  const sortedCustomers = [...filteredCustomers].sort((a, b) => {
+  const searchedCustomers = useMemo(() => {
+    if (!searchQuery.trim()) return filteredCustomers;
+    const q = searchQuery.toLowerCase();
+    return filteredCustomers.filter(
+      (c) =>
+        (c.name || "").toLowerCase().includes(q) ||
+        (c.user_pppoe || "").toLowerCase().includes(q) ||
+        (c.address || "").toLowerCase().includes(q) ||
+        (c.whatsapp || "").includes(q)
+    );
+  }, [filteredCustomers, searchQuery]);
+
+  const sortedCustomers = [...searchedCustomers].sort((a, b) => {
     if (!sortField) return 0;
     
     let aVal: any = null;
@@ -382,6 +395,16 @@ export function CustomersPage({
                 Aksi Massal ({selectedCount})
               </button>
             )}
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl px-3 py-1.5 shadow-sm font-sans w-full sm:w-64">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 shrink-0"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input
+                type="text"
+                placeholder="Cari nama, pppoe, alamat..."
+                className="bg-transparent border-0 text-xs font-semibold text-slate-750 dark:text-slate-200 focus:outline-none focus:ring-0 w-full py-0 pl-1 pr-1"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
             <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl px-3 py-2 shadow-sm font-sans">
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Filter Role</span>
               <select
@@ -407,7 +430,14 @@ export function CustomersPage({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               Export CSV
             </a>
-            <StatusPill label={`${filteredCustomers.length} item`} tone="slate" />
+            <StatusPill
+              label={
+                searchQuery.trim()
+                  ? `${searchedCustomers.length} dari ${filteredCustomers.length} item`
+                  : `${filteredCustomers.length} item`
+              }
+              tone="slate"
+            />
           </div>
         </div>
 

@@ -98,7 +98,10 @@ const hasUnpaidBills = async (phone) => {
 };
 
 const getMenuReg = async (nama, phone, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin) => {
-    const hasBills = await hasUnpaidBills(phone);
+    const session = getSession(phone);
+    const hasBills = (session?.form_data?.hasBills !== undefined)
+        ? session.form_data.hasBills
+        : await hasUnpaidBills(phone);
     const greetingStr = greeting();
     
     let text = `hai, selamat ${greetingStr} ${nama}, apa ada yang bisa di bantu ?\n`;
@@ -249,9 +252,11 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '',
         const customersList = await findCustomersByPhone(rawFrom);
         if (customersList && customersList.length > 0) {
             const customer = customersList[0];
+            const hasBills = await hasUnpaidBills(rawFrom);
             upsertSession(rawFrom, accountId, 'REG_MENU', { 
                 customerId: customer.id, 
                 customerName: customer.name,
+                hasBills: hasBills,
                 customers: customersList.map(c => ({ id: c.id, name: c.name, address: c.address || c.alamat }))
             });
             const mRegText = await getMenuReg(customer.name, rawFrom, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
@@ -293,7 +298,12 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '',
     // ── REG_MENU ────────────────────────────────────────────────────────────
     if (state === 'REG_MENU') {
         const { customerId, customerName, customers } = formData;
-        const hasBills = await hasUnpaidBills(rawFrom);
+        let hasBills = formData.hasBills;
+        if (hasBills === undefined) {
+            hasBills = await hasUnpaidBills(rawFrom);
+            upsertSession(rawFrom, accountId, 'REG_MENU', { ...formData, hasBills });
+        }
+        logger.info(`[Chatbot debug] REG_MENU phone=${phone} text="${text}" hasBills=${hasBills} customerId=${customerId}`);
 
         let optionCekTagihan = matchTrigger(text, triggerBilling) || matchTrigger(text, '1') || matchTrigger(text, 'cek tagihan');
         let optionKonfirmasi = false;
@@ -1136,6 +1146,12 @@ const sendPackageList = async (accountId, to, sendFn) => {
         await sendFn(accountId, to, 'Maaf, daftar paket belum tersedia. Hubungi admin untuk informasi lebih lanjut.');
         return;
     }
+    // Sort from cheapest to most expensive
+    packages.sort((a, b) => {
+        const priceA = a.harga ?? a.price ?? 0;
+        const priceB = b.harga ?? b.price ?? 0;
+        return priceA - priceB;
+    });
     const list = packages.map(p => `${p.nama || p.name} - ${p.kecepatan_mbps || p.speed_mbps} Mbps - ${formatRp(p.harga || p.price)}`).join('\n');
     await sendFn(accountId, to, `ini paket yang kami punya,\n${list}`);
     await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');

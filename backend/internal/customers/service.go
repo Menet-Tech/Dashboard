@@ -257,6 +257,13 @@ func (s Service) SyncToMikrotik(ctx context.Context, customer Customer) error {
 		} else {
 			profileName = "isolir"
 		}
+	} else if customer.Status == "inactive" {
+		inactiveProfile, err := s.Settings.GetString(ctx, settings.KeyMikrotikInactiveProfile)
+		if err == nil && strings.TrimSpace(inactiveProfile) != "" {
+			profileName = strings.TrimSpace(inactiveProfile)
+		} else {
+			profileName = "nonaktif"
+		}
 	}
 
 	// Fetch active routers from mikrotik_routers table

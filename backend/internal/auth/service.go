@@ -11,12 +11,9 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
-)
 
-type DiscordAlerter interface {
-	IsEventEnabled(ctx context.Context, event string) bool
-	SendAlert(ctx context.Context, message string) error
-}
+	"menettech/dashboard/backend/internal/notifications"
+)
 
 const placeholderHash = "BOOTSTRAP_PENDING"
 
@@ -56,7 +53,7 @@ type Service struct {
 	LoginWindow            time.Duration
 	BootstrapAdminUsername string
 	BootstrapAdminPassword string
-	Discord                DiscordAlerter
+	Discord                notifications.DiscordSender
 }
 
 func (s Service) Bootstrap(ctx context.Context) error {
@@ -115,7 +112,17 @@ func (s Service) Login(ctx context.Context, username, password, identifier, ip s
 		}
 		if failures >= maxAttempts {
 			if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_security") {
-				_ = s.Discord.SendAlert(ctx, fmt.Sprintf("🚨 **Brute Force Terdeteksi**: Identifier `%s` — %d percobaan login gagal", identifier, failures))
+				_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+					Title:       "🚨 Deteksi Brute Force Login",
+					Description: "Sistem mendeteksi aktivitas mencurigakan berupa percobaan login berulang.",
+					Color:       15158332, // Red (#e74c3c)
+					Fields: []notifications.EmbedField{
+						{Name: "Identifier", Value: identifier, Inline: true},
+						{Name: "Jumlah Percobaan Gagal", Value: fmt.Sprintf("%d Kali", failures), Inline: true},
+						{Name: "Waktu Terdeteksi", Value: time.Now().Format("2006-01-02 15:04:05"), Inline: false},
+						{Name: "Tindakan Sistem", Value: "Akses login ditolak sementara (Rate Limited)", Inline: false},
+					},
+				})
 			}
 			return User{}, Session{}, ErrTooManyAttempts
 		}

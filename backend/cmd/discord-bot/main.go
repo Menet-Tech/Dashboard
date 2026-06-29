@@ -19,18 +19,18 @@ import (
 	"github.com/bwmarrin/discordgo"
 	_ "modernc.org/sqlite"
 
-	"menettech/dashboard/backend/internal/audit"
-	"menettech/dashboard/backend/internal/settings"
 	"menettech/dashboard/backend/internal/acs"
+	"menettech/dashboard/backend/internal/audit"
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/mikrotik"
+	"menettech/dashboard/backend/internal/settings"
 )
 
 var (
 	botToken      string
 	applicationID string
 	guildID       string
-	apiBaseURL    = os.Getenv("API_BASE_URL")      // e.g. http://localhost:8080
+	apiBaseURL    = os.Getenv("API_BASE_URL") // e.g. http://localhost:8080
 	sqlitePath    = envOrDefault("SQLITE_PATH", "../storage/dashboard.db")
 
 	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -295,13 +295,13 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	cmdData := i.ApplicationCommandData()
-	var responseContent string
+	var embed *discordgo.MessageEmbed
 
 	switch cmdData.Name {
 	case "summary":
-		responseContent = buildSummaryMessage()
+		embed = buildSummaryEmbed()
 	case "health":
-		responseContent = buildHealthMessage()
+		embed = buildHealthEmbed()
 	case "tagihan":
 		limit := 10
 		periode := ""
@@ -313,23 +313,23 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				periode = opt.StringValue()
 			}
 		}
-		responseContent = buildTagihanMessage(limit, periode)
+		embed = buildTagihanEmbed(limit, periode)
 	case "pelanggan":
 		name := ""
 		if len(cmdData.Options) > 0 {
 			name = cmdData.Options[0].StringValue()
 		}
-		responseContent = buildPelangganMessage(name)
+		embed = buildPelangganEmbed(name)
 	case "pengaturan":
-		responseContent = handlePengaturanCommand(i, cmdData.Options)
+		embed = handlePengaturanCommand(i, cmdData.Options)
 	case "reboot":
-		responseContent = handleRebootCommand(i, cmdData.Options)
+		embed = handleRebootCommand(i, cmdData.Options)
 	case "sync":
-		responseContent = handleSyncCommand(i, cmdData.Options)
+		embed = handleSyncCommand(i, cmdData.Options)
 	case "kick":
-		responseContent = handleKickCommand(i, cmdData.Options)
+		embed = handleKickCommand(i, cmdData.Options)
 	case "ont":
-		responseContent = handleOntCommand(i, cmdData.Options)
+		embed = handleOntCommand(i, cmdData.Options)
 	case "ubah-status":
 		var target, status string
 		for _, opt := range cmdData.Options {
@@ -340,15 +340,24 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				status = opt.StringValue()
 			}
 		}
-		responseContent = handleUbahStatusCommand(i, target, status)
+		embed = handleUbahStatusCommand(i, target, status)
 	default:
-		responseContent = "Unknown command"
+		embed = errorEmbed("Perintah tidak dikenal.")
+	}
+
+	if embed.Timestamp == "" {
+		embed.Timestamp = time.Now().Format(time.RFC3339)
+	}
+	if embed.Footer == nil {
+		embed.Footer = &discordgo.MessageEmbedFooter{
+			Text: "Menet-Tech Dashboard Bot",
+		}
 	}
 
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: responseContent,
+			Embeds: []*discordgo.MessageEmbed{embed},
 		},
 	})
 	if err != nil {
@@ -478,106 +487,157 @@ func queryCustomers(name string) ([]customerRow, error) {
 	return result, rows.Err()
 }
 
-// ─── Message builders ─────────────────────────────────────────────────────────
+// ─── Message builders (Rich Embeds) ──────────────────────────────────────────
 
-func buildSummaryMessage() string {
+func buildSummaryEmbed() *discordgo.MessageEmbed {
 	s, err := querySummary()
 	if err != nil {
-		return "❌ Gagal membaca data: " + err.Error()
+		return errorEmbed("Gagal membaca summary: " + err.Error())
 	}
-	return fmt.Sprintf(
-		"📊 **Dashboard Summary**\n"+
-			"👥 Total Pelanggan: **%d** (Active: %d)\n"+
-			"📄 Total Tagihan: **%d** | Lunas: %d | Belum Bayar: **%d**\n"+
-			"💰 Total Tunggakan: **Rp %s**",
-		s.TotalCustomers, s.ActiveCustomers,
-		s.TotalBills, s.PaidBills, s.UnpaidBills,
-		formatRupiah(s.UnpaidAmount),
-	)
+	return &discordgo.MessageEmbed{
+		Title:       "📊 Ringkasan Dashboard Billing",
+		Description: "Berikut adalah statistik pelanggan dan penagihan saat ini.",
+		Color:       3447003, // Blue (#3498db)
+		Fields: []*discordgo.MessageEmbedField{
+			{Name: "Total Pelanggan", Value: fmt.Sprintf("%d Pelanggan", s.TotalCustomers), Inline: true},
+			{Name: "Pelanggan Aktif", Value: fmt.Sprintf("%d Pelanggan", s.ActiveCustomers), Inline: true},
+			{Name: "Total Tagihan", Value: fmt.Sprintf("%d Tagihan", s.TotalBills), Inline: true},
+			{Name: "Tagihan Lunas", Value: fmt.Sprintf("%d Tagihan", s.PaidBills), Inline: true},
+			{Name: "Tagihan Belum Bayar", Value: fmt.Sprintf("%d Tagihan", s.UnpaidBills), Inline: true},
+			{Name: "Total Tunggakan", Value: "Rp " + formatRupiah(s.UnpaidAmount), Inline: false},
+		},
+	}
 }
 
-func buildHealthMessage() string {
+func buildHealthEmbed() *discordgo.MessageEmbed {
 	httpResp, err := http.Get(apiBaseURL + "/api/v1/health")
 	if err != nil {
-		return "❌ Gagal menghubungi API: " + err.Error()
+		return errorEmbed("Gagal menghubungi API server: " + err.Error())
 	}
 	defer httpResp.Body.Close()
 
 	body, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		return "❌ Gagal membaca response API"
+		return errorEmbed("Gagal membaca status kesehatan dari API")
 	}
 
 	var result map[string]any
 	if jsonErr := json.Unmarshal(body, &result); jsonErr != nil {
-		return "❌ Response tidak valid"
+		return errorEmbed("Format response API tidak valid")
 	}
+
 	overallStatus, _ := result["status"].(string)
 	emoji := "✅"
+	color := 3066993 // Green (#2ecc71)
 	if overallStatus != "ok" {
 		emoji = "⚠️"
+		color = 15105570 // Orange (#e67e22)
 	}
-	msg := fmt.Sprintf("%s **Health: %s**\n", emoji, strings.ToUpper(overallStatus))
+
+	fields := []*discordgo.MessageEmbedField{}
 	if services, ok := result["services"].(map[string]any); ok {
 		for k, v := range services {
-			msg += fmt.Sprintf("  • %s: %v\n", k, v)
+			fields = append(fields, &discordgo.MessageEmbedField{
+				Name:   strings.ToUpper(k),
+				Value:  fmt.Sprintf("%v", v),
+				Inline: true,
+			})
 		}
 	}
+
+	var descAlerts string
 	if alerts, ok := result["alerts"].([]any); ok && len(alerts) > 0 {
-		msg += "\n⚠️ Alerts:\n"
+		var sb strings.Builder
+		sb.WriteString("\n**Alerts Terdeteksi:**\n")
 		for _, a := range alerts {
-			msg += fmt.Sprintf("  - %v\n", a)
+			sb.WriteString(fmt.Sprintf("⚠️ %v\n", a))
 		}
+		descAlerts = sb.String()
 	}
-	return strings.TrimRight(msg, "\n")
+
+	return &discordgo.MessageEmbed{
+		Title:       fmt.Sprintf("%s Status Kesehatan Sistem: %s", emoji, strings.ToUpper(overallStatus)),
+		Description: descAlerts,
+		Color:       color,
+		Fields:      fields,
+	}
 }
 
-func buildTagihanMessage(limit int, periode string) string {
+func buildTagihanEmbed(limit int, periode string) *discordgo.MessageEmbed {
 	bills, err := queryUnpaidBills(limit, periode)
 	if err != nil {
-		return "❌ Gagal membaca tagihan: " + err.Error()
+		return errorEmbed("Gagal membaca tagihan: " + err.Error())
 	}
+
 	if len(bills) == 0 {
+		desc := "Tidak ada tagihan belum bayar."
 		if periode != "" {
-			return fmt.Sprintf("✅ Tidak ada tagihan belum bayar untuk periode **%s**!", periode)
+			desc = "Tidak ada tagihan belum bayar untuk periode " + periode
 		}
-		return "✅ Tidak ada tagihan belum bayar!"
+		return &discordgo.MessageEmbed{
+			Title:       "📋 Daftar Tagihan Belum Bayar",
+			Description: desc,
+			Color:       3066993, // Green
+		}
 	}
-	var sb strings.Builder
-	if periode != "" {
-		sb.WriteString(fmt.Sprintf("📋 **%d Tagihan Belum Bayar Periode %s** (terdekat jatuh tempo):\n", len(bills), periode))
-	} else {
-		sb.WriteString(fmt.Sprintf("📋 **%d Tagihan Belum Bayar** (terdekat jatuh tempo):\n", len(bills)))
-	}
+
+	fields := []*discordgo.MessageEmbedField{}
 	for _, b := range bills {
-		sb.WriteString(fmt.Sprintf("• `%s` — %s | %s | Rp %s | Due: %s\n",
-			b.InvoiceNumber, b.CustomerName, b.Period, formatRupiah(b.Amount), b.DueDate))
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   fmt.Sprintf("Invoice %s", b.InvoiceNumber),
+			Value:  fmt.Sprintf("Pelanggan: **%s**\nPeriode: %s\nNominal: **Rp %s**\nJatuh Tempo: %s", b.CustomerName, b.Period, formatRupiah(b.Amount), b.DueDate),
+			Inline: false,
+		})
 	}
-	return strings.TrimRight(sb.String(), "\n")
+
+	title := "📋 Daftar Tagihan Belum Bayar"
+	if periode != "" {
+		title = "📋 Daftar Tagihan Belum Bayar — Periode " + periode
+	}
+
+	return &discordgo.MessageEmbed{
+		Title:  title,
+		Color:  15105570, // Orange
+		Fields: fields,
+	}
 }
 
-func buildPelangganMessage(name string) string {
+func buildPelangganEmbed(name string) *discordgo.MessageEmbed {
 	customers, err := queryCustomers(name)
 	if err != nil {
-		return "❌ Gagal membaca pelanggan: " + err.Error()
+		return errorEmbed("Gagal membaca pelanggan: " + err.Error())
 	}
+
 	if len(customers) == 0 {
-		return fmt.Sprintf("🔍 Tidak ada pelanggan dengan nama **%s**", name)
+		return &discordgo.MessageEmbed{
+			Title:       "🔍 Cari Pelanggan",
+			Description: fmt.Sprintf("Tidak ada pelanggan dengan nama **%s**.", name),
+			Color:       15105570, // Orange
+		}
 	}
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("👥 **Hasil Pencarian: \"%s\"** (%d ditemukan)\n", name, len(customers)))
+
+	fields := []*discordgo.MessageEmbedField{}
 	for _, c := range customers {
-		statusEmoji := "🟢"
+		statusLabel := "Aktif 🟢"
 		switch c.Status {
 		case "limit":
-			statusEmoji = "🟡"
+			statusLabel = "Terisolir/Limit 🟡"
 		case "inactive":
-			statusEmoji = "🔴"
+			statusLabel = "Nonaktif (DHCP Only) 🔴"
 		}
-		sb.WriteString(fmt.Sprintf("%s **%s** | Paket: %s | WA: %s | Jatuh Tempo: tgl %d\n",
-			statusEmoji, c.Name, c.PackageName, c.Whatsapp, c.DueDay))
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   c.Name,
+			Value:  fmt.Sprintf("Status: **%s**\nPaket: %s\nWhatsApp: %s\nJatuh Tempo: Tanggal %d setiap bulan", statusLabel, c.PackageName, c.Whatsapp, c.DueDay),
+			Inline: false,
+		})
 	}
-	return strings.TrimRight(sb.String(), "\n")
+
+	return &discordgo.MessageEmbed{
+		Title:       fmt.Sprintf("🔍 Hasil Pencarian Pelanggan: \"%s\"", name),
+		Description: fmt.Sprintf("Ditemukan %d pelanggan terdaftar.", len(customers)),
+		Color:       3447003, // Blue
+		Fields:      fields,
+	}
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -614,11 +674,27 @@ func envOrDefault(key, def string) string {
 	return v
 }
 
+func errorEmbed(message string) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Title:       "❌ Error",
+		Description: message,
+		Color:       15158332, // Red (#e74c3c)
+	}
+}
+
+func successEmbed(title, message string) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Title:       "✅ " + title,
+		Description: message,
+		Color:       3066993, // Green (#2ecc71)
+	}
+}
+
 // ─── Settings subcommand handlers ─────────────────────────────────────────────
 
-func handlePengaturanCommand(i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) string {
+func handlePengaturanCommand(i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.MessageEmbed {
 	if len(options) == 0 {
-		return "❌ Subcommand tidak ditemukan."
+		return errorEmbed("Subcommand tidak ditemukan.")
 	}
 	subCmd := options[0]
 	switch subCmd.Name {
@@ -627,7 +703,7 @@ func handlePengaturanCommand(i *discordgo.InteractionCreate, options []*discordg
 		if len(subCmd.Options) > 0 {
 			kunci = subCmd.Options[0].StringValue()
 		}
-		return buildLihatPengaturanMessage(kunci)
+		return buildLihatPengaturanEmbed(kunci)
 	case "ubah":
 		var kunci, nilai string
 		for _, opt := range subCmd.Options {
@@ -639,12 +715,12 @@ func handlePengaturanCommand(i *discordgo.InteractionCreate, options []*discordg
 			}
 		}
 		if kunci == "" {
-			return "❌ Kunci tidak boleh kosong."
+			return errorEmbed("Kunci tidak boleh kosong.")
 		}
 		discordUser := getDiscordUser(i)
-		return buildUbahPengaturanMessage(discordUser, kunci, nilai)
+		return buildUbahPengaturanEmbed(discordUser, kunci, nilai)
 	default:
-		return "❌ Subcommand tidak dikenal."
+		return errorEmbed("Subcommand tidak dikenal.")
 	}
 }
 
@@ -658,32 +734,37 @@ func getDiscordUser(i *discordgo.InteractionCreate) string {
 	return "unknown"
 }
 
-func buildLihatPengaturanMessage(kunci string) string {
+func buildLihatPengaturanEmbed(kunci string) *discordgo.MessageEmbed {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if kunci != "" {
 		kunci = strings.TrimSpace(kunci)
 		if !settings.IsAllowedKey(kunci) {
-			return fmt.Sprintf("❌ Kunci tidak dikenal: `%s`", kunci)
+			return errorEmbed(fmt.Sprintf("Kunci tidak dikenal: `%s`", kunci))
 		}
 		val, err := settingsSvc.GetString(ctx, kunci)
 		if err != nil {
-			return fmt.Sprintf("❌ Gagal mengambil pengaturan: %s", err.Error())
+			return errorEmbed(fmt.Sprintf("Gagal mengambil pengaturan: %s", err.Error()))
 		}
 		if isSensitiveKey(kunci) && val != "" {
 			val = "••••••••"
 		}
-		return fmt.Sprintf("⚙️ **Pengaturan**\n• `%s`: `%s`", kunci, val)
+		return &discordgo.MessageEmbed{
+			Title: "⚙️ Pengaturan Sistem",
+			Color: 3447003, // Blue
+			Fields: []*discordgo.MessageEmbedField{
+				{Name: kunci, Value: fmt.Sprintf("`%s`", val), Inline: false},
+			},
+		}
 	}
 
 	all, err := settingsSvc.GetAll(ctx)
 	if err != nil {
-		return fmt.Sprintf("❌ Gagal mengambil semua pengaturan: %s", err.Error())
+		return errorEmbed(fmt.Sprintf("Gagal mengambil semua pengaturan: %s", err.Error()))
 	}
 
-	var sb strings.Builder
-	sb.WriteString("⚙️ **Daftar Pengaturan Sistem**:\n")
+	fields := []*discordgo.MessageEmbedField{}
 	var keys []string
 	for k := range all {
 		if !strings.HasPrefix(k, "worker_") {
@@ -696,12 +777,20 @@ func buildLihatPengaturanMessage(kunci string) string {
 		if isSensitiveKey(k) && val != "" {
 			val = "••••••••"
 		}
-		sb.WriteString(fmt.Sprintf("• `%s`: `%s`\n", k, val))
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   k,
+			Value:  fmt.Sprintf("`%s`", val),
+			Inline: true,
+		})
 	}
-	return sb.String()
+	return &discordgo.MessageEmbed{
+		Title:  "⚙️ Daftar Pengaturan Sistem",
+		Color:  3447003, // Blue
+		Fields: fields,
+	}
 }
 
-func buildUbahPengaturanMessage(discordUser, kunci, nilai string) string {
+func buildUbahPengaturanEmbed(discordUser, kunci, nilai string) *discordgo.MessageEmbed {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -709,18 +798,18 @@ func buildUbahPengaturanMessage(discordUser, kunci, nilai string) string {
 	nilai = strings.TrimSpace(nilai)
 
 	if !settings.IsAllowedKey(kunci) {
-		return fmt.Sprintf("❌ Kunci tidak dikenal: `%s`", kunci)
+		return errorEmbed(fmt.Sprintf("Kunci tidak dikenal: `%s`", kunci))
 	}
 
 	if (kunci == "wa_gateway_url" || kunci == settings.KeyDiscordWebhookURL || kunci == settings.KeyACSURL) && nilai != "" {
 		if _, err := url.ParseRequestURI(nilai); err != nil {
-			return fmt.Sprintf("❌ URL tidak valid untuk: `%s`", kunci)
+			return errorEmbed(fmt.Sprintf("URL tidak valid untuk: `%s`", kunci))
 		}
 	}
 
 	err := settingsSvc.Set(ctx, kunci, nilai)
 	if err != nil {
-		return fmt.Sprintf("❌ Gagal mengubah pengaturan: %s", err.Error())
+		return errorEmbed(fmt.Sprintf("Gagal mengubah pengaturan: %s", err.Error()))
 	}
 
 	logMsg := fmt.Sprintf("Discord user %s updated setting %s to %s", discordUser, kunci, nilai)
@@ -734,7 +823,7 @@ func buildUbahPengaturanMessage(discordUser, kunci, nilai string) string {
 		displayValue = "••••••••"
 	}
 
-	return fmt.Sprintf("✅ Berhasil memperbarui pengaturan `%s` menjadi `%s`", kunci, displayValue)
+	return successEmbed("Pengaturan Diperbarui", fmt.Sprintf("Berhasil memperbarui pengaturan `%s` menjadi `%s`", kunci, displayValue))
 }
 
 func isSensitiveKey(k string) bool {
@@ -774,9 +863,9 @@ func findCustomerByTarget(ctx context.Context, target string) (customers.Custome
 	return customers.Customer{}, fmt.Errorf("pelanggan dengan target '%s' tidak ditemukan", target)
 }
 
-func handleRebootCommand(i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) string {
+func handleRebootCommand(i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.MessageEmbed {
 	if len(options) == 0 {
-		return "❌ Parameter `target` diperlukan."
+		return errorEmbed("Parameter `target` diperlukan.")
 	}
 	target := options[0].StringValue()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -784,11 +873,11 @@ func handleRebootCommand(i *discordgo.InteractionCreate, options []*discordgo.Ap
 
 	cust, err := findCustomerByTarget(ctx, target)
 	if err != nil {
-		return "❌ " + err.Error()
+		return errorEmbed(err.Error())
 	}
 
 	if strings.TrimSpace(cust.SNOnt) == "" {
-		return fmt.Sprintf("❌ Pelanggan **%s** tidak memiliki Serial Number ONT terkonfigurasi.", cust.Name)
+		return errorEmbed(fmt.Sprintf("Pelanggan **%s** tidak memiliki Serial Number ONT terkonfigurasi.", cust.Name))
 	}
 
 	acsURL, err := settingsSvc.GetString(ctx, settings.KeyACSURL)
@@ -801,18 +890,18 @@ func handleRebootCommand(i *discordgo.InteractionCreate, options []*discordgo.Ap
 
 	err = acsClient.RebootDevice(ctx, cust.SNOnt)
 	if err != nil {
-		return fmt.Sprintf("❌ Gagal mengirim perintah reboot untuk ONT **%s** (SN: %s): %v", cust.Name, cust.SNOnt, err)
+		return errorEmbed(fmt.Sprintf("Gagal mengirim perintah reboot untuk ONT **%s** (SN: %s): %v", cust.Name, cust.SNOnt, err))
 	}
 
 	discordUser := getDiscordUser(i)
 	_ = auditSvc.Record(ctx, nil, nil, "discord.ont_reboot", fmt.Sprintf("User %s rebooted ONT for customer %s (SN: %s) via Discord bot", discordUser, cust.Name, cust.SNOnt))
 
-	return fmt.Sprintf("✅ Perintah reboot berhasil dikirim ke GenieACS untuk pelanggan **%s** (SN: %s). ONT akan segera dimuat ulang.", cust.Name, cust.SNOnt)
+	return successEmbed("Reboot Terkirim", fmt.Sprintf("Perintah reboot berhasil dikirim ke GenieACS untuk pelanggan **%s** (SN: %s). ONT akan segera dimuat ulang.", cust.Name, cust.SNOnt))
 }
 
-func handleSyncCommand(i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) string {
+func handleSyncCommand(i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.MessageEmbed {
 	if len(options) == 0 {
-		return "❌ Parameter `target` diperlukan."
+		return errorEmbed("Parameter `target` diperlukan.")
 	}
 	target := options[0].StringValue()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -820,27 +909,27 @@ func handleSyncCommand(i *discordgo.InteractionCreate, options []*discordgo.Appl
 
 	cust, err := findCustomerByTarget(ctx, target)
 	if err != nil {
-		return "❌ " + err.Error()
+		return errorEmbed(err.Error())
 	}
 
 	if strings.TrimSpace(cust.UserPPPoE) == "" {
-		return fmt.Sprintf("❌ Pelanggan **%s** tidak memiliki user PPPoE terkonfigurasi.", cust.Name)
+		return errorEmbed(fmt.Sprintf("Pelanggan **%s** tidak memiliki user PPPoE terkonfigurasi.", cust.Name))
 	}
 
 	err = customersSvc.SyncToMikrotik(ctx, cust)
 	if err != nil {
-		return fmt.Sprintf("❌ Gagal melakukan sinkronisasi credentials pelanggan **%s** ke MikroTik: %v", cust.Name, err)
+		return errorEmbed(fmt.Sprintf("Gagal melakukan sinkronisasi credentials pelanggan **%s** ke MikroTik: %v", cust.Name, err))
 	}
 
 	discordUser := getDiscordUser(i)
 	_ = auditSvc.Record(ctx, nil, nil, "discord.customer_sync", fmt.Sprintf("User %s synced customer %s to MikroTik via Discord bot", discordUser, cust.Name))
 
-	return fmt.Sprintf("✅ Berhasil mensinkronkan PPPoE credentials pelanggan **%s** (User: %s) ke MikroTik.", cust.Name, cust.UserPPPoE)
+	return successEmbed("Sinkronisasi Berhasil", fmt.Sprintf("Berhasil mensinkronkan PPPoE credentials pelanggan **%s** (User: %s) ke MikroTik.", cust.Name, cust.UserPPPoE))
 }
 
-func handleKickCommand(i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) string {
+func handleKickCommand(i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.MessageEmbed {
 	if len(options) == 0 {
-		return "❌ Parameter `target` diperlukan."
+		return errorEmbed("Parameter `target` diperlukan.")
 	}
 	target := options[0].StringValue()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -848,40 +937,40 @@ func handleKickCommand(i *discordgo.InteractionCreate, options []*discordgo.Appl
 
 	cust, err := findCustomerByTarget(ctx, target)
 	if err != nil {
-		return "❌ " + err.Error()
+		return errorEmbed(err.Error())
 	}
 
 	if strings.TrimSpace(cust.UserPPPoE) == "" {
-		return fmt.Sprintf("❌ Pelanggan **%s** tidak memiliki user PPPoE terkonfigurasi.", cust.Name)
+		return errorEmbed(fmt.Sprintf("Pelanggan **%s** tidak memiliki user PPPoE terkonfigurasi.", cust.Name))
 	}
 
 	mikrotikHost, _ := settingsSvc.GetString(ctx, settings.KeyMikrotikHost)
 	mikrotikUser, _ := settingsSvc.GetString(ctx, settings.KeyMikrotikUser)
 	mikrotikPass, _ := settingsSvc.GetString(ctx, settings.KeyMikrotikPass)
 	if strings.TrimSpace(mikrotikHost) == "" || strings.TrimSpace(mikrotikUser) == "" {
-		return "❌ MikroTik host atau user belum terkonfigurasi di pengaturan sistem."
+		return errorEmbed("MikroTik host atau user belum terkonfigurasi di pengaturan sistem.")
 	}
 
 	client := mikrotik.NewClient(mikrotikHost, mikrotikUser, mikrotikPass)
 	if err := client.Connect(ctx); err != nil {
-		return fmt.Sprintf("❌ Gagal terhubung ke MikroTik: %v", err)
+		return errorEmbed(fmt.Sprintf("Gagal terhubung ke MikroTik: %v", err))
 	}
 	defer client.Close()
 
 	err = client.KickUser(ctx, cust.UserPPPoE)
 	if err != nil {
-		return fmt.Sprintf("❌ Gagal memutuskan sesi aktif PPPoE pelanggan **%s** (User: %s) di MikroTik: %v", cust.Name, cust.UserPPPoE, err)
+		return errorEmbed(fmt.Sprintf("Gagal memutuskan sesi aktif PPPoE pelanggan **%s** (User: %s) di MikroTik: %v", cust.Name, cust.UserPPPoE, err))
 	}
 
 	discordUser := getDiscordUser(i)
 	_ = auditSvc.Record(ctx, nil, nil, "discord.customer_kick", fmt.Sprintf("User %s kicked active PPPoE session for customer %s (User: %s) via Discord bot", discordUser, cust.Name, cust.UserPPPoE))
 
-	return fmt.Sprintf("✅ Sesi aktif PPPoE pelanggan **%s** (User: %s) berhasil diputuskan (kick) di MikroTik.", cust.Name, cust.UserPPPoE)
+	return successEmbed("Sesi Diputuskan", fmt.Sprintf("Sesi aktif PPPoE pelanggan **%s** (User: %s) berhasil diputuskan (kick) di MikroTik.", cust.Name, cust.UserPPPoE))
 }
 
-func handleOntCommand(_ *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) string {
+func handleOntCommand(_ *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.MessageEmbed {
 	if len(options) == 0 {
-		return "❌ Parameter `target` diperlukan."
+		return errorEmbed("Parameter `target` diperlukan.")
 	}
 	target := options[0].StringValue()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -889,11 +978,11 @@ func handleOntCommand(_ *discordgo.InteractionCreate, options []*discordgo.Appli
 
 	cust, err := findCustomerByTarget(ctx, target)
 	if err != nil {
-		return "❌ " + err.Error()
+		return errorEmbed(err.Error())
 	}
 
 	if strings.TrimSpace(cust.SNOnt) == "" {
-		return fmt.Sprintf("❌ Pelanggan **%s** tidak memiliki Serial Number ONT terkonfigurasi.", cust.Name)
+		return errorEmbed(fmt.Sprintf("Pelanggan **%s** tidak memiliki Serial Number ONT terkonfigurasi.", cust.Name))
 	}
 
 	acsURL, err := settingsSvc.GetString(ctx, settings.KeyACSURL)
@@ -906,57 +995,52 @@ func handleOntCommand(_ *discordgo.InteractionCreate, options []*discordgo.Appli
 
 	status, err := acsClient.GetDeviceStatus(ctx, cust.SNOnt)
 	if err != nil {
-		return fmt.Sprintf("❌ Gagal mengambil status ONT dari GenieACS untuk pelanggan **%s** (SN: %s): %v", cust.Name, cust.SNOnt, err)
+		return errorEmbed(fmt.Sprintf("Gagal mengambil status ONT dari GenieACS untuk pelanggan **%s** (SN: %s): %v", cust.Name, cust.SNOnt, err))
 	}
 
-	statusEmoji := "🟢 ONLINE"
+	statusEmoji := "ONLINE 🟢"
+	color := 3066993 // Green (#2ecc71)
 	if status.Status == "offline" {
-		statusEmoji = "🔴 OFFLINE"
+		statusEmoji = "OFFLINE 🔴"
+		color = 15158332 // Red (#e74c3c)
 	}
 
-	return fmt.Sprintf(
-		"📡 **Detail Status ONT Pelanggan**\n"+
-			"• **Nama Pelanggan**: %s\n"+
-			"• **User PPPoE**: %s\n"+
-			"• **Model ONT**: %s\n"+
-			"• **Serial Number**: `%s`\n"+
-			"• **IP Address**: %s\n"+
-			"• **Uptime ONT**: %s\n"+
-			"• **Redaman (Rx Optical)**: `%s` (Tx: `%s`)\n"+
-			"• **Status Koneksi**: %s\n"+
-			"• **Last Inform**: %s",
-		cust.Name,
-		cust.UserPPPoE,
-		status.Model,
-		status.SerialNumber,
-		status.IPAddress,
-		status.Uptime,
-		status.RxOpticalPower,
-		status.TxOpticalPower,
-		statusEmoji,
-		status.LastInformTime.Format("2006-01-02 15:04:05"),
-	)
+	return &discordgo.MessageEmbed{
+		Title: "📡 Detail Status ONT Pelanggan",
+		Color: color,
+		Fields: []*discordgo.MessageEmbedField{
+			{Name: "Nama Pelanggan", Value: cust.Name, Inline: true},
+			{Name: "User PPPoE", Value: cust.UserPPPoE, Inline: true},
+			{Name: "Model ONT", Value: status.Model, Inline: true},
+			{Name: "Serial Number", Value: fmt.Sprintf("`%s`", status.SerialNumber), Inline: true},
+			{Name: "IP Address", Value: status.IPAddress, Inline: true},
+			{Name: "Uptime ONT", Value: status.Uptime, Inline: true},
+			{Name: "Redaman (Rx Optical)", Value: fmt.Sprintf("`%s` (Tx: `%s`)", status.RxOpticalPower, status.TxOpticalPower), Inline: false},
+			{Name: "Status Koneksi", Value: statusEmoji, Inline: true},
+			{Name: "Last Inform", Value: status.LastInformTime.Format("2006-01-02 15:04:05"), Inline: true},
+		},
+	}
 }
 
-func handleUbahStatusCommand(i *discordgo.InteractionCreate, target, status string) string {
+func handleUbahStatusCommand(i *discordgo.InteractionCreate, target, status string) *discordgo.MessageEmbed {
 	if target == "" || status == "" {
-		return "❌ Parameter `target` dan `status` diperlukan."
+		return errorEmbed("Parameter `target` dan `status` diperlukan.")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	cust, err := findCustomerByTarget(ctx, target)
 	if err != nil {
-		return "❌ " + err.Error()
+		return errorEmbed(err.Error())
 	}
 
 	err = customersSvc.UpdateStatus(ctx, cust.ID, status)
 	if err != nil {
-		return fmt.Sprintf("❌ Gagal memperbarui status pelanggan **%s** menjadi **%s**: %v", cust.Name, status, err)
+		return errorEmbed(fmt.Sprintf("Gagal memperbarui status pelanggan **%s** menjadi **%s**: %v", cust.Name, status, err))
 	}
 
 	discordUser := getDiscordUser(i)
 	_ = auditSvc.Record(ctx, nil, nil, "discord.customer_update_status", fmt.Sprintf("User %s changed customer %s status to %s via Discord bot", discordUser, cust.Name, status))
 
-	return fmt.Sprintf("✅ Berhasil mengubah status pelanggan **%s** menjadi **%s** dan mensinkronkan ke MikroTik.", cust.Name, status)
+	return successEmbed("Status Diperbarui", fmt.Sprintf("Berhasil mengubah status pelanggan **%s** menjadi **%s** dan mensinkronkan ke MikroTik.", cust.Name, status))
 }

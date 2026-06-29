@@ -63,7 +63,14 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 		if err := s.RunOnce(ctx); err != nil {
 			s.Logger.Error("worker run failed", "error", err)
 			if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
-				_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Worker Run Error**: %v", err))
+				_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+					Title:       "⚠️ Worker Loop Error",
+					Description: "Terjadi kesalahan saat mengeksekusi cycle daemon worker.",
+					Color:       15158332, // Red (#e74c3c)
+					Fields: []notifications.EmbedField{
+						{Name: "Pesan Kesalahan", Value: err.Error(), Inline: false},
+					},
+				})
 			}
 		}
 	} else {
@@ -97,7 +104,14 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 			if err := s.RunOnce(ctx); err != nil {
 				s.Logger.Error("worker run failed", "error", err)
 				if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
-					_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Worker Run Error**: %v", err))
+					_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+						Title:       "⚠️ Worker Loop Error",
+						Description: "Terjadi kesalahan saat mengeksekusi cycle daemon worker.",
+						Color:       15158332, // Red (#e74c3c)
+						Fields: []notifications.EmbedField{
+							{Name: "Pesan Kesalahan", Value: err.Error(), Inline: false},
+						},
+					})
 				}
 			}
 		}
@@ -255,6 +269,43 @@ func (s Service) RunOnce(ctx context.Context) error {
 			if s.Discord == nil || !s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
 				return nil
 			}
+			if strings.Contains(message, "Isolir Penuh") {
+				parts := strings.Split(message, "Pelanggan **")
+				custName := ""
+				if len(parts) > 1 {
+					custName = strings.Split(parts[1], "**")[0]
+				}
+				return s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+					Title:       "🚫 Layanan Dinonaktifkan (Isolir Penuh)",
+					Description: fmt.Sprintf("Pelanggan **%s** dinonaktifkan sepenuhnya dari jaringan karena tunggakan tagihan melebihi batas.", custName),
+					Color:       15158332, // Red (#e74c3c)
+					Fields: []notifications.EmbedField{
+						{Name: "Nama Pelanggan", Value: custName, Inline: true},
+						{Name: "Status Baru", Value: "Inactive (Nonaktif)", Inline: true},
+					},
+				})
+			} else if strings.Contains(message, "Isolir (Limit)") {
+				parts := strings.Split(message, "Pelanggan **")
+				custName := ""
+				if len(parts) > 1 {
+					custName = strings.Split(parts[1], "**")[0]
+				}
+				return s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+					Title:       "🚫 Pembatasan Layanan (Limit)",
+					Description: fmt.Sprintf("Pelanggan **%s** otomatis dimasukkan ke profil isolir/limit bandwidth karena keterlambatan pembayaran.", custName),
+					Color:       15105570, // Orange (#e67e22)
+					Fields: []notifications.EmbedField{
+						{Name: "Nama Pelanggan", Value: custName, Inline: true},
+						{Name: "Status Baru", Value: "Limit (Terisolir)", Inline: true},
+					},
+				})
+			} else if strings.Contains(message, "Combined") {
+				return s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+					Title:       "⏳ Notifikasi Tagihan Terkirim",
+					Description: message,
+					Color:       3447003, // Blue (#3498db)
+				})
+			}
 			return s.Discord.SendAlert(ctx, message)
 		},
 	}); err != nil {
@@ -302,7 +353,14 @@ func (s Service) runScheduledBackup(ctx context.Context, now time.Time) error {
 	filename, err := s.Backup.CreateBackup(ctx)
 	if err != nil {
 		if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
-			_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Auto Backup Gagal**: %v", err))
+			_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+				Title:       "⚠️ Auto Backup Gagal",
+				Description: "Sistem gagal melakukan pencadangan database otomatis.",
+				Color:       15158332, // Red (#e74c3c)
+				Fields: []notifications.EmbedField{
+					{Name: "Error", Value: err.Error(), Inline: false},
+				},
+			})
 		}
 		return err
 	}
@@ -314,7 +372,14 @@ func (s Service) runScheduledBackup(ctx context.Context, now time.Time) error {
 	_ = s.Settings.Set(ctx, "worker_last_backup_filename", filename)
 
 	if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
-		_ = s.Discord.SendAlert(ctx, fmt.Sprintf("💾 **Auto Backup**: Database berhasil dicadangkan ke `%s`", filename))
+		_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+			Title:       "💾 Auto Backup Sukses",
+			Description: "Database sistem berhasil dicadangkan secara otomatis.",
+			Color:       3066993, // Green (#2ecc71)
+			Fields: []notifications.EmbedField{
+				{Name: "Nama Berkas", Value: filename, Inline: false},
+			},
+		})
 	}
 
 	return nil
@@ -680,18 +745,23 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 						if cust.OntStatus == "online" && status.Status == "offline" {
 							if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_gacs_offline") {
 								matiKapan := time.Now().Format("2006-01-02 15:04:05")
-								alertMsg := fmt.Sprintf("🚨 **ONT CLIENT OFFLINE DETECTED** 🚨\n"+
-									"• **Nama Pelanggan**: %s\n"+
-									"• **User PPPoE**: %s\n"+
-									"• **Serial Number (SN)**: %s\n"+
-									"• **Waktu Mati**: %s\n"+
-									"• **Redaman Terakhir**: %s (Tx: %s)\n"+
-									"• **IP Address**: %s\n"+
-									"• **Status**: OFFLINE 🔴",
-									cust.Name, cust.UserPPPoE, serialNum, matiKapan, status.RxOpticalPower, status.TxOpticalPower, status.IPAddress)
-								go func(msg string) {
-									_ = s.Discord.SendAlert(context.Background(), msg)
-								}(alertMsg)
+								embed := notifications.DiscordEmbed{
+									Title:       "🚨 ONT CLIENT OFFLINE DETECTED 🚨",
+									Description: fmt.Sprintf("ONT milik pelanggan **%s** terdeteksi putus koneksi (offline).", cust.Name),
+									Color:       15158332, // Red (#e74c3c)
+									Fields: []notifications.EmbedField{
+										{Name: "Nama Pelanggan", Value: cust.Name, Inline: true},
+										{Name: "User PPPoE", Value: cust.UserPPPoE, Inline: true},
+										{Name: "Serial Number (SN)", Value: serialNum, Inline: true},
+										{Name: "Waktu Mati", Value: matiKapan, Inline: true},
+										{Name: "Redaman Terakhir (Rx)", Value: fmt.Sprintf("%s (Tx: %s)", status.RxOpticalPower, status.TxOpticalPower), Inline: false},
+										{Name: "IP Address", Value: status.IPAddress, Inline: true},
+										{Name: "Status", Value: "OFFLINE 🔴", Inline: true},
+									},
+								}
+								go func(emb notifications.DiscordEmbed) {
+									_ = s.Discord.SendEmbed(context.Background(), emb)
+								}(embed)
 							}
 						}
 

@@ -15,7 +15,8 @@ export type CustomerLifecycleKey =
   | "perpanjangan"
   | "jatuh_tempo"
   | "menunggak"
-  | "lunas";
+  | "lunas"
+  | "nonaktif";
 
 export type CustomerLifecycleEntry = {
   key: CustomerLifecycleKey;
@@ -41,6 +42,8 @@ function parseBillDate(value: string): Date | null {
 
 export function lifecycleRank(key: CustomerLifecycleKey): number {
   switch (key) {
+    case "nonaktif":
+      return 6;
     case "menunggak":
       return 5;
     case "jatuh_tempo":
@@ -175,6 +178,19 @@ export function buildCustomerLifecycleMap(
             note: trialEndsAt
               ? `Free trial sampai ${formatDateId(trialEndsAt)} (${customer.trial_days ?? 3} hari).`
               : `Free trial ${customer.trial_days ?? 3} hari sedang berjalan.`,
+          },
+        ];
+      }
+
+      // Customer status "inactive" means their service is disabled/suspended
+      if (customer.status === "inactive") {
+        return [
+          customer.id,
+          {
+            key: "nonaktif" as const,
+            label: "Nonaktif",
+            tone: "slate" as const,
+            note: "Layanan dinonaktifkan oleh administrator.",
           },
         ];
       }

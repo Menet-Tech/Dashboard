@@ -138,7 +138,23 @@ func (s Service) Generate(ctx context.Context, period string) (GenerateResult, e
 		go func() {
 			alertCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			_ = s.Discord.SendAlert(alertCtx, fmt.Sprintf("📢 **Generate Tagihan**: %d tagihan baru dibuat untuk periode **%s**", generated, period))
+			_ = s.Discord.SendEmbed(alertCtx, notifications.DiscordEmbed{
+				Title:       "📢 Tagihan Bulanan Baru Dibuat",
+				Description: fmt.Sprintf("Sistem berhasil men-generate tagihan baru untuk periode **%s**.", period),
+				Color:       3447003, // Blue (#3498db)
+				Fields: []notifications.EmbedField{
+					{
+						Name:   "Jumlah Pelanggan",
+						Value:  fmt.Sprintf("%d Pelanggan", generated),
+						Inline: true,
+					},
+					{
+						Name:   "Periode Layanan",
+						Value:  period,
+						Inline: true,
+					},
+				},
+			})
 		}()
 	}
 
@@ -204,10 +220,45 @@ func (s Service) MarkPaid(ctx context.Context, billID int64, method string, user
 			if err != nil {
 				return
 			}
-			msg := fmt.Sprintf("💰 **Pembayaran Diterima**: Tagihan **%s** sejumlah **%s** atas nama **%s** telah dilunasi via **%s**",
-				detail.InvoiceNumber, formatIDRCurrency(detail.Amount), detail.CustomerName, method)
-
-			sendErr := s.Discord.SendAlert(bgCtx, msg)
+			
+			embed := notifications.DiscordEmbed{
+				Title:       "💰 Pembayaran Tagihan Diterima",
+				Description: fmt.Sprintf("Tagihan milik pelanggan **%s** telah lunas.", detail.CustomerName),
+				Color:       3066993, // Green (#2ecc71)
+				Fields: []notifications.EmbedField{
+					{
+						Name:   "Pelanggan",
+						Value:  detail.CustomerName,
+						Inline: true,
+					},
+					{
+						Name:   "Nomor Invoice",
+						Value:  detail.InvoiceNumber,
+						Inline: true,
+					},
+					{
+						Name:   "Jumlah Nominal",
+						Value:  formatIDRCurrency(detail.Amount),
+						Inline: true,
+					},
+					{
+						Name:   "Metode Pembayaran",
+						Value:  method,
+						Inline: true,
+					},
+					{
+						Name:   "Periode Tagihan",
+						Value:  detail.Period,
+						Inline: true,
+					},
+					{
+						Name:   "Tanggal Jatuh Tempo",
+						Value:  detail.DueDate,
+						Inline: true,
+					},
+				},
+			}
+			sendErr := s.Discord.SendEmbed(bgCtx, embed)
 
 			status := "sent"
 			logMsg := ""
@@ -782,7 +833,16 @@ func (s Service) ProcessTrialExpiry(ctx context.Context, now time.Time) error {
 		bill, created, err := s.Repository.EnsureBillForCustomer(ctx, customer.ID, period, menunggakDays, now)
 		if err != nil {
 			if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
-				_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Trial Expiry Generate Failed**: Gagal generate tagihan untuk **%s** (ID:%d): %v", customer.Name, customer.ID, err))
+				_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+					Title:       "⚠️ Gagal Membuat Tagihan Pasca-Trial",
+					Description: fmt.Sprintf("Gagal memproses tagihan baru untuk pelanggan **%s**.", customer.Name),
+					Color:       15158332, // Red (#e74c3c)
+					Fields: []notifications.EmbedField{
+						{Name: "Nama Pelanggan", Value: customer.Name, Inline: true},
+						{Name: "ID Pelanggan", Value: strconv.FormatInt(customer.ID, 10), Inline: true},
+						{Name: "Error", Value: err.Error(), Inline: false},
+					},
+				})
 			}
 			continue
 		}
@@ -792,7 +852,16 @@ func (s Service) ProcessTrialExpiry(ctx context.Context, now time.Time) error {
 
 		if err := s.Customers.EndTrial(ctx, customer.ID); err != nil {
 			if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
-				_ = s.Discord.SendAlert(ctx, fmt.Sprintf("⚠️ **Trial Expiry End Failed**: Gagal end trial untuk **%s** (ID:%d): %v", customer.Name, customer.ID, err))
+				_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+					Title:       "⚠️ Gagal Menyelesaikan Masa Trial",
+					Description: fmt.Sprintf("Gagal mengubah status trial pelanggan **%s** menjadi selesai.", customer.Name),
+					Color:       15158332, // Red (#e74c3c)
+					Fields: []notifications.EmbedField{
+						{Name: "Nama Pelanggan", Value: customer.Name, Inline: true},
+						{Name: "ID Pelanggan", Value: strconv.FormatInt(customer.ID, 10), Inline: true},
+						{Name: "Error", Value: err.Error(), Inline: false},
+					},
+				})
 			}
 			continue
 		}
@@ -822,9 +891,19 @@ func (s Service) ProcessTrialExpiry(ctx context.Context, now time.Time) error {
 		if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
 			action := "mengaktifkan tagihan trial yang sudah ada"
 			if created {
-				action = "membuat tagihan otomatis"
+				action = "membuat tagihan otomatis baru"
 			}
-			_ = s.Discord.SendAlert(ctx, fmt.Sprintf("✅ **Trial Period Expired**: Pelanggan **%s** (ID:%d) trial berakhir. Sistem berhasil %s untuk periode **%s**", customer.Name, customer.ID, action, period))
+			_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+				Title:       "✅ Masa Trial Berakhir",
+				Description: fmt.Sprintf("Masa trial pelanggan **%s** telah selesai.", customer.Name),
+				Color:       3066993, // Green (#2ecc71)
+				Fields: []notifications.EmbedField{
+					{Name: "Pelanggan", Value: customer.Name, Inline: true},
+					{Name: "ID Pelanggan", Value: strconv.FormatInt(customer.ID, 10), Inline: true},
+					{Name: "Tindakan Sistem", Value: action, Inline: false},
+					{Name: "Periode Tagihan", Value: period, Inline: true},
+				},
+			})
 		}
 	}
 

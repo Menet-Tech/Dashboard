@@ -447,9 +447,9 @@ func (c *Client) SyncCustomer(ctx context.Context, username, password, profile, 
 	case "inactive":
 		targetProfile = profile
 		if targetProfile == "" {
-			targetProfile = "default"
+			targetProfile = "nonaktif"
 		}
-		disabled = "yes"
+		disabled = "no"
 	default:
 		targetProfile = profile
 		if targetProfile == "" {
