@@ -16,6 +16,7 @@ import (
 
 type mockDiscordSender struct {
 	messages []string
+	embeds   []notifications.DiscordEmbed
 }
 
 type mockTrialWhatsAppSender struct {
@@ -33,6 +34,11 @@ func (m *mockTrialWhatsAppSender) SendDirectMessage(ctx context.Context, account
 
 func (m *mockDiscordSender) SendAlert(ctx context.Context, msg string) error {
 	m.messages = append(m.messages, msg)
+	return nil
+}
+
+func (m *mockDiscordSender) SendEmbed(ctx context.Context, embed notifications.DiscordEmbed) error {
+	m.embeds = append(m.embeds, embed)
 	return nil
 }
 
@@ -102,7 +108,7 @@ func TestProcessTrialExpiryGeneratesBillsForExpiredTrials(t *testing.T) {
 	}
 
 	// Verify Discord notification was sent
-	if len(mockDiscord.messages) == 0 {
+	if len(mockDiscord.messages) == 0 && len(mockDiscord.embeds) == 0 {
 		t.Error("expected Discord notification to be sent")
 	}
 

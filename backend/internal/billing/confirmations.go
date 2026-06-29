@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"menettech/dashboard/backend/internal/notifications"
 )
 
 type PaymentConfirmation struct {
@@ -96,7 +98,51 @@ func (s Service) CreatePaymentConfirmation(ctx context.Context, tagihanID int64,
 
 		// Send Discord alert
 		if s.Discord != nil {
-			_ = s.Discord.SendAlert(bgCtx, alertMsg)
+			fields := []notifications.EmbedField{
+				{
+					Name:   "Pelanggan",
+					Value:  customerName,
+					Inline: true,
+				},
+				{
+					Name:   "Nomor Invoice",
+					Value:  invoiceNumber,
+					Inline: true,
+				},
+				{
+					Name:   "Metode Konfirmasi",
+					Value:  method,
+					Inline: true,
+				},
+			}
+			if nominal > 0 {
+				fields = append(fields, notifications.EmbedField{
+					Name:   "Nominal Tagihan",
+					Value:  formatIDRCurrency(nominal),
+					Inline: true,
+				})
+			}
+			if catatan != "" {
+				fields = append(fields, notifications.EmbedField{
+					Name:   "Catatan Pelanggan",
+					Value:  catatan,
+					Inline: false,
+				})
+			}
+			if method == "Transfer" && buktiTransfer != nil && *buktiTransfer != "" {
+				fields = append(fields, notifications.EmbedField{
+					Name:   "Bukti Transfer",
+					Value:  *buktiTransfer,
+					Inline: false,
+				})
+			}
+
+			_ = s.Discord.SendEmbed(bgCtx, notifications.DiscordEmbed{
+				Title:       "🔔 Konfirmasi Pembayaran Baru",
+				Description: "Pelanggan mengajukan konfirmasi pembayaran. Silakan periksa di dashboard.",
+				Color:       3447003, // Blue (#3498db)
+				Fields:      fields,
+			})
 		}
 
 		// Send WhatsApp message to admins

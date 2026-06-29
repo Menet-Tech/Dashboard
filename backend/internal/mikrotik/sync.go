@@ -130,12 +130,19 @@ func (s *RouterService) ReconcileSecrets(ctx context.Context, r Router) error {
 	}
 	defer client.Close()
 
-	// 2. Fetch the isolir profile from the pengaturan table
+	// 2. Fetch the isolir and inactive profiles from the pengaturan table
 	var isolirProfile string
 	_ = s.DB.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = ?", "mikrotik_isolir_profile").Scan(&isolirProfile)
 	isolirProfile = strings.TrimSpace(isolirProfile)
 	if isolirProfile == "" {
 		isolirProfile = "isolir"
+	}
+
+	var inactiveProfile string
+	_ = s.DB.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = ?", "mikrotik_inactive_profile").Scan(&inactiveProfile)
+	inactiveProfile = strings.TrimSpace(inactiveProfile)
+	if inactiveProfile == "" {
+		inactiveProfile = "nonaktif"
 	}
 
 	// 3. Fetch all active/inactive customers with PPPoE configured from the database
@@ -201,11 +208,8 @@ func (s *RouterService) ReconcileSecrets(ctx context.Context, r Router) error {
 			targetProfile = isolirProfile
 			disabled = false
 		case "inactive":
-			targetProfile = dbSec.Profile
-			if targetProfile == "" {
-				targetProfile = "default"
-			}
-			disabled = true
+			targetProfile = inactiveProfile
+			disabled = false
 		default:
 			targetProfile = dbSec.Profile
 			if targetProfile == "" {
