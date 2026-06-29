@@ -3,6 +3,7 @@ import { formatCurrency } from "../../utils/format";
 import { displayStatusLabel, displayStatusTone } from "../../utils/status";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
 import { notifyBill, grantBillExtension } from "../../lib/api";
+import { useDialog } from "../../context/DialogContext";
 import type { ConfirmDialogState } from "../../hooks/types";
 import type { BillItem, User, NotificationLog } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
@@ -79,6 +80,7 @@ export function BillsPage({
 }: BillsPageProps) {
 
   const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
+  const { showConfirm } = useDialog();
 
   const handleSendManualWA = async (id: number, triggerKey: string) => {
     pushToast("slate", "Mengirim notifikasi WhatsApp...");
@@ -257,9 +259,12 @@ export function BillsPage({
                             disabled={isBusy(`notify-${bill.id}`)}
                           >
                             <option value="" disabled>Kirim WA</option>
+                            <option value="tagihan-h7">Tagihan H-7</option>
+                            <option value="reminder-h3">Reminder H-3</option>
                             <option value="reminder-h5">Reminder H-5</option>
                             <option value="jatuh_tempo">Jatuh Tempo</option>
                             <option value="limit_5hari">Limit 5 Hari</option>
+                            <option value="isolir_20hari">Isolir 20 Hari</option>
                             <option value="lunas">Lunas</option>
                           </select>
 
@@ -285,21 +290,9 @@ export function BillsPage({
                               type="button"
                               title="Perpanjangan: tagihan ini digabung ke bulan depan (nominal dikali 2)"
                               className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
-                              onClick={() => {
-                                if (askForConfirmation) {
-                                  askForConfirmation({
-                                    title: "Konfirmasi Perpanjangan Tagihan",
-                                    body: `Apakah Anda yakin ingin memperpanjang tagihan ${bill.invoice_number}? Pelanggan akan dialihkan ke status 'pending' (perpanjangan) dan tagihan bulan depan digabung (nominal dikali 2).`,
-                                    confirmLabel: "Perpanjang",
-                                    tone: "danger",
-                                    onConfirm: async () => {
-                                      onGrantExtension(bill.id);
-                                    }
-                                  });
-                                } else {
-                                  if (confirm(`Perpanjang tagihan ${bill.invoice_number}? Pelanggan akan dialihkan ke status 'pending' dan tagihan bulan depan digabung.`)) {
-                                    onGrantExtension(bill.id);
-                                  }
+                              onClick={async () => {
+                                if (await showConfirm(`Perpanjang tagihan ${bill.invoice_number}? Pelanggan akan dialihkan ke status 'pending' (perpanjangan) dan tagihan bulan depan digabung (nominal dikali 2).`)) {
+                                  onGrantExtension(bill.id);
                                 }
                               }}
 

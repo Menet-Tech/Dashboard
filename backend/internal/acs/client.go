@@ -54,25 +54,41 @@ func NewClient(baseURL, username, password string) *Client {
 	}
 }
 
-// GetDeviceStatus fetches device parameters by ONT serial number.
-func (c *Client) GetDeviceStatus(ctx context.Context, serialNumber string) (DeviceStatus, error) {
+// hasPath checks if a dot-separated parameter path exists in the nested map structure of GenieACS device.
+func hasPath(dev map[string]any, path string) bool {
+	parts := strings.Split(path, ".")
+	curr := dev
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			_, ok := curr[part]
+			return ok
+		}
+		next, ok := curr[part].(map[string]any)
+		if !ok {
+			return false
+		}
+		curr = next
+	}
+	return false
+}
+
+// getRawDevice fetches the raw device map from GenieACS API by ONT serial number.
+func (c *Client) getRawDevice(ctx context.Context, serialNumber string) (map[string]any, error) {
 	serialNumber = strings.TrimSpace(serialNumber)
 	if serialNumber == "" {
-		return DeviceStatus{}, fmt.Errorf("serial number cannot be empty")
+		return nil, fmt.Errorf("serial number cannot be empty")
 	}
 
-	// If unconfigured or points to mock, return a realistic mockup for testing.
-	if c.BaseURL == "" || strings.Contains(strings.ToLower(c.BaseURL), "mock") || strings.Contains(strings.ToLower(c.BaseURL), "localhost") {
-		return getMockStatus(serialNumber), nil
+	if c.BaseURL == "" || strings.Contains(strings.ToLower(c.BaseURL), "mock") {
+		return nil, nil
 	}
 
-	// Query URL
 	queryJSON := fmt.Sprintf(`{"_deviceId._SerialNumber":"%s"}`, serialNumber)
 	reqURL := fmt.Sprintf("%s/devices?query=%s", c.BaseURL, url.QueryEscape(queryJSON))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
-		return DeviceStatus{}, err
+		return nil, err
 	}
 
 	if c.Username != "" {
@@ -81,21 +97,39 @@ func (c *Client) GetDeviceStatus(ctx context.Context, serialNumber string) (Devi
 
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		return getMockStatus(serialNumber), nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return DeviceStatus{}, fmt.Errorf("genieacs returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("genieacs returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var devices []map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&devices); err != nil {
-		return DeviceStatus{}, err
+		return nil, err
 	}
 
 	if len(devices) == 0 {
+		return nil, nil
+	}
+
+	return devices[0], nil
+}
+
+// GetDeviceStatus fetches device parameters by ONT serial number.
+func (c *Client) GetDeviceStatus(ctx context.Context, serialNumber string) (DeviceStatus, error) {
+	dev, err := c.getRawDevice(ctx, serialNumber)
+	if err != nil {
+		return DeviceStatus{}, err
+	}
+
+	if dev == nil {
+		// Fallback to mock status if mock URL or device not found in live DB (for test safety)
+		if c.BaseURL == "" || strings.Contains(strings.ToLower(c.BaseURL), "mock") {
+			return getMockStatus(serialNumber), nil
+		}
 		return DeviceStatus{
 			SerialNumber: serialNumber,
 			Status:       "offline",
@@ -103,7 +137,6 @@ func (c *Client) GetDeviceStatus(ctx context.Context, serialNumber string) (Devi
 		}, nil
 	}
 
-	dev := devices[0]
 	return parseDeviceMap(dev, serialNumber), nil
 }
 
@@ -469,25 +502,34 @@ func (c *Client) SetWifiConfig(ctx context.Context, serialNumber, ssid, password
 
 	baseURL := strings.TrimSuffix(c.BaseURL, "/")
 
-	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") || strings.Contains(strings.ToLower(baseURL), "localhost") {
+	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") {
 		time.Sleep(1000 * time.Millisecond)
 		return nil
 	}
 
-	status, err := c.GetDeviceStatus(ctx, serialNumber)
+	dev, err := c.getRawDevice(ctx, serialNumber)
 	if err != nil {
 		return err
 	}
-	if status.ID == "" {
+	if dev == nil {
+		return fmt.Errorf("device not found in GenieACS for serial number %s", serialNumber)
+	}
+
+	idVal, _ := dev["_id"].(string)
+	if idVal == "" {
 		return fmt.Errorf("device ID not found in GenieACS for serial number %s", serialNumber)
 	}
 
-	reqURL := fmt.Sprintf("%s/devices/%s/tasks", baseURL, url.PathEscape(status.ID))
+	reqURL := fmt.Sprintf("%s/devices/%s/tasks", baseURL, url.PathEscape(idVal))
 
 	paths := []struct {
 		ssidKey string
 		passKey string
 	}{
+		{
+			ssidKey: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID",
+			passKey: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase",
+		},
 		{
 			ssidKey: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID",
 			passKey: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey",
@@ -496,20 +538,50 @@ func (c *Client) SetWifiConfig(ctx context.Context, serialNumber, ssid, password
 			ssidKey: "Device.WiFi.SSID.1.SSID",
 			passKey: "Device.WiFi.AccessPoint.1.Security.KeyPassphrase",
 		},
+		{
+			ssidKey: "Device.WiFi.SSID.1.SSID",
+			passKey: "Device.WiFi.AccessPoint.1.Security.PreSharedKey",
+		},
 	}
 
-	var paramValues [][]string
+	var selectedSSIDKey, selectedPassKey string
 	for _, p := range paths {
-		paramValues = append(paramValues, []string{p.ssidKey, ssid})
-		paramValues = append(paramValues, []string{p.passKey, password})
+		if hasPath(dev, p.ssidKey) && hasPath(dev, p.passKey) {
+			selectedSSIDKey = p.ssidKey
+			selectedPassKey = p.passKey
+			break
+		}
 	}
 
-	taskBody := map[string]any{
-		"name":            "setParameterValues",
-		"parameterValues": paramValues,
+	// Fallback to default TR-069 path if no matching path found in the dev document cache
+	if selectedSSIDKey == "" || selectedPassKey == "" {
+		selectedSSIDKey = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID"
+		selectedPassKey = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase"
 	}
 
-	bodyBytes, err := json.Marshal(taskBody)
+	// Construct JSON tasks array matching user format exactly:
+	// [{"name":"setParameterValues","parameterValues":[[key, val, "xsd:string"]]}, ...]
+	type Task struct {
+		Name            string     `json:"name"`
+		ParameterValues [][]string `json:"parameterValues"`
+	}
+
+	tasks := []Task{
+		{
+			Name: "setParameterValues",
+			ParameterValues: [][]string{
+				{selectedSSIDKey, ssid, "xsd:string"},
+			},
+		},
+		{
+			Name: "setParameterValues",
+			ParameterValues: [][]string{
+				{selectedPassKey, password, "xsd:string"},
+			},
+		},
+	}
+
+	bodyBytes, err := json.Marshal(tasks)
 	if err != nil {
 		return err
 	}
@@ -1961,9 +2033,30 @@ func getNestedStringFromPath(m map[string]any, path string) string {
 		}
 	}
 	if valMap, ok := current.(map[string]any); ok {
-		return fmt.Sprintf("%v", valMap["_value"])
+		if val, ok := valMap["_value"]; ok && val != nil {
+			valStr := fmt.Sprintf("%v", val)
+			if valStr == "<nil>" {
+				return ""
+			}
+			return valStr
+		}
+		// If it's a GenieACS metadata map with no value
+		if _, hasObj := valMap["_object"]; hasObj {
+			return ""
+		}
+		if _, hasWrite := valMap["_writable"]; hasWrite {
+			return ""
+		}
+		return fmt.Sprintf("%v", current)
 	}
-	return fmt.Sprintf("%v", current)
+	if current == nil {
+		return ""
+	}
+	valStr := fmt.Sprintf("%v", current)
+	if valStr == "<nil>" {
+		return ""
+	}
+	return valStr
 }
 
 func getNestedString(m map[string]any, keys ...string) string {
@@ -1973,11 +2066,29 @@ func getNestedString(m map[string]any, keys ...string) string {
 			if childMap, ok := current.(map[string]any); ok {
 				if v, ok := childMap[key]; ok {
 					if vm, ok := v.(map[string]any); ok {
-						if val, ok := vm["_value"]; ok {
-							return fmt.Sprintf("%v", val)
+						if val, ok := vm["_value"]; ok && val != nil {
+							valStr := fmt.Sprintf("%v", val)
+							if valStr == "<nil>" {
+								return ""
+							}
+							return valStr
+						}
+						// If it's a GenieACS metadata map with no value
+						if _, hasObj := vm["_object"]; hasObj {
+							return ""
+						}
+						if _, hasWrite := vm["_writable"]; hasWrite {
+							return ""
 						}
 					}
-					return fmt.Sprintf("%v", v)
+					if v == nil {
+						return ""
+					}
+					valStr := fmt.Sprintf("%v", v)
+					if valStr == "<nil>" {
+						return ""
+					}
+					return valStr
 				}
 			}
 			return ""
@@ -2037,6 +2148,70 @@ func (c *Client) GetDevicesSummary(ctx context.Context, db *sql.DB) ([]map[strin
 		"_lastInform",
 	}
 
+	type custInfo struct {
+		ID   int
+		Name string
+	}
+	snToCust := make(map[string]custInfo)
+	pppoeToCust := make(map[string]custInfo)
+
+	if db != nil {
+		rows, err := db.QueryContext(ctx, "SELECT id, nama, COALESCE(user_pppoe, ''), COALESCE(sn_ont, '') FROM pelanggan WHERE user_pppoe != '' OR sn_ont != ''")
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var id int
+				var name, pppoe, sn string
+				if err := rows.Scan(&id, &name, &pppoe, &sn); err == nil {
+					pppoe = strings.TrimSpace(pppoe)
+					sn = strings.TrimSpace(sn)
+					info := custInfo{ID: id, Name: name}
+					if sn != "" {
+						snToCust[strings.ToLower(sn)] = info
+					}
+					if pppoe != "" {
+						pppoeToCust[strings.ToLower(pppoe)] = info
+					}
+				}
+			}
+		}
+	}
+
+	attachCustInfo := func(resItem map[string]any) {
+		var matchedCust *custInfo
+		
+		snStr := ""
+		if snVal, ok := resItem["SerialNumber"].(string); ok {
+			snStr = snVal
+		}
+		snLower := strings.ToLower(strings.TrimSpace(snStr))
+
+		pppoeStr := ""
+		if pppoeVal := resItem["pppoe"]; pppoeVal != nil {
+			pppoeStr = strings.TrimSpace(fmt.Sprintf("%v", pppoeVal))
+		}
+		pppoeLower := strings.ToLower(pppoeStr)
+
+		if snLower != "" {
+			if info, ok := snToCust[snLower]; ok {
+				matchedCust = &info
+			}
+		}
+		if matchedCust == nil && pppoeLower != "" {
+			if info, ok := pppoeToCust[pppoeLower]; ok {
+				matchedCust = &info
+			}
+		}
+
+		if matchedCust != nil {
+			resItem["customer_id"] = matchedCust.ID
+			resItem["customer_name"] = matchedCust.Name
+			resItem["is_registered"] = true
+		} else {
+			resItem["is_registered"] = false
+		}
+	}
+
 	// Clean BaseURL
 	baseURL := strings.TrimSuffix(c.BaseURL, "/")
 	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") || strings.Contains(strings.ToLower(baseURL), "localhost") {
@@ -2080,6 +2255,8 @@ func (c *Client) GetDevicesSummary(ctx context.Context, db *sql.DB) ([]map[strin
 			"ssid8":         nil,
 			"_lastInform":   time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
 		}
+		attachCustInfo(mock1)
+		attachCustInfo(mock2)
 		return []map[string]any{mock1, mock2}, nil
 	}
 
@@ -2184,6 +2361,7 @@ func (c *Client) GetDevicesSummary(ctx context.Context, db *sql.DB) ([]map[strin
 			"ssid8":         getSSID("8"),
 			"_lastInform":   item["_lastInform"],
 		}
+		attachCustInfo(resItem)
 		result = append(result, resItem)
 	}
 

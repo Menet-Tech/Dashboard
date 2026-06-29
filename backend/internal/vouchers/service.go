@@ -146,6 +146,19 @@ func (s Service) Claim(ctx context.Context, customerID int64, code string) (Cust
 		return CustomerVoucher{}, err
 	}
 
+	// 1.5. Check if customer has a special discount (special user)
+	var diskon int
+	err = s.Repository.DB.QueryRowContext(ctx, `SELECT diskon FROM pelanggan WHERE id = ?`, customerID).Scan(&diskon)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return CustomerVoucher{}, errors.New("customer not found")
+		}
+		return CustomerVoucher{}, err
+	}
+	if diskon > 0 {
+		return CustomerVoucher{}, errors.New("pelanggan khusus tidak diperbolehkan mengklaim atau menggunakan voucher")
+	}
+
 	// 2. Check if customer already has active voucher
 	var count int
 	err = s.Repository.DB.QueryRowContext(ctx, `

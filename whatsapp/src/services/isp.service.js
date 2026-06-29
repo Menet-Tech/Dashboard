@@ -96,6 +96,31 @@ const getActiveBill = async (customerId) => {
 };
 
 /**
+ * Ambil tagihan terbaru pelanggan (tanpa filter status).
+ * @param {number} customerId
+ * @returns {object|null}
+ */
+const getLatestBill = async (customerId) => {
+    try {
+        const res = await client.get('/api/v1/bills', {
+            params: { customer_id: customerId, limit: 1 },
+        });
+        const data = res.data?.data;
+        if (Array.isArray(data) && data.length > 0) {
+            const bill = data[0];
+            bill.periode = bill.period || bill.periode;
+            bill.nominal = bill.amount !== undefined ? bill.amount : bill.nominal;
+            bill.jatuh_tempo = bill.due_date || bill.jatuh_tempo;
+            return bill;
+        }
+        return null;
+    } catch (err) {
+        logger.error(`[ISP] getLatestBill failed for customer ${customerId}:`, err.message);
+        return null;
+    }
+};
+
+/**
  * Ambil daftar paket internet yang tersedia (dengan in-memory caching 1 menit).
  * @returns {Array<{name, speed_mbps, price}>}
  */
@@ -242,9 +267,13 @@ const getReferredCount = async (customerId) => {
  * @param {number} amount
  * @returns {Promise<object>}
  */
-const withdrawReferral = async (customerId, amount) => {
+const withdrawReferral = async (customerId, amount, method, paymentTarget) => {
     try {
-        const res = await client.post(`/api/v1/customers/${customerId}/referral/withdraw`, { amount });
+        const res = await client.post(`/api/v1/customers/${customerId}/referral/withdraw`, {
+            amount,
+            method,
+            payment_target: paymentTarget
+        });
         return res.data;
     } catch (err) {
         logger.error(`[ISP] withdrawReferral failed for customer ${customerId}:`, err.message);
@@ -407,6 +436,7 @@ module.exports = {
     findCustomersByPhone,
     findCustomerByID,
     getActiveBill,
+    getLatestBill,
     getPackageList,
     notifyAdminViaWA,
     notifyAdminViaDiscord,

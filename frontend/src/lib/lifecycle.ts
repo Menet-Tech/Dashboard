@@ -12,6 +12,7 @@ export type CustomerLifecycleKey =
   | "all"
   | "trial"
   | "tertagih"
+  | "perpanjangan"
   | "jatuh_tempo"
   | "menunggak"
   | "lunas";
@@ -46,6 +47,8 @@ export function lifecycleRank(key: CustomerLifecycleKey): number {
       return 4;
     case "tertagih":
       return 3;
+    case "perpanjangan":
+      return 2;
     case "trial":
       return 2;
     case "lunas":
@@ -63,6 +66,16 @@ function customerLifecycleFromBill(
   trialGraceDays: number,
   menunggakDays: number,
 ): CustomerLifecycleEntry {
+  // Perpanjangan: bill is carried over to next period
+  if (bill.display_status === "perpanjangan" || bill.display_status === "pending_perpanjangan") {
+    return {
+      key: "perpanjangan",
+      label: "Perpanjangan",
+      tone: "gold",
+      note: `Invoice ${bill.invoice_number} diperpanjang ke periode berikutnya dan digabung dengan tagihan bulan depan.`,
+    };
+  }
+
   const dueDate = parseBillDate(bill.due_date);
   if (!dueDate) {
     return {
@@ -166,6 +179,24 @@ export function buildCustomerLifecycleMap(
         ];
       }
 
+      // Customer status "pending" means they are in perpanjangan mode
+      if (customer.status === "pending") {
+        const perpBill = (billsByCustomer.get(customer.id) ?? []).find(
+          (b) => b.status !== "lunas",
+        );
+        return [
+          customer.id,
+          {
+            key: "perpanjangan" as const,
+            label: "Perpanjangan",
+            tone: "gold" as const,
+            note: perpBill
+              ? `Invoice ${perpBill.invoice_number} diperpanjang ke periode berikutnya dan digabung dengan tagihan bulan depan.`
+              : "Tagihan bulan ini diperpanjang ke periode berikutnya.",
+          },
+        ];
+      }
+
       const unpaidBills = (billsByCustomer.get(customer.id) ?? []).filter(
         (bill) => bill.status !== "lunas",
       );
@@ -205,6 +236,7 @@ export function readCustomerLifecycleFilter(): CustomerLifecycleKey {
   const stored = window.localStorage.getItem("customers.lifecycleFilter");
   if (
     stored === "trial" ||
+    stored === "perpanjangan" ||
     stored === "tertagih" ||
     stored === "jatuh_tempo" ||
     stored === "menunggak" ||

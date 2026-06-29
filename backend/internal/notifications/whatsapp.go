@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -112,7 +113,20 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 				rows.Close()
 			}
 
-			if len(bills) > 1 {
+			if len(bills) == 0 {
+				var b BillInfo
+				err := s.Logs.DB.QueryRowContext(ctx, `
+					SELECT t.periode, t.nominal, p.name
+					FROM tagihan t
+					JOIN pelanggan p ON t.pelanggan_id = p.id
+					WHERE t.id = ?
+				`, payload.BillID).Scan(&b.Period, &b.Nominal, &b.CustName)
+				if err == nil {
+					bills = append(bills, b)
+				}
+			}
+
+			if len(bills) >= 1 {
 				primaryName := bills[0].CustName
 				var builder strings.Builder
 				builder.WriteString(fmt.Sprintf("Pelanggan Yth,\nBapak/Ibu %s,\n\nTerimakasih Atas pembayaran Tagihan anda.\n", primaryName))
@@ -163,7 +177,20 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 				rows.Close()
 			}
 
-			if len(trials) > 1 {
+			if len(trials) == 0 {
+				var t TrialInfo
+				err := s.Logs.DB.QueryRowContext(ctx, `
+					SELECT t.periode, t.nominal, p.name, t.invoice_number, t.jatuh_tempo
+					FROM tagihan t
+					JOIN pelanggan p ON t.pelanggan_id = p.id
+					WHERE t.id = ?
+				`, payload.BillID).Scan(&t.Period, &t.Nominal, &t.CustName, &t.Invoice, &t.DueDate)
+				if err == nil {
+					trials = append(trials, t)
+				}
+			}
+
+			if len(trials) >= 1 {
 				primaryName := trials[0].CustName
 				dueDateFormatted := formatDateLabel(trials[0].DueDate)
 				var builder strings.Builder
@@ -366,11 +393,11 @@ func (s WhatsAppService) sendDirect(ctx context.Context, msg QueuedMessage) erro
 func (s WhatsAppService) accountIDForTrigger(ctx context.Context, triggerKey string) (string, error) {
 	settingKey := settings.KeyWAAccountID
 	switch triggerKey {
-	case "reminder-h5":
+	case "tagihan-h7", "reminder-h3", "reminder-h5":
 		settingKey = settings.KeyWAReminderAccountID
 	case "jatuh_tempo", "trial_expired":
 		settingKey = settings.KeyWADueAccountID
-	case "limit_5hari":
+	case "limit_5hari", "isolir_20hari":
 		settingKey = settings.KeyWALimitAccountID
 	case "lunas":
 		settingKey = settings.KeyWAPaymentAccountID
@@ -477,5 +504,74 @@ func formatDateLabel(raw string) string {
 		return raw
 	}
 	return value.Format("02-01-2006")
+}
+
+func (s WhatsAppService) ResolveChatbotSession(ctx context.Context, phone, accountID string) error {
+	urlVal, err := s.Settings.GetString(ctx, settings.KeyWAGatewayURL)
+	if err != nil {
+		return err
+	}
+	trimmedURL := strings.TrimSpace(urlVal)
+	if envValue := strings.TrimSpace(os.Getenv("WA_GATEWAY_URL")); envValue != "" && (trimmedURL == "" || trimmedURL == "http://localhost:3001") {
+		urlVal = envValue
+	}
+	if strings.TrimSpace(urlVal) == "" {
+		urlVal = os.Getenv("WA_GATEWAY_URL")
+	}
+	if strings.TrimSpace(urlVal) == "" {
+		urlVal = "http://localhost:3001"
+	}
+
+	apiKey, err := s.Settings.GetString(ctx, settings.KeyWAAPIKey)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(apiKey) == "" {
+		apiKey = os.Getenv("DASHBOARD_INTERNAL_API_KEY")
+	}
+	if strings.TrimSpace(apiKey) == "" {
+		return fmt.Errorf("WA API Key is not configured")
+	}
+
+	timeoutSecs, _ := s.Settings.GetInt(ctx, "wa_client_timeout_seconds")
+	if timeoutSecs <= 0 {
+		timeoutSecs = 15
+	}
+
+	client := s.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: time.Duration(timeoutSecs) * time.Second}
+	} else if client.Timeout == 0 {
+		client.Timeout = time.Duration(timeoutSecs) * time.Second
+	}
+
+	escPhone := url.QueryEscape(phone)
+	reqUrl := fmt.Sprintf("%s/api/v1/chatbot/sessions/%s/resolve", strings.TrimRight(urlVal, "/"), escPhone)
+
+	reqBody, err := json.Marshal(map[string]string{
+		"accountId": accountID,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal resolve request payload: %w", err)
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, reqUrl, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("create resolve request: %w", err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-API-Key", apiKey)
+
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("send resolve request HTTP: %w", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode >= 400 {
+		return fmt.Errorf("whatsapp gateway resolve chatbot session returned status %d", response.StatusCode)
+	}
+
+	return nil
 }
 

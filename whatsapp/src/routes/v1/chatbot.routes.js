@@ -94,4 +94,36 @@ router.delete('/forms/:id', (req, res) => {
     res.json({ status: 'success', message: 'Data form berhasil dihapus' });
 });
 
+/**
+ * POST /api/v1/chatbot/sessions/:phone/resolve
+ * Memberitahukan bahwa complaint telah diatasi, menghapus sesi WAITING_ADMIN, dan mengirimkan menu utama
+ */
+router.post('/sessions/:phone/resolve', async (req, res, next) => {
+    try {
+        const phone = decodeURIComponent(req.params.phone);
+        const { accountId } = req.body;
+        
+        // Normalize: if it doesn't end with @c.us and doesn't contain @, append it
+        const rawFrom = (phone.includes('@') || phone.endsWith('@c.us')) ? phone : `${phone}@c.us`;
+        
+        // 1. Delete chatbot session
+        deleteSession(rawFrom);
+        
+        // 2. Send resolved message
+        const { sendTextMessage } = require('../../services/whatsapp.service');
+        const accId = accountId || 'default';
+        await sendTextMessage(accId, rawFrom, "Complain Anda sudah diatasi.");
+        
+        // 3. Trigger main menu sending
+        const { handleMessage } = require('../../services/chatbot.service');
+        await handleMessage(rawFrom, '', accId, async (actId, to, text) => {
+            await sendTextMessage(actId, to, text);
+        });
+        
+        res.json({ status: 'success', message: `Complaint resolved and session reset for ${phone}` });
+    } catch (err) {
+        next(err);
+    }
+});
+
 module.exports = router;

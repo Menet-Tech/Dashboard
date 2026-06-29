@@ -13,7 +13,7 @@
 
 const logger = require('../utils/logger');
 const { getSession, upsertSession, deleteSession, saveContactForm } = require('../utils/database');
-const { findCustomerByPhone, findCustomersByPhone, findCustomerByID, getActiveBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket, getTemplateByTrigger, getAllTemplates, getSettings, getReferredCount, withdrawReferral, convertReferralToVoucher, getActiveTicket, getTicket, replyToTicket, updateCustomerWifi, claimVoucher, toggleAutoApplyVoucher, getCustomerVouchers, saveChatbotFormToBackend, getPendingConfirmation, uploadProofBase64, createPaymentConfirmation } = require('./isp.service');
+const { findCustomerByPhone, findCustomersByPhone, findCustomerByID, getActiveBill, getLatestBill, getPackageList, notifyAdminViaWA, notifyAdminViaDiscord, createTicket, getTemplateByTrigger, getAllTemplates, getSettings, getReferredCount, withdrawReferral, convertReferralToVoucher, getActiveTicket, getTicket, replyToTicket, updateCustomerWifi, claimVoucher, toggleAutoApplyVoucher, getCustomerVouchers, saveChatbotFormToBackend, getPendingConfirmation, uploadProofBase64, createPaymentConfirmation } = require('./isp.service');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -111,14 +111,14 @@ const getMenuReg = async (nama, phone, triggerBilling, triggerSupport, triggerPa
         text += `ketik 5 untuk melihat pertanyaan umum\n`;
         text += `ketik 6 untuk chat ke admin\n`;
         text += `ketik 7 untuk cek referral dan clain\n`;
-        text += `ketik 8 untuk ganti nama/password wifi`;
+        text += `ketik 8 untuk ganti nama/password wifi (BETA)`;
     } else {
         text += `ketik 2 jika ada kendala mengenai wifi\n`;
         text += `ketik 3 untuk melihat paket yang disediakan\n`;
         text += `ketik 4 untuk melihat pertanyaan umum\n`;
         text += `ketik 5 untuk chat ke admin\n`;
         text += `ketik 6 untuk cek referral dan clain\n`;
-        text += `ketik 7 untuk ganti nama/password wifi`;
+        text += `ketik 7 untuk ganti nama/password wifi (BETA)`;
     }
     return text;
 };
@@ -344,7 +344,7 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '',
                 return;
             }
             upsertSession(rawFrom, accountId, 'REG_WIFI_FORM_SSID', { ...formData, snOnt: customer.sn_ont });
-            await sendFn(accountId, rawFrom, "SSID dan Password apa yang ingin Anda gunakan?\n\nSilakan masukkan Nama WiFi (SSID) baru Anda:\n_(Ketik 'batal' untuk membatalkan)_");
+            await sendFn(accountId, rawFrom, "SSID dan Password apa yang ingin Anda gunakan?\n\n*Catatan:* Fitur ganti WiFi mandiri ini masih dalam tahap *BETA*. Jika terjadi kegagalan atau kendala, silakan laporkan via menu utama (ketik 2 untuk kendala wifi).\n\nSilakan masukkan Nama WiFi (SSID) baru Anda:\n_(Ketik 'batal' untuk membatalkan)_");
         } else if (optionKonfirmasi) {
             const customersList = await findCustomersByPhone(rawFrom);
             const unpaidBills = [];
@@ -369,7 +369,31 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '',
                 await sendFn(accountId, rawFrom, "Anda tidak memiliki tagihan aktif yang perlu dikonfirmasi saat ini.");
             }
             return;
-        } else if (matchTrigger(text, 'oke') || matchTrigger(text, 'siap') || matchTrigger(text, 'sudah') || matchTrigger(text, 'ya') || matchTrigger(text, 'ok') || matchTrigger(text, 'baik') || matchTrigger(text, 'sudah bayar') || matchTrigger(text, 'ya saya sudah bayar')) {
+        } else if (matchTrigger(text, 'oke') || matchTrigger(text, 'siap') || matchTrigger(text, 'baik') || matchTrigger(text, 'setuju') || matchTrigger(text, 'ok') || matchTrigger(text, 'oke siap')) {
+            const customersList = await findCustomersByPhone(rawFrom);
+            const unpaidBills = [];
+            for (const cust of customersList) {
+                if (cust.is_trial) continue;
+                const bill = await getActiveBill(cust.id);
+                if (bill && bill.status === 'belum_bayar') {
+                    const pendingConf = await getPendingConfirmation(bill.id);
+                    if (!pendingConf) {
+                        unpaidBills.push({ customer: cust, bill });
+                    }
+                }
+            }
+
+            if (unpaidBills.length > 0) {
+                upsertSession(rawFrom, accountId, 'WAITING_PROOF', {
+                    ...formData,
+                    unpaidBills: unpaidBills.map(item => ({ billId: item.bill.id, customerId: item.customer.id }))
+                });
+                await sendFn(accountId, rawFrom, `baik bapak/ibu ${customerName}, akan kami tunggu pembayaraanya. jika kamu menggunakan metode transfer, silahkan langsung kirimkan bukti screenshoot ke sini. terimakasih`);
+            } else {
+                await sendFn(accountId, rawFrom, "Anda tidak memiliki tagihan aktif yang perlu dikonfirmasi saat ini.");
+            }
+            return;
+        } else if (matchTrigger(text, 'sudah') || matchTrigger(text, 'sudah bayar') || matchTrigger(text, 'ya saya sudah bayar') || matchTrigger(text, 'ya')) {
             const customersList = await findCustomersByPhone(rawFrom);
             const unpaidBills = [];
             for (const cust of customersList) {
@@ -454,22 +478,8 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '',
                 return;
             }
 
-            try {
-                await withdrawReferral(customer.id, amount);
-                
-                // Notif Admin via WA & Discord
-                const cleanPhone = rawFrom.replace(/@c\.us$/, '').replace(/^\+/, '');
-                const linkNumber = cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone.replace(/^0/, '');
-                const alertMsg = `💸 *Permintaan Penarikan Tunai Referral*\nNama Pelanggan: ${customerName}\nNo HP: wa.me/+${linkNumber}\nNominal Pencairan: ${formatRp(amount)}\n\nMohon segera diproses transfernya ke pelanggan terkait.`;
-                
-                await notifyAdminViaWA({ phone: rawFrom, contactName: customerName, accountId }, sendFn, alertMsg);
-                await notifyAdminViaDiscord({ phone: rawFrom, contactName: customerName }, alertMsg);
-
-                await sendFn(accountId, rawFrom, `✅ *Penarikan Tunai Berhasil Diajukan!*\n\nPermintaan penarikan saldo sebesar *${formatRp(amount)}* telah kami catat.\nAdmin akan mentransfer dana tersebut ke bank/e-wallet Anda secepatnya.\n\nKetik *menu* untuk kembali.`);
-                upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
-            } catch (err) {
-                await sendFn(accountId, rawFrom, `❌ Gagal memproses penarikan: ${err.message}`);
-            }
+            upsertSession(rawFrom, accountId, 'WAIT_WITHDRAW_METHOD', { ...formData, withdrawAmount: amount });
+            await sendFn(accountId, rawFrom, `Pilih Metode Penarikan Saldo Referral Anda:\n\n1. Cash (Tunai - Admin akan mengantarkan ke rumah Anda)\n2. Transfer (Bank / E-Wallet)\n\nSilakan balas dengan angka *1* atau *2*:\n_(Ketik *menu* untuk membatalkan)_`);
         } else if (matchVoucher) {
             const amount = parseInt(matchVoucher[2], 10);
             if (amount <= 0) {
@@ -509,6 +519,74 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '',
         } else {
             // Jika input tidak dikenali, kirim ulang menu referral
             await sendReferralMenu(customerId, customerName, accountId, rawFrom, sendFn);
+        }
+        return;
+    }
+
+    // ── WAIT_WITHDRAW_METHOD ────────────────────────────────────────────────
+    if (state === 'WAIT_WITHDRAW_METHOD') {
+        const { customerId, customerName, withdrawAmount } = formData;
+        if (lower === 'batal' || lower === 'menu') {
+            upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            const mRegText = await getMenuReg(customerName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+            await sendFn(accountId, rawFrom, `❌ Penarikan saldo dibatalkan.\n\n${mRegText}`);
+            return;
+        }
+
+        if (text === '1') {
+            // Cash Method
+            try {
+                await withdrawReferral(customerId, withdrawAmount, 'cash', '');
+
+                const cleanPhone = rawFrom.replace(/@c\.us$/, '').replace(/^\+/, '');
+                const linkNumber = cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone.replace(/^0/, '');
+                const alertMsg = `💸 *Permintaan Penarikan Tunai (Cash) Referral*\nNama Pelanggan: ${customerName}\nNo HP: wa.me/+${linkNumber}\nNominal Pencairan: ${formatRp(withdrawAmount)}\nMetode: Cash\n\nMohon segera diproses manual ke rumah pelanggan.`;
+
+                await notifyAdminViaWA({ phone: rawFrom, contactName: customerName, accountId }, sendFn, alertMsg);
+                await notifyAdminViaDiscord({ phone: rawFrom, contactName: customerName }, alertMsg);
+
+                await sendFn(accountId, rawFrom, `✅ *Penarikan Tunai (Cash) Berhasil Diajukan!*\n\nPermintaan penarikan saldo sebesar *${formatRp(withdrawAmount)}* secara tunai telah dicatat.\nAdmin kami akan berkunjung ke rumah Anda untuk memberikan dana tunai dan mengambil foto dokumentasi bukti serah terima.\n\nKetik *menu* untuk kembali.`);
+                upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            } catch (err) {
+                await sendFn(accountId, rawFrom, `❌ Gagal memproses penarikan: ${err.message}`);
+                upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            }
+        } else if (text === '2') {
+            // Transfer Method -> wait for bank/wallet details
+            upsertSession(rawFrom, accountId, 'WAIT_WITHDRAW_TARGET', { ...formData });
+            await sendFn(accountId, rawFrom, `Silakan masukkan nama Bank / E-Wallet dan Nomor Rekening tujuan Anda.\n(Contoh: *Seabank 901096534584 a.n. Irfan Dharmawan*)\n\n_(Ketik *menu* untuk membatalkan)_`);
+        } else {
+            await sendFn(accountId, rawFrom, `Pilihan tidak valid. Silakan balas dengan angka *1* atau *2*:\n\n1. Cash (Tunai - Admin akan mengantarkan ke rumah Anda)\n2. Transfer (Bank / E-Wallet)\n\n_(Ketik *menu* untuk membatalkan)_`);
+        }
+        return;
+    }
+
+    // ── WAIT_WITHDRAW_TARGET ────────────────────────────────────────────────
+    if (state === 'WAIT_WITHDRAW_TARGET') {
+        const { customerId, customerName, withdrawAmount } = formData;
+        if (lower === 'batal' || lower === 'menu') {
+            upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+            const mRegText = await getMenuReg(customerName, triggerBilling, triggerSupport, triggerPackages, triggerFAQ, triggerAdmin);
+            await sendFn(accountId, rawFrom, `❌ Penarikan saldo dibatalkan.\n\n${mRegText}`);
+            return;
+        }
+
+        const paymentTarget = text;
+        try {
+            await withdrawReferral(customerId, withdrawAmount, 'transfer', paymentTarget);
+
+            const cleanPhone = rawFrom.replace(/@c\.us$/, '').replace(/^\+/, '');
+            const linkNumber = cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone.replace(/^0/, '');
+            const alertMsg = `💸 *Permintaan Penarikan Transfer Referral*\nNama Pelanggan: ${customerName}\nNo HP: wa.me/+${linkNumber}\nNominal Pencairan: ${formatRp(withdrawAmount)}\nMetode: Transfer\nTujuan Rekening: ${paymentTarget}\n\nMohon segera diproses transfer dan unggah bukti ke dashboard.`;
+
+            await notifyAdminViaWA({ phone: rawFrom, contactName: customerName, accountId }, sendFn, alertMsg);
+            await notifyAdminViaDiscord({ phone: rawFrom, contactName: customerName }, alertMsg);
+
+            await sendFn(accountId, rawFrom, `✅ *Penarikan Transfer Berhasil Diajukan!*\n\nPermintaan penarikan saldo sebesar *${formatRp(withdrawAmount)}* ke rekening *${paymentTarget}* telah dicatat.\nAdmin kami akan segera melakukan transfer dan mengunggah buktinya.\n\nKetik *menu* untuk kembali.`);
+            upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
+        } catch (err) {
+            await sendFn(accountId, rawFrom, `❌ Gagal memproses penarikan: ${err.message}`);
+            upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
         }
         return;
     }
@@ -554,7 +632,7 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '',
         } catch (err) {
             logger.error('[Chatbot] Failed to update WiFi ONT via GenieACS:', err.message);
             upsertSession(rawFrom, accountId, 'REG_MENU', { customerId, customerName });
-            await sendFn(accountId, rawFrom, `❌ *Gagal mengubah WiFi:* ${err.message || 'Koneksi ke GenieACS bermasalah'}.\n\nSilakan hubungi admin atau ketik *menu* untuk kembali.`);
+            await sendFn(accountId, rawFrom, `❌ *Gagal mengubah WiFi:* ${err.message || 'Koneksi ke GenieACS bermasalah'}.\n\n*Catatan:* Fitur ini masih tahap *BETA*. Jika terjadi kegagalan, silakan buat laporan kendala dengan mengetik *2* di menu utama agar dapat dibantu oleh teknisi kami secara manual.\n\nKetik *menu* untuk kembali.`);
         }
         return;
     }
@@ -778,8 +856,8 @@ Nomor WA: wa.me/+${linkNumber}`;
             }
             return;
         } else {
-            await sendFn(accountId, rawFrom, "Format tidak dikenal. Silakan kirim foto bukti transfer Anda, atau balas dengan *\"ya saya sudah bayar\"* jika membayar cash.\n_(Ketik 'batal' untuk membatalkan)_");
-            return;
+            upsertSession(rawFrom, accountId, 'REG_MENU', { ...formData });
+            return handleMessage(rawFrom, body, accountId, sendFn, contactName, rawMsg);
         }
     }
 
@@ -845,162 +923,131 @@ const sendBillInfo = async (customerId, customerName, accountId, to, sendFn) => 
     // Sort by customer ID to determine primary customer
     customersList.sort((a, b) => a.id - b.id);
     
-    if (customersList.length <= 1) {
-        const customer = customersList[0] || await findCustomerByID(customerId);
-        if (!customer) {
-            await sendFn(accountId, to, "Maaf, data pelanggan Anda tidak ditemukan.");
-            return;
+    if (customersList.length === 0) {
+        const customer = await findCustomerByID(customerId);
+        if (customer) {
+            customersList.push(customer);
         }
-        
-        if (customer.is_trial) {
-            let remainingDays = customer.trial_days || 3;
-            if (customer.trial_started_at) {
-                const start = new Date(customer.trial_started_at);
+    }
+
+    if (customersList.length === 0) {
+        await sendFn(accountId, to, "Maaf, data pelanggan Anda tidak ditemukan.");
+        return;
+    }
+
+    const allBillsInfo = [];
+    let hasUnpaid = false;
+    let totalUnpaidAmount = 0;
+    let totalUnpaidDiscount = 0;
+    const unpaidBillItems = [];
+    let latestDueDate = null;
+    let latestPeriod = "";
+
+    for (const cust of customersList) {
+        if (cust.is_trial) {
+            let remainingDays = cust.trial_days || 3;
+            if (cust.trial_started_at) {
+                const start = new Date(cust.trial_started_at);
                 const now = new Date();
                 const elapsedMs = now.getTime() - start.getTime();
                 const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
-                remainingDays = Math.max(0, customer.trial_days - elapsedDays);
+                remainingDays = Math.max(0, cust.trial_days - elapsedDays);
             }
-
-            const tpl = await getTemplateByTrigger('chatbot_trial');
-            if (tpl) {
-                const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customer.name, hari_limit: remainingDays });
-                await sendFn(accountId, to, msg);
-            } else {
-                await sendFn(accountId, to, `halo ${customer.name} terimakaish telah mengugunakan menet, kamu sedang ada di dalam masa trial, tidak akan ada tagihan selama ${remainingDays} hari kedepan, terimakasih.`);
-            }
-            await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
-            return;
+            allBillsInfo.push({
+                customer: cust,
+                bill: null,
+                isTrial: true,
+                remainingDays,
+                statusText: `Masa Trial (${remainingDays} hari tersisa)`
+            });
+            continue;
         }
 
-        const bill = await getActiveBill(customer.id);
+        const bill = await getLatestBill(cust.id);
         if (!bill) {
-            const now = new Date();
-            const periode = `${now.toLocaleString('id-ID', { month: 'long' })} ${now.getFullYear()}`;
-            const tpl = await getTemplateByTrigger('chatbot_no_bill');
-            if (tpl) {
-                const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customer.name, periode });
-                await sendFn(accountId, to, msg);
-            } else {
-                await sendFn(accountId, to,
-                    `halo ${customer.name}, kamu gak ada tagihan aktif di periode ${periode}, terimakasih telah menggunakan menet`
-                );
-            }
+            allBillsInfo.push({
+                customer: cust,
+                bill: null,
+                isTrial: false,
+                statusText: "Belum Ada Tagihan"
+            });
+            continue;
+        }
+
+        let statusText = "";
+        if (bill.status === 'lunas') {
+            statusText = "Lunas";
         } else {
             const pendingConf = await getPendingConfirmation(bill.id);
             if (pendingConf) {
-                if (pendingConf.bukti_transfer) {
-                    await sendFn(accountId, to, `halo ${customer.name}, Pembayaran Anda sedang dalam proses verifikasi (pending).`);
-                } else {
-                    await sendFn(accountId, to, `halo ${customer.name}, Pembayaran sedang dalam proses pengecekan.`);
-                }
+                statusText = pendingConf.bukti_transfer ? "Proses Verifikasi (Pending)" : "Proses Pengecekan";
             } else {
                 const isDue = new Date(bill.jatuh_tempo) < new Date();
-                if (isDue) {
-                    const tpl = await getTemplateByTrigger('chatbot_due_bill');
-                    if (tpl) {
-                        const msg = renderTemplate(tpl.content || tpl.isi_template, { nama: customer.name });
-                        await sendFn(accountId, to, msg);
-                    } else {
-                        await sendFn(accountId, to,
-                            `halo ${customer.name}, tagihan kamu sudah jatuh tempo, mohon segera di bayar, agar service tidak terganggu`
-                        );
-                    }
-                } else {
-                    const tpl = await getTemplateByTrigger('chatbot_active_bill');
-                    if (tpl) {
-                        const msg = renderTemplate(tpl.content || tpl.isi_template, {
-                            nama: customer.name,
-                            periode: bill.periode,
-                            nominal: formatRp(bill.nominal),
-                            jatuh_tempo: formatDate(bill.jatuh_tempo)
-                        });
-                        await sendFn(accountId, to, msg);
-                    } else {
-                        await sendFn(accountId, to,
-                            `halo ${customer.name}, kamu punya tagihan aktif untuk periode ${bill.periode} dengan nominal sebesar ${formatRp(bill.nominal)}, dan akan jatuh tempo pada ${formatDate(bill.jatuh_tempo)}.`
-                        );
-                    }
-                }
+                statusText = isDue ? "Jatuh Tempo (Belum Dibayar)" : "Belum Dibayar";
+                
+                hasUnpaid = true;
+                totalUnpaidAmount += Number(bill.nominal);
+                totalUnpaidDiscount += Number(bill.diskon || 0) + Number(bill.diskon_referral || 0);
+                unpaidBillItems.push({ customer: cust, bill });
+                latestDueDate = bill.jatuh_tempo;
+                latestPeriod = bill.periode;
             }
         }
-        await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
-        return;
+
+        allBillsInfo.push({
+            customer: cust,
+            bill,
+            isTrial: false,
+            statusText
+        });
     }
 
-    // MULTIPLE CUSTOMER ACCOUNTS FLOW
     const primaryCustomer = customersList[0];
-    const unpaidBills = [];
-    const pendingBills = [];
-    for (const cust of customersList) {
-        if (cust.is_trial) continue;
-        const bill = await getActiveBill(cust.id);
-        if (bill && bill.status === 'belum_bayar') {
-            const pendingConf = await getPendingConfirmation(bill.id);
-            if (pendingConf) {
-                pendingBills.push({ customer: cust, bill, pendingConf });
-            } else {
-                unpaidBills.push({ customer: cust, bill });
+    let msg = `Halo ${primaryCustomer.name}, berikut detail tagihan Anda:\n\n`;
+    for (let i = 0; i < allBillsInfo.length; i++) {
+        const item = allBillsInfo[i];
+        if (item.isTrial) {
+            msg += `Nama Terdaftar: ${item.customer.name}
+Paket: ${item.customer.package_name || 'Trial Internet'}
+Status: ${item.statusText}`;
+        } else if (!item.bill) {
+            msg += `Nama Terdaftar: ${item.customer.name}
+Paket: ${item.customer.package_name || 'Internet'}
+Status: ${item.statusText}`;
+        } else {
+            msg += `Nama Terdaftar: ${item.customer.name}
+Paket: ${item.customer.package_name || item.bill.package_name || 'Internet'}
+Periode: ${item.bill.periode}
+Nominal: ${formatRp(item.bill.nominal)}
+Jatuh Tempo: ${formatDate(item.bill.jatuh_tempo)}
+Status Tagihan: ${item.statusText}`;
+        }
+        if (i < allBillsInfo.length - 1) {
+            msg += `\n\n--------------------\n\n`;
+        }
+    }
+
+    if (hasUnpaid) {
+        msg += `\n\n====================\n\n`;
+        if (unpaidBillItems.length > 1) {
+            let detailBlock = "";
+            for (const item of unpaidBillItems) {
+                const itemNominal = Number(item.bill.nominal);
+                const itemDiscount = Number(item.bill.diskon || 0) + Number(item.bill.diskon_referral || 0);
+                const originalPrice = itemNominal + itemDiscount;
+                detailBlock += `Nama : ${item.customer.name}\n> Paket: ${item.customer.package_name || item.bill.package_name || 'Internet'}\n> Harga: ${formatRp(originalPrice)}.\n`;
+                if (itemDiscount > 0) {
+                    detailBlock += `> Diskon: ${formatRp(itemDiscount)}.\n`;
+                }
+                detailBlock += `\n`;
             }
-        }
-    }
 
-    if (unpaidBills.length === 0 && pendingBills.length > 0) {
-        const hasProof = pendingBills.some(item => item.pendingConf.bukti_transfer);
-        if (hasProof) {
-            await sendFn(accountId, to, `Halo ${primaryCustomer.name}, Pembayaran Anda sedang dalam proses verifikasi (pending).`);
+            msg += `Tagihan Anda periode ${latestPeriod} sebesar ${formatRp(totalUnpaidAmount)}., dengan detail berikut\n\n${detailBlock}Total Tagihan: ${formatRp(totalUnpaidAmount)}.\n\n`;
         } else {
-            await sendFn(accountId, to, `Halo ${primaryCustomer.name}, Pembayaran sedang dalam proses pengecekan.`);
+            msg += `Total Tagihan Belum Dibayar: ${formatRp(totalUnpaidAmount)}\n\n`;
         }
-        await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
-        return;
-    }
 
-    if (unpaidBills.length === 0 && pendingBills.length === 0) {
-        const now = new Date();
-        const periode = `${now.toLocaleString('id-ID', { month: 'long' })} ${now.getFullYear()}`;
-        await sendFn(accountId, to, `Halo ${primaryCustomer.name}, semua akun Anda tidak memiliki tagihan aktif di periode ${periode}. Terima kasih telah menggunakan Menet.`);
-        await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
-        return;
-    }
-
-    if (unpaidBills.length === 1) {
-        const { customer, bill } = unpaidBills[0];
-        const isDue = new Date(bill.jatuh_tempo) < new Date();
-        if (isDue) {
-            await sendFn(accountId, to, `halo ${customer.name}, tagihan kamu sudah jatuh tempo, mohon segera di bayar, agar service tidak terganggu`);
-        } else {
-            await sendFn(accountId, to, `halo ${customer.name}, kamu punya tagihan aktif untuk periode ${bill.periode} dengan nominal sebesar ${formatRp(bill.nominal)}, dan akan jatuh tempo pada ${formatDate(bill.jatuh_tempo)}.`);
-        }
-        await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
-        return;
-    }
-
-    // Two or more unpaid bills: generate combined bill message
-    let totalAmount = 0;
-    let totalDiscount = 0;
-    let detailBlock = "";
-    let period = unpaidBills[0].bill.periode;
-    let dueDate = unpaidBills[0].bill.jatuh_tempo;
-
-    for (const item of unpaidBills) {
-        const itemNominal = Number(item.bill.nominal);
-        const itemDiscount = Number(item.bill.diskon || 0) + Number(item.bill.diskon_referral || 0);
-        const originalPrice = itemNominal + itemDiscount;
-        totalAmount += itemNominal;
-        totalDiscount += itemDiscount;
-
-        detailBlock += `Nama : ${item.customer.name}\n> Paket: ${item.customer.package_name || item.bill.package_name || 'Internet'}\n> Harga: ${formatRp(originalPrice)}.\n`;
-        if (itemDiscount > 0) {
-            detailBlock += `> Diskon: ${formatRp(itemDiscount)}.\n`;
-        }
-        detailBlock += `\n`;
-    }
-
-    let combinedMsg = `Tagihan Anda periode ${period} sebesar ${formatRp(totalAmount)}., dengan detail berikut
-
-${detailBlock}Total Tagihan: ${formatRp(totalAmount)}.\n\n`;
-    combinedMsg += `Mohon lakukan pembayaran sebelum tanggal ${formatDate(dueDate)} agar terhindar dari Pembatasan Layanan.
+        msg += `Mohon lakukan pembayaran sebelum tanggal ${formatDate(latestDueDate)} agar terhindar dari Pembatasan Layanan.
 
 Rekening Pembayaran:
 Bank Mandiri
@@ -1022,8 +1069,9 @@ Untuk konfirmasi pembayaran & Pengaduan kendala dapat menghubungi kami melalui P
 Atas perhatian dan kerja samanya, kami ucapkan terima kasih.
 Hormat kami,
 Tim Billing — MeNet Tech`;
+    }
 
-    await sendFn(accountId, to, combinedMsg);
+    await sendFn(accountId, to, msg);
     await sendFn(accountId, to, 'Ketik *menu* untuk kembali ke menu utama.');
 };
 

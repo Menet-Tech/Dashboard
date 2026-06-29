@@ -6,6 +6,7 @@ import { Loader2, Plus, RefreshCw, Check, AlertTriangle } from "lucide-react";
 import type { PackageItem } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
 import { fetchMikrotikIPPools, type MikrotikIPPoolItem, apiRequest } from "../../lib/api";
+import { useDialog } from "../../context/DialogContext";
 
 export type PackageFormState = {
   name: string;
@@ -63,6 +64,7 @@ export function PackagesPage({
 }: PackagesPageProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSyncOpen, setIsSyncOpen] = useState(false);
+  const { showAlert } = useDialog();
 
   // IP Pools list
   const [ipPools, setIpPools] = useState<MikrotikIPPoolItem[]>([]);
@@ -152,7 +154,7 @@ export function PackagesPage({
       .map(([name]) => name);
 
     if (selectedNames.length === 0) {
-      alert("Pilih minimal satu profil untuk diimpor.");
+      await showAlert("Pilih minimal satu profil untuk diimpor.");
       return;
     }
 
@@ -163,13 +165,13 @@ export function PackagesPage({
         body: JSON.stringify({ names: selectedNames }),
       });
 
-      alert(`Berhasil mengimpor ${data.imported} paket internet.`);
+      await showAlert(`Berhasil mengimpor ${data.imported} paket internet.`);
       setIsSyncOpen(false);
       if (onRefresh) {
         onRefresh();
       }
     } catch (err: any) {
-      alert(err.message || String(err));
+      await showAlert(err.message || String(err));
     } finally {
       setSyncLoading(false);
     }

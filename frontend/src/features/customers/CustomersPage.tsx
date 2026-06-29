@@ -9,6 +9,7 @@ import type { CustomerLifecycleFilter } from "../../hooks/useCustomers";
 import { formatCurrency } from "../../utils/format";
 import { displayStatusLabel, displayStatusTone } from "../../utils/status";
 import { bulkUpdateCustomerStatus } from "../../lib/api";
+import { useDialog } from "../../context/DialogContext";
 
 import { CustomerFormCard } from "./components/CustomerFormCard";
 import { BroadcastModal } from "./components/BroadcastModal";
@@ -109,6 +110,7 @@ export function CustomersPage({
   onEndTrial,
 }: CustomersPageProps) {
   const [selectedIds, setSelectedIds] = useState<Record<number, boolean>>({});
+  const { showAlert, showConfirm } = useDialog();
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const [detailedCustomer, setDetailedCustomer] = useState<CustomerItem | null>(null);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
@@ -260,7 +262,7 @@ export function CustomersPage({
       confirmMsg = `Ubah status ${ids.length} pelanggan terpilih menjadi ${selectedStatus}?`;
     } else if (bulkActionType === "package") {
       if (!selectedPackageId) {
-        alert("Pilih paket internet terlebih dahulu!");
+        await showAlert("Pilih paket internet terlebih dahulu!");
         return;
       }
       payload.paket_id = selectedPackageId;
@@ -268,7 +270,7 @@ export function CustomersPage({
       confirmMsg = `Ubah paket ${ids.length} pelanggan terpilih menjadi ${pkgName}?`;
     } else if (bulkActionType === "odp") {
       if (selectedOdpId === null) {
-        alert("Pilih ODP terlebih dahulu!");
+        await showAlert("Pilih ODP terlebih dahulu!");
         return;
       }
       payload.odp_id = selectedOdpId === -1 ? null : selectedOdpId;
@@ -276,7 +278,7 @@ export function CustomersPage({
       confirmMsg = `Ubah ODP ${ids.length} pelanggan terpilih menjadi ${odpName}?`;
     } else if (bulkActionType === "referral") {
       if (selectedReferredById === null) {
-        alert("Pilih referral terlebih dahulu!");
+        await showAlert("Pilih referral terlebih dahulu!");
         return;
       }
       payload.referred_by_id = selectedReferredById === -1 ? null : selectedReferredById;
@@ -286,7 +288,7 @@ export function CustomersPage({
       confirmMsg = `HAPUS secara permanen ${ids.length} pelanggan terpilih beserta semua PPP secret mereka di MikroTik? Tindakan ini tidak dapat dibatalkan!`;
     }
 
-    if (window.confirm(confirmMsg)) {
+    if (await showConfirm(confirmMsg)) {
       try {
         if (bulkActionType === "delete") {
           await onDeleteBulk(ids);
@@ -391,6 +393,7 @@ export function CustomersPage({
                 <option value="exclude_inactive">Semua Kecuali Inactive</option>
                 <option value="all">Semua (Termasuk Inactive)</option>
                 <option value="trial">Trial Aktif</option>
+                <option value="perpanjangan">Perpanjangan</option>
                 <option value="tertagih">Tertagih</option>
                 <option value="jatuh_tempo">Jatuh Tempo</option>
                 <option value="menunggak">Menunggak</option>

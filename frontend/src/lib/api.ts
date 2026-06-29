@@ -621,17 +621,57 @@ export function apiRequest<T>(path: string, options: RequestInit = {}): Promise<
   return request<T>(path, options);
 }
 
-export function withdrawReferral(id: number, amount: number) {
-  return request<{ message: string }>(`/api/v1/customers/${id}/referral/withdraw`, {
+export const REFERRAL_WITHDRAWAL_AMOUNT = 50_000;
+
+export function withdrawReferral(id: number, method?: string, paymentTarget?: string) {
+  return request<{ message: string; id?: number }>(`/api/v1/customers/${id}/referral/withdraw`, {
     method: "POST",
-    body: JSON.stringify({ amount }),
+    body: JSON.stringify({ amount: REFERRAL_WITHDRAWAL_AMOUNT, method, payment_target: paymentTarget }),
   });
 }
 
-export function convertReferralToVoucher(id: number, amount: number) {
+export type ReferralWithdrawalItem = {
+  id: number;
+  customer_id: number;
+  customer_name: string;
+  customer_phone: string;
+  amount: number;
+  method: string;
+  payment_target: string;
+  period: string;
+  status: "pending" | "completed" | "rejected";
+  proof_path?: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export function fetchReferralWithdrawals(status?: string) {
+  const path = status ? `/api/v1/referral/withdrawals?status=${status}` : `/api/v1/referral/withdrawals`;
+  return request<{ data: ReferralWithdrawalItem[] }>(path);
+}
+
+export function completeReferralWithdrawal(id: number, proofFile: File, notes: string) {
+  const formData = new FormData();
+  formData.append("proof", proofFile);
+  formData.append("notes", notes);
+  return request<{ message: string; proof_path: string }>(`/api/v1/referral/withdrawals/${id}/complete`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export function rejectReferralWithdrawal(id: number, notes: string) {
+  return request<{ message: string }>(`/api/v1/referral/withdrawals/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ notes }),
+  });
+}
+
+export function convertReferralToVoucher(id: number) {
   return request<{ message: string }>(`/api/v1/customers/${id}/referral/convert-voucher`, {
     method: "POST",
-    body: JSON.stringify({ amount }),
+    body: JSON.stringify({ amount: REFERRAL_WITHDRAWAL_AMOUNT }),
   });
 }
 
@@ -681,6 +721,9 @@ export type GacsDevice = {
     uptime?: string;
     wan_ip?: string;
   };
+  customer_id?: number;
+  customer_name?: string;
+  is_registered?: boolean;
 };
 
 export type VPValue = {

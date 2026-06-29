@@ -733,7 +733,10 @@ export default function App() {
 
           {view === "tickets" ? (
             <Suspense fallback={<SkeletonCard />}>
-              <TicketsPage />
+              <TicketsPage
+                waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
+                waApiKey={settingsHook.state.settingsForm.wa_api_key}
+              />
             </Suspense>
           ) : null}
           {view === "registration" ? (
