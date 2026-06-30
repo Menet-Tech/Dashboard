@@ -178,8 +178,12 @@ func TestHealthHandlerWhatsAppConfiguredUsesSettingsURL(t *testing.T) {
 }
 
 func TestHealthHandlerWhatsAppIgnoresEnvWithoutAPIKeySetting(t *testing.T) {
+	// Env var WA_GATEWAY_URL is present, but WA API key is absent both from
+	// env (DASHBOARD_INTERNAL_API_KEY) and from the settings DB.
+	// Health handler must report whatsapp_configured = false in this case.
 	t.Setenv("WA_GATEWAY_URL", "http://env-only.invalid")
-	_ = os.Unsetenv("WA_API_KEY")
+	t.Setenv("DASHBOARD_INTERNAL_API_KEY", "") // clear env fallback used by settings.GetString
+	_ = os.Unsetenv("WA_API_KEY")              // legacy env var
 
 	db := handlerTestDB(t)
 	svc := settings.Service{Repository: settings.Repository{DB: db}}

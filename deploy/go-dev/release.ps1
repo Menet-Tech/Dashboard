@@ -60,8 +60,12 @@ Write-Host "=========================================================" -Foregrou
 # ─── Step 1: Clean & prepare Releases directory ──────────────────────────────
 Write-Step 1 $TOTAL_STEPS "Membersihkan dan mempersiapkan folder Releases..."
 
+# Bersihkan isi Releases, kecuali folder backend (agar storage tidak terhapus)
 Get-ChildItem -Path $releasesDir -ErrorAction SilentlyContinue | Where-Object {
-    $_.Name -notin @("backend")
+    $_.Name -eq "backend"  # folder backend dipertahankan (isinya akan dibersihkan di bawah)
+} | Out-Null
+Get-ChildItem -Path $releasesDir -ErrorAction SilentlyContinue | Where-Object {
+    $_.Name -ne "backend"  # hapus semua selain backend (termasuk Linux-installer.sh lama)
 } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
 # Bersihkan isi backend kecuali storage
@@ -82,6 +86,12 @@ Write-Step 2 $TOTAL_STEPS "Menjalankan backend tests..."
 Push-Location (Join-Path $repoRoot "backend")
 try {
     go test ./... -timeout 120s
+    # PowerShell tidak otomatis throw pada exit code non-0 dari program eksternal.
+    # Kita harus cek $LASTEXITCODE secara eksplisit.
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "Backend tests GAGAL! Perbaiki test yang gagal sebelum build release."
+        exit 1
+    }
     Write-OK "Semua backend tests lulus"
 }
 finally {
@@ -111,8 +121,9 @@ try {
     Write-OK "binary: $integrationOut\discord-bot"
 }
 finally {
-    $env:GOOS = $null
-    $env:GOARCH = $null
+    # Hapus env var dengan benar agar tidak meninggalkan string kosong
+    if (Test-Path Env:GOOS)   { Remove-Item Env:GOOS }
+    if (Test-Path Env:GOARCH) { Remove-Item Env:GOARCH }
     Pop-Location
 }
 
@@ -211,20 +222,14 @@ foreach ($svc in $serviceFiles) {
     }
 }
 
-# Salin Linux-installer.sh ke root Releases
-$installerSrc = Join-Path $repoRoot "Releases\Linux-installer.sh"
-if (Test-Path $installerSrc) {
-    Write-OK "Linux-installer.sh sudah ada di Releases\"
+# Salin Linux-installer.sh ke root Releases (SELALU dari sumber, agar selalu terbaru)
+$fallbackInstaller = Join-Path $productionDir "install.sh"
+if (Test-Path $fallbackInstaller) {
+    Copy-Item -Path $fallbackInstaller -Destination (Join-Path $releasesDir "Linux-installer.sh") -Force
+    Write-OK "Linux-installer.sh disalin dari deploy\production\install.sh"
 }
 else {
-    $fallbackInstaller = Join-Path $productionDir "install.sh"
-    if (Test-Path $fallbackInstaller) {
-        Copy-Item -Path $fallbackInstaller -Destination (Join-Path $releasesDir "Linux-installer.sh") -Force
-        Write-OK "Linux-installer.sh disalin dari deploy\production\install.sh"
-    }
-    else {
-        Write-Warn "install.sh tidak ditemukan di deploy\production\"
-    }
+    Write-Warn "install.sh tidak ditemukan di deploy\production\ - Linux-installer.sh tidak akan ada di Releases!"
 }
 
 # ─── Step 8: Verify & Print Summary ─────────────────────────────────────────

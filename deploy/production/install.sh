@@ -1,234 +1,492 @@
 #!/usr/bin/env bash
 ################################################################################
-# Menet-Tech Production Installer for Custom Release Bundle
-# 
+# Menet-Tech Production Installer
+#
 # Usage:
 #   chmod +x Linux-installer.sh
 #   sudo ./Linux-installer.sh
+#
+# Yang dilakukan script ini:
+#   1. Install semua dependensi sistem (Node.js, nginx, puppeteer libs)
+#   2. Buat user sistem 'menettech'
+#   3. Salin semua file ke /opt/menettech-go/
+#   4. Buat .env backend otomatis (IP server terdeteksi otomatis)
+#   5. Install node_modules & download Chrome untuk WhatsApp Gateway
+#   6. Konfigurasi nginx sebagai reverse proxy (port 80)
+#   7. Pasang dan jalankan semua systemd services
+#   8. Tampilkan panduan akses
 ################################################################################
 
 set -euo pipefail
 
-# Colors
+# ─── Warna output ──────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m'
 
 INSTALL_DIR="/opt/menettech-go"
 SERVICE_USER="menettech"
 SERVICE_GROUP="menettech"
+NGINX_CONF="/etc/nginx/sites-available/menettech"
 
-log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
-log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
-log_warn() { echo -e "${YELLOW}[!]${NC} $*"; }
-log_error() { echo -e "${RED}[✗]${NC} $*"; }
+log_info()    { echo -e "${BLUE}[INFO]${NC}    $*"; }
+log_success() { echo -e "${GREEN}[✓]${NC}      $*"; }
+log_warn()    { echo -e "${YELLOW}[!]${NC}      $*"; }
+log_error()   { echo -e "${RED}[✗]${NC}      $*"; exit 1; }
+log_step()    { echo -e "\n${BOLD}${CYAN}━━━ $* ━━━${NC}"; }
 
-# 1. Validation & Dependency Installation
+# ─── Harus root ────────────────────────────────────────────────────────────────
 if [[ $EUID -ne 0 ]]; then
-    log_error "Script ini harus dijalankan sebagai root (gunakan: sudo ./Linux-installer.sh)"
+    echo -e "${RED}[✗] Script ini harus dijalankan sebagai root:${NC}"
+    echo -e "    sudo ./Linux-installer.sh"
     exit 1
 fi
 
-log_info "Memulai instalasi dependensi sistem untuk VM baru..."
+# ─── Deteksi IP Server dari 'ip a' (antarmuka ke-2, non-loopback) ─────────────
+SERVER_IP=$(ip -4 addr show scope global | awk '/inet /{match($2, /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/, a); if (a[1] != "") {print a[1]; exit}}')
+if [[ -z "${SERVER_IP}" ]]; then
+    SERVER_IP="127.0.0.1"
+    log_warn "IP server tidak terdeteksi otomatis, menggunakan 127.0.0.1 sebagai fallback."
+else
+    log_success "IP server terdeteksi: ${SERVER_IP}"
+fi
 
-# Update apt-get
-log_info "Mengupdate package list index (apt-get update)..."
-apt-get update -y
+echo ""
+echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
+echo -e "${BOLD}${GREEN}║    Menet-Tech Dashboard Go - Production Installer    ║${NC}"
+echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
+echo -e "  Install dir : ${INSTALL_DIR}"
+echo -e "  Server IP   : ${SERVER_IP}"
+echo -e "  Service user: ${SERVICE_USER}"
+echo ""
 
-# Install standard utilities
-log_info "Menginstal utilitas dasar (curl, wget, unzip, git, sqlite3, build-essential)..."
-apt-get install -y curl wget unzip git sqlite3 ca-certificates build-essential
+# ─── Input password admin sebelum instalasi dimulai ───────────────────────────
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BOLD}🔐 PENGATURAN PASSWORD ADMIN DASHBOARD${NC}"
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "Password ini akan digunakan untuk login pertama ke dashboard."
+echo -e "Minimal 8 karakter."
+echo ""
+while true; do
+    read -r -s -p "Masukkan password admin : " ADMIN_PASSWORD
+    echo ""
+    if [[ -z "${ADMIN_PASSWORD}" ]]; then
+        echo -e "${RED}Password tidak boleh kosong.${NC}"
+        continue
+    fi
+    if [[ ${#ADMIN_PASSWORD} -lt 8 ]]; then
+        echo -e "${RED}Password minimal 8 karakter.${NC}"
+        continue
+    fi
+    read -r -s -p "Konfirmasi password      : " ADMIN_PASSWORD_CONFIRM
+    echo ""
+    if [[ "${ADMIN_PASSWORD}" != "${ADMIN_PASSWORD_CONFIRM}" ]]; then
+        echo -e "${RED}Password tidak cocok! Silakan coba lagi.${NC}"
+        continue
+    fi
+    break
+done
+log_success "Password admin berhasil diatur"
+echo ""
 
-# Install Node.js if missing
-if ! command -v node &> /dev/null; then
-    log_info "Node.js tidak terdeteksi. Mengunduh dan menginstal Node.js v20 LTS..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
-    log_success "Node.js $(node -v) dan npm $(npm -v) berhasil diinstal."
+# ─── Konfigurasi nginx: domain name ──────────────────────────────────
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BOLD}🌐 KONFIGURASI NGINX (Web Server)${NC}"
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "Jika menggunakan domain (misal: dashboard.menet.my.id), isi di bawah."
+echo -e "Jika hanya pakai IP server, kosongkan saja (tekan Enter)."
+echo ""
+read -r -p "Domain name (kosongkan jika pakai IP): " DOMAIN_INPUT
+if [[ -n "${DOMAIN_INPUT}" ]]; then
+    DOMAIN_NAME="${DOMAIN_INPUT}"
+    log_success "Domain dikonfigurasi: ${DOMAIN_NAME}"
+else
+    DOMAIN_NAME="${SERVER_IP}"
+    log_info "Menggunakan IP server sebagai server_name: ${DOMAIN_NAME}"
+fi
+echo ""
+
+# ─── Tanya HTTPS / certbot ───────────────────────────────────────────
+SETUP_HTTPS="n"
+if [[ "${DOMAIN_NAME}" != "${SERVER_IP}" ]]; then
+    echo -e "Domain terdeteksi. Aktifkan HTTPS otomatis dengan Let's Encrypt (certbot)?"
+    echo -e "${YELLOW}Catatan: Domain harus sudah diarahkan (DNS A record) ke IP ${SERVER_IP} terlebih dahulu.${NC}"
+    read -r -p "Setup HTTPS dengan certbot? (y/N): " https_choice
+    if [[ "${https_choice}" =~ ^[Yy]$ ]]; then
+        SETUP_HTTPS="y"
+        read -r -p "Email untuk notifikasi Let's Encrypt (opsional, tekan Enter untuk skip): " LE_EMAIL
+        log_success "HTTPS akan dikonfigurasi setelah nginx berjalan"
+    else
+        log_info "Melewati setup HTTPS."
+    fi
+else
+    log_info "HTTPS memerlukan domain name, bukan IP. Melewati setup HTTPS."
+fi
+echo ""
+
+# ══════════════════════════════════════════════════════════════════════════════
+log_step "1/8 - Install Dependensi Sistem"
+# ══════════════════════════════════════════════════════════════════════════════
+log_info "Mengupdate package list..."
+apt-get update -y -q
+
+log_info "Menginstal utilitas dasar..."
+apt-get install -y -q curl wget unzip git sqlite3 ca-certificates build-essential iproute2
+
+log_info "Menginstal nginx..."
+apt-get install -y -q nginx
+log_success "nginx terinstal"
+
+# ─── Node.js v20 LTS ──────────────────────────────────────────────────────────
+if ! command -v node &>/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d 'v')" -lt 18 ]]; then
+    log_info "Menginstal Node.js v20 LTS..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
+    apt-get install -y -q nodejs
+    log_success "Node.js $(node -v) & npm $(npm -v) terinstal"
 else
     log_info "Node.js sudah terpasang: $(node -v)"
 fi
 
-# Install Puppeteer system dependencies
-log_info "Menginstal dependensi grafis untuk headless Chromium (Puppeteer)..."
-apt-get install -y libxss1 libasound2 libatk1.0-0 libatk-bridge2.0-0 libgconf-2-4 libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev libnss3
-log_success "Seluruh dependensi sistem berhasil diinstal!"
+# ─── Puppeteer / Chromium system libraries ────────────────────────────────────
+log_info "Menginstal library sistem untuk Chromium (Puppeteer)..."
+# Package names compatible across Ubuntu 20.04 / 22.04 / 24.04
+apt-get install -y -q \
+    libxss1 libatk1.0-0 libatk-bridge2.0-0 \
+    libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev libnss3 \
+    libdrm2 libxcomposite1 libxdamage1 libxrandr2 \
+    libxfixes3 libxkbcommon0 libpango-1.0-0 libcairo2 \
+    fonts-liberation libappindicator3-1 libasound2t64 2>/dev/null \
+    || apt-get install -y -q libasound2 2>/dev/null || true
+log_success "Library sistem untuk Chromium terinstal"
 
-# 2. Setup User & Group
-log_info "Setup system user: ${SERVICE_USER}"
-if ! id "${SERVICE_USER}" &>/dev/null 2>&1; then
+# ══════════════════════════════════════════════════════════════════════════════
+log_step "2/8 - Setup User Sistem"
+# ══════════════════════════════════════════════════════════════════════════════
+if ! id "${SERVICE_USER}" &>/dev/null; then
     useradd -r -s /bin/bash -d "${INSTALL_DIR}" -m "${SERVICE_USER}"
-    log_success "User ${SERVICE_USER} berhasil dibuat"
+    log_success "User '${SERVICE_USER}' berhasil dibuat"
 else
-    log_warn "User ${SERVICE_USER} sudah tersedia"
+    log_warn "User '${SERVICE_USER}' sudah tersedia, melewati pembuatan."
 fi
 
-# 3. Create Directory Structure
-log_info "Membuat directory structure di ${INSTALL_DIR}"
+# ══════════════════════════════════════════════════════════════════════════════
+log_step "3/8 - Buat Struktur Direktori"
+# ══════════════════════════════════════════════════════════════════════════════
 mkdir -p "${INSTALL_DIR}"/{backend/storage/{uploads,Backup},frontend,integration/whatsapp}
+log_success "Struktur direktori di ${INSTALL_DIR} siap"
 
-# 4. Copy Release Files (assuming script is run in extracted release folder root)
-log_info "Menyalin file rilis ke direktori instalasi..."
+# ══════════════════════════════════════════════════════════════════════════════
+log_step "4/8 - Salin File Rilis"
+# ══════════════════════════════════════════════════════════════════════════════
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Go backend
-if [[ -f "./backend/api" ]]; then
-    cp "./backend/api" "${INSTALL_DIR}/backend/"
-    chmod +x "${INSTALL_DIR}/backend/api"
+# ─── Backend binary ───────────────────────────────────────────────────────────
+if [[ -f "${SCRIPT_DIR}/backend/api" ]]; then
+    cp "${SCRIPT_DIR}/backend/api"    "${INSTALL_DIR}/backend/"
+    cp "${SCRIPT_DIR}/backend/api"    "${INSTALL_DIR}/backend/worker"
+    chmod +x "${INSTALL_DIR}/backend/api" "${INSTALL_DIR}/backend/worker"
+    log_success "Binary backend (api, worker) disalin"
+else
+    log_error "File backend/api tidak ditemukan di ${SCRIPT_DIR}/backend/. Pastikan script dijalankan dari folder release."
 fi
-if [[ -f "./backend/worker" ]]; then
-    cp "./backend/worker" "${INSTALL_DIR}/backend/"
-    chmod +x "${INSTALL_DIR}/backend/worker"
-elif [[ -f "./worker" ]]; then
-    cp "./worker" "${INSTALL_DIR}/backend/"
-    chmod +x "${INSTALL_DIR}/backend/worker"
-fi
 
-# Go backend configuration
+# ─── Backend .env (hanya buat jika belum ada) ────────────────────────────────
 if [[ ! -f "${INSTALL_DIR}/backend/.env" ]]; then
-    if [[ -f "./backend/.env" ]]; then
-        cp "./backend/.env" "${INSTALL_DIR}/backend/"
-        log_success "Konfigurasi .env disalin ke ${INSTALL_DIR}/backend/.env"
-    elif [[ -f "./backend/.env.example" ]]; then
-        cp "./backend/.env.example" "${INSTALL_DIR}/backend/.env"
-        log_warn "Membuat file .env baru dari .env.example di ${INSTALL_DIR}/backend/.env"
+    if [[ -f "${SCRIPT_DIR}/backend/.env.example" ]]; then
+        cp "${SCRIPT_DIR}/backend/.env.example" "${INSTALL_DIR}/backend/.env"
+        sed -i "s|SQLITE_PATH=.*|SQLITE_PATH=${INSTALL_DIR}/backend/storage/dashboard.db|g" "${INSTALL_DIR}/backend/.env"
+        sed -i "s|STORAGE_PATH=.*|STORAGE_PATH=${INSTALL_DIR}/backend/storage|g"            "${INSTALL_DIR}/backend/.env"
+        sed -i "s|FRONTEND_DIST_PATH=.*|FRONTEND_DIST_PATH=${INSTALL_DIR}/frontend|g"       "${INSTALL_DIR}/backend/.env"
+        # Terapkan password yang sudah diinput sebelumnya
+        # Escape karakter khusus di password agar aman untuk sed
+        ADMIN_PASSWORD_ESCAPED=$(printf '%s\n' "${ADMIN_PASSWORD}" | sed 's/[\&/|]/\\&/g')
+        sed -i "s|BOOTSTRAP_ADMIN_PASSWORD=.*|BOOTSTRAP_ADMIN_PASSWORD=${ADMIN_PASSWORD_ESCAPED}|g" "${INSTALL_DIR}/backend/.env"
+        log_success "File .env backend dibuat, password admin telah diset"
     fi
 else
-    log_info "File ${INSTALL_DIR}/backend/.env sudah ada. Melewati penyalinan."
+    log_info "File .env backend sudah ada, melewati penyalinan."
+    log_warn "Password yang Anda input tidak diterapkan ke .env yang sudah ada."
 fi
 
-# Frontend
-if [[ -d "./frontend" ]]; then
-    cp -r ./frontend/* "${INSTALL_DIR}/frontend/"
-elif [[ -d "./Frontend/frontend" ]]; then
-    cp -r ./Frontend/frontend/* "${INSTALL_DIR}/frontend/"
+# ─── Frontend (static files) ─────────────────────────────────────────────────
+if [[ -d "${SCRIPT_DIR}/frontend" ]] && [[ -n "$(ls -A "${SCRIPT_DIR}/frontend" 2>/dev/null)" ]]; then
+    cp -r "${SCRIPT_DIR}/frontend/." "${INSTALL_DIR}/frontend/"
+    log_success "File frontend disalin ke ${INSTALL_DIR}/frontend/"
+else
+    log_warn "Folder frontend tidak ditemukan atau kosong."
 fi
 
-# Integration
-if [[ -f "./integration/discord-bot" ]]; then
-    cp "./integration/discord-bot" "${INSTALL_DIR}/integration/"
+# ─── Discord Bot binary ───────────────────────────────────────────────────────
+if [[ -f "${SCRIPT_DIR}/integration/discord-bot" ]]; then
+    cp "${SCRIPT_DIR}/integration/discord-bot" "${INSTALL_DIR}/integration/"
     chmod +x "${INSTALL_DIR}/integration/discord-bot"
-elif [[ -f "./Intergration/discord-bot" ]]; then
-    cp "./Intergration/discord-bot" "${INSTALL_DIR}/integration/"
-    chmod +x "${INSTALL_DIR}/integration/discord-bot"
+    log_success "Binary discord-bot disalin"
 fi
 
+# ─── Discord Bot .env (hanya buat jika belum ada) ────────────────────────────
 if [[ ! -f "${INSTALL_DIR}/integration/.env" ]]; then
-    if [[ -f "./integration/.env" ]]; then
-        cp "./integration/.env" "${INSTALL_DIR}/integration/"
-        log_success "Konfigurasi .env disalin ke ${INSTALL_DIR}/integration/.env"
-    elif [[ -f "./integration/.env.example" ]]; then
-        cp "./integration/.env.example" "${INSTALL_DIR}/integration/.env"
-        log_warn "Membuat file .env baru dari .env.example di ${INSTALL_DIR}/integration/.env"
+    if [[ -f "${SCRIPT_DIR}/integration/.env.example" ]]; then
+        cp "${SCRIPT_DIR}/integration/.env.example" "${INSTALL_DIR}/integration/.env"
+        sed -i "s|SQLITE_PATH=.*|SQLITE_PATH=${INSTALL_DIR}/backend/storage/dashboard.db|g" "${INSTALL_DIR}/integration/.env"
+        log_success "File .env discord-bot dibuat"
+        log_warn "Isi DISCORD_BOT_TOKEN dan DISCORD_APPLICATION_ID di ${INSTALL_DIR}/integration/.env (atau lewat Settings UI)"
     fi
 else
-    log_info "File ${INSTALL_DIR}/integration/.env sudah ada. Melewati penyalinan."
+    log_info "File .env discord-bot sudah ada, melewati penyalinan."
 fi
 
-if [[ -d "./integration/whatsapp" ]]; then
-    cp -r ./integration/whatsapp/* "${INSTALL_DIR}/integration/whatsapp/"
-elif [[ -d "./Intergration/Whatsapp" ]]; then
-    cp -r ./Intergration/Whatsapp/* "${INSTALL_DIR}/integration/whatsapp/"
+# ─── WhatsApp Gateway source ─────────────────────────────────────────────────
+if [[ -d "${SCRIPT_DIR}/integration/whatsapp" ]] && [[ -n "$(ls -A "${SCRIPT_DIR}/integration/whatsapp" 2>/dev/null)" ]]; then
+    cp -r "${SCRIPT_DIR}/integration/whatsapp/." "${INSTALL_DIR}/integration/whatsapp/"
+    log_success "Source WhatsApp Gateway disalin"
+else
+    log_warn "Folder integration/whatsapp tidak ditemukan atau kosong."
 fi
 
+# ─── WhatsApp .env (hanya buat jika belum ada) ───────────────────────────────
 if [[ ! -f "${INSTALL_DIR}/integration/whatsapp/.env" ]]; then
     if [[ -f "${INSTALL_DIR}/integration/whatsapp/.env.example" ]]; then
         cp "${INSTALL_DIR}/integration/whatsapp/.env.example" "${INSTALL_DIR}/integration/whatsapp/.env"
-        log_warn "Membuat file .env baru dari .env.example di ${INSTALL_DIR}/integration/whatsapp/.env"
+        # Sesuaikan URL dashboard API dan public URL otomatis
+        sed -i "s|DASHBOARD_API_URL=.*|DASHBOARD_API_URL=http://127.0.0.1:8080|g"  "${INSTALL_DIR}/integration/whatsapp/.env"
+        sed -i "s|PUBLIC_URL=.*|PUBLIC_URL=http://${SERVER_IP}|g"                   "${INSTALL_DIR}/integration/whatsapp/.env"
+        log_success "File .env WhatsApp Gateway dibuat"
+        log_warn "Isi API_KEY dan DASHBOARD_INTERNAL_API_KEY di ${INSTALL_DIR}/integration/whatsapp/.env"
     fi
+else
+    log_info "File .env WhatsApp Gateway sudah ada, melewati penyalinan."
 fi
 
-# 5. Install Node Dependencies for WhatsApp Gateway
-log_info "Menginstall Node dependencies untuk WhatsApp Gateway..."
+# ══════════════════════════════════════════════════════════════════════════════
+log_step "5/8 - Install Node Modules & Download Chrome (WhatsApp)"
+# ══════════════════════════════════════════════════════════════════════════════
+# Perbaiki kepemilikan terlebih dahulu agar npm berjalan sebagai user yang benar
+chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
+
 (
     cd "${INSTALL_DIR}/integration/whatsapp"
-    if command -v npm &> /dev/null; then
-        # Ensure correct folder ownership before running npm as service user
-        chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
-        
-        # Run npm install as the service user to avoid root permission issues
+    if command -v npm &>/dev/null; then
+        log_info "Menjalankan npm install sebagai user '${SERVICE_USER}'..."
+        # HOME harus menunjuk ke direktori home user agar npm cache tersimpan dengan benar
         if [[ -f "package-lock.json" ]]; then
-            sudo -u "${SERVICE_USER}" npm ci --omit=dev
+            sudo -u "${SERVICE_USER}" HOME="${INSTALL_DIR}" npm ci --omit=dev 2>&1 || \
+            sudo -u "${SERVICE_USER}" HOME="${INSTALL_DIR}" npm install --omit=dev 2>&1
         else
-            sudo -u "${SERVICE_USER}" npm install --omit=dev
+            sudo -u "${SERVICE_USER}" HOME="${INSTALL_DIR}" npm install --omit=dev 2>&1
+        fi
+        log_success "node_modules WhatsApp Gateway terinstal"
+
+        # Download Chrome menggunakan binary puppeteer LOKAL (bukan npx global)
+        # PUPPETEER_CACHE_DIR disetel eksplisit ke HOME/.cache/puppeteer agar konsisten
+        log_info "Mengunduh Chrome binary untuk Puppeteer..."
+        PUPPETEER_BIN="${INSTALL_DIR}/integration/whatsapp/node_modules/.bin/puppeteer"
+        if [[ -f "${PUPPETEER_BIN}" ]]; then
+            sudo -u "${SERVICE_USER}" \
+                HOME="${INSTALL_DIR}" \
+                PUPPETEER_CACHE_DIR="${INSTALL_DIR}/.cache/puppeteer" \
+                "${PUPPETEER_BIN}" browsers install chrome 2>&1 && \
+                log_success "Chrome binary berhasil diunduh ke ${INSTALL_DIR}/.cache/puppeteer" || \
+                log_warn "Gagal mengunduh Chrome via local binary. Lihat log di atas."
+        else
+            log_warn "Binary puppeteer lokal tidak ditemukan (${PUPPETEER_BIN}). npm install mungkin gagal."
         fi
 
-        # Download the specific Chrome binary required by Puppeteer under the service user
-        log_info "Mengunduh Chrome binary resmi untuk Puppeteer..."
-        sudo -u "${SERVICE_USER}" npx puppeteer browsers install chrome || {
-            log_warn "Gagal mengunduh Chrome dengan user ${SERVICE_USER}. Mencoba sebagai root..."
-            npx puppeteer browsers install chrome || true
-        }
+        # Set PUPPETEER_CACHE_DIR di .env WhatsApp agar runtime tahu path Chrome
+        if [[ -f "${INSTALL_DIR}/integration/whatsapp/.env" ]]; then
+            if ! grep -q "PUPPETEER_CACHE_DIR" "${INSTALL_DIR}/integration/whatsapp/.env"; then
+                echo "PUPPETEER_CACHE_DIR=${INSTALL_DIR}/.cache/puppeteer" >> "${INSTALL_DIR}/integration/whatsapp/.env"
+                log_success "PUPPETEER_CACHE_DIR ditambahkan ke .env WhatsApp"
+            fi
+        fi
     else
-        log_error "npm tidak ditemukan. Silakan jalankan npm install manual di ${INSTALL_DIR}/integration/whatsapp setelah instalasi selesai."
+        log_warn "npm tidak ditemukan. Jalankan manual:\n  cd ${INSTALL_DIR}/integration/whatsapp && npm install --omit=dev\n  ./node_modules/.bin/puppeteer browsers install chrome"
     fi
 )
 
-# 6. Apply Permissions
-log_info "Mengatur kepemilikan dan izin folder..."
+# ──────────────────────────────────────────────────────────────────────────────
+log_step "6/8 - Konfigurasi nginx (Port 80 → Reverse Proxy)"
+# ──────────────────────────────────────────────────────────────────────────────
+# Hapus konfigurasi default nginx
+if [[ -f /etc/nginx/sites-enabled/default ]]; then
+    rm -f /etc/nginx/sites-enabled/default
+fi
+
+# Buat konfigurasi nginx dengan server_name dari input user
+cat > "${NGINX_CONF}" <<NGINX_EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME} _;
+
+    # Serve frontend static files langsung via nginx (performa lebih baik)
+    root ${INSTALL_DIR}/frontend;
+    index index.html;
+
+    # API backend - forward ke Go API
+    location /api/ {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 120s;
+        client_max_body_size 50M;
+    }
+
+    # WhatsApp Gateway API
+    location /wa/ {
+        proxy_pass         http://127.0.0.1:3001/;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_read_timeout 120s;
+    }
+
+    # SPA fallback - semua route non-file diarahkan ke index.html
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    # Upload storage
+    location /storage/ {
+        alias ${INSTALL_DIR}/backend/storage/;
+        expires 7d;
+        add_header Cache-Control "public";
+    }
+}
+NGINX_EOF
+
+# Aktifkan konfigurasi nginx
+ln -sf "${NGINX_CONF}" /etc/nginx/sites-enabled/menettech
+
+# Validasi dan restart nginx
+if nginx -t 2>/dev/null; then
+    systemctl enable nginx
+    systemctl restart nginx
+    log_success "nginx dikonfigurasi dan berjalan di port 80 (server_name: ${DOMAIN_NAME})"
+else
+    log_warn "Konfigurasi nginx gagal divalidasi. Jalankan 'nginx -t' untuk detail."
+fi
+
+# ─── Setup HTTPS dengan certbot (jika dipilih) ─────────────────────────────────
+if [[ "${SETUP_HTTPS}" == "y" ]]; then
+    log_info "Menginstal certbot dan plugin nginx..."
+    apt-get install -y -q certbot python3-certbot-nginx
+
+    CERTBOT_CMD="certbot --nginx -d ${DOMAIN_NAME} --non-interactive --agree-tos --redirect"
+    if [[ -n "${LE_EMAIL:-}" ]]; then
+        CERTBOT_CMD+" -m ${LE_EMAIL}"
+    else
+        CERTBOT_CMD+=" --register-unsafely-without-email"
+    fi
+
+    log_info "Menjalankan certbot untuk domain ${DOMAIN_NAME}..."
+    if eval "${CERTBOT_CMD}"; then
+        log_success "HTTPS berhasil dikonfigurasi! Dashboard dapat diakses di https://${DOMAIN_NAME}"
+        # Setup auto-renewal cron
+        (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --post-hook 'systemctl reload nginx'") | crontab -
+        log_success "Auto-renewal SSL certificate dikonfigurasi (cron setiap hari jam 03:00)"
+        ACCESS_URL="https://${DOMAIN_NAME}"
+    else
+        log_warn "certbot gagal. Pastikan domain ${DOMAIN_NAME} sudah mengarah ke IP ${SERVER_IP}."
+        log_warn "Jalankan manual: certbot --nginx -d ${DOMAIN_NAME}"
+        ACCESS_URL="http://${DOMAIN_NAME}"
+    fi
+else
+    if [[ "${DOMAIN_NAME}" != "${SERVER_IP}" ]]; then
+        ACCESS_URL="http://${DOMAIN_NAME}"
+    else
+        ACCESS_URL="http://${SERVER_IP}"
+    fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+log_step "7/8 - Set Kepemilikan File & Permission"
+# ══════════════════════════════════════════════════════════════════════════════
 chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
 chmod 755 "${INSTALL_DIR}"
 chmod -R 700 "${INSTALL_DIR}/backend/storage"
+# nginx perlu bisa baca frontend
+chmod -R o+rX "${INSTALL_DIR}/frontend"
+log_success "Permission dan kepemilikan sudah diatur"
 
-# 6b. Interactive .env configuration check
-echo -e "\n${YELLOW}========================================================================${NC}"
-echo -e "${YELLOW}🔔 KONFIGURASI DIKUNCI SEMENTARA: UBAH FILE .env BERIKUT${NC}"
-echo -e "${YELLOW}========================================================================${NC}"
-echo -e "Aplikasi telah disalin, tetapi Anda perlu melengkapi konfigurasi .env."
-echo -e "Silakan buka sesi terminal lain dan sesuaikan file berikut:"
-echo -e "1. Backend & Worker:"
-echo -e "   👉 ${GREEN}nano ${INSTALL_DIR}/backend/.env${NC}"
-echo -e "2. Discord Bot:"
-echo -e "   👉 ${GREEN}nano ${INSTALL_DIR}/integration/.env${NC}"
-echo -e "3. WhatsApp Gateway:"
-echo -e "   👉 ${GREEN}nano ${INSTALL_DIR}/integration/whatsapp/.env${NC}"
-echo -e "\n*Catatan: Frontend sudah terkompilasi statis (tidak perlu .env di server).* "
-echo -e "${YELLOW}========================================================================${NC}"
-
-read -p "Apakah Anda sudah melengkapi semua berkas .env tersebut? (y/N): " choice
-if [[ "$choice" =~ ^[Yy]$ ]]; then
-    log_success "Melanjutkan registrasi dan menjalankan systemd services..."
-else
-    log_warn "Proses instalasi dihentikan sementara."
-    log_warn "Setelah melengkapi berkas .env di atas, Anda dapat mengaktifkan layanan manual dengan:"
-    log_warn "👉 sudo systemctl daemon-reload"
-    log_warn "👉 sudo systemctl restart menettech-api menettech-worker menettech-discord menettech-whatsapp"
-    exit 0
-fi
-
-# 7. Configure Systemd Services
-log_info "Memasang systemd service files..."
+# ══════════════════════════════════════════════════════════════════════════════
+log_step "8/8 - Pasang & Jalankan Systemd Services"
+# ══════════════════════════════════════════════════════════════════════════════
 SERVICES=("menettech-api.service" "menettech-worker.service" "menettech-discord.service" "menettech-whatsapp.service")
 for svc in "${SERVICES[@]}"; do
-    if [[ -f "./deploy/${svc}" ]]; then
-        cp "./deploy/${svc}" /etc/systemd/system/
-    elif [[ -f "./deploy/production/${svc}" ]]; then
-        cp "./deploy/production/${svc}" /etc/systemd/system/
+    if [[ -f "${SCRIPT_DIR}/deploy/${svc}" ]]; then
+        cp "${SCRIPT_DIR}/deploy/${svc}" /etc/systemd/system/
+        log_success "Service file dipasang: ${svc}"
     else
-        log_warn "File service ${svc} tidak ditemukan di folder deploy."
+        log_warn "File service tidak ditemukan: ${SCRIPT_DIR}/deploy/${svc}"
     fi
 done
 
-log_info "Reloading systemd daemon..."
 systemctl daemon-reload
 
-# Enable & Start Services
-log_info "Mengaktifkan dan menjalankan layanan..."
 for svc in "${SERVICES[@]}"; do
-    systemctl enable "${svc}" || true
-    systemctl restart "${svc}" || true
+    systemctl enable "${svc}" 2>/dev/null || true
+    systemctl restart "${svc}" 2>/dev/null || true
 done
+log_success "Semua services dijalankan"
 
-log_success "Instalasi selesai!"
-echo "--------------------------------------------------------"
-echo "Status Layanan:"
+# ══════════════════════════════════════════════════════════════════════════════
+# RINGKASAN & PANDUAN AKSES
+# ══════════════════════════════════════════════════════════════════════════════
+echo ""
+echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
+echo -e "${BOLD}${GREEN}║         ✓ INSTALASI BERHASIL SELESAI!               ║${NC}"
+echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "${BOLD}📋 STATUS LAYANAN:${NC}"
 for svc in "${SERVICES[@]}"; do
-    status=$(systemctl is-active "${svc}" || echo "inactive")
-    echo " - ${svc}: ${status}"
+    status=$(systemctl is-active "${svc}" 2>/dev/null || echo "inactive")
+    if [[ "${status}" == "active" ]]; then
+        echo -e "   ${GREEN}●${NC} ${svc}: ${GREEN}${status}${NC}"
+    else
+        echo -e "   ${RED}●${NC} ${svc}: ${RED}${status}${NC}"
+    fi
 done
-echo "--------------------------------------------------------"
-echo "Untuk melihat log aktivitas secara langsung:"
-echo "👉 journalctl -u menettech-api.service -f"
-echo "👉 journalctl -u menettech-whatsapp.service -f"
-echo "--------------------------------------------------------"
+echo ""
+echo -e "${BOLD}🌐 CARA AKSES DASHBOARD:${NC}"
+echo -e "   Buka browser dan kunjungi:"
+echo -e "   ${CYAN}${BOLD}${ACCESS_URL}${NC}"
+echo ""
+echo -e "${BOLD}🔐 KREDENSIAL LOGIN AWAL:${NC}"
+echo -e "   Username : ${GREEN}admin${NC}"
+echo -e "   Password : ${GREEN}(password yang Anda masukkan tadi)${NC}"
+echo ""
+echo -e "${BOLD}⚙️  KONFIGURASI INTEGRASI (LEWAT DASHBOARD UI):${NC}"
+echo -e "   Setelah login, buka menu ${CYAN}Settings${NC} untuk mengatur:"
+echo -e "   • MikroTik  (host, username, password)"
+echo -e "   • Discord   (bot token, application ID, guild ID)"
+echo -e "   • WhatsApp  (isi ADMIN_WA_NUMBERS di file .env whatsapp)"
+echo ""
+echo -e "${BOLD}📁 FILE KONFIGURASI YANG PERLU DIPERHATIKAN:${NC}"
+echo -e "   Backend : ${CYAN}nano ${INSTALL_DIR}/backend/.env${NC}"
+echo -e "   WA GW   : ${CYAN}nano ${INSTALL_DIR}/integration/whatsapp/.env${NC}"
+echo -e "   Discord : ${CYAN}nano ${INSTALL_DIR}/integration/.env${NC}  (opsional)"
+echo ""
+echo -e "${BOLD}🔍 PERINTAH MONITORING:${NC}"
+echo -e "   journalctl -u menettech-api.service -f"
+echo -e "   journalctl -u menettech-whatsapp.service -f"
+echo -e "   journalctl -u menettech-worker.service -f"
+echo -e "   systemctl status menettech-api menettech-worker menettech-whatsapp"
+echo ""
+echo -e "${BOLD}🔄 RESTART SEMUA LAYANAN:${NC}"
+echo -e "   systemctl restart menettech-api menettech-worker menettech-discord menettech-whatsapp"
+echo ""
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}⚠  LANGKAH PERTAMA SETELAH INSTALASI:${NC}"
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "   1. Buka  → ${CYAN}http://${SERVER_IP}${NC}"
+echo -e "   2. Login → username: ${GREEN}admin${NC}  password: ${GREEN}change-me-now${NC}"
+echo -e "   3. Ganti password di menu Profile"
+echo -e "   4. Buka Settings → isi konfigurasi MikroTik, Discord"
+echo ""
