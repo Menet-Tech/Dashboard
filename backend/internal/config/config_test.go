@@ -117,13 +117,9 @@ func TestValidateForProduction(t *testing.T) {
 		t.Fatalf("expected valid config, got error: %v", err)
 	}
 
-	invalid := valid
-	invalid.SessionCookieSecure = false
-	if err := ValidateForProduction(invalid); err == nil {
-		t.Fatal("expected error when secure cookie disabled")
-	}
 
-	invalid = valid
+
+	invalid := valid
 	invalid.BootstrapAdminPassword = "password"
 	if err := ValidateForProduction(invalid); err == nil {
 		t.Fatal("expected error when bootstrap password is default")

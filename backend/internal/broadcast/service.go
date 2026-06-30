@@ -62,21 +62,30 @@ func (s Service) SendBroadcast(ctx context.Context, targetType string, targetIDs
 	if err != nil {
 		return 0, fmt.Errorf("query broadcast targets: %w", err)
 	}
-	defer rows.Close()
+	type target struct {
+		name  string
+		phone string
+		email string
+	}
+
+	var targets []target
+	for rows.Next() {
+		var t target
+		if err := rows.Scan(&t.name, &t.phone, &t.email); err != nil {
+			return 0, fmt.Errorf("scan broadcast target: %w", err)
+		}
+		targets = append(targets, t)
+	}
+	rows.Close() // Tutup rows sesegera mungkin agar koneksi dilepas kembali ke pool
 
 	count := 0
-	for rows.Next() {
-		var name, phone, email string
-		if err := rows.Scan(&name, &phone, &email); err != nil {
-			return count, fmt.Errorf("scan broadcast target: %w", err)
-		}
-
+	for _, t := range targets {
 		// Personalize message: replace {nama} with customer's name
-		personalizedMsg := strings.ReplaceAll(message, "{nama}", name)
+		personalizedMsg := strings.ReplaceAll(message, "{nama}", t.name)
 		queuedAny := false
 
 		// Clean up phone number and queue if not empty
-		cleanPhone := strings.TrimSpace(phone)
+		cleanPhone := strings.TrimSpace(t.phone)
 		if cleanPhone != "" {
 			if !strings.Contains(cleanPhone, "@") {
 				cleanPhone = cleanPhone + "@c.us"
@@ -90,7 +99,7 @@ func (s Service) SendBroadcast(ctx context.Context, targetType string, targetIDs
 		}
 
 		// Queue email if email is not empty
-		cleanEmail := strings.TrimSpace(email)
+		cleanEmail := strings.TrimSpace(t.email)
 		if cleanEmail != "" {
 			_, err = s.DB.ExecContext(ctx, `
 				INSERT INTO email_queue (to_email, subject, body, status, attempts)
@@ -108,5 +117,5 @@ func (s Service) SendBroadcast(ctx context.Context, targetType string, targetIDs
 		}
 	}
 
-	return count, rows.Err()
+	return count, nil
 }

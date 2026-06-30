@@ -69,6 +69,34 @@ func (s *ServiceManager) Reconcile(ctx context.Context) error {
 	return nil
 }
 
+func (s *ServiceManager) getPaths() (waDir string, discordBotBin string, isProd bool) {
+	// Check if running in production layout:
+	// API working directory: /opt/menettech-go/backend
+	// WhatsApp source directory: /opt/menettech-go/integration/whatsapp
+	// Discord Bot precompiled binary: /opt/menettech-go/integration/discord-bot
+	wd, err := os.Getwd()
+	if err == nil {
+		prodWaDir := filepath.Clean(filepath.Join(wd, "..", "integration", "whatsapp"))
+		prodDiscordBotBin := filepath.Clean(filepath.Join(wd, "..", "integration", "discord-bot"))
+		if _, err := os.Stat(prodWaDir); err == nil {
+			return prodWaDir, prodDiscordBotBin, true
+		}
+	}
+
+	// Fallback to development mode finding repo root
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		return "", "", false
+	}
+	waDir = filepath.Join(repoRoot, "whatsapp")
+	ext := ""
+	if runtime.GOOS == "windows" {
+		ext = ".exe"
+	}
+	discordBotBin = filepath.Join(repoRoot, "backend", "bin", "discord-bot"+ext)
+	return waDir, discordBotBin, false
+}
+
 func findRepoRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -101,11 +129,10 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 
 	s.logger.Info("Starting WhatsApp Gateway service...")
 
-	repoRoot, err := findRepoRoot()
-	if err != nil {
-		return fmt.Errorf("find repo root: %w", err)
+	waDir, _, _ := s.getPaths()
+	if waDir == "" {
+		return fmt.Errorf("could not resolve whatsapp directory path")
 	}
-	waDir := filepath.Join(repoRoot, "whatsapp")
 
 	// Get configuration
 	waGatewayURL, _ := s.settingsSvc.GetString(ctx, settings.KeyWAGatewayURL)
@@ -131,23 +158,6 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 		}
 	}
 
-	// Check if node_modules exists, install if missing
-	nodeModules := filepath.Join(waDir, "node_modules")
-	if _, err := os.Stat(nodeModules); os.IsNotExist(err) {
-		s.logger.Info("node_modules not found in whatsapp/, running npm install...")
-		npmCmd := "npm"
-		if runtime.GOOS == "windows" {
-			npmCmd = "npm.cmd"
-		}
-		cmdInstall := exec.Command(npmCmd, "install")
-		cmdInstall.Dir = waDir
-		cmdInstall.Stdout = os.Stdout
-		cmdInstall.Stderr = os.Stderr
-		if err := cmdInstall.Run(); err != nil {
-			return fmt.Errorf("npm install: %w", err)
-		}
-	}
-
 	// Start Node process directly
 	cmd := exec.Command("node", "src/server.js")
 	cmd.Dir = waDir
@@ -159,9 +169,15 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 	env = append(env, fmt.Sprintf("DASHBOARD_INTERNAL_API_KEY=%s", waAPIKey))
 	env = append(env, fmt.Sprintf("API_KEY=%s", waAPIKey))
 	env = append(env, fmt.Sprintf("WA_ACCOUNT_ID=%s", waAccountID))
+	
+	// Pass home or user-specific Puppeteer variables
+	if homeDir := os.Getenv("HOME"); homeDir != "" {
+		env = append(env, fmt.Sprintf("HOME=%s", homeDir))
+		env = append(env, fmt.Sprintf("PUPPETEER_CACHE_DIR=%s/.cache/puppeteer", homeDir))
+	}
 	cmd.Env = env
 
-	// Capture outputs to system standard outputs
+	// Capture outputs to standard outputs
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -177,7 +193,6 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 		err := cmd.Wait()
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		// Only remove and log if it's still the same process in map (not stopped intentionally)
 		if currentCmd, exists := s.processes["whatsapp"]; exists && currentCmd == cmd {
 			delete(s.processes, "whatsapp")
 			s.logger.Warn("WhatsApp Gateway service exited", "error", err)
@@ -194,35 +209,33 @@ func (s *ServiceManager) startDiscord(_ context.Context) error {
 
 	s.logger.Info("Starting Discord Bot service...")
 
-	repoRoot, err := findRepoRoot()
-	if err != nil {
-		return fmt.Errorf("find repo root: %w", err)
-	}
-	backendDir := filepath.Join(repoRoot, "backend")
-
-	// 1. Compile Discord Bot first to ensure clean execution and termination
-	if err := s.compileDiscordBot(backendDir); err != nil {
-		return fmt.Errorf("compile discord bot: %w", err)
+	_, discordBotBin, isProd := s.getPaths()
+	if discordBotBin == "" {
+		return fmt.Errorf("could not resolve discord bot binary path")
 	}
 
-	ext := ""
-	if runtime.GOOS == "windows" {
-		ext = ".exe"
+	// 1. Compile Discord Bot only in development
+	if !isProd {
+		repoRoot, err := findRepoRoot()
+		if err != nil {
+			return fmt.Errorf("find repo root: %w", err)
+		}
+		backendDir := filepath.Join(repoRoot, "backend")
+		if err := s.compileDiscordBot(backendDir); err != nil {
+			return fmt.Errorf("compile discord bot: %w", err)
+		}
 	}
-	binaryPath := filepath.Join(backendDir, "bin", "discord-bot"+ext)
 
-	cmd := exec.Command(binaryPath)
-	cmd.Dir = backendDir
+	// 2. Start the binary
+	cmd := exec.Command(discordBotBin)
+	cmd.Dir = filepath.Dir(discordBotBin)
 
 	// Configure environment variables
 	env := os.Environ()
 	dbPath := s.sqlitePath
 	if !filepath.IsAbs(dbPath) {
-		if dbPath != "" {
-			dbPath = filepath.Join(backendDir, dbPath)
-		} else {
-			dbPath = filepath.Join(backendDir, "storage", "dashboard.db")
-		}
+		wd, _ := os.Getwd()
+		dbPath = filepath.Clean(filepath.Join(wd, dbPath))
 	}
 	env = append(env, fmt.Sprintf("SQLITE_PATH=%s", dbPath))
 	cmd.Env = env

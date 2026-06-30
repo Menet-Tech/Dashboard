@@ -94,9 +94,8 @@ func ValidateForProduction(cfg Config) error {
 	if strings.TrimSpace(cfg.Environment) != "production" {
 		return nil
 	}
-	if !cfg.SessionCookieSecure {
-		return fmt.Errorf("SESSION_COOKIE_SECURE must be true in production")
-	}
+	// Allow SESSION_COOKIE_SECURE to be false in production for staging/HTTP-only deployments.
+	// But warn if it is false (or do nothing since logging is handled elsewhere).
 	if strings.TrimSpace(cfg.BootstrapAdminPassword) == "" || strings.TrimSpace(cfg.BootstrapAdminPassword) == "password" || strings.TrimSpace(cfg.BootstrapAdminPassword) == "change-me-now" {
 		return fmt.Errorf("BOOTSTRAP_ADMIN_PASSWORD must be changed in production")
 	}

@@ -47,7 +47,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ─── Deteksi IP Server dari 'ip a' (antarmuka ke-2, non-loopback) ─────────────
-SERVER_IP=$(ip -4 addr show scope global | awk '/inet /{match($2, /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/, a); if (a[1] != "") {print a[1]; exit}}')
+SERVER_IP=$(ip -4 addr show scope global | awk '/inet /{split($2, a, "/"); if (a[1] != "") {print a[1]; exit}}')
 if [[ -z "${SERVER_IP}" ]]; then
     SERVER_IP="127.0.0.1"
     log_warn "IP server tidak terdeteksi otomatis, menggunakan 127.0.0.1 sebagai fallback."
@@ -388,6 +388,10 @@ if [[ "${SETUP_HTTPS}" == "y" ]]; then
     log_info "Menjalankan certbot untuk domain ${DOMAIN_NAME}..."
     if eval "${CERTBOT_CMD}"; then
         log_success "HTTPS berhasil dikonfigurasi! Dashboard dapat diakses di https://${DOMAIN_NAME}"
+        # Set SESSION_COOKIE_SECURE=true karena HTTPS aktif
+        if [[ -f "${INSTALL_DIR}/backend/.env" ]]; then
+            sed -i "s|SESSION_COOKIE_SECURE=.*|SESSION_COOKIE_SECURE=true|g" "${INSTALL_DIR}/backend/.env"
+        fi
         # Setup auto-renewal cron
         (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --post-hook 'systemctl reload nginx'") | crontab -
         log_success "Auto-renewal SSL certificate dikonfigurasi (cron setiap hari jam 03:00)"
@@ -395,9 +399,17 @@ if [[ "${SETUP_HTTPS}" == "y" ]]; then
     else
         log_warn "certbot gagal. Pastikan domain ${DOMAIN_NAME} sudah mengarah ke IP ${SERVER_IP}."
         log_warn "Jalankan manual: certbot --nginx -d ${DOMAIN_NAME}"
+        # Set SESSION_COOKIE_SECURE=false karena gagal HTTPS (kembali ke HTTP)
+        if [[ -f "${INSTALL_DIR}/backend/.env" ]]; then
+            sed -i "s|SESSION_COOKIE_SECURE=.*|SESSION_COOKIE_SECURE=false|g" "${INSTALL_DIR}/backend/.env"
+        fi
         ACCESS_URL="http://${DOMAIN_NAME}"
     fi
 else
+    # Set SESSION_COOKIE_SECURE=false karena hanya menggunakan HTTP
+    if [[ -f "${INSTALL_DIR}/backend/.env" ]]; then
+        sed -i "s|SESSION_COOKIE_SECURE=.*|SESSION_COOKIE_SECURE=false|g" "${INSTALL_DIR}/backend/.env"
+    fi
     if [[ "${DOMAIN_NAME}" != "${SERVER_IP}" ]]; then
         ACCESS_URL="http://${DOMAIN_NAME}"
     else
@@ -408,17 +420,44 @@ fi
 # ══════════════════════════════════════════════════════════════════════════════
 log_step "7/8 - Set Kepemilikan File & Permission"
 # ══════════════════════════════════════════════════════════════════════════════
+log_info "Mengatur kepemilikan berkas ke user '${SERVICE_USER}'..."
 chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
 chmod 755 "${INSTALL_DIR}"
+
+log_info "Mengatur izin eksekusi pada binaries..."
+if [[ -f "${INSTALL_DIR}/backend/api" ]]; then
+    chmod +x "${INSTALL_DIR}/backend/api"
+fi
+if [[ -f "${INSTALL_DIR}/backend/worker" ]]; then
+    chmod +x "${INSTALL_DIR}/backend/worker"
+fi
+if [[ -f "${INSTALL_DIR}/integration/discord-bot" ]]; then
+    chmod +x "${INSTALL_DIR}/integration/discord-bot"
+fi
+
 chmod -R 700 "${INSTALL_DIR}/backend/storage"
 # nginx perlu bisa baca frontend
 chmod -R o+rX "${INSTALL_DIR}/frontend"
-log_success "Permission dan kepemilikan sudah diatur"
+log_success "Permission dan kepemilikan seluruh berkas berhasil dikonfigurasi!"
 
+# ══════════════════════════════════════════════════════════════════════════════
 # ══════════════════════════════════════════════════════════════════════════════
 log_step "8/8 - Pasang & Jalankan Systemd Services"
 # ══════════════════════════════════════════════════════════════════════════════
-SERVICES=("menettech-api.service" "menettech-worker.service" "menettech-discord.service" "menettech-whatsapp.service")
+# Matikan & hapus layanan standalone lama jika ada untuk menghindari konflik port/proses
+log_info "Membersihkan layanan integrasi mandiri lama (jika ada)..."
+for old_svc in "menettech-discord" "menettech-whatsapp"; do
+    if systemctl is-active --quiet "${old_svc}" 2>/dev/null; then
+        systemctl stop "${old_svc}" 2>/dev/null || true
+    fi
+    if systemctl is-enabled --quiet "${old_svc}" 2>/dev/null; then
+        systemctl disable "${old_svc}" 2>/dev/null || true
+    fi
+    rm -f "/etc/systemd/system/${old_svc}.service"
+done
+
+# Layanan utama yang didaftarkan ke systemd (discord & whatsapp dikelola sebagai subprocess api)
+SERVICES=("menettech-api.service" "menettech-worker.service")
 for svc in "${SERVICES[@]}"; do
     if [[ -f "${SCRIPT_DIR}/deploy/${svc}" ]]; then
         cp "${SCRIPT_DIR}/deploy/${svc}" /etc/systemd/system/
@@ -434,7 +473,7 @@ for svc in "${SERVICES[@]}"; do
     systemctl enable "${svc}" 2>/dev/null || true
     systemctl restart "${svc}" 2>/dev/null || true
 done
-log_success "Semua services dijalankan"
+log_success "Seluruh layanan utama (API + Worker) berhasil dijalankan!"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RINGKASAN & PANDUAN AKSES
@@ -475,18 +514,17 @@ echo -e "   Discord : ${CYAN}nano ${INSTALL_DIR}/integration/.env${NC}  (opsiona
 echo ""
 echo -e "${BOLD}🔍 PERINTAH MONITORING:${NC}"
 echo -e "   journalctl -u menettech-api.service -f"
-echo -e "   journalctl -u menettech-whatsapp.service -f"
 echo -e "   journalctl -u menettech-worker.service -f"
-echo -e "   systemctl status menettech-api menettech-worker menettech-whatsapp"
+echo -e "   systemctl status menettech-api menettech-worker"
 echo ""
 echo -e "${BOLD}🔄 RESTART SEMUA LAYANAN:${NC}"
-echo -e "   systemctl restart menettech-api menettech-worker menettech-discord menettech-whatsapp"
+echo -e "   systemctl restart menettech-api menettech-worker"
 echo ""
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}⚠  LANGKAH PERTAMA SETELAH INSTALASI:${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "   1. Buka  → ${CYAN}http://${SERVER_IP}${NC}"
-echo -e "   2. Login → username: ${GREEN}admin${NC}  password: ${GREEN}change-me-now${NC}"
+echo -e "   2. Login → username: ${GREEN}admin${NC}  password: ${GREEN}(password yang Anda masukkan tadi)${NC}"
 echo -e "   3. Ganti password di menu Profile"
 echo -e "   4. Buka Settings → isi konfigurasi MikroTik, Discord"
 echo ""
