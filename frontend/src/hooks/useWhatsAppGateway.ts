@@ -26,8 +26,26 @@ export function useWhatsAppGateway({ gatewayUrl, apiKey, onChatMessage }: UseWha
       return;
     }
 
+    let socketOrigin = gatewayUrl;
+    let socketPath = "/socket.io";
+    try {
+      if (gatewayUrl.startsWith("/")) {
+        socketPath = gatewayUrl.replace(/\/$/, "") + "/socket.io";
+        socketOrigin = typeof window !== "undefined" ? window.location.origin : "";
+      } else if (gatewayUrl.startsWith("http")) {
+        const parsed = new URL(gatewayUrl);
+        socketOrigin = parsed.origin;
+        if (parsed.pathname && parsed.pathname !== "/") {
+          socketPath = parsed.pathname.replace(/\/$/, "") + "/socket.io";
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse gatewayUrl path:", e);
+    }
+
     // Connect to Socket.io server
-    const socket = io(gatewayUrl, {
+    const socket = io(socketOrigin, {
+      path: socketPath,
       transports: ["websocket", "polling"],
       reconnectionAttempts: 10,
       auth: apiKey ? { apiKey } : undefined,

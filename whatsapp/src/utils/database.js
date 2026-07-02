@@ -38,6 +38,9 @@ const getDb = () => {
         try { db.exec("ALTER TABLE messages ADD COLUMN from_number TEXT"); } catch (e) {}
         try { db.exec("ALTER TABLE messages ADD COLUMN account_id TEXT DEFAULT 'default'"); } catch (e) {}
 
+        // Migration: Tambah kolom image_path untuk auto_reply_rules
+        try { db.exec("ALTER TABLE auto_reply_rules ADD COLUMN image_path TEXT"); } catch (e) {}
+
         // Tabel sesi chatbot per nomor WA (state machine)
         db.exec(`
             CREATE TABLE IF NOT EXISTS chatbot_sessions (
@@ -80,6 +83,7 @@ const getDb = () => {
                 match_type  TEXT NOT NULL DEFAULT 'contains',
                 enabled     INTEGER NOT NULL DEFAULT 1,
                 priority    INTEGER NOT NULL DEFAULT 100,
+                image_path  TEXT,
                 created_at  TEXT NOT NULL,
                 updated_at  TEXT NOT NULL
             );
@@ -227,8 +231,8 @@ const saveAutoReplyRule = (rule) => {
     const id = rule.id || require('crypto').randomBytes(8).toString('hex');
     const now = new Date().toISOString();
     db.prepare(`
-        INSERT INTO auto_reply_rules (id, account_id, keyword, reply, match_type, enabled, priority, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO auto_reply_rules (id, account_id, keyword, reply, match_type, enabled, priority, image_path, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id,
         rule.account_id || '*',
@@ -237,6 +241,7 @@ const saveAutoReplyRule = (rule) => {
         rule.match_type || 'contains',
         rule.enabled === false ? 0 : 1,
         Number.isFinite(Number(rule.priority)) ? Number(rule.priority) : 100,
+        rule.image_path || null,
         now,
         now
     );
@@ -270,7 +275,7 @@ const updateAutoReplyRule = (id, changes) => {
     const next = { ...current, ...changes };
     getDb().prepare(`
         UPDATE auto_reply_rules
-        SET account_id = ?, keyword = ?, reply = ?, match_type = ?, enabled = ?, priority = ?, updated_at = ?
+        SET account_id = ?, keyword = ?, reply = ?, match_type = ?, enabled = ?, priority = ?, image_path = ?, updated_at = ?
         WHERE id = ?
     `).run(
         next.account_id || '*',
@@ -279,6 +284,7 @@ const updateAutoReplyRule = (id, changes) => {
         next.match_type || 'contains',
         next.enabled === false ? 0 : 1,
         Number.isFinite(Number(next.priority)) ? Number(next.priority) : 100,
+        next.image_path || null,
         new Date().toISOString(),
         id
     );
@@ -296,6 +302,7 @@ const normalizeAutoReplyRule = (row) => ({
     ...row,
     enabled: !!row.enabled,
     priority: Number(row.priority) || 100,
+    image_path: row.image_path || null,
 });
 
 const getGatewaySetting = (key, fallback = '') => {

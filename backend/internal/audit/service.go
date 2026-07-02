@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+
+	"menettech/dashboard/backend/internal/notifications"
 )
 
 type Entry struct {
@@ -24,6 +26,7 @@ type Repository struct {
 
 type Service struct {
 	Repository Repository
+	Discord    notifications.DiscordSender
 }
 
 func (s Service) Record(ctx context.Context, userID *int64, pelangganID *int64, action, message string) error {
@@ -35,7 +38,117 @@ func (s Service) RecordWithIP(ctx context.Context, userID *int64, pelangganID *i
 	if action == "" {
 		return nil
 	}
-	return s.Repository.Insert(ctx, userID, pelangganID, action, strings.TrimSpace(message), strings.TrimSpace(ip))
+	err := s.Repository.Insert(ctx, userID, pelangganID, action, strings.TrimSpace(message), strings.TrimSpace(ip))
+	if err != nil {
+		return err
+	}
+
+	if s.Discord != nil {
+		go s.sendDiscordNotification(context.Background(), userID, action, message, ip)
+	}
+
+	return nil
+}
+
+func (s Service) sendDiscordNotification(ctx context.Context, userID *int64, action, message, ip string) {
+	var username string = "Sistem"
+	if userID != nil && *userID > 0 {
+		_ = s.Repository.DB.QueryRowContext(ctx, "SELECT username FROM users WHERE id = ?", *userID).Scan(&username)
+	}
+
+	title := ""
+	description := ""
+	color := 3447003 // Default Blue (#3498db)
+
+	actionLower := strings.ToLower(action)
+
+	switch actionLower {
+	case "auth.login":
+		title = "🔓 Login Berhasil"
+		description = fmt.Sprintf("Admin/Staff **%s** berhasil masuk ke sistem.", username)
+		color = 3066993 // Green (#2ecc71)
+	case "auth.logout":
+		title = "🔒 Logout"
+		description = fmt.Sprintf("Admin/Staff **%s** telah keluar dari sistem.", username)
+		color = 15158332 // Red (#e74c3c)
+	}
+
+	// 2. Package CRUD
+	if strings.HasPrefix(actionLower, "post /api/v1/packages") {
+		title = "📦 Paket Baru Dibuat"
+		description = fmt.Sprintf("Admin/Staff **%s** membuat paket internet baru.", username)
+		color = 3447003
+	} else if strings.HasPrefix(actionLower, "put /api/v1/packages/") {
+		title = "📦 Paket Diubah"
+		description = fmt.Sprintf("Admin/Staff **%s** memperbarui data paket internet.", username)
+		color = 10181046 // Purple (#9b59b6)
+	} else if strings.HasPrefix(actionLower, "delete /api/v1/packages/") {
+		title = "🗑️ Paket Dihapus"
+		description = fmt.Sprintf("Admin/Staff **%s** menghapus paket internet.", username)
+		color = 15158332
+	}
+
+	// 3. User (Staff) CRUD & Reset Password
+	if strings.HasPrefix(actionLower, "post /api/v1/users") && strings.HasSuffix(actionLower, "/reset-password") {
+		title = "🔑 Password Tim Direset"
+		description = fmt.Sprintf("Admin/Staff **%s** mereset password salah satu akun staff.", username)
+		color = 15158332
+	} else if strings.HasPrefix(actionLower, "post /api/v1/users") {
+		title = "👥 Akun Tim Baru Dibuat"
+		description = fmt.Sprintf("Admin/Staff **%s** menambahkan akun staff baru.", username)
+		color = 3447003
+	} else if strings.HasPrefix(actionLower, "put /api/v1/users/") {
+		title = "👥 Akun Tim Diubah"
+		description = fmt.Sprintf("Admin/Staff **%s** mengubah detail data akun staff.", username)
+		color = 10181046
+	} else if strings.HasPrefix(actionLower, "delete /api/v1/users/") {
+		title = "👥 Akses Akun Tim Dihapus"
+		description = fmt.Sprintf("Admin/Staff **%s** menghapus akses akun staff dari sistem.", username)
+		color = 15158332
+	}
+
+	// 4. Bills Generation
+	if strings.HasPrefix(actionLower, "post /api/v1/bills/generate") {
+		title = "📢 Pembuatan Tagihan Massal"
+		description = fmt.Sprintf("Admin/Staff **%s** men-generate tagihan baru di sistem.", username)
+		color = 3447003
+	}
+
+	switch actionLower {
+	case "customer.delete":
+		title = "🗑️ Pelanggan Dihapus (Tagihan Terhapus)"
+		description = fmt.Sprintf("Admin/Staff **%s** menghapus data pelanggan.\nDetail: %s", username, message)
+		color = 15158332
+	case "customer.bulk_delete":
+		title = "🗑️ Pelanggan Dihapus secara Massal"
+		description = fmt.Sprintf("Admin/Staff **%s** menghapus beberapa data pelanggan sekaligus.\nDetail: %s", username, message)
+		color = 15158332
+	}
+
+	// 6. Payment Confirmation Rejection
+	if strings.HasPrefix(actionLower, "post /api/v1/bills/confirmations/") && strings.HasSuffix(actionLower, "/reject") {
+		title = "❌ Bukti Pembayaran Ditolak"
+		description = fmt.Sprintf("Admin/Staff **%s** menolak konfirmasi bukti pembayaran.", username)
+		color = 15158332
+	}
+
+	if title != "" {
+		fields := []notifications.EmbedField{
+			{Name: "Pelaku", Value: username, Inline: true},
+		}
+		if ip != "" {
+			fields = append(fields, notifications.EmbedField{Name: "Alamat IP", Value: ip, Inline: true})
+		}
+		if message != "" && !strings.HasPrefix(message, "status=") {
+			fields = append(fields, notifications.EmbedField{Name: "Keterangan", Value: message, Inline: false})
+		}
+		_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+			Title:       title,
+			Description: description,
+			Color:       color,
+			Fields:      fields,
+		})
+	}
 }
 
 func (s Service) List(ctx context.Context, limit int) ([]Entry, error) {

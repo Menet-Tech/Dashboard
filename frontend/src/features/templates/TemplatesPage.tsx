@@ -93,6 +93,7 @@ export function TemplatesPage({
     chatbot_account_id: "*",
     auto_reply_account_id: "*",
     auto_reply_before_chatbot: "1",
+    chatbot_enabled: "1",
   });
   const [loading, setLoading] = useState(false);
   const [gatewayError, setGatewayError] = useState<string | null>(null);
@@ -156,10 +157,20 @@ export function TemplatesPage({
     reply: string;
     matchType: AutoReplyRule["match_type"];
     priority: number;
+    image?: File;
   }) {
     if (!gatewayUrl) return;
     await withFeedback(async () => {
-      await createAutoReplyRule(gatewayUrl, apiKey, ruleForm);
+      const formData = new FormData();
+      formData.append("accountId", ruleForm.accountId);
+      formData.append("keyword", ruleForm.keyword);
+      formData.append("reply", ruleForm.reply);
+      formData.append("matchType", ruleForm.matchType);
+      formData.append("priority", String(ruleForm.priority));
+      if (ruleForm.image) {
+        formData.append("image", ruleForm.image);
+      }
+      await createAutoReplyRule(gatewayUrl, apiKey, formData);
       const res = await getAutoReplyRules(gatewayUrl, apiKey);
       setAutoReplyRules(res.data);
       pushSuccess("Rule auto-response berhasil ditambahkan");
@@ -505,6 +516,7 @@ export function TemplatesPage({
 
       {activeTab === "autoreply" && (
         <ChatbotTab
+          gatewayUrl={gatewayUrl}
           accounts={accounts}
           canDecrypt={canDecrypt}
           chatbotSettings={chatbotSettings}
@@ -523,6 +535,7 @@ export function TemplatesPage({
 
       {activeTab === "sessions" && (
         <ChatbotTab
+          gatewayUrl={gatewayUrl}
           accounts={accounts}
           canDecrypt={canDecrypt}
           chatbotSettings={chatbotSettings}

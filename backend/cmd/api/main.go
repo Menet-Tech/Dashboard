@@ -49,9 +49,12 @@ func main() {
 	}
 	defer closeQuietly(db, logger)
 
-	if err := migrate.Apply(db); err != nil {
-		logger.Error("failed to apply migrations", "error", err)
-		os.Exit(1)
+	// Apply migrations ONLY for the "api" command to prevent parallel migration lock race conditions on boot.
+	if command == "api" {
+		if err := migrate.Apply(db); err != nil {
+			logger.Error("failed to apply migrations", "error", err)
+			os.Exit(1)
+		}
 	}
 
 	settingsService := settings.Service{Repository: settings.Repository{DB: db}}

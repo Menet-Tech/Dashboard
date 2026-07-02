@@ -176,7 +176,7 @@ export default function App() {
 
   const feedback = useAppFeedback();
 
-  const [loginForm, setLoginForm] = useState({ username: "admin", password: "password" });
+  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginErrors, setLoginErrors] = useState<FieldErrors>({});
 
   const [navOpen, setNavOpen] = useState(false);
@@ -303,6 +303,20 @@ export default function App() {
         : "unknown",
   );
   const appTone = statusTone(monitoringHook.state.health?.status);
+
+  const rawWaGatewayUrl = settingsHook.state.settingsForm.wa_gateway_url;
+  const waGatewayUrl = useMemo(() => {
+    const trimmed = rawWaGatewayUrl?.trim() || "http://localhost:3001";
+    if (typeof window !== "undefined") {
+      const hostname = window.location.hostname;
+      if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+        if (trimmed.includes("localhost") || trimmed.includes("127.0.0.1")) {
+          return `${window.location.protocol}//${window.location.host}/wa`;
+        }
+      }
+    }
+    return trimmed;
+  }, [rawWaGatewayUrl]);
 
   function switchView(nextView: ViewKey) {
     localStorage.setItem("active_view", nextView);
@@ -636,7 +650,7 @@ export default function App() {
               }}
               onDelete={(id) => void templatesHook.handlers.handleTemplateDelete(id)}
               user={user}
-              waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
+              waGatewayUrl={waGatewayUrl}
               waApiKey={settingsHook.state.settingsForm.wa_api_key}
               pushSuccess={feedback.pushSuccess}
               pushError={feedback.pushError}
@@ -734,7 +748,7 @@ export default function App() {
           {view === "tickets" ? (
             <Suspense fallback={<SkeletonCard />}>
               <TicketsPage
-                waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
+                waGatewayUrl={waGatewayUrl}
                 waApiKey={settingsHook.state.settingsForm.wa_api_key}
               />
             </Suspense>
@@ -742,7 +756,7 @@ export default function App() {
           {view === "registration" ? (
             <Suspense fallback={<SkeletonCard />}>
               <RegistrationPage
-                waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
+                waGatewayUrl={waGatewayUrl}
                 waAccountId={settingsHook.state.settingsForm.wa_account_id}
                 waApiKey={settingsHook.state.settingsForm.wa_api_key}
                 packages={packagesHook.state.packages}
@@ -812,7 +826,7 @@ export default function App() {
             <Suspense fallback={<SkeletonCard />}>
               <WhatsAppPage
                 user={user}
-                waGatewayUrl={settingsHook.state.settingsForm.wa_gateway_url}
+                waGatewayUrl={waGatewayUrl}
                 waAccountId={settingsHook.state.settingsForm.wa_account_id}
                 waApiKey={settingsHook.state.settingsForm.wa_api_key}
                 pushSuccess={feedback.pushSuccess}

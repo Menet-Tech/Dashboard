@@ -39,7 +39,8 @@ func (s *ServiceManager) Reconcile(ctx context.Context) error {
 	// 1. Reconcile WhatsApp
 	waEnabledStr, err := s.settingsSvc.GetString(ctx, settings.KeyWAGatewayEnabled)
 	if err != nil {
-		waEnabledStr = "0"
+		s.logger.Error("Reconcile: failed to read WhatsApp Gateway status", "error", err)
+		return fmt.Errorf("read wa_gateway_enabled: %w", err)
 	}
 	waEnabled := waEnabledStr == "1"
 
@@ -54,7 +55,8 @@ func (s *ServiceManager) Reconcile(ctx context.Context) error {
 	// 2. Reconcile Discord Bot
 	discordEnabledStr, err := s.settingsSvc.GetString(ctx, settings.KeyDiscordBotEnabled)
 	if err != nil {
-		discordEnabledStr = "0"
+		s.logger.Error("Reconcile: failed to read Discord Bot status", "error", err)
+		return fmt.Errorf("read discord_bot_enabled: %w", err)
 	}
 	discordEnabled := discordEnabledStr == "1"
 

@@ -146,6 +146,14 @@ func (s Service) startEmailQueueProcessor(ctx context.Context) {
 	}
 }
 
+func (s Service) getQueueThrottleDuration(ctx context.Context) time.Duration {
+	throttleSecs, _ := s.Settings.GetInt(ctx, "wa_queue_throttle_seconds")
+	if throttleSecs <= 0 {
+		throttleSecs = 120 // default 120 seconds (2 minutes)
+	}
+	return time.Duration(throttleSecs) * time.Second
+}
+
 func (s Service) startQueueProcessor(ctx context.Context) {
 	if s.WhatsApp.Logs.DB == nil {
 		s.Logger.Warn("whatsapp queue processor: database connection is nil, skipping")
@@ -166,11 +174,7 @@ func (s Service) startQueueProcessor(ctx context.Context) {
 			}
 
 			if processed {
-				throttleSecs, _ := s.Settings.GetInt(ctx, "wa_queue_throttle_seconds")
-				if throttleSecs <= 0 {
-					throttleSecs = 2 // default 2 seconds throttling
-				}
-				time.Sleep(time.Duration(throttleSecs) * time.Second)
+				time.Sleep(s.getQueueThrottleDuration(ctx))
 			} else {
 				// No pending messages, wait a short time before checking again
 				time.Sleep(500 * time.Millisecond)

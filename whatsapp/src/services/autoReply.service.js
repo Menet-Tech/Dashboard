@@ -10,6 +10,7 @@ const toLegacyRule = (rule) => ({
     ...rule,
     accountId: rule.account_id,
     matchType: rule.match_type,
+    imagePath: rule.image_path,
     createdAt: rule.created_at,
     updatedAt: rule.updated_at,
 });
@@ -22,6 +23,7 @@ const addRule = (keyword, reply, matchType = 'contains', options = {}) => {
         match_type: matchType,
         enabled: options.enabled !== false,
         priority: options.priority ?? 100,
+        image_path: options.image_path || null,
     });
     logger.info(`[AutoReply] Rule ${rule.id} added: "${keyword}" -> "${reply}" (${matchType})`);
     return toLegacyRule(rule);
@@ -44,6 +46,7 @@ const updateRule = (id, changes) => {
         match_type: changes.matchType ?? changes.match_type,
         enabled: changes.enabled,
         priority: changes.priority,
+        image_path: changes.image_path,
     };
     Object.keys(payload).forEach((key) => payload[key] === undefined && delete payload[key]);
     const rule = updateAutoReplyRule(id, payload);
@@ -52,7 +55,7 @@ const updateRule = (id, changes) => {
 
 const toggleRule = (id, enabled) => updateRule(id, { enabled });
 
-const findReply = (messageBody, accountId = null) => {
+const findReplyRule = (messageBody, accountId = null) => {
     const body = String(messageBody || '').trim();
     const lowerBody = body.toLowerCase();
 
@@ -84,10 +87,15 @@ const findReply = (messageBody, accountId = null) => {
                 matched = lowerBody.includes(lowerKeyword);
         }
 
-        if (matched) return rule.reply;
+        if (matched) return toLegacyRule(rule);
     }
 
     return null;
 };
 
-module.exports = { addRule, getAllRules, deleteRule, updateRule, toggleRule, findReply };
+const findReply = (messageBody, accountId = null) => {
+    const rule = findReplyRule(messageBody, accountId);
+    return rule ? rule.reply : null;
+};
+
+module.exports = { addRule, getAllRules, deleteRule, updateRule, toggleRule, findReplyRule, findReply };

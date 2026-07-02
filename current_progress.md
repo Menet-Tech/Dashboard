@@ -1,5 +1,12 @@
 # Current Progress
 
+## 2026-06-30
+
+- Fixed system monitoring status showing `unknown`:
+  - Exposed `/health`, `/livez`, and `/readyz` endpoints under public `/api/v1` group in Go backend router.
+  - Changed frontend api.ts `fetchHealth` endpoint to request `/api/v1/health` instead of `/health` so Nginx reverse proxies it correctly in production.
+  - Recompiled and packaged binaries into `Releases.zip`.
+
 ## 2026-06-09
 
 - Fixed network map authentication mismatch:

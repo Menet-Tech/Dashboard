@@ -1,8 +1,8 @@
 const logger = require('../utils/logger');
 const { saveMessage, getGatewaySetting } = require('../utils/database');
 const { handleMessage } = require('../services/chatbot.service');
-const { sendTextMessage } = require('../services/whatsapp.service');
-const { findReply } = require('../services/autoReply.service');
+const { sendTextMessage, sendMediaMessage } = require('../services/whatsapp.service');
+const { findReplyRule } = require('../services/autoReply.service');
 
 const accountMatchesSetting = (settingValue, accountId) => {
     const value = String(settingValue || '*').trim();
@@ -78,10 +78,16 @@ const setupEvents = (client, accountId) => {
         const autoReplyBeforeChatbot = getGatewaySetting('auto_reply_before_chatbot', '1') !== '0';
 
         if (autoReplyBeforeChatbot && accountMatchesSetting(autoReplyAccount, accountId)) {
-            const reply = findReply(message.body, accountId);
-            if (reply) {
+            const rule = findReplyRule(message.body, accountId);
+            if (rule) {
                 try {
-                    await sendTextMessage(accountId, realFrom, reply);
+                    if (rule.image_path || rule.imagePath) {
+                        const path = require('path');
+                        const fullPath = path.join(__dirname, '../../storage/uploads', rule.image_path || rule.imagePath);
+                        await sendMediaMessage(accountId, realFrom, fullPath, rule.reply);
+                    } else {
+                        await sendTextMessage(accountId, realFrom, rule.reply);
+                    }
                 } catch (err) {
                     logger.error(`[${accountId}] Gagal mengirim autoreply ke ${realFrom}: ${err.message}`);
                 }
@@ -89,7 +95,8 @@ const setupEvents = (client, accountId) => {
             }
         }
 
-        if (!accountMatchesSetting(chatbotAccount, accountId)) {
+        const chatbotEnabled = getGatewaySetting('chatbot_enabled', '1') !== '0';
+        if (!chatbotEnabled || !accountMatchesSetting(chatbotAccount, accountId)) {
             return;
         }
 

@@ -125,3 +125,44 @@ func TestRunLoopStaysAliveWhileLeaseHeldByAnotherWorker(t *testing.T) {
 		t.Fatalf("expected context deadline exceeded, got %v", err)
 	}
 }
+
+func TestGetQueueThrottleDuration(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`
+		CREATE TABLE pengaturan (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL,
+			updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+	`)
+	if err != nil {
+		t.Fatalf("create settings table: %v", err)
+	}
+
+	settingsSvc := settings.Service{Repository: settings.Repository{DB: db}}
+	svc := Service{
+		Settings: settingsSvc,
+	}
+
+	// 1. Default should be 120 seconds (2 minutes)
+	dur := svc.getQueueThrottleDuration(t.Context())
+	if dur != 120*time.Second {
+		t.Errorf("expected default 120s, got %v", dur)
+	}
+
+	// 2. Setting set to custom value (e.g. 5 seconds)
+	_, err = db.Exec("INSERT OR REPLACE INTO pengaturan (key, value) VALUES ('wa_queue_throttle_seconds', '5')")
+	if err != nil {
+		t.Fatalf("insert setting: %v", err)
+	}
+
+	dur = svc.getQueueThrottleDuration(t.Context())
+	if dur != 5*time.Second {
+		t.Errorf("expected custom 5s, got %v", dur)
+	}
+}

@@ -154,17 +154,20 @@ describe('🤖 Chatbot API Routes — Integration Tests', () => {
             expect(res.statusCode).toBe(200);
             expect(res.body.status).toBe('success');
             expect(res.body.data).toHaveProperty('chatbot_account_id');
+            expect(res.body.data).toHaveProperty('chatbot_enabled');
         });
 
         it('PUT /settings harus mengubah setting tertentu', async () => {
             const res = await request(app)
                 .put('/api/v1/chatbot/settings')
                 .set('X-API-Key', API_KEY)
-                .send({ chatbot_account_id: 'test-account-id' });
+                .send({ chatbot_account_id: 'test-account-id', chatbot_enabled: '0' });
             expect(res.statusCode).toBe(200);
             expect(res.body.status).toBe('success');
             expect(res.body.data.chatbot_account_id).toBe('test-account-id');
+            expect(res.body.data.chatbot_enabled).toBe('0');
             expect(database.getGatewaySetting('chatbot_account_id')).toBe('test-account-id');
+            expect(database.getGatewaySetting('chatbot_enabled')).toBe('0');
         });
     });
 

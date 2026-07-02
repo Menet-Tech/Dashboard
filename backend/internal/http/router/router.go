@@ -45,7 +45,11 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	r.Use(requestLogger(logger))
 
 	settingsService := settings.Service{Repository: settings.Repository{DB: db}}
-	auditService := audit.Service{Repository: audit.Repository{DB: db}}
+	discordService := notifications.NewDiscordService(settingsService)
+	auditService := audit.Service{
+		Repository: audit.Repository{DB: db},
+		Discord:    discordService,
+	}
 	templateService := templates.Service{Repository: templates.Repository{DB: db}}
 	whatsAppService := notifications.WhatsAppService{
 		Settings:  settingsService,
@@ -77,8 +81,6 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 		Repository: odp.Repository{DB: db},
 	})
 	gacsHandler := handler.NewGacsHandler(db, settingsService)
-
-	discordService := notifications.NewDiscordService(settingsService)
 	reportsHandler := handler.NewReportsHandler(reports.Service{DB: db})
 
 	customersService := customers.Service{
@@ -254,6 +256,10 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 		api.Get("/meta", func(w http.ResponseWriter, r *http.Request) {
 			handler.WriteMeta(w, cfg)
 		})
+		api.Get("/health", healthHandler.Show)
+		api.Get("/livez", healthHandler.Live)
+		api.Get("/readyz", healthHandler.Ready)
+
 
 		api.Group(func(protected chi.Router) {
 			protected.Use(authMiddleware(authService))

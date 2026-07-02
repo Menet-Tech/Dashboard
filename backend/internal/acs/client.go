@@ -126,10 +126,6 @@ func (c *Client) GetDeviceStatus(ctx context.Context, serialNumber string) (Devi
 	}
 
 	if dev == nil {
-		// Fallback to mock status if mock URL or device not found in live DB (for test safety)
-		if c.BaseURL == "" || strings.Contains(strings.ToLower(c.BaseURL), "mock") {
-			return getMockStatus(serialNumber), nil
-		}
 		return DeviceStatus{
 			SerialNumber: serialNumber,
 			Status:       "offline",
@@ -268,44 +264,7 @@ func formatUptime(uptimeStr string) string {
 	return fmt.Sprintf("%dm %ds", minutes, secs)
 }
 
-func getMockStatus(serialNumber string) DeviceStatus {
-	sum := 0
-	for _, char := range serialNumber {
-		sum += int(char)
-	}
 
-	models := []string{"ZTE F609", "ZTE F660", "Huawei HG8245H", "FiberHome HG6243C"}
-	model := models[sum%len(models)]
-
-	status := "online"
-	rxPower := -15.0 - float64(sum%12) - (float64(sum%10) / 10.0) // range -15.0 to -27.0 dBm
-	txPower := 1.5 + (float64(sum%20) / 10.0)                     // range 1.5 to 3.5 dBm
-
-	rxStr := fmt.Sprintf("%.1f dBm", rxPower)
-	txStr := fmt.Sprintf("%.1f dBm", txPower)
-
-	days := (sum % 15) + 1
-	hours := sum % 24
-	mins := sum % 60
-	uptime := fmt.Sprintf("%dd %dh %dm", days, hours, mins)
-
-	ipSuffix := (sum % 250) + 2
-	ip := fmt.Sprintf("10.100.12.%d", ipSuffix)
-
-	return DeviceStatus{
-		ID:              fmt.Sprintf("mock-device-%s", serialNumber),
-		SerialNumber:    serialNumber,
-		Model:           model,
-		Status:          status,
-		IPAddress:       ip,
-		Uptime:          uptime,
-		HardwareVersion: "V1.0",
-		SoftwareVersion: "V6.0.0P1T2",
-		RxOpticalPower:  rxStr,
-		TxOpticalPower:  txStr,
-		LastInformTime:  time.Now().Add(-time.Duration(sum%120) * time.Second),
-	}
-}
 
 // RebootDevice sends a reboot task command to GenieACS.
 func (c *Client) RebootDevice(ctx context.Context, serialNumber string) error {
@@ -2215,49 +2174,7 @@ func (c *Client) GetDevicesSummary(ctx context.Context, db *sql.DB) ([]map[strin
 	// Clean BaseURL
 	baseURL := strings.TrimSuffix(c.BaseURL, "/")
 	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") || strings.Contains(strings.ToLower(baseURL), "localhost") {
-		mock1 := map[string]any{
-			"_id":           "mock-device-ZTEGC1234567",
-			"SerialNumber":  "ZTEGC1234567",
-			"productclass":  "F609",
-			"tags":          []string{"portal:12345"},
-			"pppoe":         "pppoe_test1",
-			"wanbridge":     "0",
-			"rxpower":       "-21.5",
-			"temperature":   "42",
-			"activedevices": "3",
-			"ssid1":         "WiFi-Mock-1",
-			"ssid2":         nil,
-			"ssid3":         nil,
-			"ssid4":         nil,
-			"ssid5":         nil,
-			"ssid6":         nil,
-			"ssid7":         nil,
-			"ssid8":         nil,
-			"_lastInform":   time.Now().Format(time.RFC3339),
-		}
-		mock2 := map[string]any{
-			"_id":           "mock-device-HWTC98765432",
-			"SerialNumber":  "HWTC98765432",
-			"productclass":  "HG8245H",
-			"tags":          []string{},
-			"pppoe":         "pppoe_test2",
-			"wanbridge":     "1",
-			"rxpower":       "-26.1",
-			"temperature":   "45",
-			"activedevices": "1",
-			"ssid1":         "WiFi-Mock-Huawei",
-			"ssid2":         nil,
-			"ssid3":         nil,
-			"ssid4":         nil,
-			"ssid5":         nil,
-			"ssid6":         nil,
-			"ssid7":         nil,
-			"ssid8":         nil,
-			"_lastInform":   time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
-		}
-		attachCustInfo(mock1)
-		attachCustInfo(mock2)
-		return []map[string]any{mock1, mock2}, nil
+		return []map[string]any{}, nil
 	}
 
 	reqURL := fmt.Sprintf("%s/devices?projection=%s", baseURL, url.QueryEscape(strings.Join(projection, ",")))

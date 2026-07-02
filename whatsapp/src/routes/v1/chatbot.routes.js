@@ -39,12 +39,13 @@ router.get('/settings', (req, res) => {
             chatbot_account_id: settings.chatbot_account_id || '*',
             auto_reply_account_id: settings.auto_reply_account_id || '*',
             auto_reply_before_chatbot: settings.auto_reply_before_chatbot || '1',
+            chatbot_enabled: settings.chatbot_enabled || '1',
         },
     });
 });
 
 router.put('/settings', (req, res) => {
-    const allowed = ['chatbot_account_id', 'auto_reply_account_id', 'auto_reply_before_chatbot'];
+    const allowed = ['chatbot_account_id', 'auto_reply_account_id', 'auto_reply_before_chatbot', 'chatbot_enabled'];
     const result = {};
     for (const key of allowed) {
         if (Object.prototype.hasOwnProperty.call(req.body, key)) {

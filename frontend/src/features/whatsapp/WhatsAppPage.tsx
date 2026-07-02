@@ -89,14 +89,10 @@ export function WhatsAppPage({
     async function loadData() {
       try {
         setLoading(true);
-        const [accRes, histRes] = await Promise.all([
-          getGatewayAccounts(gatewayUrl!, apiKey!),
-          getGatewayHistory(gatewayUrl!, apiKey!, null, 100),
-        ]);
+        const accRes = await getGatewayAccounts(gatewayUrl!, apiKey!);
 
         if (active) {
           setAccounts(accRes.data);
-          setHistoryMessages(histRes.data);
           setGatewayError(null);
 
           if (accRes.data.length > 0) {
@@ -106,6 +102,15 @@ export function WhatsAppPage({
               return configuredAccount?.accountId ?? accRes.data[0].accountId;
             });
           }
+        }
+
+        try {
+          const histRes = await getGatewayHistory(gatewayUrl!, apiKey!, null, 100);
+          if (active) {
+            setHistoryMessages(histRes.data);
+          }
+        } catch (histErr: any) {
+          console.warn("History failed to load (client might not be ready yet):", histErr);
         }
       } catch (err: any) {
         if (active) {
@@ -166,10 +171,16 @@ export function WhatsAppPage({
   async function handleRefreshAccounts() {
     await withFeedback(async () => {
       const accRes = await getGatewayAccounts(gatewayUrl, apiKey);
-      const histRes = await getGatewayHistory(gatewayUrl, apiKey, null, 100);
       setAccounts(accRes.data);
-      setHistoryMessages(histRes.data);
       setGatewayError(null);
+      
+      try {
+        const histRes = await getGatewayHistory(gatewayUrl, apiKey, null, 100);
+        setHistoryMessages(histRes.data);
+      } catch (histErr) {
+        console.warn("History failed to load on refresh:", histErr);
+      }
+      
       pushSuccess("Data gateway berhasil diperbarui");
     }, "refresh-accounts");
   }

@@ -41,13 +41,12 @@ export type ContactForm = {
 export type AutoReplyRule = {
   id: string;
   account_id: string;
-  accountId?: string;
   keyword: string;
   reply: string;
   match_type: "exact" | "contains" | "startsWith" | "endsWith" | "regex";
-  matchType?: "exact" | "contains" | "startsWith" | "endsWith" | "regex";
   enabled: boolean;
   priority: number;
+  image_path?: string;
   created_at: string;
   updated_at?: string;
 };
@@ -56,6 +55,7 @@ export type ChatbotSettings = {
   chatbot_account_id: string;
   auto_reply_account_id: string;
   auto_reply_before_chatbot: string;
+  chatbot_enabled?: string;
 };
 
 async function gatewayRequest<T>(
@@ -66,15 +66,21 @@ async function gatewayRequest<T>(
 ): Promise<T> {
   const cleanUrl = url.replace(/\/$/, "");
   const traceId = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+  
+  const headers: HeadersInit = {
+    Accept: "application/json",
+    "X-API-Key": apiKey,
+    "X-Request-Id": traceId,
+    ...(options.headers ?? {}),
+  };
+  
+  if (!(options.body instanceof FormData)) {
+    (headers as any)["Content-Type"] = "application/json";
+  }
+
   const response = await fetch(`${cleanUrl}${path}`, {
     ...options,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      "X-API-Key": apiKey,
-      "X-Request-Id": traceId,
-      ...(options.headers ?? {}),
-    },
+    headers,
   });
 
   const payload = await response.json().catch(() => null);
@@ -171,7 +177,7 @@ export function getAutoReplyRules(url: string, apiKey: string, accountId?: strin
 export function createAutoReplyRule(
   url: string,
   apiKey: string,
-  payload: {
+  payload: FormData | {
     accountId?: string;
     keyword: string;
     reply: string;
@@ -180,9 +186,10 @@ export function createAutoReplyRule(
     priority?: number;
   }
 ) {
+  const body = payload instanceof FormData ? payload : JSON.stringify(payload);
   return gatewayRequest<{ data: AutoReplyRule }>(url, apiKey, "/api/v1/autoreply", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body,
   });
 }
 
@@ -190,7 +197,7 @@ export function updateAutoReplyRule(
   url: string,
   apiKey: string,
   id: string,
-  payload: Partial<{
+  payload: FormData | Partial<{
     accountId: string;
     keyword: string;
     reply: string;
@@ -199,9 +206,10 @@ export function updateAutoReplyRule(
     priority: number;
   }>
 ) {
+  const body = payload instanceof FormData ? payload : JSON.stringify(payload);
   return gatewayRequest<{ data: AutoReplyRule }>(url, apiKey, `/api/v1/autoreply/${id}`, {
     method: "PATCH",
-    body: JSON.stringify(payload),
+    body,
   });
 }
 

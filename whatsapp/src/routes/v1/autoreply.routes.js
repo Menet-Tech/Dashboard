@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { createRule, listRules, removeRule, patchRule } = require('../../controllers/autoreply.controller');
+const { uploadPersistent } = require('../../utils/fileHandler');
 
 /**
  * @swagger
@@ -33,7 +34,7 @@ const { createRule, listRules, removeRule, patchRule } = require('../../controll
  *     summary: Lihat semua rule auto-reply
  *     tags: [AutoReply]
  */
-router.post('/', createRule);
+router.post('/', uploadPersistent.single('image'), createRule);
 router.get('/', listRules);
 
 /**
@@ -61,6 +62,6 @@ router.get('/', listRules);
  *                 type: boolean
  */
 router.delete('/:id', removeRule);
-router.patch('/:id', patchRule);
+router.patch('/:id', uploadPersistent.single('image'), patchRule);
 
 module.exports = router;

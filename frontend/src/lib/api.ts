@@ -175,7 +175,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
 }
 
 export function fetchHealth() {
-  return request<HealthPayload>("/health");
+  return request<HealthPayload>("/api/v1/health");
 }
 
 export async function fetchSummary(): Promise<SummaryPayload> {

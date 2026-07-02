@@ -91,6 +91,7 @@ describe('Chatbot ISP state machine', () => {
         expect(database.upsertSession).toHaveBeenCalledWith(phone, 'billing', 'REG_MENU', {
             customerId: 5,
             customerName: 'Budi',
+            hasBills: false,
             customers: [{ id: 5, name: 'Budi', address: undefined }]
         });
         expect(sendFn).toHaveBeenCalledWith('billing', phone, expect.stringContaining('Budi'));

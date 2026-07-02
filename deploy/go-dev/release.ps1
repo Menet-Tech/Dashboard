@@ -48,7 +48,7 @@ if ($target -ne "linux") {
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Resolve-Path (Join-Path $scriptDir "..\..") | Select-Object -ExpandProperty Path
 $releasesDir = Join-Path $repoRoot "Releases"
-$TOTAL_STEPS = 8
+$TOTAL_STEPS = 9
 
 Write-Host "=========================================================" -ForegroundColor Green
 Write-Host "  Menet-Tech - Build & Package Release for Linux (amd64)" -ForegroundColor Green
@@ -257,18 +257,43 @@ foreach ($c in $checks) {
     }
 }
 
+# ─── Step 9: Compress to Releases.zip ───────────────────────────────────────
+Write-Step 9 $TOTAL_STEPS "Mengompres folder Releases ke Releases.zip..."
+
+# Hapus cache sesi WhatsApp lokal di folder Releases agar tidak terjadi locked files
+$waSessionDir = Join-Path $releasesDir "integration\whatsapp\src\whatsapp\sessions"
+if (Test-Path $waSessionDir) {
+    Write-Host "  -> Menghapus cache sesi WhatsApp lokal di folder Releases..."
+    Remove-Item -Recurse -Force $waSessionDir -ErrorAction SilentlyContinue
+}
+
+$zipPath = Join-Path $repoRoot "Releases.zip"
+if (Test-Path $zipPath) {
+    Remove-Item -Force $zipPath -ErrorAction SilentlyContinue
+}
+
+try {
+    Compress-Archive -Path "$releasesDir\*" -DestinationPath $zipPath -Force
+    Write-OK "Releases.zip berhasil dibuat di: $zipPath"
+}
+catch {
+    Write-Err "Gagal membuat Releases.zip: $_"
+    $allOk = $false
+}
+
 Write-Host "`n=========================================================" -ForegroundColor Green
 if ($allOk) {
-    Write-Host "  Build BERHASIL! Folder Releases siap dikompres." -ForegroundColor Green
+    Write-Host "  Build & Kompres BERHASIL! file Releases.zip siap diunggah." -ForegroundColor Green
 }
 else {
     Write-Host "  Build SELESAI dengan beberapa peringatan di atas." -ForegroundColor Yellow
 }
-Write-Host "  Output : $releasesDir" -ForegroundColor Cyan
+Write-Host "  Output ZIP : $zipPath" -ForegroundColor Cyan
+Write-Host "  Output Dir : $releasesDir" -ForegroundColor Cyan
 Write-Host "=========================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Langkah selanjutnya:" -ForegroundColor White
-Write-Host "  1. Kompres folder Releases menjadi .zip atau .rar" -ForegroundColor Gray
-Write-Host "  2. Upload ke server Linux" -ForegroundColor Gray
-Write-Host "  3. Ekstrak dan jalankan: sudo ./Linux-installer.sh" -ForegroundColor Gray
+Write-Host "  1. Upload berkas 'Releases.zip' ke server Linux" -ForegroundColor Gray
+Write-Host "  2. Ekstrak dan jalankan: sudo ./Linux-installer.sh" -ForegroundColor Gray
 Write-Host ""
+

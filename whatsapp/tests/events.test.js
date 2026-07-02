@@ -7,10 +7,12 @@ jest.mock('../src/utils/database', () => ({
 
 jest.mock('../src/services/autoReply.service', () => ({
     findReply: jest.fn(),
+    findReplyRule: jest.fn(),
 }));
 
 jest.mock('../src/services/whatsapp.service', () => ({
     sendTextMessage: jest.fn(),
+    sendMediaMessage: jest.fn(),
 }));
 
 jest.mock('../src/services/chatbot.service', () => ({
@@ -85,7 +87,7 @@ describe('WhatsApp inbound events', () => {
 
     it('auto-reply menghentikan alur sebelum chatbot jika cocok', async () => {
         setupClient();
-        autoReply.findReply.mockReturnValue('Ini balasan otomatis');
+        autoReply.findReplyRule.mockReturnValue({ reply: 'Ini balasan otomatis' });
 
         await handlers.message({
             from: '628123@c.us',
@@ -97,6 +99,48 @@ describe('WhatsApp inbound events', () => {
         });
 
         expect(whatsappService.sendTextMessage).toHaveBeenCalledWith('billing', '628123@c.us', 'Ini balasan otomatis');
+        expect(chatbotService.handleMessage).not.toHaveBeenCalled();
+    });
+
+    it('tidak memproses chatbot jika chatbot_enabled nonaktif', async () => {
+        setupClient();
+        autoReply.findReplyRule.mockReturnValue(null);
+        database.getGatewaySetting.mockImplementation((key) => {
+            if (key === 'chatbot_enabled') return '0';
+            return '*';
+        });
+
+        await handlers.message({
+            from: '628123@c.us',
+            to: 'me',
+            body: 'halo',
+            hasMedia: false,
+            id: { id: 'wa-id' },
+            getContact: jest.fn(),
+        });
+
+        expect(chatbotService.handleMessage).not.toHaveBeenCalled();
+    });
+
+    it('auto-reply mengirim media jika rule memiliki image_path', async () => {
+        setupClient();
+        autoReply.findReplyRule.mockReturnValue({ reply: 'Ini balasan gambar', image_path: 'test-image.png' });
+
+        await handlers.message({
+            from: '628123@c.us',
+            to: 'me',
+            body: 'qr',
+            hasMedia: false,
+            id: { id: 'wa-id' },
+            getContact: jest.fn(),
+        });
+
+        expect(whatsappService.sendMediaMessage).toHaveBeenCalledWith(
+            'billing',
+            '628123@c.us',
+            expect.stringContaining('test-image.png'),
+            'Ini balasan gambar'
+        );
         expect(chatbotService.handleMessage).not.toHaveBeenCalled();
     });
 });

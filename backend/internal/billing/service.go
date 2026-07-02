@@ -212,13 +212,18 @@ func (s Service) MarkPaid(ctx context.Context, billID int64, method string, user
 		s.QueueEmailForTrigger(bgCtx, billID, "lunas", templateData)
 	}()
 
-	if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_payment") {
+	if s.Discord != nil {
 		go func() {
 			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			detail, err := s.FindByID(bgCtx, billID)
 			if err != nil {
 				return
+			}
+			
+			var adminUser string = "Sistem"
+			if userID > 0 {
+				_ = s.Repository.DB.QueryRowContext(bgCtx, "SELECT username FROM users WHERE id = ?", userID).Scan(&adminUser)
 			}
 			
 			embed := notifications.DiscordEmbed{
@@ -254,6 +259,11 @@ func (s Service) MarkPaid(ctx context.Context, billID int64, method string, user
 					{
 						Name:   "Tanggal Jatuh Tempo",
 						Value:  detail.DueDate,
+						Inline: true,
+					},
+					{
+						Name:   "Diproses Oleh",
+						Value:  adminUser,
 						Inline: true,
 					},
 				},

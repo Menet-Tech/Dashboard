@@ -4,6 +4,7 @@ import { inputClassName } from "../../../components/ui";
 import { Bot, Sliders, PlusCircle, CheckCircle2, XCircle, Trash2, Key, ToggleLeft, ToggleRight, Phone, Clock, FileText, User } from "lucide-react";
 
 type ChatbotTabProps = {
+  gatewayUrl: string;
   accounts: GatewayAccount[];
   canDecrypt: boolean;
   chatbotSettings: ChatbotSettings;
@@ -15,6 +16,7 @@ type ChatbotTabProps = {
     reply: string;
     matchType: AutoReplyRule["match_type"];
     priority: number;
+    image?: File;
   }) => Promise<void>;
   onToggleAutoReplyRule: (rule: AutoReplyRule) => Promise<void>;
   onDeleteAutoReplyRule: (id: string) => Promise<void>;
@@ -26,6 +28,7 @@ type ChatbotTabProps = {
 };
 
 export function ChatbotTab({
+  gatewayUrl,
   accounts,
   canDecrypt,
   chatbotSettings,
@@ -58,6 +61,7 @@ export function ChatbotTab({
     matchType: "contains" as AutoReplyRule["match_type"],
     priority: 100,
   });
+  const [selectedImage, setSelectedImage] = useState<File | undefined>(undefined);
 
   const handleSettingsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,8 +73,11 @@ export function ChatbotTab({
     if (!autoReplyForm.keyword.trim() || !autoReplyForm.reply.trim()) {
       return;
     }
-    await onAddAutoReplyRule(autoReplyForm);
+    await onAddAutoReplyRule({ ...autoReplyForm, image: selectedImage });
     setAutoReplyForm((current) => ({ ...current, keyword: "", reply: "" }));
+    setSelectedImage(undefined);
+    const fileInput = document.getElementById("auto-reply-image-input") as HTMLInputElement;
+    if (fileInput) fileInput.value = "";
   };
 
   return (
@@ -91,6 +98,18 @@ export function ChatbotTab({
           </div>
           
           <div className="space-y-4">
+            <label className="block">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Status Chatbot ISP</span>
+              <select
+                value={localSettings.chatbot_enabled || "1"}
+                onChange={(e) => setLocalSettings((current) => ({ ...current, chatbot_enabled: e.target.value }))}
+                className={inputClassName()}
+              >
+                <option value="1">Aktif (On)</option>
+                <option value="0">Nonaktif (Off)</option>
+              </select>
+            </label>
+
             <label className="block">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Akun Chatbot ISP</span>
               <select
@@ -193,9 +212,20 @@ export function ChatbotTab({
             </label>
           </div>
           
-          <label className="block">
+           <label className="block">
             <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Balasan</span>
             <textarea className={inputClassName()} rows={3} value={autoReplyForm.reply} onChange={(e) => setAutoReplyForm((current) => ({ ...current, reply: e.target.value }))} placeholder="Tulis pesan balasan otomatis..." required />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Gambar Lampiran (Opsional)</span>
+            <input 
+              id="auto-reply-image-input"
+              type="file" 
+              accept="image/*"
+              className={inputClassName()} 
+              onChange={(e) => setSelectedImage(e.target.files?.[0])}
+            />
           </label>
           
           <div className="pt-2">
@@ -233,11 +263,21 @@ export function ChatbotTab({
                   <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{rule.reply}</p>
                 </div>
                 
+                {rule.image_path && (
+                  <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 dark:border-slate-850 bg-slate-50 dark:bg-slate-950/50 flex items-center justify-center p-2">
+                    <img 
+                      src={`${gatewayUrl.replace(/\/$/, '')}/uploads/${rule.image_path}`} 
+                      alt={`Lampiran untuk ${rule.keyword}`} 
+                      className="max-h-24 max-w-full rounded-md object-contain"
+                    />
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-850">
                   <div className="text-[10px] text-slate-450 dark:text-slate-500 flex flex-wrap gap-2">
-                    <span>Akun: <strong className="text-slate-700 dark:text-slate-350">{rule.accountId || rule.account_id || "*"}</strong></span>
+                    <span>Akun: <strong className="text-slate-700 dark:text-slate-350">{rule.account_id || "*"}</strong></span>
                     <span>•</span>
-                    <span>Tipe: <strong className="text-slate-700 dark:text-slate-350">{rule.matchType || rule.match_type}</strong></span>
+                    <span>Tipe: <strong className="text-slate-700 dark:text-slate-350">{rule.match_type}</strong></span>
                     <span>•</span>
                     <span>Prio: <strong className="text-slate-700 dark:text-slate-350">{rule.priority}</strong></span>
                   </div>

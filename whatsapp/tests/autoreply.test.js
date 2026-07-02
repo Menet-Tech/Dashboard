@@ -14,7 +14,7 @@ jest.mock('../src/whatsapp/client', () => ({
 }));
 
 const app = require('../src/app');
-const { addRule, getAllRules, deleteRule, findReply } = require('../src/services/autoReply.service');
+const { addRule, getAllRules, deleteRule, findReplyRule, findReply } = require('../src/services/autoReply.service');
 const API_KEY = process.env.API_KEY;
 
 describe('🤖 AutoReply Service — Unit Tests', () => {
@@ -28,6 +28,20 @@ describe('🤖 AutoReply Service — Unit Tests', () => {
         expect(rule).toHaveProperty('id');
         expect(rule.keyword).toBe('harga');
         expect(rule.enabled).toBe(true);
+    });
+
+    it('addRule() harus menyimpan image_path jika diberikan', () => {
+        const rule = addRule('qr', 'Scan QR ini', 'exact', { image_path: 'qr-code.png' });
+        expect(rule.imagePath).toBe('qr-code.png');
+        expect(rule.image_path).toBe('qr-code.png');
+    });
+
+    it('findReplyRule() harus mengembalikan rule lengkap termasuk image_path', () => {
+        addRule('qr', 'Scan QR ini', 'exact', { image_path: 'qr-code.png' });
+        const matched = findReplyRule('qr');
+        expect(matched).not.toBeNull();
+        expect(matched.reply).toBe('Scan QR ini');
+        expect(matched.imagePath).toBe('qr-code.png');
     });
 
     it('findReply() harus menemukan rule yang cocok (contains)', () => {
