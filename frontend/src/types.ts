@@ -40,7 +40,7 @@ export type CustomerItem = {
   email?: string;
   sn_ont: string;
   due_day: number;
-  status: "active" | "limit" | "inactive" | "pending";
+  status: "active" | "limit" | "suspended" | "inactive" | "pending";
   address: string;
   is_trial?: boolean;
   trial_started_at?: string;
@@ -104,6 +104,7 @@ export type NotificationLog = {
   sent_to: string;
   status: string;
   response_message: string;
+  message?: string;
   created_at: string;
 };
 
@@ -117,6 +118,7 @@ export type SettingsState = {
   wa_limit_account_id?: string;
   wa_payment_account_id?: string;
   wa_api_key?: string;
+  wa_queue_throttle_seconds?: string;
   discord_webhook_url?: string;
   discord_notify_payment?: string;
   discord_notify_generate?: string;
@@ -127,6 +129,7 @@ export type SettingsState = {
   billing_reminder_days?: string;
   billing_limit_days?: string;
   billing_menunggak_days?: string;
+  billing_inactive_suspended_days?: string;
   billing_auto_generate_enabled?: string;
   billing_generate_day?: string;
   billing_generate_time?: string;
@@ -141,6 +144,7 @@ export type SettingsState = {
   mikrotik_pass?: string;
   mikrotik_test_username?: string;
   mikrotik_isolir_profile?: string;
+  mikrotik_inactive_profile?: string;
   trial_enabled?: string;
   trial_period_days?: string;
   trial_overdue_grace_days?: string;
@@ -215,6 +219,12 @@ export type PaymentConfirmationItem = {
   status: string;
   catatan: string;
   created_at: string;
+  linked_tagihan_ids?: string;
+  linked_bills?: Array<{
+    tagihan_id: number;
+    invoice_number: string;
+    amount: number;
+  }>;
 };
 
 export type ViewKey =

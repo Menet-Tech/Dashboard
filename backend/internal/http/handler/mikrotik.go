@@ -118,6 +118,9 @@ func (h MikrotikHandler) UpdateRouter(w http.ResponseWriter, r *http.Request) {
 	if val, ok := payload["role"].(string); ok {
 		router.Role = val
 	}
+	if val, ok := payload["slave_port"].(string); ok {
+		router.SlavePort = val
+	}
 	if val, ok := payload["is_active"].(bool); ok {
 		router.IsActive = val
 	}
@@ -237,3 +240,70 @@ func (h MikrotikHandler) SyncRouters(w http.ResponseWriter, r *http.Request) {
 		"data":    result,
 	})
 }
+
+func (h MikrotikHandler) GetRouterInterfaces(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		ID       *int64 `json:"id"`
+		Host     string `json:"host"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "payload tidak valid")
+		return
+	}
+
+	var host, user, pass string
+	if payload.ID != nil && *payload.ID > 0 {
+		router, err := h.RouterService.FindByID(r.Context(), *payload.ID)
+		if err != nil {
+			WriteError(w, http.StatusNotFound, "Router tidak ditemukan")
+			return
+		}
+		host = router.Host
+		user = router.Username
+		if payload.Password != "" {
+			pass = payload.Password
+		} else {
+			pass = router.Password
+		}
+	} else {
+		host = payload.Host
+		user = payload.Username
+		pass = payload.Password
+	}
+
+	if strings.TrimSpace(host) == "" || strings.TrimSpace(user) == "" {
+		WriteError(w, http.StatusBadRequest, "host dan username wajib diisi")
+		return
+	}
+
+	client := mikrotik.NewClient(host, user, pass)
+	if err := client.Connect(r.Context()); err != nil {
+		fallback := []string{"ether1", "ether2", "ether3", "ether4", "ether5"}
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"success": false,
+			"message": fmt.Sprintf("Gagal terhubung ke MikroTik: %v. Menggunakan fallback port.", err),
+			"data":    fallback,
+		})
+		return
+	}
+	defer client.Close()
+
+	interfaces, err := client.ListInterfaces(r.Context())
+	if err != nil {
+		fallback := []string{"ether1", "ether2", "ether3", "ether4", "ether5"}
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"success": false,
+			"message": fmt.Sprintf("Gagal mengambil data interface: %v. Menggunakan fallback port.", err),
+			"data":    fallback,
+		})
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"success": true,
+		"data":    interfaces,
+	})
+}
+

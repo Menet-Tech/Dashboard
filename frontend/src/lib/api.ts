@@ -272,6 +272,13 @@ export function updateCustomerStatus(id: number, status: CustomerItem["status"])
   });
 }
 
+export function assignCustomerOdp(id: number, odpId: number | null, odpPort: number | null) {
+  return request<{ message: string }>(`/api/v1/customers/${id}/odp`, {
+    method: "PATCH",
+    body: JSON.stringify({ odp_id: odpId, odp_port: odpPort }),
+  });
+}
+
 export function endCustomerTrial(id: number) {
   return request<{ message: string }>(`/api/v1/customers/${id}/end-trial`, {
     method: "POST",
@@ -1122,6 +1129,7 @@ export type MikrotikRouterItem = {
   password?: string;
   is_active: boolean;
   role: string;
+  slave_port?: string;
   status?: "online" | "failed_auth" | "offline";
 };
 
@@ -1178,6 +1186,13 @@ export function fetchMikrotikIPPools() {
   return request<{ data: MikrotikIPPoolItem[] }>("/api/v1/mikrotik/ip-pools");
 }
 
+export function fetchRouterInterfaces(input: { id?: number; host?: string; username?: string; password?: string }) {
+  return request<{ success: boolean; message?: string; data: string[] }>("/api/v1/mikrotik/routers/interfaces", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export type TrafficStats = {
   tx_rate: number;
   rx_rate: number;
@@ -1224,6 +1239,19 @@ export function approveConfirmation(id: number) {
 export function rejectConfirmation(id: number) {
   return request<{ message: string }>(`/api/v1/bills/confirmations/${id}/reject`, {
     method: "POST",
+  });
+}
+
+export function createPaymentConfirmation(payload: {
+  tagihan_id: number;
+  pelanggan_id: number;
+  bukti_transfer?: string;
+  catatan?: string;
+  linked_tagihan_ids?: string;
+}) {
+  return request<{ id: number; message: string }>("/api/v1/chatbot/confirmations", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

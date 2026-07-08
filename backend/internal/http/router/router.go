@@ -55,6 +55,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 		Settings:  settingsService,
 		Templates: templateService,
 		Logs:      notifications.NotificationLogRepository{DB: db},
+		Discord:   discordService,
 	}
 
 	authHandler := handler.NewAuthHandler(authService, auditService)
@@ -96,7 +97,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 		Discord:       discordService,
 		Notifications: notifications.NotificationLogRepository{DB: db},
 		Templates:     templateService,
-	}, cfg.AppName, cfg.StoragePath)
+	}, cfg.AppName, cfg.StoragePath, auditService)
 	templateHandler := handler.NewTemplateHandler(templateService)
 	emailTemplateHandler := handler.NewEmailTemplateHandler(templateService)
 	settingsHandler := handler.NewSettingsHandler(settingsService, serviceMgr)
@@ -296,6 +297,8 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Post("/backups/{filename}/restore", backupHandler.SimulateRestore)
 				admin.Post("/backups/staging/apply", backupHandler.ApplyRestore)
 				admin.Get("/integration/check", integrationHandler.Check)
+				admin.Get("/integration/mikrotik/check-profiles", integrationHandler.CheckProfiles)
+				admin.Post("/integration/mikrotik/setup-profiles", integrationHandler.SetupProfiles)
 				admin.Post("/integration/mikrotik/sync-import", integrationHandler.SyncImport)
 				admin.Get("/integration/mikrotik/sync-packages-preview", integrationHandler.SyncPackagesPreview)
 				admin.Post("/integration/mikrotik/sync-packages-import", integrationHandler.SyncPackagesImport)
@@ -309,6 +312,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				admin.Delete("/mikrotik/routers/{id}", mikrotikHandler.DeleteRouter)
 				admin.Post("/mikrotik/routers/{id}/test", mikrotikHandler.TestRouterConnection)
 				admin.Post("/mikrotik/routers/sync", mikrotikHandler.SyncRouters)
+				admin.Post("/mikrotik/routers/interfaces", mikrotikHandler.GetRouterInterfaces)
 				admin.Get("/mikrotik/ip-pools", mikrotikHandler.ListIPPools)
 				admin.Post("/integration/test-smtp", integrationHandler.TestSMTP)
 				admin.Put("/map-settings", gacsHandler.UpdateMapSettings)
@@ -334,6 +338,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				staff.Post("/customers/{id}/ont-wifi", customerHandler.ONTWifiUpdate)
 				staff.Post("/customers/{id}/mikrotik-kick", customerHandler.MikrotikKick)
 				staff.Patch("/customers/{id}/status", customerHandler.UpdateStatus)
+				staff.Patch("/customers/{id}/odp", customerHandler.UpdateOdp)
 				staff.Post("/customers/{id}/end-trial", customerHandler.EndTrial)
 				staff.Post("/customers/{id}/referral/withdraw", customerHandler.WithdrawReferral)
 				staff.Post("/customers/{id}/referral/convert-voucher", customerHandler.ConvertReferralToVoucher)

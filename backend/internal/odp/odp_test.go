@@ -29,6 +29,8 @@ func setupTestDB(t *testing.T) *sql.DB {
 			deskripsi TEXT,
 			ports INTEGER DEFAULT 8,
 			splitter_ratio TEXT DEFAULT '1:8',
+			latitude REAL DEFAULT 0.0,
+			longitude REAL DEFAULT 0.0,
 			updated_at DATETIME
 		);
 		CREATE TABLE pelanggan (

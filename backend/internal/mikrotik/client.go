@@ -444,12 +444,18 @@ func (c *Client) SyncCustomer(ctx context.Context, username, password, profile, 
 			targetProfile = "isolir"
 		}
 		disabled = "no"
-	case "inactive":
+	case "suspended":
 		targetProfile = profile
 		if targetProfile == "" {
 			targetProfile = "nonaktif"
 		}
 		disabled = "no"
+	case "inactive":
+		targetProfile = profile
+		if targetProfile == "" {
+			targetProfile = "nonaktif"
+		}
+		disabled = "yes"
 	default:
 		targetProfile = profile
 		if targetProfile == "" {
@@ -756,26 +762,32 @@ func (c *Client) SyncPPPProfile(ctx context.Context, name, localAddr, remoteAddr
 	id := extractField(reply, ".id")
 
 	if id != "" {
-		setReply, err := c.run(ctx,
-			"/ppp/profile/set",
-			"=.id="+id,
-			"=local-address="+localAddr,
-			"=remote-address="+remoteAddr,
-			"=rate-limit="+rateLimit,
-		)
+		args := []string{"/ppp/profile/set", "=.id=" + id}
+		if localAddr != "" {
+			args = append(args, "=local-address="+localAddr)
+		}
+		if remoteAddr != "" {
+			args = append(args, "=remote-address="+remoteAddr)
+		}
+		args = append(args, "=rate-limit="+rateLimit)
+
+		setReply, err := c.run(ctx, args...)
 		if err != nil {
 			return err
 		}
 		return hasError(setReply)
 	}
 
-	addReply, err := c.run(ctx,
-		"/ppp/profile/add",
-		"=name="+name,
-		"=local-address="+localAddr,
-		"=remote-address="+remoteAddr,
-		"=rate-limit="+rateLimit,
-	)
+	args := []string{"/ppp/profile/add", "=name=" + name}
+	if localAddr != "" {
+		args = append(args, "=local-address="+localAddr)
+	}
+	if remoteAddr != "" {
+		args = append(args, "=remote-address="+remoteAddr)
+	}
+	args = append(args, "=rate-limit="+rateLimit)
+
+	addReply, err := c.run(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -934,4 +946,82 @@ func (c *Client) GetActiveConnection(ctx context.Context, username string) (*PPP
 	}
 	return &a, nil
 }
+
+// ListInterfaces retrieves a list of interface names from RouterOS.
+func (c *Client) ListInterfaces(ctx context.Context) ([]string, error) {
+	if c.conn == nil {
+		return nil, fmt.Errorf("not connected to RouterOS")
+	}
+
+	reply, err := c.run(ctx, "/interface/print")
+	if err != nil {
+		return nil, fmt.Errorf("list interfaces: %w", err)
+	}
+	if err := hasError(reply); err != nil {
+		return nil, fmt.Errorf("list interfaces error: %w", err)
+	}
+
+	var interfaces []string
+	for _, sentence := range reply {
+		hasRe := false
+		for _, word := range sentence {
+			if word == "!re" {
+				hasRe = true
+				break
+			}
+		}
+		if !hasRe {
+			continue
+		}
+
+		var name string
+		for _, word := range sentence {
+			if strings.HasPrefix(word, "=name=") {
+				name = strings.TrimPrefix(word, "=name=")
+			}
+		}
+		if name != "" {
+			interfaces = append(interfaces, name)
+		}
+	}
+	return interfaces, nil
+}
+
+// SetInterfaceDisabled enables or disables a specific interface by name.
+func (c *Client) SetInterfaceDisabled(ctx context.Context, name string, disabled bool) error {
+	if c.conn == nil {
+		return fmt.Errorf("not connected to RouterOS")
+	}
+
+	// 1. Find the interface ID by name
+	reply, err := c.run(ctx, "/interface/print", "?name="+name)
+	if err != nil {
+		return fmt.Errorf("find interface %q: %w", name, err)
+	}
+	if err := hasError(reply); err != nil {
+		return fmt.Errorf("find interface %q error: %w", name, err)
+	}
+
+	id := extractField(reply, ".id")
+	if id == "" {
+		return fmt.Errorf("interface %q not found", name)
+	}
+
+	// 2. Set the disabled state
+	disabledStr := "no"
+	if disabled {
+		disabledStr = "yes"
+	}
+
+	setReply, err := c.run(ctx, "/interface/set", "=.id="+id, "=disabled="+disabledStr)
+	if err != nil {
+		return fmt.Errorf("set interface %q disabled=%s: %w", name, disabledStr, err)
+	}
+	if err := hasError(setReply); err != nil {
+		return fmt.Errorf("set interface %q disabled error: %w", name, err)
+	}
+
+	return nil
+}
+
 

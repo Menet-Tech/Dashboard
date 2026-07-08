@@ -17,6 +17,7 @@ type Router struct {
 	IsActive  bool   `json:"is_active"`
 	Role      string `json:"role"` // "main", "slave", "none"
 	IsOnline  bool   `json:"is_online"`
+	SlavePort string `json:"slave_port"`
 	CreatedAt string `json:"created_at,omitempty"`
 	UpdatedAt string `json:"updated_at,omitempty"`
 }
@@ -31,7 +32,7 @@ func NewRouterService(db *sql.DB) *RouterService {
 
 func (s *RouterService) List(ctx context.Context) ([]Router, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id, nama, host, username, password, is_active, role, is_online, created_at, updated_at
+		SELECT id, nama, host, username, password, is_active, role, is_online, slave_port, created_at, updated_at
 		FROM mikrotik_routers
 		ORDER BY id DESC
 	`)
@@ -45,7 +46,7 @@ func (s *RouterService) List(ctx context.Context) ([]Router, error) {
 		var r Router
 		var isActive int
 		var isOnlineVal int
-		if err := rows.Scan(&r.ID, &r.Name, &r.Host, &r.Username, &r.Password, &isActive, &r.Role, &isOnlineVal, &r.CreatedAt, &r.UpdatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Host, &r.Username, &r.Password, &isActive, &r.Role, &isOnlineVal, &r.SlavePort, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan router: %w", err)
 		}
 		r.IsActive = isActive != 0
@@ -57,7 +58,7 @@ func (s *RouterService) List(ctx context.Context) ([]Router, error) {
 
 func (s *RouterService) ListActive(ctx context.Context) ([]Router, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id, nama, host, username, password, is_active, role, is_online, created_at, updated_at
+		SELECT id, nama, host, username, password, is_active, role, is_online, slave_port, created_at, updated_at
 		FROM mikrotik_routers
 		WHERE is_active = 1
 		ORDER BY id DESC
@@ -72,7 +73,7 @@ func (s *RouterService) ListActive(ctx context.Context) ([]Router, error) {
 		var r Router
 		var isActive int
 		var isOnlineVal int
-		if err := rows.Scan(&r.ID, &r.Name, &r.Host, &r.Username, &r.Password, &isActive, &r.Role, &isOnlineVal, &r.CreatedAt, &r.UpdatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Host, &r.Username, &r.Password, &isActive, &r.Role, &isOnlineVal, &r.SlavePort, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan active router: %w", err)
 		}
 		r.IsActive = isActive != 0
@@ -84,7 +85,7 @@ func (s *RouterService) ListActive(ctx context.Context) ([]Router, error) {
 
 func (s *RouterService) FindByID(ctx context.Context, id int64) (Router, error) {
 	row := s.DB.QueryRowContext(ctx, `
-		SELECT id, nama, host, username, password, is_active, role, is_online, created_at, updated_at
+		SELECT id, nama, host, username, password, is_active, role, is_online, slave_port, created_at, updated_at
 		FROM mikrotik_routers
 		WHERE id = ?
 		LIMIT 1
@@ -92,7 +93,7 @@ func (s *RouterService) FindByID(ctx context.Context, id int64) (Router, error) 
 	var r Router
 	var isActive int
 	var isOnlineVal int
-	if err := row.Scan(&r.ID, &r.Name, &r.Host, &r.Username, &r.Password, &isActive, &r.Role, &isOnlineVal, &r.CreatedAt, &r.UpdatedAt); err != nil {
+	if err := row.Scan(&r.ID, &r.Name, &r.Host, &r.Username, &r.Password, &isActive, &r.Role, &isOnlineVal, &r.SlavePort, &r.CreatedAt, &r.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Router{}, errors.New("router not found")
 		}
@@ -109,12 +110,16 @@ func (s *RouterService) Create(ctx context.Context, r Router) (Router, error) {
 	r.Username = strings.TrimSpace(r.Username)
 	r.Password = strings.TrimSpace(r.Password)
 	r.Role = strings.TrimSpace(r.Role)
+	r.SlavePort = strings.TrimSpace(r.SlavePort)
 
 	if r.Name == "" || r.Host == "" || r.Username == "" {
 		return Router{}, errors.New("name, host, and username are required")
 	}
 	if r.Role == "" {
 		r.Role = "none"
+	}
+	if r.SlavePort == "" {
+		r.SlavePort = "ether2"
 	}
 
 	isActive := 0
@@ -128,9 +133,9 @@ func (s *RouterService) Create(ctx context.Context, r Router) (Router, error) {
 	}
 
 	result, err := s.DB.ExecContext(ctx, `
-		INSERT INTO mikrotik_routers (nama, host, username, password, is_active, role, is_online, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-	`, r.Name, r.Host, r.Username, r.Password, isActive, r.Role, isOnline)
+		INSERT INTO mikrotik_routers (nama, host, username, password, is_active, role, is_online, slave_port, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`, r.Name, r.Host, r.Username, r.Password, isActive, r.Role, isOnline, r.SlavePort)
 	if err != nil {
 		return Router{}, fmt.Errorf("create router: %w", err)
 	}
@@ -150,12 +155,16 @@ func (s *RouterService) Update(ctx context.Context, id int64, r Router, updatePa
 	r.Username = strings.TrimSpace(r.Username)
 	r.Password = strings.TrimSpace(r.Password)
 	r.Role = strings.TrimSpace(r.Role)
+	r.SlavePort = strings.TrimSpace(r.SlavePort)
 
 	if r.Name == "" || r.Host == "" || r.Username == "" {
 		return Router{}, errors.New("name, host, and username are required")
 	}
 	if r.Role == "" {
 		r.Role = "none"
+	}
+	if r.SlavePort == "" {
+		r.SlavePort = "ether2"
 	}
 
 	isActive := 0
@@ -173,15 +182,15 @@ func (s *RouterService) Update(ctx context.Context, id int64, r Router, updatePa
 	if updatePassword {
 		result, err = s.DB.ExecContext(ctx, `
 			UPDATE mikrotik_routers
-			SET nama = ?, host = ?, username = ?, password = ?, is_active = ?, role = ?, is_online = ?, updated_at = CURRENT_TIMESTAMP
+			SET nama = ?, host = ?, username = ?, password = ?, is_active = ?, role = ?, is_online = ?, slave_port = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ?
-		`, r.Name, r.Host, r.Username, r.Password, isActive, r.Role, isOnline, id)
+		`, r.Name, r.Host, r.Username, r.Password, isActive, r.Role, isOnline, r.SlavePort, id)
 	} else {
 		result, err = s.DB.ExecContext(ctx, `
 			UPDATE mikrotik_routers
-			SET nama = ?, host = ?, username = ?, is_active = ?, role = ?, is_online = ?, updated_at = CURRENT_TIMESTAMP
+			SET nama = ?, host = ?, username = ?, is_active = ?, role = ?, is_online = ?, slave_port = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ?
-		`, r.Name, r.Host, r.Username, isActive, r.Role, isOnline, id)
+		`, r.Name, r.Host, r.Username, isActive, r.Role, isOnline, r.SlavePort, id)
 	}
 
 	if err != nil {

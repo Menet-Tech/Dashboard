@@ -168,6 +168,7 @@ export function CustomerFormCard({
           <option value="active">Active</option>
           <option value="limit">Limit</option>
           <option value="pending">Pending (Perpanjangan)</option>
+          <option value="suspended">Suspended</option>
           <option value="inactive">Inactive</option>
         </select>
       </label>

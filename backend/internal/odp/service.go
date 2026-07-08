@@ -81,10 +81,10 @@ func (s Service) Delete(ctx context.Context, id int64) error {
 
 func (r Repository) List(ctx context.Context) ([]Odp, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), o.ports, COALESCE(o.splitter_ratio, '1:8'), COUNT(c.id)
+		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), o.ports, COALESCE(o.splitter_ratio, '1:8'), COALESCE(o.latitude, 0.0), COALESCE(o.longitude, 0.0), COUNT(c.id)
 		FROM odp o
 		LEFT JOIN pelanggan c ON c.odp_id = o.id
-		GROUP BY o.id, o.nama, o.lokasi, o.deskripsi, o.ports, o.splitter_ratio
+		GROUP BY o.id, o.nama, o.lokasi, o.deskripsi, o.ports, o.splitter_ratio, o.latitude, o.longitude
 		ORDER BY o.id DESC
 	`)
 	if err != nil {
@@ -95,11 +95,13 @@ func (r Repository) List(ctx context.Context) ([]Odp, error) {
 	items := []Odp{}
 	for rows.Next() {
 		var item Odp
-		if err := rows.Scan(&item.ID, &item.Nama, &item.Lokasi, &item.Deskripsi, &item.Ports, &item.SplitterRatio, &item.CustomerCount); err != nil {
+		if err := rows.Scan(&item.ID, &item.Nama, &item.Lokasi, &item.Deskripsi, &item.Ports, &item.SplitterRatio, &item.Latitude, &item.Longitude, &item.CustomerCount); err != nil {
 			return nil, fmt.Errorf("scan odp: %w", err)
 		}
-		// Parse coordinates from lokasi
-		item.Latitude, item.Longitude = parseCoordinates(item.Lokasi)
+		// Fallback for older rows
+		if item.Latitude == 0 && item.Longitude == 0 {
+			item.Latitude, item.Longitude = parseCoordinates(item.Lokasi)
+		}
 		items = append(items, item)
 	}
 	return items, rows.Err()
@@ -108,19 +110,21 @@ func (r Repository) List(ctx context.Context) ([]Odp, error) {
 func (r Repository) FindByID(ctx context.Context, id int64) (Odp, error) {
 	var item Odp
 	err := r.DB.QueryRowContext(ctx, `
-		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), o.ports, COALESCE(o.splitter_ratio, '1:8'), COUNT(c.id)
+		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), o.ports, COALESCE(o.splitter_ratio, '1:8'), COALESCE(o.latitude, 0.0), COALESCE(o.longitude, 0.0), COUNT(c.id)
 		FROM odp o
 		LEFT JOIN pelanggan c ON c.odp_id = o.id
 		WHERE o.id = ?
-		GROUP BY o.id, o.nama, o.lokasi, o.deskripsi, o.ports, o.splitter_ratio
-	`, id).Scan(&item.ID, &item.Nama, &item.Lokasi, &item.Deskripsi, &item.Ports, &item.SplitterRatio, &item.CustomerCount)
+		GROUP BY o.id, o.nama, o.lokasi, o.deskripsi, o.ports, o.splitter_ratio, o.latitude, o.longitude
+	`, id).Scan(&item.ID, &item.Nama, &item.Lokasi, &item.Deskripsi, &item.Ports, &item.SplitterRatio, &item.Latitude, &item.Longitude, &item.CustomerCount)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Odp{}, ErrOdpNotFound
 		}
 		return Odp{}, fmt.Errorf("find odp by id: %w", err)
 	}
-	item.Latitude, item.Longitude = parseCoordinates(item.Lokasi)
+	if item.Latitude == 0 && item.Longitude == 0 {
+		item.Latitude, item.Longitude = parseCoordinates(item.Lokasi)
+	}
 	return item, nil
 }
 
@@ -148,10 +152,18 @@ func (r Repository) Create(ctx context.Context, o Odp) (Odp, error) {
 	}
 	defer tx.Rollback()
 
+	// Use provided lat/lng if valid, otherwise parse from lokasi string
+	lat, lng := o.Latitude, o.Longitude
+	if lat == 0 && lng == 0 {
+		lat, lng = parseCoordinates(o.Lokasi)
+	}
+	o.Latitude = lat
+	o.Longitude = lng
+
 	result, err := tx.ExecContext(ctx, `
-		INSERT INTO odp (nama, lokasi, deskripsi, ports, splitter_ratio, updated_at)
-		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-	`, o.Nama, o.Lokasi, strings.TrimSpace(o.Deskripsi), o.Ports, o.SplitterRatio)
+		INSERT INTO odp (nama, lokasi, deskripsi, ports, splitter_ratio, latitude, longitude, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`, o.Nama, o.Lokasi, strings.TrimSpace(o.Deskripsi), o.Ports, o.SplitterRatio, lat, lng)
 	if err != nil {
 		return Odp{}, fmt.Errorf("create odp in table: %w", err)
 	}
@@ -161,14 +173,6 @@ func (r Repository) Create(ctx context.Context, o Odp) (Odp, error) {
 		return Odp{}, fmt.Errorf("get odp id: %w", err)
 	}
 	o.ID = id
-
-	// Use provided lat/lng if valid, otherwise parse from lokasi string
-	lat, lng := o.Latitude, o.Longitude
-	if lat == 0 && lng == 0 {
-		lat, lng = parseCoordinates(o.Lokasi)
-	}
-	o.Latitude = lat
-	o.Longitude = lng
 
 	nodeID := fmt.Sprintf("odp-%d", id)
 
@@ -204,11 +208,19 @@ func (r Repository) Update(ctx context.Context, id int64, o Odp) (Odp, error) {
 	}
 	defer tx.Rollback()
 
+	// Use provided lat/lng if valid, otherwise parse from lokasi string
+	lat, lng := o.Latitude, o.Longitude
+	if lat == 0 && lng == 0 {
+		lat, lng = parseCoordinates(o.Lokasi)
+	}
+	o.Latitude = lat
+	o.Longitude = lng
+
 	result, err := tx.ExecContext(ctx, `
 		UPDATE odp
-		SET nama = ?, lokasi = ?, deskripsi = ?, ports = ?, splitter_ratio = ?, updated_at = CURRENT_TIMESTAMP
+		SET nama = ?, lokasi = ?, deskripsi = ?, ports = ?, splitter_ratio = ?, latitude = ?, longitude = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, o.Nama, o.Lokasi, strings.TrimSpace(o.Deskripsi), o.Ports, o.SplitterRatio, id)
+	`, o.Nama, o.Lokasi, strings.TrimSpace(o.Deskripsi), o.Ports, o.SplitterRatio, lat, lng, id)
 	if err != nil {
 		return Odp{}, fmt.Errorf("update odp table: %w", err)
 	}
@@ -221,13 +233,6 @@ func (r Repository) Update(ctx context.Context, id int64, o Odp) (Odp, error) {
 		return Odp{}, ErrOdpNotFound
 	}
 
-	// Use provided lat/lng if valid, otherwise parse from lokasi string
-	lat, lng := o.Latitude, o.Longitude
-	if lat == 0 && lng == 0 {
-		lat, lng = parseCoordinates(o.Lokasi)
-	}
-	o.Latitude = lat
-	o.Longitude = lng
 	nodeID := fmt.Sprintf("odp-%d", id)
 
 	_, err = tx.ExecContext(ctx, `

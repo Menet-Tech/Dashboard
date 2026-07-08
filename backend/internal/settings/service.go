@@ -71,12 +71,19 @@ const (
 	KeyMikrotikInactiveProfile = "mikrotik_inactive_profile"
 	KeyWAGatewayEnabled        = "wa_gateway_enabled"
 	KeyDiscordBotEnabled       = "discord_bot_enabled"
+	KeyMikrotikAutoSyncHours   = "mikrotik_auto_sync_hours"
+	KeyMikrotikLastAutoSyncAt  = "mikrotik_last_auto_sync_at"
+	KeyWAChatbotEnabled        = "wa_chatbot_enabled"
+	KeyInactiveSuspendedDays   = "billing_inactive_suspended_days"
+	KeyWAQueueThrottleSeconds  = "wa_queue_throttle_seconds"
 )
 
 var defaults = map[string]string{
 	KeyReminderDays:            "3",
 	KeyLimitDays:               "5",
 	KeyMenunggakDays:           "30",
+	KeyInactiveSuspendedDays:   "20",
+	KeyWAQueueThrottleSeconds:  "120",
 	KeyTrialGraceDays:          "4",
 	KeyTrialPeriodDays:         "3",
 	KeyTrialAutoGenerate:       "1",
@@ -113,6 +120,7 @@ var defaults = map[string]string{
 	KeyMikrotikTestUsername:    "test-user",
 	KeyMikrotikIsolirProfile:   "isolir",
 	KeyMikrotikInactiveProfile: "nonaktif",
+	KeyMikrotikAutoSyncHours:   "0",
 	KeyChatbotTriggerBilling:    "1",
 	KeyChatbotTriggerRegister: "1",
 	KeyChatbotTriggerSupport:  "2",
@@ -132,8 +140,9 @@ var defaults = map[string]string{
 	KeySMTPFromEmail:         "",
 	KeySMTPEncryption:        "tls",
 	KeySMTPEnabled:           "0",
-	KeyWAGatewayEnabled:      "0",
-	KeyDiscordBotEnabled:     "0",
+	KeyWAGatewayEnabled:        "0",
+	KeyDiscordBotEnabled:       "0",
+	KeyWAChatbotEnabled:        "1",
 	"appName":                 "Menet-Tech Dashboard Go",
 	"portalApiKey":            "",
 	"vpPppoeUsername":         "VirtualParameters.pppoeUsername",

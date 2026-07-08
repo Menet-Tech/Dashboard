@@ -182,7 +182,20 @@ export function buildCustomerLifecycleMap(
         ];
       }
 
-      // Customer status "inactive" means their service is disabled/suspended
+      // Customer status "suspended" means they are suspended (ONT connected, redirect/block internet)
+      if (customer.status === "suspended") {
+        return [
+          customer.id,
+          {
+            key: "nonaktif" as const,
+            label: "Suspended",
+            tone: "slate" as const,
+            note: "Layanan ditangguhkan (Tahap 1: ONT terhubung).",
+          },
+        ];
+      }
+
+      // Customer status "inactive" means their service is disabled/inactive
       if (customer.status === "inactive") {
         return [
           customer.id,
@@ -190,7 +203,7 @@ export function buildCustomerLifecycleMap(
             key: "nonaktif" as const,
             label: "Nonaktif",
             tone: "slate" as const,
-            note: "Layanan dinonaktifkan oleh administrator.",
+            note: "Layanan dinonaktifkan sepenuhnya (Tahap 2: PPPoE secret dimatikan).",
           },
         ];
       }

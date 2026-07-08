@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -12,20 +13,28 @@ import (
 	"menettech/dashboard/backend/internal/notifications"
 )
 
-type PaymentConfirmation struct {
-	ID            int64   `json:"id"`
-	TagihanID     int64   `json:"tagihan_id"`
-	PelangganID   int64   `json:"pelanggan_id"`
-	CustomerName  string  `json:"customer_name"`
-	InvoiceNumber string  `json:"invoice_number"`
-	Amount        int     `json:"amount"`
-	BuktiTransfer *string `json:"bukti_transfer,omitempty"`
-	Status        string  `json:"status"`
-	Catatan       string  `json:"catatan"`
-	CreatedAt     string  `json:"created_at"`
+type LinkedBillDetail struct {
+	TagihanID     int64  `json:"tagihan_id"`
+	InvoiceNumber string `json:"invoice_number"`
+	Amount        int    `json:"amount"`
 }
 
-func (s Service) CreatePaymentConfirmation(ctx context.Context, tagihanID int64, pelangganID int64, buktiTransfer *string, catatan string) (int64, error) {
+type PaymentConfirmation struct {
+	ID               int64              `json:"id"`
+	TagihanID        int64              `json:"tagihan_id"`
+	PelangganID      int64              `json:"pelanggan_id"`
+	CustomerName     string             `json:"customer_name"`
+	InvoiceNumber    string             `json:"invoice_number"`
+	Amount           int                `json:"amount"`
+	BuktiTransfer    *string            `json:"bukti_transfer,omitempty"`
+	Status           string             `json:"status"`
+	Catatan          string             `json:"catatan"`
+	CreatedAt        string             `json:"created_at"`
+	LinkedTagihanIDs string             `json:"linked_tagihan_ids"`
+	LinkedBills      []LinkedBillDetail `json:"linked_bills,omitempty"`
+}
+
+func (s Service) CreatePaymentConfirmation(ctx context.Context, tagihanID int64, pelangganID int64, buktiTransfer *string, catatan string, linkedTagihanIDs string) (int64, error) {
 	var count int
 	err := s.Repository.DB.QueryRowContext(ctx, "SELECT COUNT(1) FROM payment_confirmations WHERE tagihan_id = ? AND status = 'pending_review'", tagihanID).Scan(&count)
 	if err != nil {
@@ -36,9 +45,9 @@ func (s Service) CreatePaymentConfirmation(ctx context.Context, tagihanID int64,
 	}
 
 	res, err := s.Repository.DB.ExecContext(ctx, `
-		INSERT INTO payment_confirmations (tagihan_id, pelanggan_id, bukti_transfer, status, catatan, created_at, updated_at)
-		VALUES (?, ?, ?, 'pending_review', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-		tagihanID, pelangganID, buktiTransfer, catatan,
+		INSERT INTO payment_confirmations (tagihan_id, pelanggan_id, bukti_transfer, status, catatan, linked_tagihan_ids, created_at, updated_at)
+		VALUES (?, ?, ?, 'pending_review', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		tagihanID, pelangganID, buktiTransfer, catatan, linkedTagihanIDs,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("insert payment confirmation: %w", err)
@@ -167,7 +176,7 @@ func (s Service) CreatePaymentConfirmation(ctx context.Context, tagihanID int64,
 
 func (s Service) ListPendingConfirmations(ctx context.Context) ([]PaymentConfirmation, error) {
 	rows, err := s.Repository.DB.QueryContext(ctx, `
-		SELECT pc.id, pc.tagihan_id, pc.pelanggan_id, c.nama, t.invoice_number, t.nominal, pc.bukti_transfer, pc.status, pc.catatan, pc.created_at
+		SELECT pc.id, pc.tagihan_id, pc.pelanggan_id, c.nama, t.invoice_number, t.nominal, pc.bukti_transfer, pc.status, pc.catatan, pc.created_at, COALESCE(pc.linked_tagihan_ids, '')
 		FROM payment_confirmations pc
 		INNER JOIN pelanggan c ON c.id = pc.pelanggan_id
 		INNER JOIN tagihan t ON t.id = pc.tagihan_id
@@ -182,13 +191,31 @@ func (s Service) ListPendingConfirmations(ctx context.Context) ([]PaymentConfirm
 	for rows.Next() {
 		var pc PaymentConfirmation
 		var bukti sql.NullString
-		if err := rows.Scan(&pc.ID, &pc.TagihanID, &pc.PelangganID, &pc.CustomerName, &pc.InvoiceNumber, &pc.Amount, &bukti, &pc.Status, &pc.Catatan, &pc.CreatedAt); err != nil {
+		var linkedIDs string
+		if err := rows.Scan(&pc.ID, &pc.TagihanID, &pc.PelangganID, &pc.CustomerName, &pc.InvoiceNumber, &pc.Amount, &bukti, &pc.Status, &pc.Catatan, &pc.CreatedAt, &linkedIDs); err != nil {
 			return nil, err
 		}
 		if bukti.Valid && bukti.String != "" {
 			val := bukti.String
 			pc.BuktiTransfer = &val
 		}
+		pc.LinkedTagihanIDs = linkedIDs
+
+		if linkedIDs != "" {
+			ids := strings.Split(linkedIDs, ",")
+			for _, idStr := range ids {
+				idStr = strings.TrimSpace(idStr)
+				if idStr == "" {
+					continue
+				}
+				var lb LinkedBillDetail
+				err := s.Repository.DB.QueryRowContext(ctx, "SELECT id, invoice_number, nominal FROM tagihan WHERE id = ?", idStr).Scan(&lb.TagihanID, &lb.InvoiceNumber, &lb.Amount)
+				if err == nil {
+					pc.LinkedBills = append(pc.LinkedBills, lb)
+				}
+			}
+		}
+
 		list = append(list, pc)
 	}
 	return list, nil
@@ -197,7 +224,8 @@ func (s Service) ListPendingConfirmations(ctx context.Context) ([]PaymentConfirm
 func (s Service) ApprovePaymentConfirmation(ctx context.Context, confirmationID int64, userID int64) error {
 	var tagihanID int64
 	var buktiTransfer sql.NullString
-	err := s.Repository.DB.QueryRowContext(ctx, "SELECT tagihan_id, bukti_transfer FROM payment_confirmations WHERE id = ?", confirmationID).Scan(&tagihanID, &buktiTransfer)
+	var linkedIDs sql.NullString
+	err := s.Repository.DB.QueryRowContext(ctx, "SELECT tagihan_id, bukti_transfer, linked_tagihan_ids FROM payment_confirmations WHERE id = ?", confirmationID).Scan(&tagihanID, &buktiTransfer, &linkedIDs)
 	if err != nil {
 		return fmt.Errorf("get confirmation: %w", err)
 	}
@@ -229,6 +257,27 @@ func (s Service) ApprovePaymentConfirmation(ctx context.Context, confirmationID 
 		_ = s.Repository.AttachProof(ctx, tagihanID, buktiTransfer.String)
 	}
 
+	// Mark paid for all linked bills
+	if linkedIDs.Valid && linkedIDs.String != "" {
+		ids := strings.Split(linkedIDs.String, ",")
+		for _, idStr := range ids {
+			idStr = strings.TrimSpace(idStr)
+			if idStr == "" {
+				continue
+			}
+			var billID int64
+			if _, err := fmt.Sscanf(idStr, "%d", &billID); err == nil && billID > 0 {
+				err = s.MarkPaid(ctx, billID, "transfer_verification", userID)
+				if err != nil {
+					slog.Error("failed to mark linked bill paid", "bill_id", billID, "error", err)
+				}
+				if buktiTransfer.Valid && buktiTransfer.String != "" {
+					_ = s.Repository.AttachProof(ctx, billID, buktiTransfer.String)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -243,13 +292,14 @@ func (s Service) RejectPaymentConfirmation(ctx context.Context, confirmationID i
 func (s Service) GetPendingConfirmationForBill(ctx context.Context, billID int64) (*PaymentConfirmation, error) {
 	var pc PaymentConfirmation
 	var bukti sql.NullString
+	var linkedIDs sql.NullString
 	err := s.Repository.DB.QueryRowContext(ctx, `
-		SELECT id, tagihan_id, pelanggan_id, status, catatan, created_at, bukti_transfer
+		SELECT id, tagihan_id, pelanggan_id, status, catatan, created_at, bukti_transfer, COALESCE(linked_tagihan_ids, '')
 		FROM payment_confirmations
 		WHERE tagihan_id = ? AND status = 'pending_review'
 		LIMIT 1`,
 		billID,
-	).Scan(&pc.ID, &pc.TagihanID, &pc.PelangganID, &pc.Status, &pc.Catatan, &pc.CreatedAt, &bukti)
+	).Scan(&pc.ID, &pc.TagihanID, &pc.PelangganID, &pc.Status, &pc.Catatan, &pc.CreatedAt, &bukti, &linkedIDs)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -259,6 +309,9 @@ func (s Service) GetPendingConfirmationForBill(ctx context.Context, billID int64
 	if bukti.Valid && bukti.String != "" {
 		val := bukti.String
 		pc.BuktiTransfer = &val
+	}
+	if linkedIDs.Valid {
+		pc.LinkedTagihanIDs = linkedIDs.String
 	}
 	return &pc, nil
 }

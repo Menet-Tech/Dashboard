@@ -2,8 +2,11 @@ package mikrotik
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"testing"
+
+	_ "modernc.org/sqlite"
 )
 
 func TestRouterService_SyncMainToSlaves_NoMain(t *testing.T) {
@@ -131,5 +134,45 @@ func TestRouterService_SyncMainToSlaves_Success(t *testing.T) {
 	}
 	if res.SecretsSynced != 1 {
 		t.Errorf("expected 1 secret synced, got %d", res.SecretsSynced)
+	}
+}
+
+func TestCheckRealSecrets(t *testing.T) {
+	t.Skip("manual integration test")
+	ctx := context.Background()
+	db, err := sql.Open("sqlite", "d:\\xampp\\htdocs\\Dashboard\\backend\\storage\\dashboard.db")
+	if err != nil {
+		t.Fatalf("failed to open real db: %v", err)
+	}
+	defer db.Close()
+
+	svc := NewRouterService(db)
+
+	cMain := NewClient("99.99.99.185:8728", "admin", "")
+	if err := cMain.Connect(ctx); err == nil {
+		defer cMain.Close()
+
+		// 1. Reconcile Profiles to Router Main (which previously lacked 15MB)
+		err := svc.ReconcileProfiles(ctx, cMain)
+		if err != nil {
+			t.Fatalf("ReconcileProfiles on Main failed: %v", err)
+		}
+
+		// 2. Try SyncCustomer on Router Main again
+		err = cMain.SyncCustomer(ctx, "test", "test", "15MB", "active")
+		if err != nil {
+			t.Fatalf("SyncCustomer on Main failed: %v", err)
+		}
+
+		t.Log("Successfully reconciled profiles and synced customer test to 15MB on Main router!")
+		
+		// List secrets to verify
+		secrets, _ := cMain.ListSecrets(ctx)
+		t.Log("=== Router Main Secrets ===")
+		for _, s := range secrets {
+			t.Logf("Name: %s, Profile: %s, Disabled: %t", s.Name, s.Profile, s.Disabled)
+		}
+	} else {
+		t.Fatalf("Router Main Connect Error: %v", err)
 	}
 }

@@ -459,6 +459,11 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		options.TrialGraceDays = 7
 	}
 
+	suspendedDays, err := s.Settings.GetInt(ctx, settings.KeyInactiveSuspendedDays)
+	if err != nil {
+		suspendedDays = 30
+	}
+
 	candidates, err := s.Repository.AutomationCandidates(ctx)
 	if err != nil {
 		return err
@@ -648,12 +653,29 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 
 		// Bypass isolir check if customer status is "pending" (perpanjangan)
 		if item.CustomerStatus != "pending" {
-			// H+20: 15 days after limit (which starts at options.LimitDays overdue)
-			if overdueDays(effectiveDueDate, options.Now) >= options.LimitDays+15 {
+			od := overdueDays(effectiveDueDate, options.Now)
+
+			// Phase 3: complete deactivation (inactive) -> options.LimitDays + 15 + suspendedDays
+			if od >= options.LimitDays+15+suspendedDays {
 				wasAlreadyInactive := item.CustomerStatus == "inactive"
 
 				if !wasAlreadyInactive {
 					if err := s.Customers.UpdateStatus(ctx, item.CustomerID, "inactive"); err != nil {
+						return err
+					}
+				}
+
+				if !wasAlreadyInactive && options.SendDiscord != nil {
+					msg := fmt.Sprintf("🚫 **Layanan Dinonaktifkan (Inactive)**: Pelanggan **%s** telah dinonaktifkan sepenuhnya (secret disabled) karena menunggak > %d hari.", item.CustomerName, options.LimitDays+15+suspendedDays)
+					_ = options.SendDiscord(ctx, msg)
+				}
+
+			// Phase 2: suspension -> options.LimitDays + 15
+			} else if od >= options.LimitDays+15 {
+				wasAlreadySuspended := item.CustomerStatus == "suspended" || item.CustomerStatus == "inactive"
+
+				if !wasAlreadySuspended {
+					if err := s.Customers.UpdateStatus(ctx, item.CustomerID, "suspended"); err != nil {
 						return err
 					}
 				}
@@ -666,14 +688,14 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 					}
 				}
 
-				if !wasAlreadyInactive && options.SendDiscord != nil {
-					msg := fmt.Sprintf("🚫 **Isolir Penuh (Dinonaktifkan)**: Pelanggan **%s** telah dinonaktifkan sepenuhnya karena menunggak > %d hari.", item.CustomerName, options.LimitDays+15)
+				if !wasAlreadySuspended && options.SendDiscord != nil {
+					msg := fmt.Sprintf("🚫 **Layanan Ditangguhkan (Suspended)**: Pelanggan **%s** telah ditangguhkan karena menunggak > %d hari.", item.CustomerName, options.LimitDays+15)
 					_ = options.SendDiscord(ctx, msg)
 				}
 
-			} else if overdueDays(effectiveDueDate, options.Now) >= options.LimitDays {
+			} else if od >= options.LimitDays {
 				// H+5: limit stage
-				wasAlreadyLimited := item.CustomerStatus == "limit" || item.CustomerStatus == "inactive"
+				wasAlreadyLimited := item.CustomerStatus == "limit" || item.CustomerStatus == "suspended" || item.CustomerStatus == "inactive"
 
 				if !wasAlreadyLimited {
 					if err := s.Customers.UpdateStatus(ctx, item.CustomerID, "limit"); err != nil {
@@ -729,65 +751,74 @@ func (s Service) sendGroupedNotifications(ctx context.Context, options Automatio
 	var detailBlock strings.Builder
 	var billIDs []int64
 
-	for _, c := range unsent {
+	for i, c := range unsent {
 		totalAmount += c.Amount
 		pkgPrice := c.Amount + c.Diskon + c.DiskonReferral
 		
-		detailBlock.WriteString(fmt.Sprintf("Nama : %s\n", c.CustomerName))
+		if i > 0 {
+			detailBlock.WriteString("\n")
+		}
+		detailBlock.WriteString(fmt.Sprintf("> Nama Pengguna: %s\n", c.CustomerName))
 		detailBlock.WriteString(fmt.Sprintf("> Paket: %s\n", c.PackageName))
-		detailBlock.WriteString(fmt.Sprintf("> Harga: %s.\n", formatIDRCurrency(pkgPrice)))
+		detailBlock.WriteString(fmt.Sprintf("> Harga: Rp %s.", formatThousandSeparator(pkgPrice)))
 		
 		totalDisc := c.Diskon + c.DiskonReferral
 		if totalDisc > 0 {
+			detailBlock.WriteString("\n")
 			if c.HasODP {
 				percent := (totalDisc * 100) / pkgPrice
-				detailBlock.WriteString(fmt.Sprintf("> Diskon: %d%%\n", percent))
+				detailBlock.WriteString(fmt.Sprintf("> Diskon: %d%%", percent))
 			} else {
-				detailBlock.WriteString(fmt.Sprintf("> Diskon: %s.\n", formatIDRCurrency(totalDisc)))
+				detailBlock.WriteString(fmt.Sprintf("> Diskon: Rp %s.", formatThousandSeparator(totalDisc)))
 			}
 		}
-		detailBlock.WriteString("\n")
 		billIDs = append(billIDs, c.ID)
 	}
 
+	primaryName, err := s.Repository.GetPrimaryCustomerNameByPhone(ctx, phone)
+	if err != nil || primaryName == "" {
+		primaryName = unsent[0].CustomerName
+	}
+
 	var sb strings.Builder
+	sb.WriteString("Pelanggan Yth,\n")
+	sb.WriteString(fmt.Sprintf("Bapak/Ibu %s,\n\n", primaryName))
+
 	switch triggerKey {
 	case "tagihan-h7":
-		sb.WriteString(fmt.Sprintf("Tagihan Anda periode %s sebesar %s., dengan detail berikut\n\n", unsent[0].Period, formatIDRCurrency(totalAmount)))
-	case "reminder-h3":
-		sb.WriteString(fmt.Sprintf("Pengingat: Tagihan Anda periode %s sebesar %s., dengan detail berikut\n\n", unsent[0].Period, formatIDRCurrency(totalAmount)))
+		sb.WriteString(fmt.Sprintf("Tagihan Anda periode %s sebesar Rp %s., dengan detail berikut\n\n", unsent[0].Period, formatThousandSeparator(totalAmount)))
+	case "reminder-h3", "reminder-h5":
+		sb.WriteString(fmt.Sprintf("Pengingat: Tagihan Anda periode %s sebesar Rp %s., dengan detail berikut\n\n", unsent[0].Period, formatThousandSeparator(totalAmount)))
 	case "jatuh_tempo":
-		sb.WriteString(fmt.Sprintf("PEMBERITAHUAN JATUH TEMPO: Tagihan Anda periode %s sebesar %s., dengan detail berikut\n\n", unsent[0].Period, formatIDRCurrency(totalAmount)))
+		sb.WriteString(fmt.Sprintf("PEMBERITAHUAN JATUH TEMPO: Tagihan Anda periode %s sebesar Rp %s., dengan detail berikut\n\n", unsent[0].Period, formatThousandSeparator(totalAmount)))
 	default:
-		sb.WriteString(fmt.Sprintf("Tagihan Anda periode %s sebesar %s., dengan detail berikut\n\n", unsent[0].Period, formatIDRCurrency(totalAmount)))
+		sb.WriteString(fmt.Sprintf("Tagihan Anda periode %s sebesar Rp %s., dengan detail berikut\n\n", unsent[0].Period, formatThousandSeparator(totalAmount)))
 	}
 
 	sb.WriteString(detailBlock.String())
-	sb.WriteString(fmt.Sprintf("Total Tagihan: %s.\n\n", formatIDRCurrency(totalAmount)))
+	sb.WriteString("\n\n")
+	sb.WriteString(fmt.Sprintf("Total Tagihan: Rp %s.\n\n", formatThousandSeparator(totalAmount)))
 
 	switch triggerKey {
-	case "tagihan-h7":
-		sb.WriteString(fmt.Sprintf("Mohon lakukan pembayaran sebelum tanggal %s agar terhindar dari Pembatasan Layanan.\n\n", formatDateLabel(unsent[0].DueDate)))
-		sb.WriteString("jika sudah melakukan pembayaran, kamu dapat memberikan bukti transfer ke sini atau balas dengan \"ya saya sudah bayar\" jika kamu membayar dengan cash\n\n")
-	case "reminder-h3":
-		sb.WriteString(fmt.Sprintf("Mohon lakukan pembayaran sebelum tanggal %s agar terhindar dari Pembatasan Layanan.\n\n", formatDateLabel(unsent[0].DueDate)))
-		sb.WriteString("Jika sudah melakukan pembayaran, silakan kirimkan bukti transfer melalui chat ini.\n\n")
 	case "jatuh_tempo":
 		sb.WriteString(fmt.Sprintf("Mohon segera lakukan pembayaran hari ini (%s) agar terhindar dari Pembatasan Layanan.\n\n", formatDateLabel(unsent[0].DueDate)))
-		sb.WriteString("Jika sudah melakukan pembayaran, silakan kirimkan bukti transfer melalui chat ini.\n\n")
 	default:
 		sb.WriteString(fmt.Sprintf("Mohon lakukan pembayaran sebelum tanggal %s agar terhindar dari Pembatasan Layanan.\n\n", formatDateLabel(unsent[0].DueDate)))
 	}
+
+	sb.WriteString("jika sudah melakukan pembayaran, kamu dapat memberikan bukti transfer ke sini atau balas dengan \"ya saya sudah payar\" jika kamu membayar dengan cash\n\n")
 
 	sb.WriteString("Rekening Pembayaran:\n")
 	sb.WriteString("Bank Mandiri\n1570006636691\n\n")
 	sb.WriteString("Shopeepay, gopay\n089621743796\n\n")
-	sb.WriteString("Seabank\n901096534584\n\n")
-	sb.WriteString("a.n. Irfan Dharmawan\n\n")
+	sb.WriteString("Seabank\n901096534584 \n\n")
+	sb.WriteString("a.n. Irfan Dharmawan \n\n")
+
 	sb.WriteString("Untuk konfirmasi pembayaran & Pengaduan kendala dapat menghubungi kami melalui Pesan ini, atau Nomor di bawah ini.\n")
 	sb.WriteString("087782297657 - Menet CS\n")
 	sb.WriteString("08987700897 - Elam\n")
 	sb.WriteString("089621743796 - Ipong\n\n")
+
 	sb.WriteString("Atas perhatian dan kerja samanya, kami ucapkan terima kasih.\n")
 	sb.WriteString("Hormat kami,\n")
 	sb.WriteString("Tim Billing — MeNet Tech")
@@ -1211,4 +1242,29 @@ func (s Service) ProcessDelayedActions(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func formatThousandSeparator(amount int) string {
+	value := strconv.Itoa(amount)
+	if len(value) <= 3 {
+		return value
+	}
+
+	parts := []byte{}
+	offset := len(value) % 3
+	if offset > 0 {
+		parts = append(parts, value[:offset]...)
+		if len(value) > offset {
+			parts = append(parts, '.')
+		}
+	}
+
+	for i := offset; i < len(value); i += 3 {
+		parts = append(parts, value[i:i+3]...)
+		if i+3 < len(value) {
+			parts = append(parts, '.')
+		}
+	}
+
+	return string(parts)
 }

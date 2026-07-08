@@ -548,6 +548,7 @@ export function CustomersPage({
                       >
                         <option value="active">Active</option>
                         <option value="limit">Limit</option>
+                        <option value="suspended">Suspended</option>
                         <option value="inactive">Inactive</option>
                       </select>
                     </td>
@@ -719,7 +720,7 @@ export function CustomersPage({
               <div className="flex flex-col gap-2.5">
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Pilih Status Baru</span>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {(["active", "limit", "pending", "inactive"] as const).map((st) => (
+                  {(["active", "limit", "pending", "suspended", "inactive"] as const).map((st) => (
                     <button
                       key={st}
                       type="button"
@@ -736,7 +737,9 @@ export function CustomersPage({
                           ? "Limit (Isolir)"
                           : st === "pending"
                             ? "Pending (Perpanjangan)"
-                            : "Inactive (Nonaktif)"}
+                            : st === "suspended"
+                              ? "Suspended (Ditangguhkan)"
+                              : "Inactive (Nonaktif)"}
                     </button>
                   ))}
                 </div>

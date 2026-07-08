@@ -526,13 +526,25 @@ func (h IntegrationHandler) TestWhatsApp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var result map[string]any
+	authenticated := true
 	if err := json.NewDecoder(resp.Body).Decode(&result); err == nil {
 		if ready, ok := result["whatsapp_ready"].(bool); ok && !ready {
-			WriteJSON(w, http.StatusOK, map[string]any{"success": false, "message": "Gateway terhubung, namun status WhatsApp tidak aktif/belum scan QR"})
-			return
+			authenticated = false
 		}
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Koneksi ke WhatsApp Gateway berhasil"})
+	if !authenticated {
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"success":       true,
+			"authenticated": false,
+			"message":       "Gateway terhubung, namun WhatsApp belum aktif/belum scan QR",
+		})
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"success":       true,
+		"authenticated": true,
+		"message":       "Koneksi ke WhatsApp Gateway berhasil",
+	})
 }
 
 // TestSMTP tests sending an email with provided SMTP settings.
@@ -705,6 +717,17 @@ func (h IntegrationHandler) SyncPackagesPreview(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	isolirProfile, err := h.Settings.GetString(ctx, settings.KeyMikrotikIsolirProfile)
+	if err != nil || strings.TrimSpace(isolirProfile) == "" {
+		isolirProfile = "isolir"
+	}
+	inactiveProfile, err := h.Settings.GetString(ctx, settings.KeyMikrotikInactiveProfile)
+	if err != nil || strings.TrimSpace(inactiveProfile) == "" {
+		inactiveProfile = "nonaktif"
+	}
+	isolirProfileLower := strings.ToLower(strings.TrimSpace(isolirProfile))
+	inactiveProfileLower := strings.ToLower(strings.TrimSpace(inactiveProfile))
+
 	client := mikrotik.NewClient(host, user, pass)
 	if err := client.Connect(ctx); err != nil {
 		WriteError(w, http.StatusBadGateway, fmt.Sprintf("gagal terhubung ke MikroTik: %v", err))
@@ -730,10 +753,14 @@ func (h IntegrationHandler) SyncPackagesPreview(w http.ResponseWriter, r *http.R
 
 	items := make([]packageSyncPreviewItem, 0, len(profiles))
 	for _, p := range profiles {
+		nameLower := strings.ToLower(strings.TrimSpace(p.Name))
+		if nameLower == "default" || nameLower == "default-encryption" || nameLower == isolirProfileLower || nameLower == inactiveProfileLower {
+			continue
+		}
 		items = append(items, packageSyncPreviewItem{
 			Name:        p.Name,
 			RateLimit:   p.RateLimit,
-			Exists:      existingSet[strings.ToLower(strings.TrimSpace(p.Name))],
+			Exists:      existingSet[nameLower],
 			ParsedSpeed: parseSpeedMbps(p.RateLimit),
 		})
 	}
@@ -882,4 +909,181 @@ func parseSpeedMbps(rateLimit string) int {
 		return 10
 	}
 	return speed
+}
+
+func (h IntegrationHandler) CheckProfiles(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	host, user, pass, err := h.resolveActiveMikrotik(ctx)
+	if err != nil {
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	isolirProfile, err := h.Settings.GetString(ctx, settings.KeyMikrotikIsolirProfile)
+	if err != nil || strings.TrimSpace(isolirProfile) == "" {
+		isolirProfile = "isolir"
+	}
+	inactiveProfile, err := h.Settings.GetString(ctx, settings.KeyMikrotikInactiveProfile)
+	if err != nil || strings.TrimSpace(inactiveProfile) == "" {
+		inactiveProfile = "nonaktif"
+	}
+
+	client := mikrotik.NewClient(host, user, pass)
+	if err := client.Connect(ctx); err != nil {
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"success": false,
+			"message": "Gagal terhubung ke MikroTik: " + err.Error(),
+		})
+		return
+	}
+	defer client.Close()
+
+	profiles, err := client.ListProfiles(ctx)
+	if err != nil {
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"success": false,
+			"message": "Gagal mengambil daftar profile MikroTik: " + err.Error(),
+		})
+		return
+	}
+
+	isolirExists := false
+	inactiveExists := false
+	for _, p := range profiles {
+		if strings.EqualFold(p.Name, isolirProfile) {
+			isolirExists = true
+		}
+		if strings.EqualFold(p.Name, inactiveProfile) {
+			inactiveExists = true
+		}
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"success":               true,
+		"isolir_exists":         isolirExists,
+		"inactive_exists":       inactiveExists,
+		"isolir_profile_name":   isolirProfile,
+		"inactive_profile_name": inactiveProfile,
+	})
+}
+
+func (h IntegrationHandler) SetupProfiles(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+
+	var payload struct {
+		IsolirProfileName   string `json:"isolir_profile_name"`
+		IsolirLocalAddress  string `json:"isolir_local_address"`
+		IsolirRemoteAddress string `json:"isolir_remote_address"`
+		IsolirRateLimit     string `json:"isolir_rate_limit"`
+		IsolirCreatePool    bool   `json:"isolir_create_pool"`
+		IsolirPoolRange     string `json:"isolir_pool_range"`
+
+		InactiveProfileName   string `json:"inactive_profile_name"`
+		InactiveLocalAddress  string `json:"inactive_local_address"`
+		InactiveRemoteAddress string `json:"inactive_remote_address"`
+		InactiveRateLimit     string `json:"inactive_rate_limit"`
+		InactiveCreatePool    bool   `json:"inactive_create_pool"`
+		InactivePoolRange     string `json:"inactive_pool_range"`
+	}
+
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "payload tidak valid")
+		return
+	}
+
+	isolirProfile := strings.TrimSpace(payload.IsolirProfileName)
+	if isolirProfile == "" {
+		isolirProfile = "isolir"
+	}
+	inactiveProfile := strings.TrimSpace(payload.InactiveProfileName)
+	if inactiveProfile == "" {
+		inactiveProfile = "nonaktif"
+	}
+
+	host, user, pass, err := h.resolveActiveMikrotik(ctx)
+	if err != nil {
+		WriteJSON(w, http.StatusBadRequest, map[string]any{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Fetch active routers from mikrotik_routers table
+	var routers []mikrotik.Router
+	if h.Routers != nil {
+		routers, _ = h.Routers.ListActive(ctx)
+	}
+
+	// Fallback to legacy single router if list is empty
+	if len(routers) == 0 {
+		routers = append(routers, mikrotik.Router{
+			Name:     "Router Legacy",
+			Host:     host,
+			Username: user,
+			Password: pass,
+			IsActive: true,
+		})
+	}
+
+	var setupErrors []string
+	for _, r := range routers {
+		client := mikrotik.NewClient(r.Host, r.Username, r.Password)
+		if err := client.Connect(ctx); err != nil {
+			setupErrors = append(setupErrors, fmt.Sprintf("%s: Gagal terhubung: %v", r.Name, err))
+			continue
+		}
+
+		// 1. Setup IP Pool if requested
+		if payload.IsolirCreatePool && strings.TrimSpace(payload.IsolirRemoteAddress) != "" && strings.TrimSpace(payload.IsolirPoolRange) != "" {
+			err = client.AddIPPool(ctx, strings.TrimSpace(payload.IsolirRemoteAddress), strings.TrimSpace(payload.IsolirPoolRange))
+			if err != nil {
+				setupErrors = append(setupErrors, fmt.Sprintf("%s: Gagal membuat IP Pool %s: %v", r.Name, payload.IsolirRemoteAddress, err))
+			}
+		}
+
+		if payload.InactiveCreatePool && strings.TrimSpace(payload.InactiveRemoteAddress) != "" && strings.TrimSpace(payload.InactivePoolRange) != "" {
+			err = client.AddIPPool(ctx, strings.TrimSpace(payload.InactiveRemoteAddress), strings.TrimSpace(payload.InactivePoolRange))
+			if err != nil {
+				setupErrors = append(setupErrors, fmt.Sprintf("%s: Gagal membuat IP Pool %s: %v", r.Name, payload.InactiveRemoteAddress, err))
+			}
+		}
+
+		// 2. Create/Sync isolir profile with rate-limit and IP Pool
+		err = client.SyncPPPProfile(ctx, isolirProfile, strings.TrimSpace(payload.IsolirLocalAddress), strings.TrimSpace(payload.IsolirRemoteAddress), strings.TrimSpace(payload.IsolirRateLimit))
+		if err != nil {
+			setupErrors = append(setupErrors, fmt.Sprintf("%s: Gagal membuat profile %s: %v", r.Name, isolirProfile, err))
+		}
+
+		// 3. Create/Sync inactive profile with rate-limit and IP Pool
+		err = client.SyncPPPProfile(ctx, inactiveProfile, strings.TrimSpace(payload.InactiveLocalAddress), strings.TrimSpace(payload.InactiveRemoteAddress), strings.TrimSpace(payload.InactiveRateLimit))
+		if err != nil {
+			setupErrors = append(setupErrors, fmt.Sprintf("%s: Gagal membuat profile %s: %v", r.Name, inactiveProfile, err))
+		}
+
+		client.Close()
+	}
+
+	if len(setupErrors) > 0 {
+		WriteJSON(w, http.StatusInternalServerError, map[string]any{
+			"success": false,
+			"message": "Beberapa router gagal disetup: " + strings.Join(setupErrors, "; "),
+		})
+		return
+	}
+
+	// Update names of profiles in settings if they differ
+	_ = h.Settings.Set(ctx, settings.KeyMikrotikIsolirProfile, isolirProfile)
+	_ = h.Settings.Set(ctx, settings.KeyMikrotikInactiveProfile, inactiveProfile)
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"success": true,
+		"message": "Profile PPPoE Isolir dan Suspended berhasil disetup di MikroTik.",
+	})
 }

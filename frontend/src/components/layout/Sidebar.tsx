@@ -71,14 +71,14 @@ const groups = [
     title: "Utama & Billing",
     icon: FolderOpen,
     gradient: "from-blue-600/10 via-indigo-600/5 to-transparent dark:from-blue-500/20 dark:via-indigo-500/10",
-    keys: ["dashboard", "bills", "payment-confirmations", "customers", "packages", "discounts"] as ViewKey[],
+    keys: ["dashboard", "bills", "payment-confirmations", "customers", "packages", "discounts", "registration"] as ViewKey[],
   },
   {
     id: "infrastruktur",
     title: "Infrastruktur",
     icon: Network,
     gradient: "from-purple-600/10 via-pink-600/5 to-transparent dark:from-purple-500/20 dark:via-pink-500/10",
-    keys: ["odp", "network-map", "devices", "traffic", "tickets", "registration"] as ViewKey[],
+    keys: ["odp", "network-map", "devices", "traffic", "tickets"] as ViewKey[],
   },
   {
     id: "komunikasi",

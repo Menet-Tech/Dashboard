@@ -3,7 +3,9 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
+	"strings"
 
 	"menettech/dashboard/backend/internal/auth"
 )
@@ -57,4 +59,12 @@ func csrfTokenFromRequest(r *http.Request) string {
 		return token
 	}
 	return ""
+}
+
+func getClientIP(r *http.Request) string {
+	ip := strings.TrimSpace(r.RemoteAddr)
+	if host, _, err := net.SplitHostPort(ip); err == nil {
+		ip = host
+	}
+	return ip
 }

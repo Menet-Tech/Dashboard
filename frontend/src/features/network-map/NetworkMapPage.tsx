@@ -37,8 +37,10 @@ import {
   resetMappingData,
   fetchGacsDevices,
   updateCustomer,
+  assignCustomerOdp,
   type GacsDevice,
 } from "../../lib/api";
+
 import type { MapNode, MapEdge, MapSettings, CustomerItem, OdpItem } from "../../types";
 
 const DEFAULT_MAP_CENTER: [number, number] = [-6.2088, 106.8456];
@@ -163,6 +165,10 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   const [edgeFiberTypeInput, setEdgeFiberTypeInput] = useState("feeder");
   const [edgeDistanceInput, setEdgeDistanceInput] = useState("");
   const [edgeNotesInput, setEdgeNotesInput] = useState("");
+  // Port input when manually connecting an ONT that has no ODP assignment yet
+  const [edgeOdpPortInput, setEdgeOdpPortInput] = useState("");
+  // Tracks whether the edge being drawn is a new ODP→ONT link needing a port assignment
+  const [pendingOdpAssignment, setPendingOdpAssignment] = useState<{ customerId: number; odpId: number } | null>(null);
 
   // Map settings inputs
   const [centerLatInput, setCenterLatInput] = useState("-6.2088");
@@ -441,17 +447,19 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         setEdgeSourceInput(sourceNode.node_id);
         setEdgeTargetInput(targetNode.node_id);
 
-        let defaultFiberType = "distribution";
-        if (sourceNode.type === "server") {
-          defaultFiberType = "feeder";
-        } else if (sourceNode.type === "odp" && targetNode.type === "ont") {
-          defaultFiberType = "drop";
+        let defaultFiberType = "odc_odp";
+        if (sourceNode.type === "server" && targetNode.type === "odc") {
+          defaultFiberType = "server_odc";
+        } else if (sourceNode.type === "server" && targetNode.type === "odp") {
+          defaultFiberType = "server_odp";
         } else if (sourceNode.type === "odc" && targetNode.type === "odp") {
-          defaultFiberType = "distribution";
-        } else if (sourceNode.type === "odp" && targetNode.type === "odp") {
-          defaultFiberType = "odp_to_odp";
-        } else if (sourceNode.type === "odc" && targetNode.type === "odc") {
-          defaultFiberType = "odc_to_odc";
+          defaultFiberType = "odc_odp";
+        } else if (sourceNode.type === "odp" && targetNode.type === "ont") {
+          defaultFiberType = "odp_ont";
+        } else if (sourceNode.type === "ont" && targetNode.type === "ont") {
+          defaultFiberType = "ont_ont";
+        } else {
+          defaultFiberType = "other";
         }
         setEdgeFiberTypeInput(defaultFiberType);
 
@@ -464,6 +472,44 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         );
         setEdgeDistanceInput(String(dist));
         setEdgeNotesInput("");
+        setEdgeOdpPortInput("");
+        setPendingOdpAssignment(null);
+
+        // --- Smart ODP-ONT connect logic ---
+        if (sourceNode.type === "odp" && targetNode.type === "ont") {
+          const odpNodeId = sourceNode.node_id;
+          const ontPppoe = targetNode.pppoe;
+          // Find the linked customer
+          const customer = ontPppoe ? customers.find(c => c.user_pppoe === ontPppoe) : null;
+
+          // Parse ODP DB id from node_id like "odp-42"
+          const odpIdMatch = odpNodeId.match(/^odp-(\.?\d+)$/);
+          const odpDbId = odpIdMatch ? parseInt(odpIdMatch[1], 10) : null;
+
+          if (customer && odpDbId) {
+            if (customer.odp_id === odpDbId) {
+              // Already linked — just create the cable silently (no modal)
+              setFirstNodeForEdge(null);
+              const newEdge: import("../../types").MapEdge = {
+                edge_id: `LINE-${Date.now().toString().slice(-6)}`,
+                source: sourceNode.node_id,
+                target: targetNode.node_id,
+                fiber_type: "odp_ont",
+                distance: dist,
+              };
+              const updatedEdges = [...edges, newEdge];
+              setEdges(updatedEdges);
+              setIsDirty(true);
+              setActiveTool("select");
+              void syncData(nodes, updatedEdges);
+              pushSuccess(`Kabel ODP→ONT berhasil dihubungkan untuk ${customer.name}.`);
+              return;
+            } else {
+              // No prior ODP assignment — show modal with port picker
+              setPendingOdpAssignment({ customerId: customer.id, odpId: odpDbId });
+            }
+          }
+        }
 
         setIsEdgeModalOpen(true);
       }
@@ -654,7 +700,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   };
 
   // Save Edge modal submission
-  const handleSaveEdge = (e: React.FormEvent) => {
+  const handleSaveEdge = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!edgeIdInput.trim() || !edgeSourceInput || !edgeTargetInput) {
       pushError("ID Kabel, Asal, dan Tujuan wajib diisi.");
@@ -696,10 +742,28 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
       pushSuccess("Kabel baru berhasil ditambahkan.");
     }
 
+    // If this is a new ODP→ONT assignment, save port to database
+    if (pendingOdpAssignment && !editingEdge) {
+      const portNum = edgeOdpPortInput ? parseInt(edgeOdpPortInput, 10) : null;
+      try {
+        await assignCustomerOdp(pendingOdpAssignment.customerId, pendingOdpAssignment.odpId, portNum);
+        // Update local customers state
+        setCustomers(prev => prev.map(c =>
+          c.id === pendingOdpAssignment!.customerId
+            ? { ...c, odp_id: pendingOdpAssignment!.odpId, odp_port: portNum ?? undefined }
+            : c
+        ));
+      } catch {
+        pushError("Kabel berhasil dibuat, tapi gagal menyimpan port ODP ke database.");
+      }
+    }
+
     setEdges(updatedEdges);
     setIsEdgeModalOpen(false);
     setIsDirty(true);
     setFirstNodeForEdge(null);
+    setPendingOdpAssignment(null);
+    setEdgeOdpPortInput("");
     setActiveTool("select");
     void syncData(nodes, updatedEdges);
   };
@@ -967,16 +1031,21 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   // Resolve fiber line color (GACS colors)
   const getFiberColor = (type?: string) => {
     switch (type) {
+      case "server_odc":
       case "feeder":
       case "odc_to_odc":
       case "odc_to_odc_ratio":
-        return "#c084fc"; // Purple
+        return "#f43f5e"; // Rose / Red
+      case "server_odp":
+        return "#a855f7"; // Purple
+      case "odc_odp":
       case "distribution":
-      case "odp_to_odp":
-        return "#60a5fa"; // Blue
+        return "#3b82f6"; // Blue
+      case "odp_ont":
       case "drop":
-      case "odp_to_odp_ratio":
-        return "#4ade80"; // Green
+        return "#10b981"; // Emerald Green
+      case "ont_ont":
+        return "#f59e0b"; // Amber/Yellow
       default:
         return "#9ca3af"; // Grey
     }
@@ -1775,7 +1844,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                         className="w-full text-xs px-3 py-2 border rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500"
                         value={nodeSnInput}
                         onChange={(e) => setNodeSnInput(e.target.value)}
-                        placeholder="ZTEGC12345"
+                        placeholder="Serial Number (Opsional)"
                       />
                     </div>
                   </div>
@@ -2023,9 +2092,24 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">NODE ASAL</label>
                   <select
-                    className="w-full text-sm px-3 py-2 border rounded-xl"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                     value={edgeSourceInput}
-                    onChange={(e) => setEdgeSourceInput(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEdgeSourceInput(val);
+                      if (val && edgeTargetInput) {
+                        const srcNode = nodes.find(n => n.node_id === val);
+                        const tgtNode = nodes.find(n => n.node_id === edgeTargetInput);
+                        if (srcNode && tgtNode) {
+                          setEdgeDistanceInput(String(calculateDistance(
+                            parseLatitude(srcNode.latitude),
+                            parseLongitude(srcNode.longitude),
+                            parseLatitude(tgtNode.latitude),
+                            parseLongitude(tgtNode.longitude)
+                          )));
+                        }
+                      }
+                    }}
                   >
                     <option value="">-- Pilih Asal --</option>
                     {nodes.map((n) => (
@@ -2038,9 +2122,24 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">NODE TUJUAN</label>
                   <select
-                    className="w-full text-sm px-3 py-2 border rounded-xl"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                     value={edgeTargetInput}
-                    onChange={(e) => setEdgeTargetInput(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEdgeTargetInput(val);
+                      if (edgeSourceInput && val) {
+                        const srcNode = nodes.find(n => n.node_id === edgeSourceInput);
+                        const tgtNode = nodes.find(n => n.node_id === val);
+                        if (srcNode && tgtNode) {
+                          setEdgeDistanceInput(String(calculateDistance(
+                            parseLatitude(srcNode.latitude),
+                            parseLongitude(srcNode.longitude),
+                            parseLatitude(tgtNode.latitude),
+                            parseLongitude(tgtNode.longitude)
+                          )));
+                        }
+                      }
+                    }}
                   >
                     <option value="">-- Pilih Tujuan --</option>
                     {nodes.map((n) => (
@@ -2056,26 +2155,55 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">TIPE FIBER</label>
                   <select
-                    className="w-full text-sm px-3 py-2 border rounded-xl"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     value={edgeFiberTypeInput}
                     onChange={(e) => setEdgeFiberTypeInput(e.target.value)}
                   >
-                    <option value="feeder">🔴 Feeder (Server ke ODC)</option>
-                    <option value="distribution">🔵 Distribution (ODC ke ODP)</option>
-                    <option value="drop">🟢 Drop (ODP ke ONT)</option>
+                    <option value="server_odc">🔴 Server ke ODC</option>
+                    <option value="server_odp">🟣 Server ke ODP</option>
+                    <option value="odc_odp">🔵 ODC ke ODP</option>
+                    <option value="odp_ont">🟢 ODP ke ONT</option>
+                    <option value="ont_ont">🟡 ONT ke ONT</option>
                     <option value="other">🟠 Lainnya</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">ESTIMASI JARAK (METER)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    className="w-full text-sm px-3 py-2 border rounded-xl"
-                    value={edgeDistanceInput}
-                    onChange={(e) => setEdgeDistanceInput(e.target.value)}
-                    placeholder="Contoh: 150"
-                  />
+                  <div className="flex flex-col">
+                    <input
+                      type="number"
+                      step="any"
+                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                      value={edgeDistanceInput}
+                      onChange={(e) => setEdgeDistanceInput(e.target.value)}
+                      placeholder="Contoh: 150"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (edgeSourceInput && edgeTargetInput) {
+                          const srcNode = nodes.find(n => n.node_id === edgeSourceInput);
+                          const tgtNode = nodes.find(n => n.node_id === edgeTargetInput);
+                          if (srcNode && tgtNode) {
+                            setEdgeDistanceInput(String(calculateDistance(
+                              parseLatitude(srcNode.latitude),
+                              parseLongitude(srcNode.longitude),
+                              parseLatitude(tgtNode.latitude),
+                              parseLongitude(tgtNode.longitude)
+                            )));
+                            pushSuccess("Jarak berhasil dihitung dari peta.");
+                          } else {
+                            pushError("Node asal atau tujuan tidak ditemukan.");
+                          }
+                        } else {
+                          pushError("Pilih node asal dan tujuan terlebih dahulu.");
+                        }
+                      }}
+                      className="text-left mt-1 text-[10px] text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold underline cursor-pointer"
+                    >
+                      Hitung Otomatis dari Peta
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2089,6 +2217,26 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   placeholder="Contoh: Core 1 red, redup di ODP..."
                 />
               </div>
+
+              {pendingOdpAssignment && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <label className="block text-xs font-bold text-amber-700 mb-1">
+                    🔌 PORT ODP UNTUK PELANGGAN INI
+                  </label>
+                  <p className="text-xs text-amber-600 mb-2">
+                    Pelanggan ini belum punya sambungan ODP. Pilih port yang digunakan (opsional).
+                  </p>
+                  <input
+                    type="number"
+                    min={1}
+                    max={96}
+                    className="w-full text-sm px-3 py-2 border border-amber-300 rounded-xl bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    value={edgeOdpPortInput}
+                    onChange={(e) => setEdgeOdpPortInput(e.target.value)}
+                    placeholder="Nomor port (misal: 1, 2, 3...)"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 border-t pt-4 mt-5">

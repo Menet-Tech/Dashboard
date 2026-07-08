@@ -95,6 +95,10 @@ func (h CustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, _ := currentUser(r)
+	ip := getClientIP(r)
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &item.ID, "customer.create", fmt.Sprintf("Pelanggan %s (PPPoE: %s, Paket: %s) berhasil dibuat", item.Name, item.UserPPPoE, item.PackageName), ip)
+
 	WriteJSON(w, http.StatusCreated, map[string]any{
 		"data": item,
 	})
@@ -129,6 +133,10 @@ func (h CustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, _ := currentUser(r)
+	ip := getClientIP(r)
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &item.ID, "customer.update", fmt.Sprintf("Data pelanggan %s (PPPoE: %s) berhasil diperbarui", item.Name, item.UserPPPoE), ip)
+
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"data": item,
 	})
@@ -157,9 +165,43 @@ func (h CustomerHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, _ := currentUser(r)
+	ip := getClientIP(r)
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &id, "customer.update_status", fmt.Sprintf("Status pelanggan ID %d diubah menjadi %s", id, payload.Status), ip)
+
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"message": "customer status updated",
 	})
+}
+
+// UpdateOdp handles PATCH /api/v1/customers/{id}/odp
+// It sets (or clears) the ODP and port assignment for a customer.
+func (h CustomerHandler) UpdateOdp(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid customer id")
+		return
+	}
+
+	var payload struct {
+		OdpID   *int64 `json:"odp_id"`
+		OdpPort *int   `json:"odp_port"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid odp payload")
+		return
+	}
+
+	if err := h.Service.UpdateOdp(r.Context(), id, payload.OdpID, payload.OdpPort); err != nil {
+		if errors.Is(err, customers.ErrCustomerNotFound) {
+			WriteError(w, http.StatusNotFound, "customer not found")
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{"message": "odp assignment updated"})
 }
 
 func (h CustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {

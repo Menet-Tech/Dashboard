@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 type ModalShellProps = {
   title: string;
   children: ReactNode;
-  actions: ReactNode;
+  actions?: ReactNode;
   onClose: () => void;
 };
 
@@ -24,7 +24,11 @@ export function Modal({ title, children, actions, onClose }: ModalShellProps) {
           </button>
         </div>
         <div className="p-6 overflow-y-auto">{children}</div>
-        <div className="p-6 border-t border-gray-100 bg-gray-50 dark:bg-slate-900/50 dark:border-slate-800 flex items-center justify-end gap-3">{actions}</div>
+        {actions && (
+          <div className="p-6 border-t border-gray-100 bg-gray-50 dark:bg-slate-900/50 dark:border-slate-800 flex items-center justify-end gap-3">
+            {actions}
+          </div>
+        )}
       </section>
     </div>
   );

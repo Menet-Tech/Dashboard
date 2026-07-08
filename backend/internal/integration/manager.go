@@ -10,16 +10,21 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 
 	"menettech/dashboard/backend/internal/settings"
 )
 
 type ServiceManager struct {
-	settingsSvc settings.Service
-	logger      *slog.Logger
-	sqlitePath  string
-	mu          sync.Mutex
-	processes   map[string]*exec.Cmd
+	settingsSvc         settings.Service
+	logger              *slog.Logger
+	sqlitePath          string
+	mu                  sync.Mutex
+	processes           map[string]*exec.Cmd
+	runningWAAPIKey     string
+	runningWAGatewayURL string
+	runningWAAccountID  string
+	runningDiscordToken string
 }
 
 func NewServiceManager(settingsSvc settings.Service, logger *slog.Logger, sqlitePath string) *ServiceManager {
@@ -44,7 +49,17 @@ func (s *ServiceManager) Reconcile(ctx context.Context) error {
 	}
 	waEnabled := waEnabledStr == "1"
 
+	waGatewayURL, _ := s.settingsSvc.GetString(ctx, settings.KeyWAGatewayURL)
+	waAPIKey, _ := s.settingsSvc.GetString(ctx, settings.KeyWAAPIKey)
+	waAccountID, _ := s.settingsSvc.GetString(ctx, settings.KeyWAAccountID)
+
 	if waEnabled {
+		_, running := s.processes["whatsapp"]
+		configChanged := running && (s.runningWAAPIKey != waAPIKey || s.runningWAGatewayURL != waGatewayURL || s.runningWAAccountID != waAccountID)
+		if configChanged {
+			s.logger.Info("WhatsApp Gateway configuration changed, restarting service...")
+			s.stopService("whatsapp")
+		}
 		if err := s.startWhatsApp(ctx); err != nil {
 			s.logger.Error("Failed to start WhatsApp Gateway", "error", err)
 		}
@@ -60,7 +75,15 @@ func (s *ServiceManager) Reconcile(ctx context.Context) error {
 	}
 	discordEnabled := discordEnabledStr == "1"
 
+	discordToken, _ := s.settingsSvc.GetString(ctx, "discord_bot_token")
+
 	if discordEnabled {
+		_, running := s.processes["discord"]
+		configChanged := running && (s.runningDiscordToken != discordToken)
+		if configChanged {
+			s.logger.Info("Discord Bot configuration changed, restarting service...")
+			s.stopService("discord")
+		}
 		if err := s.startDiscord(ctx); err != nil {
 			s.logger.Error("Failed to start Discord Bot", "error", err)
 		}
@@ -188,6 +211,9 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 	}
 
 	s.processes["whatsapp"] = cmd
+	s.runningWAAPIKey = waAPIKey
+	s.runningWAGatewayURL = waGatewayURL
+	s.runningWAAccountID = waAccountID
 	s.logger.Info("WhatsApp Gateway started successfully", "pid", cmd.Process.Pid, "port", port)
 
 	// Background goroutine to watch for unexpected termination
@@ -198,13 +224,25 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 		if currentCmd, exists := s.processes["whatsapp"]; exists && currentCmd == cmd {
 			delete(s.processes, "whatsapp")
 			s.logger.Warn("WhatsApp Gateway service exited", "error", err)
+
+			// Auto-restart if still enabled (with a delay to prevent tight loop)
+			go func() {
+				time.Sleep(5 * time.Second)
+				s.mu.Lock()
+				enabledStr, _ := s.settingsSvc.GetString(context.Background(), settings.KeyWAGatewayEnabled)
+				s.mu.Unlock()
+				if enabledStr == "1" {
+					s.logger.Info("Attempting to auto-restart WhatsApp Gateway service...")
+					_ = s.Reconcile(context.Background())
+				}
+			}()
 		}
 	}()
 
 	return nil
 }
 
-func (s *ServiceManager) startDiscord(_ context.Context) error {
+func (s *ServiceManager) startDiscord(ctx context.Context) error {
 	if _, running := s.processes["discord"]; running {
 		return nil // already running
 	}
@@ -249,7 +287,10 @@ func (s *ServiceManager) startDiscord(_ context.Context) error {
 		return fmt.Errorf("start discord bot process: %w", err)
 	}
 
+	discordToken, _ := s.settingsSvc.GetString(ctx, "discord_bot_token")
+
 	s.processes["discord"] = cmd
+	s.runningDiscordToken = discordToken
 	s.logger.Info("Discord Bot started successfully", "pid", cmd.Process.Pid)
 
 	// Background goroutine to watch for unexpected termination
@@ -260,6 +301,18 @@ func (s *ServiceManager) startDiscord(_ context.Context) error {
 		if currentCmd, exists := s.processes["discord"]; exists && currentCmd == cmd {
 			delete(s.processes, "discord")
 			s.logger.Warn("Discord Bot service exited", "error", err)
+
+			// Auto-restart if still enabled (with a delay to prevent tight loop)
+			go func() {
+				time.Sleep(5 * time.Second)
+				s.mu.Lock()
+				enabledStr, _ := s.settingsSvc.GetString(context.Background(), settings.KeyDiscordBotEnabled)
+				s.mu.Unlock()
+				if enabledStr == "1" {
+					s.logger.Info("Attempting to auto-restart Discord Bot service...")
+					_ = s.Reconcile(context.Background())
+				}
+			}()
 		}
 	}()
 

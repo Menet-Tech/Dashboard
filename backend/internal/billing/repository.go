@@ -1095,3 +1095,24 @@ func (r Repository) SetBillStatus(ctx context.Context, billID int64, status stri
 	return nil
 }
 
+// GetPrimaryCustomerNameByPhone returns the name of the first registered customer with the given phone number.
+func (r Repository) GetPrimaryCustomerNameByPhone(ctx context.Context, phone string) (string, error) {
+	if strings.TrimSpace(phone) == "" {
+		return "", nil
+	}
+	var name string
+	err := r.DB.QueryRowContext(ctx, `
+		SELECT nama FROM pelanggan
+		WHERE nomor_wa = ?
+		ORDER BY id ASC
+		LIMIT 1
+	`, phone).Scan(&name)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	return name, nil
+}
+

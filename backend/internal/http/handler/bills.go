@@ -1,10 +1,14 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"html/template"
+	"image"
+	"image/jpeg"
+	_ "image/png"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,6 +20,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"menettech/dashboard/backend/internal/audit"
 	"menettech/dashboard/backend/internal/billing"
 )
 
@@ -23,6 +28,7 @@ type BillHandler struct {
 	Service     billing.Service
 	AppName     string
 	StoragePath string
+	Audit       audit.Service
 }
 
 type billGeneratePayload struct {
@@ -36,8 +42,8 @@ type billPayPayload struct {
 var errUploadTooLarge = errors.New("upload too large")
 var errUploadTypeNotAllowed = errors.New("upload file type not allowed")
 
-func NewBillHandler(service billing.Service, appName, storagePath string) BillHandler {
-	return BillHandler{Service: service, AppName: appName, StoragePath: storagePath}
+func NewBillHandler(service billing.Service, appName, storagePath string, auditService audit.Service) BillHandler {
+	return BillHandler{Service: service, AppName: appName, StoragePath: storagePath, Audit: auditService}
 }
 
 func (h BillHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -212,6 +218,9 @@ func (h BillHandler) ApprovePaymentConfirmation(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	ip := getClientIP(r)
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, nil, "bills.confirmations.approve", fmt.Sprintf("Persetujuan pembayaran tagihan ID %d oleh staff ID %d sukses", id, user.ID), ip)
+
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"message": "pembayaran disetujui",
 	})
@@ -229,16 +238,21 @@ func (h BillHandler) RejectPaymentConfirmation(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	user, _ := currentUser(r)
+	ip := getClientIP(r)
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, nil, "bills.confirmations.reject", fmt.Sprintf("Bukti pembayaran tagihan ID %d ditolak", id), ip)
+
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"message": "pembayaran ditolak",
 	})
 }
 
 type createConfirmationPayload struct {
-	TagihanID     int64   `json:"tagihan_id"`
-	PelangganID   int64   `json:"pelanggan_id"`
-	BuktiTransfer *string `json:"bukti_transfer"`
-	Catatan       string  `json:"catatan"`
+	TagihanID        int64   `json:"tagihan_id"`
+	PelangganID      int64   `json:"pelanggan_id"`
+	BuktiTransfer    *string `json:"bukti_transfer"`
+	Catatan          string  `json:"catatan"`
+	LinkedTagihanIDs string  `json:"linked_tagihan_ids"`
 }
 
 func (h BillHandler) CreatePaymentConfirmation(w http.ResponseWriter, r *http.Request) {
@@ -253,7 +267,7 @@ func (h BillHandler) CreatePaymentConfirmation(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	id, err := h.Service.CreatePaymentConfirmation(r.Context(), payload.TagihanID, payload.PelangganID, payload.BuktiTransfer, payload.Catatan)
+	id, err := h.Service.CreatePaymentConfirmation(r.Context(), payload.TagihanID, payload.PelangganID, payload.BuktiTransfer, payload.Catatan, payload.LinkedTagihanIDs)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -361,7 +375,8 @@ func (h BillHandler) UploadConfirmationProofBase64(w http.ResponseWriter, r *htt
 		return
 	}
 
-	if err := os.WriteFile(targetPath, data, 0o644); err != nil {
+	compressedData, _ := compressImageIfPossible(data, safeExt)
+	if err := os.WriteFile(targetPath, compressedData, 0o644); err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to write file")
 		return
 	}
@@ -526,7 +541,8 @@ func (h BillHandler) storeProofFile(source io.Reader, originalName string, maxSi
 		return "", fmt.Errorf("invalid path traversal attempt")
 	}
 
-	if err := os.WriteFile(targetPath, data, 0o644); err != nil {
+	compressedData, _ := compressImageIfPossible(data, safeExt)
+	if err := os.WriteFile(targetPath, compressedData, 0o644); err != nil {
 		return "", err
 	}
 
@@ -667,4 +683,31 @@ func humanizeThousands(amount int) string {
 		}
 	}
 	return string(parts)
+}
+
+func compressImageIfPossible(data []byte, extension string) ([]byte, error) {
+	// Only compress common image extensions to keep disk footprint minimal
+	if extension != ".jpg" && extension != ".jpeg" && extension != ".png" {
+		return data, nil
+	}
+
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		// Fallback to original raw bytes if decoding fails
+		return data, nil
+	}
+
+	var buf bytes.Buffer
+	// Encode as JPEG with 75% quality for high compression ratio
+	err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 75})
+	if err != nil {
+		return data, nil
+	}
+
+	// Only return compressed data if it is actually smaller
+	if buf.Len() >= len(data) {
+		return data, nil
+	}
+
+	return buf.Bytes(), nil
 }

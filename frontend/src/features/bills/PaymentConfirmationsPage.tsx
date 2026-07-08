@@ -1,9 +1,17 @@
 import { useState, useEffect } from "react";
-import { fetchPendingConfirmations, approveConfirmation, rejectConfirmation } from "../../lib/api";
-import type { PaymentConfirmationItem } from "../../types";
+import {
+  fetchPendingConfirmations,
+  approveConfirmation,
+  rejectConfirmation,
+  fetchBills,
+  uploadBillProof,
+  createPaymentConfirmation
+} from "../../lib/api";
+import type { PaymentConfirmationItem, BillItem } from "../../types";
 import { formatCurrency } from "../../utils/format";
 import { Check, X, Eye, FileText, AlertCircle } from "lucide-react";
 import { useDialog } from "../../context/DialogContext";
+import { Modal } from "../../components/ui/Modal";
 
 type PaymentConfirmationsPageProps = {
   pushSuccess: (msg: string) => void;
@@ -20,6 +28,34 @@ export function PaymentConfirmationsPage({
   const { showConfirm } = useDialog();
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+
+  // Manual confirmation states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [unpaidBills, setUnpaidBills] = useState<BillItem[]>([]);
+  const [loadingBills, setLoadingBills] = useState(false);
+  const [selectedBillId, setSelectedBillId] = useState<number | null>(null);
+  const [selectedLinkedBillIds, setSelectedLinkedBillIds] = useState<number[]>([]);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [catatanText, setCatatanText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadUnpaidBills = async () => {
+    setLoadingBills(true);
+    try {
+      const res = await fetchBills({ status: "belum_bayar", limit: 200 });
+      setUnpaidBills(res.data || []);
+    } catch (err: any) {
+      pushError(err.message || "Gagal memuat daftar tagihan");
+    } finally {
+      setLoadingBills(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showAddModal) {
+      void loadUnpaidBills();
+    }
+  }, [showAddModal]);
 
   const loadConfirmations = async () => {
     setLoading(true);
@@ -69,6 +105,48 @@ export function PaymentConfirmationsPage({
     }
   };
 
+  const resetForm = () => {
+    setSelectedBillId(null);
+    setSelectedLinkedBillIds([]);
+    setUploadFile(null);
+    setCatatanText("");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBillId) {
+      pushError("Pilih tagihan terlebih dahulu.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      let proofPath = "";
+      if (uploadFile) {
+        const uploadRes = await uploadBillProof(selectedBillId, uploadFile);
+        proofPath = uploadRes.proof_path;
+      }
+      const selectedBill = unpaidBills.find(b => b.id === selectedBillId);
+      if (!selectedBill) throw new Error("Tagihan tidak valid");
+
+      await createPaymentConfirmation({
+        tagihan_id: selectedBill.id,
+        pelanggan_id: selectedBill.customer_id,
+        bukti_transfer: proofPath || undefined,
+        catatan: catatanText,
+        linked_tagihan_ids: selectedLinkedBillIds.join(","),
+      });
+
+      pushSuccess("Konfirmasi pembayaran manual berhasil dibuat.");
+      setShowAddModal(false);
+      resetForm();
+      void loadConfirmations();
+    } catch (err: any) {
+      pushError(err.message || "Gagal membuat konfirmasi pembayaran");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const isImage = (path?: string) => {
     if (!path) return false;
     const clean = path.toLowerCase().split("?")[0];
@@ -80,6 +158,16 @@ export function PaymentConfirmationsPage({
     );
   };
 
+  const selectedBill = unpaidBills.find((b) => b.id === selectedBillId);
+  const relatedBills = selectedBill
+    ? unpaidBills.filter(
+        (b) =>
+          b.id !== selectedBill.id &&
+          ((selectedBill.customer_phone && b.customer_phone === selectedBill.customer_phone) ||
+            b.customer_id === selectedBill.customer_id)
+      )
+    : [];
+
   return (
     <section className="grid grid-cols-1 gap-6">
       <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
@@ -90,13 +178,21 @@ export function PaymentConfirmationsPage({
               Verifikasi bukti transfer dan klaim pembayaran yang dikirimkan pelanggan melalui WhatsApp.
             </p>
           </div>
-          <button
-            onClick={loadConfirmations}
-            disabled={loading}
-            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:hover:bg-indigo-900 dark:text-indigo-300 text-xs font-semibold py-2.5 px-4 rounded-xl shadow-sm transition-all"
-          >
-            {loading ? "Menyegarkan..." : "Segarkan"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-semibold py-2.5 px-4 rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              Tambah Konfirmasi Manual
+            </button>
+            <button
+              onClick={loadConfirmations}
+              disabled={loading}
+              className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold py-2.5 px-4 rounded-xl shadow-sm transition-all cursor-pointer"
+            >
+              {loading ? "Menyegarkan..." : "Segarkan"}
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -176,11 +272,34 @@ export function PaymentConfirmationsPage({
                         </div>
                         <div className="text-right">
                           <span className="text-sm font-extrabold text-slate-900 dark:text-slate-50">
-                            {formatCurrency(item.amount)}
+                            {formatCurrency(item.amount + (item.linked_bills || []).reduce((acc, b) => acc + b.amount, 0))}
                           </span>
+                          {item.linked_bills && item.linked_bills.length > 0 && (
+                            <span className="block text-[9px] text-indigo-600 dark:text-indigo-400 font-bold mt-0.5">
+                              (Total {item.linked_bills.length + 1} Akun)
+                            </span>
+                          )}
                           <span className="block text-[10px] text-slate-400 mt-0.5">{date}</span>
                         </div>
                       </div>
+
+                      {item.linked_bills && item.linked_bills.length > 0 && (
+                        <div className="mt-2.5 mb-3 space-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-2">
+                          <span className="block text-[9px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider">
+                            Akun Lain yang Ditautkan:
+                          </span>
+                          {item.linked_bills.map((lb) => (
+                            <div key={lb.tagihan_id} className="flex justify-between items-center text-[11px] bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                              <span className="text-slate-650 dark:text-slate-400 font-semibold">
+                                {lb.invoice_number}
+                              </span>
+                              <span className="font-extrabold text-slate-800 dark:text-slate-300">
+                                {formatCurrency(lb.amount)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
                       <div className="bg-slate-50 dark:bg-slate-900/60 rounded-xl p-3 text-xs text-slate-650 dark:text-slate-350 border border-slate-100 dark:border-slate-800">
                         <strong className="block text-[10px] text-slate-450 dark:text-slate-500 mb-1 tracking-wider uppercase">
@@ -215,6 +334,114 @@ export function PaymentConfirmationsPage({
           </div>
         )}
       </article>
+
+      {showAddModal && (
+        <Modal title="Tambah Konfirmasi Pembayaran Manual" onClose={() => setShowAddModal(false)}>
+          <form onSubmit={handleSubmit} className="space-y-4 font-sans">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-355 mb-1">
+                Pilih Tagihan Pelanggan (Belum Bayar) *
+              </label>
+              {loadingBills ? (
+                <div className="text-xs text-slate-400 py-1">Memuat daftar tagihan...</div>
+              ) : (
+                <select
+                  value={selectedBillId || ""}
+                  onChange={(e) => {
+                    setSelectedBillId(Number(e.target.value) || null);
+                    setSelectedLinkedBillIds([]);
+                  }}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs px-3 py-2 text-slate-800 dark:text-slate-200"
+                  required
+                >
+                  <option value="">-- Pilih Tagihan --</option>
+                  {unpaidBills.map((bill) => (
+                    <option key={bill.id} value={bill.id}>
+                      {bill.customer_name} - {bill.invoice_number} ({formatCurrency(bill.amount)})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {relatedBills.length > 0 && (
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 space-y-2">
+                <span className="block text-[10px] font-bold text-indigo-650 dark:text-indigo-400 uppercase tracking-wider">
+                  Tautkan Tagihan Lain (Multi-Akun / Nomer WA Sama)
+                </span>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {relatedBills.map((bill) => {
+                    const isChecked = selectedLinkedBillIds.includes(bill.id);
+                    return (
+                      <label
+                        key={bill.id}
+                        className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900/60 p-1.5 rounded-lg transition-all"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedLinkedBillIds((prev) => [...prev, bill.id]);
+                            } else {
+                              setSelectedLinkedBillIds((prev) => prev.filter((id) => id !== bill.id));
+                            }
+                          }}
+                          className="rounded border-slate-300 dark:border-slate-800 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                        />
+                        <span>
+                          {bill.invoice_number} - {bill.package_name} ({formatCurrency(bill.amount)})
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-355 mb-1">
+                Bukti Transfer (Gambar / PDF - Opsional)
+              </label>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-355 mb-1">
+                Catatan Pembayaran
+              </label>
+              <textarea
+                value={catatanText}
+                onChange={(e) => setCatatanText(e.target.value)}
+                placeholder="Contoh: Transfer Bank Mandiri an Pengirim"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs px-3 py-2 h-20 text-slate-800 dark:text-slate-200"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold py-2 px-4 rounded-xl text-xs hover:bg-slate-50 dark:hover:bg-slate-750 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              >
+                {submitting ? "Menyimpan..." : "Simpan Konfirmasi"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </section>
   );
 }

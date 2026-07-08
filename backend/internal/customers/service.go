@@ -155,6 +155,11 @@ func (s Service) UpdateStatus(ctx context.Context, id int64, status string) erro
 	return nil
 }
 
+// UpdateOdp sets or clears the ODP assignment for a customer.
+func (s Service) UpdateOdp(ctx context.Context, id int64, odpID *int64, odpPort *int) error {
+	return s.Repository.UpdateOdp(ctx, id, odpID, odpPort)
+}
+
 func (s Service) Delete(ctx context.Context, id int64) error {
 	customer, err := s.FindByID(ctx, id)
 	if err != nil {
@@ -258,7 +263,7 @@ func (s Service) SyncToMikrotik(ctx context.Context, customer Customer) error {
 		} else {
 			profileName = "isolir"
 		}
-	case "inactive":
+	case "suspended", "inactive":
 		inactiveProfile, err := s.Settings.GetString(ctx, settings.KeyMikrotikInactiveProfile)
 		if err == nil && strings.TrimSpace(inactiveProfile) != "" {
 			profileName = strings.TrimSpace(inactiveProfile)
@@ -299,6 +304,11 @@ func (s Service) SyncToMikrotik(ctx context.Context, customer Customer) error {
 			slog.Error("failed to connect to MikroTik during sync", "router", r.Name, "customer", customer.Name, "error", err)
 			lastErr = err
 			continue
+		}
+
+		// Ensure package profiles exist on this router
+		if err := routerSvc.ReconcileProfiles(ctx, client); err != nil {
+			slog.Error("failed to reconcile profiles during customer sync", "router", r.Name, "customer", customer.Name, "error", err)
 		}
 
 		err = client.SyncCustomer(ctx, username, customer.PasswordPPPoE, profileName, customer.Status)
@@ -390,7 +400,7 @@ func validateCustomer(customer Customer) error {
 
 func isValidStatus(status string) bool {
 	switch status {
-	case "active", "limit", "inactive", "pending":
+	case "active", "limit", "suspended", "inactive", "pending":
 		return true
 	default:
 		return false
@@ -689,8 +699,42 @@ func (r Repository) UpdateStatus(ctx context.Context, id int64, status string) e
 	return nil
 }
 
+// UpdateOdp updates the ODP assignment for a customer.
+// If odpID is nil, the association is cleared.
+func (r Repository) UpdateOdp(ctx context.Context, id int64, odpID *int64, odpPort *int) error {
+	result, err := r.DB.ExecContext(ctx, `
+		UPDATE pelanggan
+		SET odp_id = ?, odp_port = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, odpID, odpPort, id)
+	if err != nil {
+		return fmt.Errorf("update customer odp: %w", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("customer odp rows affected: %w", err)
+	}
+
+	if affected == 0 {
+		return ErrCustomerNotFound
+	}
+
+	return nil
+}
+
 func (r Repository) Delete(ctx context.Context, id int64) error {
-	result, err := r.DB.ExecContext(ctx, "DELETE FROM pelanggan WHERE id = ?", id)
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin delete customer tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Get pppoe before deleting so we can clean up the map node
+	var pppoe string
+	_ = tx.QueryRowContext(ctx, "SELECT user_pppoe FROM pelanggan WHERE id = ?", id).Scan(&pppoe)
+
+	result, err := tx.ExecContext(ctx, "DELETE FROM pelanggan WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("delete customer: %w", err)
 	}
@@ -704,7 +748,12 @@ func (r Repository) Delete(ctx context.Context, id int64) error {
 		return ErrCustomerNotFound
 	}
 
-	return nil
+	// Remove linked ONT node from the network map (edges cascade automatically)
+	if pppoe != "" {
+		_, _ = tx.ExecContext(ctx, "DELETE FROM mapping_nodes WHERE pppoe = ? AND type = 'ont'", pppoe)
+	}
+
+	return tx.Commit()
 }
 
 

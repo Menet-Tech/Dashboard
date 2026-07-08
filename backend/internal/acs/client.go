@@ -275,7 +275,7 @@ func (c *Client) RebootDevice(ctx context.Context, serialNumber string) error {
 
 	baseURL := strings.TrimSuffix(c.BaseURL, "/")
 
-	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") || strings.Contains(strings.ToLower(baseURL), "localhost") {
+	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") {
 		time.Sleep(500 * time.Millisecond)
 		return nil
 	}
@@ -328,7 +328,7 @@ func (c *Client) RebootDeviceByID(ctx context.Context, deviceID string) error {
 
 	baseURL := strings.TrimSuffix(c.BaseURL, "/")
 
-	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") || strings.Contains(strings.ToLower(baseURL), "localhost") {
+	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") {
 		time.Sleep(500 * time.Millisecond)
 		return nil
 	}
@@ -371,7 +371,7 @@ func (c *Client) TestConnection(ctx context.Context) error {
 		return fmt.Errorf("URL GenieACS kosong")
 	}
 
-	if strings.Contains(strings.ToLower(baseURL), "mock") || strings.Contains(strings.ToLower(baseURL), "localhost") {
+	if strings.Contains(strings.ToLower(baseURL), "mock") {
 		return nil
 	}
 
@@ -408,7 +408,7 @@ func (c *Client) FactoryResetDevice(ctx context.Context, serialNumber string) er
 
 	baseURL := strings.TrimSuffix(c.BaseURL, "/")
 
-	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") || strings.Contains(strings.ToLower(baseURL), "localhost") {
+	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") {
 		time.Sleep(500 * time.Millisecond)
 		return nil
 	}
@@ -2173,7 +2173,7 @@ func (c *Client) GetDevicesSummary(ctx context.Context, db *sql.DB) ([]map[strin
 
 	// Clean BaseURL
 	baseURL := strings.TrimSuffix(c.BaseURL, "/")
-	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") || strings.Contains(strings.ToLower(baseURL), "localhost") {
+	if baseURL == "" || strings.Contains(strings.ToLower(baseURL), "mock") {
 		return []map[string]any{}, nil
 	}
 

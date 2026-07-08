@@ -14,6 +14,7 @@ import (
 
 	"menettech/dashboard/backend/internal/acs"
 	"menettech/dashboard/backend/internal/config"
+	"menettech/dashboard/backend/internal/mikrotik"
 	"menettech/dashboard/backend/internal/settings"
 )
 
@@ -98,10 +99,24 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}
 
 	discordConfigured := strings.TrimSpace(discordWebhookURL) != ""
-	mikrotikConfigured := strings.TrimSpace(mikrotikHost) != "" &&
+
+	// Check multi-router configuration
+	var activeRouters []mikrotik.Router
+	routerSvc := mikrotik.NewRouterService(h.DB)
+	if list, err := routerSvc.ListActive(ctx); err == nil {
+		activeRouters = list
+	}
+
+	mikrotikConfigured := len(activeRouters) > 0 || (strings.TrimSpace(mikrotikHost) != "" &&
 		strings.TrimSpace(mikrotikUser) != "" &&
-		strings.TrimSpace(mikrotikPass) != ""
-	genieACSConfigured := strings.TrimSpace(acsURL) != ""
+		strings.TrimSpace(mikrotikPass) != "")
+
+	// GenieACS is always configured because it falls back to http://localhost:7557
+	genieACSConfigured := true
+	effectiveACSURL := acsURL
+	if effectiveACSURL == "" {
+		effectiveACSURL = "http://localhost:7557"
+	}
 
 	dbQuickCheck := "unknown"
 	dbQuickCheckMessage := "belum diperiksa"
@@ -164,12 +179,21 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 
 	mikrotikOnline := false
 	if mikrotikConfigured {
-		mikrotikOnline = checkMikrotikOnline(mikrotikHost)
+		if len(activeRouters) > 0 {
+			// Online if at least one active router is reachable in real-time
+			for _, r := range activeRouters {
+				if checkMikrotikOnline(r.Host) {
+					mikrotikOnline = true
+				}
+			}
+		} else {
+			mikrotikOnline = checkMikrotikOnline(mikrotikHost)
+		}
 	}
 
 	genieACSOnline := false
 	if genieACSConfigured {
-		genieACSOnline = checkGenieACSOnline(ctx, acsURL, acsUsername, acsPassword)
+		genieACSOnline = checkGenieACSOnline(ctx, effectiveACSURL, acsUsername, acsPassword)
 	}
 
 	if !waConfigured {

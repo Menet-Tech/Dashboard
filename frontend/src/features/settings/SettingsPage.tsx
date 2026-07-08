@@ -13,8 +13,11 @@ import {
   testRouterConnection,
   testSMTP,
   syncMikrotikRouters,
+  fetchRouterInterfaces,
+  fetchMikrotikIPPools,
   type MikrotikRouterItem,
   type SyncResultData,
+  type MikrotikIPPoolItem,
   // New imports
   fetchVendors,
   createVendor,
@@ -169,6 +172,9 @@ export function SettingsPage({
     try {
       await updateSettings(dataToSave);
       pushSuccess(`Pengaturan ${sectionName} berhasil disimpan.`);
+      if (sectionName === "MikroTik Global" || sectionName === "MikroTik") {
+        void handleCheckProfiles();
+      }
     } catch (e: any) {
       pushError(e.message || `Gagal menyimpan pengaturan ${sectionName}.`);
     } finally {
@@ -364,7 +370,7 @@ export function SettingsPage({
 
   // Connection test states
   const [testingWa, setTestingWa] = useState(false);
-  const [waResult, setWaResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [waResult, setWaResult] = useState<{ success: boolean; authenticated?: boolean; message: string } | null>(null);
 
   const [testingDiscord, setTestingDiscord] = useState(false);
   const [discordResult, setDiscordResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -389,9 +395,38 @@ export function SettingsPage({
   const [routerTestStatus, setRouterTestStatus] = useState<Record<number, { success: boolean; message: string }>>({});
   const [testingRouterId, setTestingRouterId] = useState<number | null>(null);
   const [newRouterRole, setNewRouterRole] = useState("none");
+  const [newRouterSlavePort, setNewRouterSlavePort] = useState("ether2");
+  const [routerInterfaces, setRouterInterfaces] = useState<string[]>(["ether1", "ether2", "ether3", "ether4", "ether5"]);
+  const [fetchingInterfaces, setFetchingInterfaces] = useState(false);
   const [syncingRouters, setSyncingRouters] = useState(false);
   const [routerSyncError, setRouterSyncError] = useState<string | null>(null);
   const [routerSyncSuccess, setRouterSyncSuccess] = useState<SyncResultData | null>(null);
+
+  const loadRouterInterfaces = useCallback(async (params: { id?: number; host?: string; username?: string; password?: string }) => {
+    if (!params.host || !params.username) return;
+    setFetchingInterfaces(true);
+    try {
+      const res = await fetchRouterInterfaces(params);
+      if (res.data && res.data.length > 0) {
+        setRouterInterfaces(res.data);
+      }
+    } catch (err) {
+      console.error("Gagal memuat interface router:", err);
+    } finally {
+      setFetchingInterfaces(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (newRouterRole === "slave" && newRouterHost && newRouterUser) {
+      void loadRouterInterfaces({
+        id: editingRouterId || undefined,
+        host: newRouterHost,
+        username: newRouterUser,
+        password: newRouterPass || undefined,
+      });
+    }
+  }, [newRouterRole, newRouterHost, newRouterUser, loadRouterInterfaces, editingRouterId]);
 
   const handleRouterSync = async () => {
     setSyncingRouters(true);
@@ -431,11 +466,131 @@ export function SettingsPage({
     }
   }, [pushError]);
 
+  const [profileCheck, setProfileCheck] = useState<{
+    isolir_exists: boolean;
+    inactive_exists: boolean;
+    isolir_profile_name: string;
+    inactive_profile_name: string;
+    success?: boolean;
+    message?: string;
+  } | null>(null);
+  const [checkingProfiles, setCheckingProfiles] = useState(false);
+  const [settingUpProfiles, setSettingUpProfiles] = useState(false);
+
+  const handleCheckProfiles = useCallback(async () => {
+    setCheckingProfiles(true);
+    try {
+      const data = await apiRequest<{
+        success: boolean;
+        isolir_exists: boolean;
+        inactive_exists: boolean;
+        isolir_profile_name: string;
+        inactive_profile_name: string;
+        message?: string;
+      }>("/api/v1/integration/mikrotik/check-profiles");
+      if (data.success) {
+        setProfileCheck(data);
+      } else {
+        setProfileCheck({
+          isolir_exists: true,
+          inactive_exists: true,
+          isolir_profile_name: "isolir",
+          inactive_profile_name: "nonaktif",
+          success: false,
+          message: data.message,
+        });
+      }
+    } catch (e: any) {
+      setProfileCheck({
+        isolir_exists: true,
+        inactive_exists: true,
+        isolir_profile_name: "isolir",
+        inactive_profile_name: "nonaktif",
+        success: false,
+        message: e.message || String(e),
+      });
+    } finally {
+      setCheckingProfiles(false);
+    }
+  }, []);
+
+  const [mikrotikPools, setMikrotikPools] = useState<MikrotikIPPoolItem[]>([]);
+  const [showSetupForm, setShowSetupForm] = useState(false);
+
+  // Setup form states
+  const [setupIsolirName, setSetupIsolirName] = useState("");
+  const [setupIsolirLocal, setSetupIsolirLocal] = useState("192.168.0.254");
+  const [setupIsolirLimit, setSetupIsolirLimit] = useState("128k/128k");
+  const [setupIsolirPoolMode, setSetupIsolirPoolMode] = useState<"new" | "existing">("new");
+  const [setupIsolirPoolName, setSetupIsolirPoolName] = useState("isolir");
+  const [setupIsolirPoolRange, setSetupIsolirPoolRange] = useState("192.168.3.2-192.168.3.254");
+
+  const [setupInactiveName, setSetupInactiveName] = useState("");
+  const [setupInactiveLocal, setSetupInactiveLocal] = useState("192.168.0.254");
+  const [setupInactiveLimit, setSetupInactiveLimit] = useState("8k/8k");
+  const [setupInactivePoolMode, setSetupInactivePoolMode] = useState<"new" | "existing">("new");
+  const [setupInactivePoolName, setSetupInactivePoolName] = useState("nonaktif");
+  const [setupInactivePoolRange, setSetupInactivePoolRange] = useState("192.168.4.2-192.168.4.254");
+
+  const loadMikrotikPools = useCallback(async () => {
+    try {
+      const res = await fetchMikrotikIPPools();
+      if (res.data) {
+        setMikrotikPools(res.data);
+      }
+    } catch (e) {
+      console.error("Gagal memuat IP Pool MikroTik:", e);
+    }
+  }, []);
+
+  const triggerSetupProfiles = async () => {
+    setSettingUpProfiles(true);
+    try {
+      const data = await apiRequest<{ success: boolean; message: string }>("/api/v1/integration/mikrotik/setup-profiles", {
+        method: "POST",
+        body: JSON.stringify({
+          isolir_profile_name: setupIsolirName,
+          isolir_local_address: setupIsolirLocal,
+          isolir_remote_address: setupIsolirPoolName,
+          isolir_rate_limit: setupIsolirLimit,
+          isolir_create_pool: setupIsolirPoolMode === "new",
+          isolir_pool_range: setupIsolirPoolRange,
+
+          inactive_profile_name: setupInactiveName,
+          inactive_local_address: setupInactiveLocal,
+          inactive_remote_address: setupInactivePoolName,
+          inactive_rate_limit: setupInactiveLimit,
+          inactive_create_pool: setupInactivePoolMode === "new",
+          inactive_pool_range: setupInactivePoolRange,
+        }),
+      });
+      if (data.success) {
+        pushSuccess(data.message || "Setup profile berhasil!");
+        setShowSetupForm(false);
+        onFormChange({
+          ...settingsForm,
+          mikrotik_isolir_profile: setupIsolirName,
+          mikrotik_inactive_profile: setupInactiveName,
+        });
+        void handleCheckProfiles();
+        void loadMikrotikPools();
+      } else {
+        pushError(data.message || "Setup profile gagal.");
+      }
+    } catch (e: any) {
+      pushError(e.message || String(e));
+    } finally {
+      setSettingUpProfiles(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === "app" && appSubTab === "mikrotik") {
       void loadRouters();
+      void handleCheckProfiles();
+      void loadMikrotikPools();
     }
-  }, [activeTab, appSubTab, loadRouters]);
+  }, [activeTab, appSubTab, loadRouters, handleCheckProfiles, loadMikrotikPools]);
 
   const handleTestSMTP = async () => {
     if (!testEmailReceiver) {
@@ -472,7 +627,7 @@ export function SettingsPage({
     setTestingWa(true);
     setWaResult(null);
     try {
-      const data = await apiRequest<{ success: boolean; message: string }>("/api/v1/integration/test-whatsapp", {
+      const data = await apiRequest<{ success: boolean; authenticated?: boolean; message: string }>("/api/v1/integration/test-whatsapp", {
         method: "POST",
         body: JSON.stringify({
           gateway_url: settingsForm.wa_gateway_url || "http://localhost:3001",
@@ -480,9 +635,9 @@ export function SettingsPage({
           account_id: settingsForm.wa_account_id || "default",
         }),
       });
-      setWaResult({ success: data.success, message: data.message });
+      setWaResult({ success: data.success, authenticated: data.authenticated, message: data.message });
       if (data.success) {
-        pushSuccess("Test WhatsApp Gateway berhasil!");
+        pushSuccess(data.message || "Test WhatsApp Gateway berhasil!");
       } else {
         pushError(data.message || "WhatsApp Gateway tidak merespon.");
       }
@@ -896,6 +1051,35 @@ export function SettingsPage({
                               Jalankan atau matikan background process service WhatsApp Gateway.
                             </span>
                           </label>
+
+                          <label className="flex flex-col gap-1.5">
+                            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Aktifkan Chatbot WhatsApp</span>
+                            <select
+                              className={inputClassName()}
+                              value={settingsForm["wa_chatbot_enabled"] ?? "1"}
+                              onChange={(e) => onFormChange({ ...settingsForm, wa_chatbot_enabled: e.target.value })}
+                            >
+                              <option value="1">Aktif (Gunakan Chatbot)</option>
+                              <option value="0">Nonaktif (Matikan Chatbot)</option>
+                            </select>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                              Mengaktifkan atau menonaktifkan respon otomatis dari chatbot WhatsApp secara global.
+                            </span>
+                          </label>
+
+                          <label className="flex flex-col gap-1.5">
+                            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Jeda Pengiriman Antrean WhatsApp (Detik)</span>
+                            <input
+                              type="number"
+                              className={inputClassName()}
+                              value={settingsForm["wa_queue_throttle_seconds"] ?? "120"}
+                              onChange={(e) => onFormChange({ ...settingsForm, wa_queue_throttle_seconds: e.target.value })}
+                              placeholder="Default: 120"
+                            />
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                              Jeda waktu (detik) antara pengiriman pesan dalam antrean otomatis/broadcast. Pengiriman manual dari dashboard akan mengabaikan jeda ini.
+                            </span>
+                          </label>
                         </div>
                       </div>
 
@@ -903,9 +1087,18 @@ export function SettingsPage({
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Uji kredensial/koneksi WhatsApp Gateway.</span>
                         <div className="flex items-center gap-2">
                           {waResult && (
-                            <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${waResult.success ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-455 dark:border-emerald-900/60" : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-955/20 dark:text-rose-455 dark:border-rose-900/60"
-                              }`}>
-                              {waResult.success ? "Sukses" : "Gagal"}
+                            <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                              !waResult.success 
+                                ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-955/20 dark:text-rose-455 dark:border-rose-900/60" 
+                                : waResult.authenticated === false 
+                                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-455 dark:border-amber-900/60" 
+                                  : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-455 dark:border-emerald-900/60"
+                            }`}>
+                              {!waResult.success 
+                                ? "Gagal" 
+                                : waResult.authenticated === false 
+                                  ? "Belum Auth" 
+                                  : "Sukses"}
                             </span>
                           )}
                           <button
@@ -1082,7 +1275,7 @@ export function SettingsPage({
                         <button
                           type="button"
                           onClick={() => saveSection("WhatsApp", [
-                            "wa_gateway_url", "wa_api_key", "wa_gateway_enabled", "wa_account_id",
+                            "wa_gateway_url", "wa_api_key", "wa_gateway_enabled", "wa_chatbot_enabled", "wa_account_id",
                             "wa_billing_account_id", "wa_reminder_account_id", "wa_due_account_id",
                             "wa_limit_account_id", "wa_payment_account_id"
                           ])}
@@ -1152,6 +1345,19 @@ export function SettingsPage({
                                 }
                               />
                               <span className="text-[10px] text-slate-400 dark:text-slate-500">Batas hari untuk mengubah status tagihan menunggak.</span>
+                            </label>
+
+                            <label className="flex flex-col gap-1.5">
+                              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Suspended Days</span>
+                              <input
+                                className={inputClassName()}
+                                type="number"
+                                value={settingsForm["billing_inactive_suspended_days"] ?? "20"}
+                                onChange={(e) =>
+                                  onFormChange({ ...settingsForm, billing_inactive_suspended_days: e.target.value })
+                                }
+                              />
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500">Batas hari setelah ditangguhkan (suspended) sebelum status menjadi nonaktif (inactive) dan PPPoE secret dimatikan sepenuhnya.</span>
                             </label>
                           </div>
 
@@ -1355,7 +1561,7 @@ export function SettingsPage({
                         <button
                           type="button"
                           onClick={() => saveSection("Billing", [
-                            "billing_reminder_days", "billing_limit_days", "billing_menunggak_days",
+                            "billing_reminder_days", "billing_limit_days", "billing_menunggak_days", "billing_inactive_suspended_days",
                             "billing_auto_generate_enabled", "billing_generate_day", "billing_generate_time",
                             "billing_generate_retry_attempts", "billing_generate_retry_backoff_seconds",
                             "worker_interval_seconds", "backup_auto_enabled", "backup_auto_time",
@@ -1418,7 +1624,7 @@ export function SettingsPage({
                                     <h4 className="font-bold text-slate-950 dark:text-slate-50 text-sm">{router.name}</h4>
                                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-mono">{router.host}</p>
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                                      User: {router.username} &bull; Peran: {router.role === "main" ? "Utama (Main)" : router.role === "slave" ? "Slave (Second)" : "Tidak Ada"}
+                                      User: {router.username} &bull; Peran: {router.role === "main" ? "Utama (Main)" : router.role === "slave" ? `Slave (Port: ${router.slave_port || "ether2"})` : "Tidak Ada"}
                                     </p>
                                   </div>
                                   <div className="flex flex-col items-end gap-2">
@@ -1495,6 +1701,7 @@ export function SettingsPage({
                                       setNewRouterUser(router.username);
                                       setNewRouterPass(""); // blank means no change unless typed
                                       setNewRouterRole(router.role || "none");
+                                      setNewRouterSlavePort(router.slave_port || "ether2");
                                       setNewRouterIsActive(router.is_active);
                                       setChangePassword(false);
                                     }}
@@ -1599,6 +1806,40 @@ export function SettingsPage({
                           </select>
                         </label>
 
+                        {newRouterRole === "slave" && (
+                          <div className="mt-4">
+                            <label className="block">
+                              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">PPPoE Port (Interface)</span>
+                              <div className="flex gap-2">
+                                <select
+                                  value={newRouterSlavePort}
+                                  onChange={(e) => setNewRouterSlavePort(e.target.value)}
+                                  className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs px-3 py-2"
+                                >
+                                  {routerInterfaces.map((iface) => (
+                                    <option key={iface} value={iface}>{iface}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => void loadRouterInterfaces({
+                                    id: editingRouterId || undefined,
+                                    host: newRouterHost,
+                                    username: newRouterUser,
+                                    password: newRouterPass,
+                                  })}
+                                  disabled={fetchingInterfaces || !newRouterHost || !newRouterUser}
+                                  className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 p-2 rounded-xl text-slate-650 dark:text-slate-300 disabled:opacity-50 flex items-center justify-center cursor-pointer"
+                                  title="Ambil Port dari Router"
+                                >
+                                  <RefreshCw size={14} className={fetchingInterfaces ? "animate-spin" : ""} />
+                                </button>
+                              </div>
+                              <span className="text-[9px] text-slate-400 block mt-1">Interface yang digunakan untuk sumber PPPoE (dinonaktifkan otomatis saat Main online).</span>
+                            </label>
+                          </div>
+                        )}
+
                         <div className="flex gap-2 pt-2">
                           {editingRouterId && (
                             <button
@@ -1610,6 +1851,7 @@ export function SettingsPage({
                                 setNewRouterUser("");
                                 setNewRouterPass("");
                                 setNewRouterRole("none");
+                                setNewRouterSlavePort("ether2");
                                 setNewRouterIsActive(true);
                                 setChangePassword(false);
                               }}
@@ -1632,6 +1874,7 @@ export function SettingsPage({
                                     host: newRouterHost,
                                     username: newRouterUser,
                                     role: newRouterRole,
+                                    slave_port: newRouterSlavePort,
                                     is_active: newRouterIsActive,
                                     ...(changePassword ? { password: newRouterPass } : {}),
                                   });
@@ -1644,6 +1887,7 @@ export function SettingsPage({
                                     password: newRouterPass,
                                     is_active: newRouterIsActive,
                                     role: newRouterRole,
+                                    slave_port: newRouterSlavePort,
                                   });
                                   pushSuccess("Router baru berhasil didaftarkan.");
                                 }
@@ -1676,10 +1920,10 @@ export function SettingsPage({
                         </div>
                         <div>
                           <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Pengaturan Global MikroTik</h3>
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi profile bandwidth default untuk status isolir.</p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi profile bandwidth default untuk status isolir dan suspended.</p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <label className="flex flex-col gap-1.5 font-sans">
                           <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Nama PPPoE Profile Limit (Isolir)</span>
                           <input
@@ -1693,11 +1937,38 @@ export function SettingsPage({
                           />
                           <span className="text-[10px] text-slate-400 dark:text-slate-500">PPPoE Profile di MikroTik yang digunakan ketika pelanggan berstatus Limit/Isolir.</span>
                         </label>
+                        <label className="flex flex-col gap-1.5 font-sans">
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Nama PPPoE Profile Suspended</span>
+                          <input
+                            className={inputClassName()}
+                            type="text"
+                            value={settingsForm["mikrotik_inactive_profile"] ?? "nonaktif"}
+                            onChange={(e) =>
+                              onFormChange({ ...settingsForm, mikrotik_inactive_profile: e.target.value })
+                            }
+                            placeholder="nonaktif"
+                          />
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">PPPoE Profile di MikroTik yang digunakan ketika pelanggan berstatus Suspended.</span>
+                        </label>
+                        <label className="flex flex-col gap-1.5 font-sans">
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Auto-sync Main ke Slave (Jam)</span>
+                          <input
+                            className={inputClassName()}
+                            type="number"
+                            min="0"
+                            value={settingsForm["mikrotik_auto_sync_hours"] ?? "0"}
+                            onChange={(e) =>
+                              onFormChange({ ...settingsForm, mikrotik_auto_sync_hours: e.target.value })
+                            }
+                            placeholder="0"
+                          />
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">Interval auto-sync router Utama ke Slave dalam hitungan jam. Isi 0 untuk menonaktifkan.</span>
+                        </label>
                       </div>
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
                         <button
                           type="button"
-                          onClick={() => saveSection("MikroTik Global", ["mikrotik_isolir_profile"])}
+                          onClick={() => saveSection("MikroTik Global", ["mikrotik_isolir_profile", "mikrotik_inactive_profile", "mikrotik_auto_sync_hours"])}
                           disabled={savingSection === "MikroTik Global"}
                           className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
@@ -1706,6 +1977,270 @@ export function SettingsPage({
                         </button>
                       </div>
                     </article>
+                                      {/* Auto setup panel (shows up if profile Check detects missing profiles on MikroTik) */}
+                    {profileCheck && (!profileCheck.isolir_exists || !profileCheck.inactive_exists) && (
+                      <article className="col-span-full bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/40 rounded-3xl p-6 shadow-sm space-y-4 animate-in fade-in duration-200">
+                        <div className="flex items-start gap-4">
+                          <div className="p-2 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 rounded-xl">
+                            <AlertCircle size={20} />
+                          </div>
+                          <div className="space-y-1 w-full">
+                            <h3 className="text-sm font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">PPP Profile Hilang di MikroTik</h3>
+                            <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                              Sistem mendeteksi bahwa profile PPPoE berikut belum terkonfigurasi di MikroTik Anda:
+                            </p>
+                            <ul className="list-disc list-inside text-xs text-amber-600 dark:text-amber-400 mt-2 space-y-1 font-mono">
+                              {!profileCheck.isolir_exists && (
+                                <li>
+                                  Profile Limit/Isolir: <span className="font-semibold">"{profileCheck.isolir_profile_name}"</span>
+                                </li>
+                              )}
+                              {!profileCheck.inactive_exists && (
+                                <li>
+                                  Profile Suspended: <span className="font-semibold">"{profileCheck.inactive_profile_name}"</span>
+                                </li>
+                              )}
+                            </ul>
+
+                            {showSetupForm ? (
+                              <div className="mt-4 p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-6 text-slate-800 dark:text-slate-100">
+                                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-350 uppercase tracking-wider">Konfigurasi Setup Profile & Pool</h4>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                  {/* Isolir Profile Setup */}
+                                  <div className="space-y-4 border-slate-100 dark:border-slate-800/80 lg:border-r pr-0 lg:pr-6">
+                                    <div className="border-b pb-1 border-slate-100 dark:border-slate-800">
+                                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">1. Konfigurasi Profil Limit (Isolir)</span>
+                                    </div>
+                                    <label className="block">
+                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Nama Profile</span>
+                                      <input
+                                        type="text"
+                                        value={setupIsolirName}
+                                        onChange={(e) => setSetupIsolirName(e.target.value)}
+                                        className={inputClassName()}
+                                      />
+                                    </label>
+                                    <label className="block">
+                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Local Address</span>
+                                      <input
+                                        type="text"
+                                        value={setupIsolirLocal}
+                                        onChange={(e) => setSetupIsolirLocal(e.target.value)}
+                                        placeholder="Contoh: 192.168.0.254"
+                                        className={inputClassName()}
+                                      />
+                                    </label>
+                                    <label className="block">
+                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Rate Limit Bandwidth</span>
+                                      <input
+                                        type="text"
+                                        value={setupIsolirLimit}
+                                        onChange={(e) => setSetupIsolirLimit(e.target.value)}
+                                        placeholder="Contoh: 128k/128k"
+                                        className={inputClassName()}
+                                      />
+                                    </label>
+                                    
+                                    <div className="space-y-2">
+                                      <span className="text-[11px] font-semibold text-slate-500 block">Koneksi Remote Address (IP Pool)</span>
+                                      <div className="flex gap-4">
+                                        <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                                          <input
+                                            type="radio"
+                                            checked={setupIsolirPoolMode === "new"}
+                                            onChange={() => setSetupIsolirPoolMode("new")}
+                                          />
+                                          Buat IP Pool Baru
+                                        </label>
+                                        <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                                          <input
+                                            type="radio"
+                                            checked={setupIsolirPoolMode === "existing"}
+                                            onChange={() => setSetupIsolirPoolMode("existing")}
+                                            disabled={mikrotikPools.length === 0}
+                                          />
+                                          Gunakan IP Pool yang Ada
+                                        </label>
+                                      </div>
+                                    </div>
+
+                                    {setupIsolirPoolMode === "new" ? (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-800">
+                                        <label className="block">
+                                          <span className="text-[10px] font-medium text-slate-500 block mb-1">Nama IP Pool</span>
+                                          <input
+                                            type="text"
+                                            value={setupIsolirPoolName}
+                                            onChange={(e) => setSetupIsolirPoolName(e.target.value)}
+                                            className={inputClassName()}
+                                          />
+                                        </label>
+                                        <label className="block">
+                                          <span className="text-[10px] font-medium text-slate-500 block mb-1">IP Range</span>
+                                          <input
+                                            type="text"
+                                            value={setupIsolirPoolRange}
+                                            onChange={(e) => setSetupIsolirPoolRange(e.target.value)}
+                                            placeholder="192.168.3.2-192.168.3.254"
+                                            className={inputClassName()}
+                                          />
+                                        </label>
+                                      </div>
+                                    ) : (
+                                      <label className="block">
+                                        <span className="text-[10px] font-medium text-slate-500 block mb-1">Pilih IP Pool</span>
+                                        <select
+                                          value={setupIsolirPoolName}
+                                          onChange={(e) => setSetupIsolirPoolName(e.target.value)}
+                                          className={inputClassName()}
+                                        >
+                                          {mikrotikPools.map((p) => (
+                                            <option key={p.id} value={p.name}>
+                                              {p.name} ({p.ranges})
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                    )}
+                                  </div>
+
+                                  {/* Suspended Profile Setup */}
+                                  <div className="space-y-4">
+                                    <div className="border-b pb-1 border-slate-100 dark:border-slate-800">
+                                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">2. Konfigurasi Profil Suspended</span>
+                                    </div>
+                                    <label className="block">
+                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Nama Profile</span>
+                                      <input
+                                        type="text"
+                                        value={setupInactiveName}
+                                        onChange={(e) => setSetupInactiveName(e.target.value)}
+                                        className={inputClassName()}
+                                      />
+                                    </label>
+                                    <label className="block">
+                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Local Address</span>
+                                      <input
+                                        type="text"
+                                        value={setupInactiveLocal}
+                                        onChange={(e) => setSetupInactiveLocal(e.target.value)}
+                                        placeholder="Contoh: 192.168.0.254"
+                                        className={inputClassName()}
+                                      />
+                                    </label>
+                                    <label className="block">
+                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Rate Limit Bandwidth</span>
+                                      <input
+                                        type="text"
+                                        value={setupInactiveLimit}
+                                        onChange={(e) => setSetupInactiveLimit(e.target.value)}
+                                        placeholder="Contoh: 8k/8k"
+                                        className={inputClassName()}
+                                      />
+                                    </label>
+
+                                    <div className="space-y-2">
+                                      <span className="text-[11px] font-semibold text-slate-500 block">Koneksi Remote Address (IP Pool)</span>
+                                      <div className="flex gap-4">
+                                        <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                                          <input
+                                            type="radio"
+                                            checked={setupInactivePoolMode === "new"}
+                                            onChange={() => setSetupInactivePoolMode("new")}
+                                          />
+                                          Buat IP Pool Baru
+                                        </label>
+                                        <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                                          <input
+                                            type="radio"
+                                            checked={setupInactivePoolMode === "existing"}
+                                            onChange={() => setSetupInactivePoolMode("existing")}
+                                            disabled={mikrotikPools.length === 0}
+                                          />
+                                          Gunakan IP Pool yang Ada
+                                        </label>
+                                      </div>
+                                    </div>
+
+                                    {setupInactivePoolMode === "new" ? (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-800">
+                                        <label className="block">
+                                          <span className="text-[10px] font-medium text-slate-500 block mb-1">Nama IP Pool</span>
+                                          <input
+                                            type="text"
+                                            value={setupInactivePoolName}
+                                            onChange={(e) => setSetupInactivePoolName(e.target.value)}
+                                            className={inputClassName()}
+                                          />
+                                        </label>
+                                        <label className="block">
+                                          <span className="text-[10px] font-medium text-slate-500 block mb-1">IP Range</span>
+                                          <input
+                                            type="text"
+                                            value={setupInactivePoolRange}
+                                            onChange={(e) => setSetupInactivePoolRange(e.target.value)}
+                                            placeholder="192.168.4.2-192.168.4.254"
+                                            className={inputClassName()}
+                                          />
+                                        </label>
+                                      </div>
+                                    ) : (
+                                      <label className="block">
+                                        <span className="text-[10px] font-medium text-slate-500 block mb-1">Pilih IP Pool</span>
+                                        <select
+                                          value={setupInactivePoolName}
+                                          onChange={(e) => setSetupInactivePoolName(e.target.value)}
+                                          className={inputClassName()}
+                                        >
+                                          {mikrotikPools.map((p) => (
+                                            <option key={p.id} value={p.name}>
+                                              {p.name} ({p.ranges})
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
+                                Tekan tombol di bawah untuk mengonfigurasi profile limit dan suspended, beserta IP Pool barunya pada MikroTik secara otomatis.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex justify-end pt-3 border-t border-amber-100 dark:border-amber-900/30 gap-3">
+                          {showSetupForm && (
+                            <button
+                              type="button"
+                              onClick={() => setShowSetupForm(false)}
+                              className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center cursor-pointer border border-transparent"
+                            >
+                              Batal
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!showSetupForm) {
+                                setSetupIsolirName(settingsForm.mikrotik_isolir_profile || "isolir");
+                                setSetupInactiveName(settingsForm.mikrotik_inactive_profile || "nonaktif");
+                                setShowSetupForm(true);
+                              } else {
+                                void triggerSetupProfiles();
+                              }
+                            }}
+                            disabled={settingUpProfiles}
+                            className="bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            {settingUpProfiles ? <Loader2 size={12} className="animate-spin" /> : <Settings size={12} />}
+                            {showSetupForm ? "Mulai Setup" : "Setup Profile Otomatis"}
+                          </button>
+                        </div>
+                      </article>
+                    )}
 
                     {/* Router Main -> Slave Sync Panel (Full Width) */}
                     <article className="col-span-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4 animate-in fade-in duration-200">

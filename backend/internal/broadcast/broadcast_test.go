@@ -57,6 +57,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 			attempts INTEGER DEFAULT 0,
 			bill_id INTEGER,
 			trigger_key TEXT,
+			is_manual INTEGER DEFAULT 0,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 		CREATE TABLE email_queue (

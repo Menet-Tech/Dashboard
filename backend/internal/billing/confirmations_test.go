@@ -49,7 +49,7 @@ func TestCreatePaymentConfirmation(t *testing.T) {
 	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (1, 1, 1, '2026-04', 'INV-001', 250000, '2026-04-08', 'belum_bayar')`)
 
 	bukti := "uploads/payment-proofs/test.png"
-	id, err := service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar tagihan")
+	id, err := service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar tagihan", "")
 	if err != nil {
 		t.Fatalf("failed to create confirmation: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestCreatePaymentConfirmation(t *testing.T) {
 	}
 
 	// Try to create duplicate
-	_, err = service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar lagi")
+	_, err = service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar lagi", "")
 	if err == nil {
 		t.Fatal("expected duplicate confirmation to fail, but it succeeded")
 	}
@@ -73,7 +73,7 @@ func TestListPendingConfirmations(t *testing.T) {
 	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (1, 1, 1, '2026-04', 'INV-001', 250000, '2026-04-08', 'belum_bayar')`)
 
 	bukti := "uploads/payment-proofs/test.png"
-	_, err := service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar tagihan Budi")
+	_, err := service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar tagihan Budi", "")
 	if err != nil {
 		t.Fatalf("failed to create confirmation: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestApprovePaymentConfirmation(t *testing.T) {
 	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (1, 1, 1, '2026-04', 'INV-001', 250000, '2026-04-08', 'belum_bayar')`)
 
 	bukti := "uploads/payment-proofs/test.png"
-	confID, err := service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar tagihan Budi")
+	confID, err := service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar tagihan Budi", "")
 	if err != nil {
 		t.Fatalf("failed to create confirmation: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestRejectPaymentConfirmation(t *testing.T) {
 	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (1, 1, 1, '2026-04', 'INV-001', 250000, '2026-04-08', 'belum_bayar')`)
 
 	bukti := "uploads/payment-proofs/test.png"
-	confID, err := service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar tagihan Budi")
+	confID, err := service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar tagihan Budi", "")
 	if err != nil {
 		t.Fatalf("failed to create confirmation: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestGetPendingConfirmationForBill(t *testing.T) {
 	}
 
 	bukti := "uploads/payment-proofs/test.png"
-	_, err = service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar tagihan Budi")
+	_, err = service.CreatePaymentConfirmation(ctx, 1, 1, &bukti, "Bayar tagihan Budi", "")
 	if err != nil {
 		t.Fatalf("failed to create confirmation: %v", err)
 	}

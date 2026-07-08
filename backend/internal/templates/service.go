@@ -17,6 +17,7 @@ type Template struct {
 	Content         string `json:"content"`
 	TriggerKeywords string `json:"trigger_keywords"`
 	IsActive        bool   `json:"is_active"`
+	IsCustom        bool   `json:"is_custom"`
 }
 
 type Repository struct {
@@ -78,7 +79,7 @@ func validate(item Template) error {
 
 func (r Repository) List(ctx context.Context) ([]Template, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT id, nama, trigger_key, isi_template, COALESCE(trigger_keywords, ''), is_active
+		SELECT id, nama, trigger_key, isi_template, COALESCE(trigger_keywords, ''), is_active, COALESCE(is_custom, 0)
 		FROM template_wa
 		ORDER BY id ASC
 	`)
@@ -90,11 +91,12 @@ func (r Repository) List(ctx context.Context) ([]Template, error) {
 	items := []Template{}
 	for rows.Next() {
 		var item Template
-		var active int
-		if err := rows.Scan(&item.ID, &item.Name, &item.TriggerKey, &item.Content, &item.TriggerKeywords, &active); err != nil {
+		var active, isCustom int
+		if err := rows.Scan(&item.ID, &item.Name, &item.TriggerKey, &item.Content, &item.TriggerKeywords, &active, &isCustom); err != nil {
 			return nil, fmt.Errorf("scan template: %w", err)
 		}
 		item.IsActive = active == 1
+		item.IsCustom = isCustom == 1
 		items = append(items, item)
 	}
 
@@ -120,7 +122,7 @@ func (r Repository) Create(ctx context.Context, item Template) (Template, error)
 func (r Repository) Update(ctx context.Context, id int64, item Template) (Template, error) {
 	result, err := r.DB.ExecContext(ctx, `
 		UPDATE template_wa
-		SET nama = ?, trigger_key = ?, isi_template = ?, trigger_keywords = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+		SET nama = ?, trigger_key = ?, isi_template = ?, trigger_keywords = ?, is_active = ?, is_custom = 1, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, item.Name, item.TriggerKey, item.Content, item.TriggerKeywords, boolInt(item.IsActive), id)
 	if err != nil {
@@ -134,6 +136,7 @@ func (r Repository) Update(ctx context.Context, id int64, item Template) (Templa
 		return Template{}, ErrTemplateNotFound
 	}
 	item.ID = id
+	item.IsCustom = true
 	return item, nil
 }
 
@@ -154,7 +157,7 @@ func (r Repository) Delete(ctx context.Context, id int64) error {
 
 func (r Repository) FindActiveByTrigger(ctx context.Context, triggerKey string) (Template, error) {
 	row := r.DB.QueryRowContext(ctx, `
-		SELECT id, nama, trigger_key, isi_template, COALESCE(trigger_keywords, ''), is_active
+		SELECT id, nama, trigger_key, isi_template, COALESCE(trigger_keywords, ''), is_active, COALESCE(is_custom, 0)
 		FROM template_wa
 		WHERE trigger_key = ?
 		  AND is_active = 1
@@ -162,14 +165,15 @@ func (r Repository) FindActiveByTrigger(ctx context.Context, triggerKey string) 
 	`, triggerKey)
 
 	var item Template
-	var active int
-	if err := row.Scan(&item.ID, &item.Name, &item.TriggerKey, &item.Content, &item.TriggerKeywords, &active); err != nil {
+	var active, isCustom int
+	if err := row.Scan(&item.ID, &item.Name, &item.TriggerKey, &item.Content, &item.TriggerKeywords, &active, &isCustom); err != nil {
 		if err == sql.ErrNoRows {
 			return Template{}, ErrTemplateNotFound
 		}
 		return Template{}, fmt.Errorf("find template by trigger: %w", err)
 	}
 	item.IsActive = active == 1
+	item.IsCustom = isCustom == 1
 	return item, nil
 }
 

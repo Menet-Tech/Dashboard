@@ -166,7 +166,7 @@ func (s Service) startQueueProcessor(ctx context.Context) {
 			s.Logger.Info("whatsapp queue processor stopped")
 			return
 		default:
-			processed, err := s.WhatsApp.ProcessQueue(ctx)
+			processed, isManual, err := s.WhatsApp.ProcessQueue(ctx)
 			if err != nil {
 				s.Logger.Error("queue processing encountered error", "error", err)
 				time.Sleep(2 * time.Second)
@@ -174,7 +174,12 @@ func (s Service) startQueueProcessor(ctx context.Context) {
 			}
 
 			if processed {
-				time.Sleep(s.getQueueThrottleDuration(ctx))
+				if isManual {
+					s.Logger.Info("manual WhatsApp notification processed, skipping queue throttle delay")
+					time.Sleep(1 * time.Second) // 1s safety interval for manual trigger
+				} else {
+					time.Sleep(s.getQueueThrottleDuration(ctx))
+				}
 			} else {
 				// No pending messages, wait a short time before checking again
 				time.Sleep(500 * time.Millisecond)
@@ -206,6 +211,10 @@ func (s Service) RunOnce(ctx context.Context) error {
 
 	if err := s.runScheduledBackup(ctx, now); err != nil {
 		s.Logger.Error("auto backup failed", "error", err)
+	}
+
+	if err := s.runScheduledMikrotikSync(ctx, now); err != nil {
+		s.Logger.Error("scheduled mikrotik sync failed", "error", err)
 	}
 
 	// Process trial expiry and auto-generate bills
@@ -273,15 +282,30 @@ func (s Service) RunOnce(ctx context.Context) error {
 			if s.Discord == nil || !s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
 				return nil
 			}
-			if strings.Contains(message, "Isolir Penuh") {
+			if strings.Contains(message, "Layanan Ditangguhkan") {
 				parts := strings.Split(message, "Pelanggan **")
 				custName := ""
 				if len(parts) > 1 {
 					custName = strings.Split(parts[1], "**")[0]
 				}
 				return s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
-					Title:       "🚫 Layanan Dinonaktifkan (Isolir Penuh)",
-					Description: fmt.Sprintf("Pelanggan **%s** dinonaktifkan sepenuhnya dari jaringan karena tunggakan tagihan melebihi batas.", custName),
+					Title:       "🚫 Layanan Ditangguhkan (Suspended)",
+					Description: fmt.Sprintf("Pelanggan **%s** telah ditangguhkan karena tunggakan tagihan melebihi batas toleransi (internet dinonaktifkan tetapi ONT tetap terhubung).", custName),
+					Color:       9807270, // Grey/purple
+					Fields: []notifications.EmbedField{
+						{Name: "Nama Pelanggan", Value: custName, Inline: true},
+						{Name: "Status Baru", Value: "Suspended (Ditangguhkan)", Inline: true},
+					},
+				})
+			} else if strings.Contains(message, "Layanan Dinonaktifkan") {
+				parts := strings.Split(message, "Pelanggan **")
+				custName := ""
+				if len(parts) > 1 {
+					custName = strings.Split(parts[1], "**")[0]
+				}
+				return s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+					Title:       "🚫 Layanan Dinonaktifkan (Inactive)",
+					Description: fmt.Sprintf("Pelanggan **%s** telah dinonaktifkan sepenuhnya dari jaringan (PPPoE Secret Dinonaktifkan) karena tunggakan tagihan melebihi batas.", custName),
 					Color:       15158332, // Red (#e74c3c)
 					Fields: []notifications.EmbedField{
 						{Name: "Nama Pelanggan", Value: custName, Inline: true},
@@ -631,6 +655,25 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 								} else {
 									s.Logger.Info("sync main to slaves completed successfully")
 								}
+
+								// Extra safety: Disable backup ports on all active slaves
+								if slaves, serr := routerSvc.ListActive(ctx); serr == nil {
+									for _, sl := range slaves {
+										if sl.Role == "slave" && sl.SlavePort != "" {
+											go func(slRouter mikrotik.Router) {
+												slClient := mikrotik.NewClient(slRouter.Host, slRouter.Username, slRouter.Password)
+												if err := slClient.Connect(context.Background()); err == nil {
+													defer slClient.Close()
+													if err := slClient.SetInterfaceDisabled(context.Background(), slRouter.SlavePort, true); err != nil {
+														s.Logger.Error("failed to disable backup port on slave router", "slave", slRouter.Name, "port", slRouter.SlavePort, "error", err)
+													} else {
+														s.Logger.Info("disabled backup port on slave router due to main recovery", "slave", slRouter.Name, "port", slRouter.SlavePort)
+													}
+												}
+											}(sl)
+										}
+									}
+								}
 							}
 						}
 						_ = routerSvc.UpdateOnlineStatus(ctx, r.ID, true)
@@ -648,6 +691,27 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 					if r.IsOnline {
 						s.Logger.Warn("Router transitioned from online to offline", "router", r.Name, "host", r.Host, "error", err)
 						_ = routerSvc.UpdateOnlineStatus(ctx, r.ID, false)
+
+						// Enable backup ports on all active slaves if Main goes down
+						if r.Role == "main" {
+							if slaves, serr := routerSvc.ListActive(ctx); serr == nil {
+								for _, sl := range slaves {
+									if sl.Role == "slave" && sl.SlavePort != "" {
+										go func(slRouter mikrotik.Router) {
+											slClient := mikrotik.NewClient(slRouter.Host, slRouter.Username, slRouter.Password)
+											if err := slClient.Connect(context.Background()); err == nil {
+												defer slClient.Close()
+												if err := slClient.SetInterfaceDisabled(context.Background(), slRouter.SlavePort, false); err != nil {
+													s.Logger.Error("failed to enable backup port on slave router", "slave", slRouter.Name, "port", slRouter.SlavePort, "error", err)
+												} else {
+													s.Logger.Info("enabled backup port on slave router because main went offline", "slave", slRouter.Name, "port", slRouter.SlavePort)
+												}
+											}
+										}(sl)
+									}
+								}
+							}
+						}
 					}
 				}
 			}
@@ -706,11 +770,15 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 			defer wg.Done()
 			for cust := range tasksChan {
 				modified := false
+				wasPppoeOnline := cust.PppoeStatus == "online" || cust.PppoeStatus == "limit"
+				wasOntOnline := cust.OntStatus == "online"
 
 				// Determine PPPoE Status
 				pppoeUsername := strings.ToLower(strings.TrimSpace(cust.UserPPPoE))
+				isPppoeOnline := false
 				if pppoeUsername != "" {
 					if active, ok := activePPPMap[pppoeUsername]; ok {
+						isPppoeOnline = true
 						statusVal := "online"
 						if cust.Status == "limit" {
 							statusVal = "limit"
@@ -742,33 +810,14 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 
 				// Determine GenieACS Status
 				serialNum := strings.TrimSpace(cust.SNOnt)
+				isOntOnline := false
+				var status acs.DeviceStatus
+				var err error
 				if serialNum != "" {
 					// Query device status from GenieACS Client
-					status, err := acsClient.GetDeviceStatus(ctx, serialNum)
+					status, err = acsClient.GetDeviceStatus(ctx, serialNum)
 					if err == nil {
-						if cust.OntStatus == "online" && status.Status == "offline" {
-							if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_gacs_offline") {
-								matiKapan := time.Now().Format("2006-01-02 15:04:05")
-								embed := notifications.DiscordEmbed{
-									Title:       "🚨 ONT CLIENT OFFLINE DETECTED 🚨",
-									Description: fmt.Sprintf("ONT milik pelanggan **%s** terdeteksi putus koneksi (offline).", cust.Name),
-									Color:       15158332, // Red (#e74c3c)
-									Fields: []notifications.EmbedField{
-										{Name: "Nama Pelanggan", Value: cust.Name, Inline: true},
-										{Name: "User PPPoE", Value: cust.UserPPPoE, Inline: true},
-										{Name: "Serial Number (SN)", Value: serialNum, Inline: true},
-										{Name: "Waktu Mati", Value: matiKapan, Inline: true},
-										{Name: "Redaman Terakhir (Rx)", Value: fmt.Sprintf("%s (Tx: %s)", status.RxOpticalPower, status.TxOpticalPower), Inline: false},
-										{Name: "IP Address", Value: status.IPAddress, Inline: true},
-										{Name: "Status", Value: "OFFLINE 🔴", Inline: true},
-									},
-								}
-								go func(emb notifications.DiscordEmbed) {
-									_ = s.Discord.SendEmbed(context.Background(), emb)
-								}(embed)
-							}
-						}
-
+						isOntOnline = status.Status == "online"
 						if cust.OntStatus != status.Status || cust.OntIP != status.IPAddress || cust.OntUptime != status.Uptime || cust.OntRxPower != status.RxOpticalPower || cust.OntTxPower != status.TxOpticalPower {
 							cust.OntStatus = status.Status
 							cust.OntIP = status.IPAddress
@@ -788,6 +837,77 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 						cust.OntRxPower = ""
 						cust.OntTxPower = ""
 						modified = true
+					}
+				}
+
+				// Discord Alert on State Change
+				becamePppoeOffline := false
+				if pppoeUsername != "" {
+					becamePppoeOffline = wasPppoeOnline && !isPppoeOnline
+				}
+				becameOntOffline := false
+				if serialNum != "" && err == nil {
+					becameOntOffline = wasOntOnline && !isOntOnline
+				}
+
+				if becamePppoeOffline || becameOntOffline {
+					if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_gacs_offline") {
+						var statusStr string
+						var color int
+
+						hasPppoe := pppoeUsername != ""
+						hasOnt := serialNum != "" && err == nil
+
+						if hasPppoe && hasOnt {
+							if !isPppoeOnline && !isOntOnline {
+								statusStr = "offline"
+								color = 15158332 // Red (#e74c3c)
+							} else if !isPppoeOnline {
+								statusStr = "disconnected"
+								color = 16776960 // Yellow (#f1c40f)
+							} else {
+								statusStr = "down"
+								color = 15105570 // Orange (#e67e22)
+							}
+						} else if hasPppoe {
+							if !isPppoeOnline {
+								statusStr = "disconnected"
+								color = 16776960
+							}
+						} else if hasOnt {
+							if !isOntOnline {
+								statusStr = "down"
+								color = 15105570
+							}
+						}
+
+						if statusStr != "" {
+							matiKapan := time.Now().Format("2006-01-02 15:04:05")
+							rxPower := cust.OntRxPower
+							txPower := cust.OntTxPower
+							if serialNum != "" && err == nil {
+								rxPower = status.RxOpticalPower
+								txPower = status.TxOpticalPower
+							}
+
+							embed := notifications.DiscordEmbed{
+								Title:       "🚨 CLIENT CONNECTION UPDATE 🚨",
+								Description: fmt.Sprintf("Koneksi pelanggan **%s** mengalami gangguan.", cust.Name),
+								Color:       color,
+								Fields: []notifications.EmbedField{
+									{Name: "Nama Pelanggan", Value: cust.Name, Inline: true},
+									{Name: "User PPPoE", Value: cust.UserPPPoE, Inline: true},
+									{Name: "Serial Number (SN)", Value: cust.SNOnt, Inline: true},
+									{Name: "Waktu Kejadian", Value: matiKapan, Inline: true},
+									{Name: "Redaman Terakhir (Rx)", Value: fmt.Sprintf("%s (Tx: %s)", rxPower, txPower), Inline: false},
+									{Name: "Status Terdeteksi", Value: strings.ToUpper(statusStr) + " 🔴", Inline: true},
+								},
+							}
+
+							go func(emb notifications.DiscordEmbed) {
+								_ = s.Discord.SendEmbed(context.Background(), emb)
+							}(embed)
+						}
 					}
 				}
 
@@ -820,3 +940,31 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 
 	return nil
 }
+
+func (s Service) runScheduledMikrotikSync(ctx context.Context, now time.Time) error {
+	syncHours, err := s.Settings.GetInt(ctx, "mikrotik_auto_sync_hours")
+	if err != nil || syncHours <= 0 {
+		return nil
+	}
+
+	lastSyncStr, _ := s.Settings.GetString(ctx, "mikrotik_last_auto_sync_at")
+	if lastSyncStr != "" {
+		if lastSync, err := time.Parse(time.RFC3339, lastSyncStr); err == nil {
+			if now.Sub(lastSync) < time.Duration(syncHours)*time.Hour {
+				return nil
+			}
+		}
+	}
+
+	s.Logger.Info("Scheduled MikroTik sync starting", "interval_hours", syncHours)
+	routerSvc := mikrotik.NewRouterService(s.DB)
+	if _, err := routerSvc.SyncMainToSlaves(ctx); err != nil {
+		s.Logger.Error("Scheduled MikroTik sync failed", "error", err)
+		return err
+	}
+
+	s.Logger.Info("Scheduled MikroTik sync completed successfully")
+	_ = s.Settings.Set(ctx, "mikrotik_last_auto_sync_at", now.UTC().Format(time.RFC3339))
+	return nil
+}
+

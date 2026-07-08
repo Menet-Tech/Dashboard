@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -432,8 +433,13 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 		return err
 	}
 
+	// NOTE: Removing an ODP node from the map does NOT delete the ODP record.
+	// ODP management (create/delete from odp table) is done exclusively via the ODP management page.
+
 	// 1. Process ODP nodes first to assign correct node IDs and build redirection map
 	oldNodeIDToNewNodeID := make(map[string]string)
+	// odpNodeIDs tracks which ODP node IDs are present in this sync (for auto-edge generation)
+	odpNodeIDs := make(map[string]bool)
 	for i, n := range nodes {
 		if n.Type == "odp" {
 			loc := fmt.Sprintf("%f, %f", n.Latitude, n.Longitude)
@@ -455,6 +461,7 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 			}
 
 			if hasOdpID {
+				odpNodeIDs[n.NodeID] = true
 				_, err = tx.ExecContext(ctx, `
 					INSERT INTO odp (id, nama, lokasi, deskripsi, ports, updated_at)
 					VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -499,11 +506,63 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 						return fmt.Errorf("get new odp last insert ID: %w", err)
 					}
 				}
-				
+
 				// Update n.NodeID and map old ID to new ID
 				newNodeID := fmt.Sprintf("odp-%d", odpID)
 				oldNodeIDToNewNodeID[n.NodeID] = newNodeID
 				nodes[i].NodeID = newNodeID
+				odpNodeIDs[newNodeID] = true
+			}
+		}
+	}
+
+	// Auto-generate edges for mapped ONT nodes connected to mapped ODP nodes
+	nodeByID := make(map[string]MappingNode)
+	for _, n := range nodes {
+		nodeByID[n.NodeID] = n
+	}
+
+	for _, n := range nodes {
+		if n.Type == "ont" && n.Pppoe != nil && *n.Pppoe != "" {
+			var dbOdpID sql.NullInt64
+			err := tx.QueryRowContext(ctx, "SELECT odp_id FROM pelanggan WHERE user_pppoe = ?", *n.Pppoe).Scan(&dbOdpID)
+			if err == nil && dbOdpID.Valid {
+				targetOdpNodeID := fmt.Sprintf("odp-%d", dbOdpID.Int64)
+				// Check if the connected ODP is also on the map
+				if odpNodeIDs[targetOdpNodeID] {
+					// Check if there is already an edge between them
+					hasEdge := false
+					for _, e := range edges {
+						src := e.Source
+						if val, ok := oldNodeIDToNewNodeID[src]; ok {
+							src = val
+						}
+						tgt := e.Target
+						if val, ok := oldNodeIDToNewNodeID[tgt]; ok {
+							tgt = val
+						}
+						if (src == n.NodeID && tgt == targetOdpNodeID) || (src == targetOdpNodeID && tgt == n.NodeID) {
+							hasEdge = true
+							break
+						}
+					}
+
+					if !hasEdge {
+						// Create missing edge automatically
+						odpNode := nodeByID[targetOdpNodeID]
+						dist := calculateDistance(n.Latitude, n.Longitude, odpNode.Latitude, odpNode.Longitude)
+						
+						fiberTypeStr := "odp_ont"
+						newEdge := MappingEdge{
+							EdgeID:    fmt.Sprintf("edge-auto-%s-%s", n.NodeID, targetOdpNodeID),
+							Source:    targetOdpNodeID,
+							Target:    n.NodeID,
+							FiberType: &fiberTypeStr,
+							Distance:  &dist,
+						}
+						edges = append(edges, newEdge)
+					}
+				}
 			}
 		}
 	}
@@ -642,4 +701,16 @@ func ResetMappingData(ctx context.Context, db *sql.DB) error {
 	}
 
 	return tx.Commit()
+}
+
+func calculateDistance(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371000 // Earth radius in meters
+	rad := math.Pi / 180
+	dLat := (lat2 - lat1) * rad
+	dLon := (lon2 - lon1) * rad
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*rad)*math.Cos(lat2*rad)*
+			math.Sin(dLon/2)*math.Sin(dLon/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	return R * c
 }

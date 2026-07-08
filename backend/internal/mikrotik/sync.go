@@ -48,6 +48,11 @@ func (s *RouterService) SyncMainToSlaves(ctx context.Context) (*SyncResult, erro
 	}
 	defer mainClient.Close()
 
+	// Reconcile profiles to the main router from database first
+	if err := s.ReconcileProfiles(ctx, mainClient); err != nil {
+		slog.Error("sync: failed to reconcile profiles on main router", "router", mainRouter.Name, "error", err)
+	}
+
 	pools, err := mainClient.ListIPPools(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list ip pools from main router: %w", err)
@@ -106,6 +111,14 @@ func (s *RouterService) SyncMainToSlaves(ctx context.Context) (*SyncResult, erro
 				result.SecretsSynced++
 			}
 
+			// Disable PPPoE interface on slave router to avoid collision with main
+			if slave.Role == "slave" && slave.SlavePort != "" {
+				slog.Info("sync: disabling backup port on slave router", "router", slave.Name, "port", slave.SlavePort)
+				if err := slaveClient.SetInterfaceDisabled(ctx, slave.SlavePort, true); err != nil {
+					slog.Error("sync: failed to disable backup port on slave router", "router", slave.Name, "port", slave.SlavePort, "error", err)
+				}
+			}
+
 			return nil
 		}()
 
@@ -121,6 +134,47 @@ func (s *RouterService) SyncMainToSlaves(ctx context.Context) (*SyncResult, erro
 	return result, nil
 }
 
+// ReconcileProfiles ensures that all PPP profiles defined in the database packages exist on the given router client.
+func (s *RouterService) ReconcileProfiles(ctx context.Context, client *Client) error {
+	rows, err := s.DB.QueryContext(ctx, "SELECT nama, kecepatan_mbps, COALESCE(ip_pool, ''), COALESCE(local_address, '') FROM paket")
+	if err != nil {
+		return fmt.Errorf("failed to query packages: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var name, ipPool, localAddress string
+		var speedMbps int
+		if err := rows.Scan(&name, &speedMbps, &ipPool, &localAddress); err != nil {
+			return fmt.Errorf("scan package: %w", err)
+		}
+
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+
+		rateLimit := fmt.Sprintf("%dM/%dM", speedMbps, speedMbps)
+		// Resolve the exact pool name case-sensitively from the router's pools if configured
+		actualPoolName := ipPool
+		if ipPool != "" {
+			if pools, err := client.ListIPPools(ctx); err == nil {
+				for _, p := range pools {
+					if strings.EqualFold(p.Name, ipPool) {
+						actualPoolName = p.Name
+						break
+					}
+				}
+			}
+		}
+
+		if err := client.SyncPPPProfile(ctx, name, localAddress, actualPoolName, rateLimit); err != nil {
+			slog.Error("reconcile profiles: failed to sync profile", "profile", name, "error", err)
+		}
+	}
+	return nil
+}
+
 // ReconcileSecrets reconciles customer PPPoE secrets between the local database and a specific router.
 func (s *RouterService) ReconcileSecrets(ctx context.Context, r Router) error {
 	// 1. Connect to the router
@@ -129,6 +183,11 @@ func (s *RouterService) ReconcileSecrets(ctx context.Context, r Router) error {
 		return fmt.Errorf("failed to connect to router %s (%s): %w", r.Name, r.Host, err)
 	}
 	defer client.Close()
+
+	// Reconcile profiles first
+	if err := s.ReconcileProfiles(ctx, client); err != nil {
+		slog.Error("reconcile: failed to reconcile profiles", "router", r.Name, "error", err)
+	}
 
 	// 2. Fetch the isolir and inactive profiles from the pengaturan table
 	var isolirProfile string
@@ -207,9 +266,12 @@ func (s *RouterService) ReconcileSecrets(ctx context.Context, r Router) error {
 		case "limit":
 			targetProfile = isolirProfile
 			disabled = false
-		case "inactive":
+		case "suspended":
 			targetProfile = inactiveProfile
 			disabled = false
+		case "inactive":
+			targetProfile = inactiveProfile
+			disabled = true
 		default:
 			targetProfile = dbSec.Profile
 			if targetProfile == "" {

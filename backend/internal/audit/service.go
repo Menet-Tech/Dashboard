@@ -67,10 +67,42 @@ func (s Service) sendDiscordNotification(ctx context.Context, userID *int64, act
 		title = "🔓 Login Berhasil"
 		description = fmt.Sprintf("Admin/Staff **%s** berhasil masuk ke sistem.", username)
 		color = 3066993 // Green (#2ecc71)
+	case "auth.login.failed":
+		title = "⚠️ Login Gagal"
+		description = fmt.Sprintf("Percobaan login gagal untuk username: **%s**", message)
+		color = 15158332 // Red (#e74c3c)
 	case "auth.logout":
 		title = "🔒 Logout"
 		description = fmt.Sprintf("Admin/Staff **%s** telah keluar dari sistem.", username)
-		color = 15158332 // Red (#e74c3c)
+		color = 10066329 // Light Gray (#999999)
+	case "customer.create":
+		title = "👤 Pelanggan Baru Ditambahkan"
+		description = fmt.Sprintf("Admin/Staff **%s** menambahkan pelanggan baru ke sistem.", username)
+		color = 3066993 // Green
+	case "customer.update":
+		title = "👤 Data Pelanggan Diperbarui"
+		description = fmt.Sprintf("Admin/Staff **%s** memperbarui data pelanggan.", username)
+		color = 15105570 // Orange (#e67e22)
+	case "customer.update_status":
+		title = "🔄 Status Pelanggan Diubah"
+		description = fmt.Sprintf("Admin/Staff **%s** mengubah status pelanggan.", username)
+		color = 10181046 // Purple (#9b59b6)
+	case "customer.delete":
+		title = "🗑️ Pelanggan Dihapus (Tagihan Terhapus)"
+		description = fmt.Sprintf("Admin/Staff **%s** menghapus data pelanggan.", username)
+		color = 15158332
+	case "customer.bulk_delete":
+		title = "🗑️ Pelanggan Dihapus secara Massal"
+		description = fmt.Sprintf("Admin/Staff **%s** menghapus beberapa data pelanggan sekaligus.", username)
+		color = 15158332
+	case "bills.confirmations.approve":
+		title = "✅ Bukti Pembayaran Disetujui"
+		description = fmt.Sprintf("Admin/Staff **%s** menyetujui konfirmasi bukti pembayaran.", username)
+		color = 3066993
+	case "bills.confirmations.reject":
+		title = "❌ Bukti Pembayaran Ditolak"
+		description = fmt.Sprintf("Admin/Staff **%s** menolak konfirmasi bukti pembayaran.", username)
+		color = 15158332
 	}
 
 	// 2. Package CRUD
@@ -112,17 +144,6 @@ func (s Service) sendDiscordNotification(ctx context.Context, userID *int64, act
 		title = "📢 Pembuatan Tagihan Massal"
 		description = fmt.Sprintf("Admin/Staff **%s** men-generate tagihan baru di sistem.", username)
 		color = 3447003
-	}
-
-	switch actionLower {
-	case "customer.delete":
-		title = "🗑️ Pelanggan Dihapus (Tagihan Terhapus)"
-		description = fmt.Sprintf("Admin/Staff **%s** menghapus data pelanggan.\nDetail: %s", username, message)
-		color = 15158332
-	case "customer.bulk_delete":
-		title = "🗑️ Pelanggan Dihapus secara Massal"
-		description = fmt.Sprintf("Admin/Staff **%s** menghapus beberapa data pelanggan sekaligus.\nDetail: %s", username, message)
-		color = 15158332
 	}
 
 	// 6. Payment Confirmation Rejection

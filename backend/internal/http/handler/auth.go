@@ -40,14 +40,17 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	user, session, err := h.Service.Login(r.Context(), request.Username, request.Password, identifier, remoteAddr)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
+			_ = h.Audit.RecordWithIP(r.Context(), nil, nil, "auth.login.failed", request.Username, remoteAddr)
 			WriteError(w, http.StatusUnauthorized, "username atau password tidak valid")
 			return
 		}
 		if errors.Is(err, auth.ErrTooManyAttempts) {
+			_ = h.Audit.RecordWithIP(r.Context(), nil, nil, "auth.login.failed", request.Username+" (terblokir)", remoteAddr)
 			WriteError(w, http.StatusTooManyRequests, "terlalu banyak percobaan login, coba lagi beberapa menit lagi")
 			return
 		}
 
+		_ = h.Audit.RecordWithIP(r.Context(), nil, nil, "auth.login.failed", request.Username+" (error server)", remoteAddr)
 		WriteError(w, http.StatusInternalServerError, "failed to authenticate user")
 		return
 	}

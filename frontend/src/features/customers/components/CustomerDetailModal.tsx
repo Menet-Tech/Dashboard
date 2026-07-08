@@ -298,7 +298,13 @@ export function CustomerDetailModal({
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Status Layanan</span>
               <span className="mt-1 block">
                 <StatusPill
-                  label={customer.status === "pending" ? "pending (perpanjangan)" : customer.status}
+                  label={
+                    customer.status === "pending"
+                      ? "pending (perpanjangan)"
+                      : customer.status === "suspended"
+                        ? "suspended"
+                        : customer.status
+                  }
                   tone={customer.status === "active" ? "green" : customer.status === "limit" ? "red" : customer.status === "pending" ? "gold" : "slate"}
                 />
               </span>

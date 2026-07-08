@@ -14,6 +14,7 @@ import (
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/platform/migrate"
+	"menettech/dashboard/backend/internal/settings"
 )
 
 func TestServiceGenerateCreatesBillsForEligibleCustomers(t *testing.T) {
@@ -174,6 +175,7 @@ func TestServiceProcessAutomation(t *testing.T) {
 
 	service := Service{
 		Repository:    Repository{DB: db},
+		Settings:      settings.Service{Repository: settings.Repository{DB: db}},
 		Customers:     customers.Service{Repository: customers.Repository{DB: db}},
 		Notifications: notifications.NotificationLogRepository{DB: db},
 	}
@@ -394,8 +396,13 @@ func TestServiceProcessAutomationNewRules(t *testing.T) {
 	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (6, 'CustOverdue20', 1, 25, 'limit')`)
 	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (6, 6, 1, '2026-03', 'INV-6', 250000, '2026-03-25', 'belum_bayar')`)
 
+	// Customer 7: Overdue H+50 (limit_days + 15 + suspendedDays) suspended check (due on 2026-02-23, limit is 5 days, now is 2026-04-14 - so 50 days overdue)
+	mustBillingExec(t, db, `INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status) VALUES (7, 'CustSuspended', 1, 23, 'suspended')`)
+	mustBillingExec(t, db, `INSERT INTO tagihan (id, pelanggan_id, paket_id, periode, invoice_number, nominal, jatuh_tempo, status) VALUES (7, 7, 1, '2026-02', 'INV-7', 250000, '2026-02-23', 'belum_bayar')`)
+
 	service := Service{
 		Repository:    Repository{DB: db},
+		Settings:      settings.Service{Repository: settings.Repository{DB: db}},
 		Customers:     customers.Service{Repository: customers.Repository{DB: db}},
 		Notifications: notifications.NotificationLogRepository{DB: db},
 	}
@@ -445,18 +452,27 @@ func TestServiceProcessAutomationNewRules(t *testing.T) {
 		t.Errorf("expected reminder-h3 for customer 5 (rejected confirmation), got %d", waCalls["5-reminder-h3"])
 	}
 
-	// Verify Customer 6 status updated to inactive (complete isolir)
+	// Verify Customer 6 status updated to suspended (complete isolir)
 	var status6 string
 	if err := db.QueryRow(`SELECT status FROM pelanggan WHERE id = 6`).Scan(&status6); err != nil {
 		t.Fatalf("failed to query status for customer 6: %v", err)
 	}
-	if status6 != "inactive" {
-		t.Errorf("expected customer 6 status to transition to 'inactive', got %q", status6)
+	if status6 != "suspended" {
+		t.Errorf("expected customer 6 status to transition to 'suspended', got %q", status6)
 	}
 
 	// Verify Customer 6 got isolir_20hari message
 	if waCalls["6-isolir_20hari"] != 1 {
 		t.Errorf("expected isolir_20hari for customer 6, got %d", waCalls["6-isolir_20hari"])
+	}
+
+	// Verify Customer 7 status updated to inactive
+	var status7 string
+	if err := db.QueryRow(`SELECT status FROM pelanggan WHERE id = 7`).Scan(&status7); err != nil {
+		t.Fatalf("failed to query status for customer 7: %v", err)
+	}
+	if status7 != "inactive" {
+		t.Errorf("expected customer 7 status to transition to 'inactive', got %q", status7)
 	}
 }
 

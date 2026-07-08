@@ -158,10 +158,12 @@ func runWorker(cfg config.Config, logger *slog.Logger, db *sql.DB) {
 		Notifications: notifications.NotificationLogRepository{DB: db},
 		Templates:     templateService,
 	}
+	discordService := notifications.NewDiscordService(settingsService)
 	whatsAppService := notifications.WhatsAppService{
 		Settings:  settingsService,
 		Templates: templateService,
 		Logs:      notifications.NotificationLogRepository{DB: db},
+		Discord:   discordService,
 	}
 	billingService.WhatsApp = whatsAppService
 
@@ -171,7 +173,6 @@ func runWorker(cfg config.Config, logger *slog.Logger, db *sql.DB) {
 		os.Exit(1)
 	}
 
-	discordService := notifications.NewDiscordService(settingsService)
 	billingService.Discord = discordService
 	backupDir := filepath.Join(cfg.StoragePath, "backups")
 	backupService := backup.NewService(db, backupDir, cfg.SQLitePath)

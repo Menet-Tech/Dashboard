@@ -178,6 +178,8 @@ export default function App() {
 
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginErrors, setLoginErrors] = useState<FieldErrors>({});
+  const [loginApiError, setLoginApiError] = useState<string | null>(null);
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
 
   const [navOpen, setNavOpen] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
@@ -345,12 +347,18 @@ export default function App() {
     const nextErrors = validateLogin(loginForm);
     setLoginErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    await feedback.withFeedback(async () => {
+    setLoginApiError(null);
+    setLoginSubmitting(true);
+    try {
       const response = await login(loginForm.username, loginForm.password);
       setLoginErrors({});
       setUser(response.user);
       feedback.pushSuccess("Login berhasil. Fondasi admin panel Go sekarang sudah aktif.");
-    }, "login");
+    } catch (caughtError) {
+      setLoginApiError(toErrorMessage(caughtError));
+    } finally {
+      setLoginSubmitting(false);
+    }
   }
 
   async function handleLogout() {
@@ -384,11 +392,13 @@ export default function App() {
       <LoginPage
         loginForm={loginForm}
         loginErrors={loginErrors}
-        submitting={feedback.submitting}
-        isBusy={feedback.isBusy}
-        onFormChange={(field, value) =>
-          setLoginForm((current) => ({ ...current, [field]: value }))
-        }
+        loginApiError={loginApiError}
+        submitting={loginSubmitting}
+        isBusy={(key) => key === "login" && loginSubmitting}
+        onFormChange={(field, value) => {
+          setLoginForm((current) => ({ ...current, [field]: value }));
+          setLoginApiError(null);
+        }}
         onLogin={handleLogin}
       />
     );
@@ -750,6 +760,9 @@ export default function App() {
               <TicketsPage
                 waGatewayUrl={waGatewayUrl}
                 waApiKey={settingsHook.state.settingsForm.wa_api_key}
+                pushSuccess={feedback.pushSuccess}
+                pushError={feedback.pushError}
+                user={user}
               />
             </Suspense>
           ) : null}
