@@ -414,7 +414,7 @@ if [[ "${UPDATE_MODE}" == "false" ]]; then
 
         CERTBOT_CMD="certbot --nginx -d ${DOMAIN_NAME} --non-interactive --agree-tos --redirect"
         if [[ -n "${LE_EMAIL:-}" ]]; then
-            CERTBOT_CMD+" -m ${LE_EMAIL}"
+            CERTBOT_CMD+=" -m ${LE_EMAIL}"
         else
             CERTBOT_CMD+=" --register-unsafely-without-email"
         fi
