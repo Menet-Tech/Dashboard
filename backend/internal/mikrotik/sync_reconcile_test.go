@@ -104,7 +104,7 @@ func TestRouterService_ReconcileSecrets(t *testing.T) {
 	if !hasSet {
 		t.Error("expected outdated-user to be updated on mock router")
 	}
-	if !hasRemove {
-		t.Error("expected extraneous-user to be deleted from mock router")
+	if hasRemove {
+		t.Error("expected extraneous-user NOT to be deleted from mock router (automatic deletion should be disabled)")
 	}
 }
