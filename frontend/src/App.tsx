@@ -285,7 +285,7 @@ export default function App() {
       customersHook.state.customers.filter((customer) => {
         const filter = customersHook.state.customerLifecycleFilter;
         if (filter === "exclude_inactive") {
-          return customer.status !== "inactive";
+          return customer.status !== "inactive" && customer.status !== "wifi_umum";
         }
         if (filter === "all") return true;
         const lifecycle = customerLifecycleMap[customer.id]?.key ?? "lunas";

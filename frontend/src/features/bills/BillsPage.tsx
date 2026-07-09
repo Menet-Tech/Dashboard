@@ -382,27 +382,54 @@ export function BillsPage({
                                         </td>
                                         <td className="px-4 py-2 text-slate-500">{log.response_message}</td>
                                         <td className="px-4 py-2 text-center">
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const cleanPhone = log.sent_to.replace(/[^0-9]/g, "");
-                                              let phone = cleanPhone;
-                                              if (phone.startsWith("0")) {
-                                                phone = "62" + phone.slice(1);
-                                              } else if (!phone.startsWith("62")) {
-                                                phone = "62" + phone;
-                                              }
-                                              const url = `https://wa.me/${phone}?text=${encodeURIComponent(log.message || "")}`;
-                                              window.open(url, "_blank");
-                                            }}
-                                            className="inline-flex items-center gap-1 bg-green-50 hover:bg-green-100 text-green-700 text-[10px] font-bold py-1 px-2 rounded-lg border border-green-200 transition"
-                                            title="Kirim secara manual via wa.me"
-                                          >
-                                            <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
-                                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.402 0 9.798-4.394 9.802-9.793.002-2.614-1.01-5.074-2.853-6.918C16.38 2.05 13.924.966 11.312.966c-5.402 0-9.802 4.394-9.802 9.794.002 1.902.51 3.5 1.461 5.09l-.989 3.605 3.682-.966zM17.07 14.5c-.274-.138-1.62-.8-1.874-.892-.252-.093-.437-.138-.62.138-.184.276-.713.892-.873 1.077-.16.184-.32.207-.593.07-.273-.138-1.156-.426-2.202-1.36-.812-.724-1.36-1.617-1.52-1.893-.16-.276-.017-.425.12-.562.122-.122.274-.32.41-.482.138-.16.184-.276.276-.46.09-.184.045-.344-.023-.482-.068-.138-.62-1.493-.849-2.046-.224-.543-.472-.47-.62-.47-.138-.008-.32-.008-.503-.008-.184 0-.482.07-.733.344-.25.276-.957.942-.957 2.3 0 1.357.987 2.668 1.123 2.852.138.184 1.94 2.962 4.7 4.15 1.543.665 2.505.772 3.414.636.58-.087 1.62-.662 1.848-1.27.228-.607.228-1.127.16-1.27-.068-.14-.25-.224-.523-.362z"/>
-                                            </svg>
-                                            Kirim WA
-                                          </button>
+                                          <div className="inline-flex items-center gap-1">
+                                            {/* Tombol Buka WA */}
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const cleanPhone = log.sent_to.replace(/[^0-9]/g, "");
+                                                let phone = cleanPhone;
+                                                if (phone.startsWith("0")) {
+                                                  phone = "62" + phone.slice(1);
+                                                } else if (!phone.startsWith("62")) {
+                                                  phone = "62" + phone;
+                                                }
+                                                const url = `https://wa.me/${phone}?text=${encodeURIComponent(log.message || "")}`;
+                                                window.open(url, "_blank");
+                                              }}
+                                              className="inline-flex items-center gap-1 bg-green-50 hover:bg-green-100 text-green-700 text-[10px] font-bold py-1 px-2 rounded-l-lg border border-green-200 transition"
+                                              title="Buka WhatsApp langsung"
+                                            >
+                                              <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.402 0 9.798-4.394 9.802-9.793.002-2.614-1.01-5.074-2.853-6.918C16.38 2.05 13.924.966 11.312.966c-5.402 0-9.802 4.394-9.802 9.794.002 1.902.51 3.5 1.461 5.09l-.989 3.605 3.682-.966zM17.07 14.5c-.274-.138-1.62-.8-1.874-.892-.252-.093-.437-.138-.62.138-.184.276-.713.892-.873 1.077-.16.184-.32.207-.593.07-.273-.138-1.156-.426-2.202-1.36-.812-.724-1.36-1.617-1.52-1.893-.16-.276-.017-.425.12-.562.122-.122.274-.32.41-.482.138-.16.184-.276.276-.46.09-.184.045-.344-.023-.482-.068-.138-.62-1.493-.849-2.046-.224-.543-.472-.47-.62-.47-.138-.008-.32-.008-.503-.008-.184 0-.482.07-.733.344-.25.276-.957.942-.957 2.3 0 1.357.987 2.668 1.123 2.852.138.184 1.94 2.962 4.7 4.15 1.543.665 2.505.772 3.414.636.58-.087 1.62-.662 1.848-1.27.228-.607.228-1.127.16-1.27-.068-.14-.25-.224-.523-.362z"/>
+                                              </svg>
+                                              Buka WA
+                                            </button>
+                                            {/* Tombol Salin Link */}
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const cleanPhone = log.sent_to.replace(/[^0-9]/g, "");
+                                                let phone = cleanPhone;
+                                                if (phone.startsWith("0")) {
+                                                  phone = "62" + phone.slice(1);
+                                                } else if (!phone.startsWith("62")) {
+                                                  phone = "62" + phone;
+                                                }
+                                                const url = `https://wa.me/${phone}?text=${encodeURIComponent(log.message || "")}`;
+                                                void navigator.clipboard.writeText(url);
+                                                pushSuccess("Link wa.me berhasil disalin ke clipboard");
+                                              }}
+                                              className="inline-flex items-center gap-1 bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold py-1 px-2 rounded-r-lg border border-l-0 border-slate-200 transition"
+                                              title="Salin link wa.me ke clipboard"
+                                            >
+                                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                              </svg>
+                                              Salin
+                                            </button>
+                                          </div>
                                         </td>
                                       </tr>
                                     ))}

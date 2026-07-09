@@ -421,6 +421,7 @@ export function CustomersPage({
                 <option value="jatuh_tempo">Jatuh Tempo</option>
                 <option value="menunggak">Menunggak</option>
                 <option value="lunas">Lunas</option>
+                <option value="wifi_umum">🛜 WiFi Umum</option>
               </select>
             </div>
             <a
@@ -550,6 +551,7 @@ export function CustomersPage({
                         <option value="limit">Limit</option>
                         <option value="suspended">Suspended</option>
                         <option value="inactive">Inactive</option>
+                        <option value="wifi_umum">WiFi Umum</option>
                       </select>
                     </td>
                     <td className="px-4 py-4 text-slate-700 dark:text-slate-300">
@@ -720,7 +722,7 @@ export function CustomersPage({
               <div className="flex flex-col gap-2.5">
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Pilih Status Baru</span>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {(["active", "limit", "pending", "suspended", "inactive"] as const).map((st) => (
+                  {(["active", "limit", "pending", "suspended", "inactive", "wifi_umum"] as const).map((st) => (
                     <button
                       key={st}
                       type="button"
@@ -739,7 +741,9 @@ export function CustomersPage({
                             ? "Pending (Perpanjangan)"
                             : st === "suspended"
                               ? "Suspended (Ditangguhkan)"
-                              : "Inactive (Nonaktif)"}
+                              : st === "wifi_umum"
+                                ? "🛜 WiFi Umum"
+                                : "Inactive (Nonaktif)"}
                     </button>
                   ))}
                 </div>

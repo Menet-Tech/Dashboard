@@ -31,16 +31,20 @@ export function validateCustomer(form: {
   user_pppoe: string;
   password_pppoe: string;
   due_day: number;
+  status?: string;
   diskon?: number;
   tipe_diskon?: string;
 }): FieldErrors {
   const errors: FieldErrors = {};
+  const isWifiUmum = form.status === "wifi_umum";
   if (!form.name.trim()) errors.name = "Nama pelanggan wajib diisi.";
   if (!form.package_id) errors.package_id = "Pilih paket pelanggan.";
-  if (!form.user_pppoe.trim()) errors.user_pppoe = "Username PPPoE wajib diisi.";
-  if (!form.password_pppoe.trim()) errors.password_pppoe = "Password PPPoE wajib diisi.";
-  if (form.due_day < 1 || form.due_day > 28)
-    errors.due_day = "Jatuh tempo bulanan harus antara 1-28.";
+  if (!isWifiUmum) {
+    if (!form.user_pppoe.trim()) errors.user_pppoe = "Username PPPoE wajib diisi.";
+    if (!form.password_pppoe.trim()) errors.password_pppoe = "Password PPPoE wajib diisi.";
+    if (form.due_day < 1 || form.due_day > 28)
+      errors.due_day = "Jatuh tempo bulanan harus antara 1-28.";
+  }
 
   if (form.diskon !== undefined && form.tipe_diskon === "percent") {
     if (form.diskon < 0 || form.diskon > 100) {

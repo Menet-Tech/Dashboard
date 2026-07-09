@@ -100,8 +100,10 @@ func main() {
 	}
 	defer dg.Close()
 
+	var requiredPerms int64 = discordgo.PermissionAdministrator | discordgo.PermissionManageServer
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(slashCommands))
 	for i, v := range slashCommands {
+		v.DefaultMemberPermissions = &requiredPerms
 		cmd, err := dg.ApplicationCommandCreate(dg.State.User.ID, guildID, v)
 		if err != nil {
 			logger.Error("cannot create command", "name", v.Name, "error", err)
@@ -291,6 +293,34 @@ var slashCommands = []*discordgo.ApplicationCommand{
 
 func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i.Type != discordgo.InteractionApplicationCommand {
+		return
+	}
+
+	// Security Check: Only allow administrators or server managers to run commands, and block DM commands
+	if i.Member != nil {
+		const requiredPerms = discordgo.PermissionAdministrator | discordgo.PermissionManageServer
+		if i.Member.Permissions&requiredPerms == 0 {
+			_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Embeds: []*discordgo.MessageEmbed{
+						errorEmbed("Akses Ditolak: Anda tidak memiliki izin Administrator atau Kelola Server untuk menjalankan perintah ini."),
+					},
+					Flags: discordgo.MessageFlagsEphemeral,
+				},
+			})
+			return
+		}
+	} else {
+		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Embeds: []*discordgo.MessageEmbed{
+					errorEmbed("Akses Ditolak: Perintah hanya dapat dijalankan di dalam Server resmi."),
+				},
+				Flags: discordgo.MessageFlagsEphemeral,
+			},
+		})
 		return
 	}
 

@@ -14,6 +14,8 @@ type TrafficPoller struct {
 	mu            sync.RWMutex
 	rates         map[string]TrafficStats // maps lowercased username -> Tx/Rx rates
 	lastBytes     map[string]interfaceSnap
+	clients       map[int64]*Client // maps Router.ID -> persistent *Client
+	running       map[int64]bool    // maps Router.ID -> is currently polling?
 }
 
 type interfaceSnap struct {
@@ -27,6 +29,8 @@ func NewTrafficPoller(routerService *RouterService) *TrafficPoller {
 		routerService: routerService,
 		rates:         make(map[string]TrafficStats),
 		lastBytes:     make(map[string]interfaceSnap),
+		clients:       make(map[int64]*Client),
+		running:       make(map[int64]bool),
 	}
 }
 
@@ -59,6 +63,12 @@ func (p *TrafficPoller) Start(ctx context.Context, interval time.Duration) {
 		select {
 		case <-ctx.Done():
 			slog.Info("MikroTik traffic poller stopped")
+			// Close all active clients on exit
+			p.mu.Lock()
+			for _, client := range p.clients {
+				client.Close()
+			}
+			p.mu.Unlock()
 			return
 		case <-ticker.C:
 			p.pollOnce(ctx)
@@ -73,20 +83,61 @@ func (p *TrafficPoller) pollOnce(ctx context.Context) {
 		return
 	}
 
+	p.mu.Lock()
+	// Clean up client connections for routers that are no longer active
+	activeIDs := make(map[int64]bool)
+	for _, r := range routers {
+		activeIDs[r.ID] = true
+	}
+	for id, client := range p.clients {
+		if !activeIDs[id] {
+			client.Close()
+			delete(p.clients, id)
+		}
+	}
+	p.mu.Unlock()
+
 	for _, router := range routers {
-		go func(r Router) {
-			pollCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		p.mu.Lock()
+		if p.running[router.ID] {
+			p.mu.Unlock()
+			continue // skip this cycle if previous query is still running
+		}
+		p.running[router.ID] = true
+
+		client, exists := p.clients[router.ID]
+		// Recreate client if configuration has changed
+		if !exists || client.Host != router.Host || client.Username != router.Username || client.Password != router.Password {
+			if exists {
+				client.Close()
+			}
+			client = NewClient(router.Host, router.Username, router.Password)
+			p.clients[router.ID] = client
+		}
+		p.mu.Unlock()
+
+		go func(r Router, cl *Client) {
+			defer func() {
+				p.mu.Lock()
+				p.running[r.ID] = false
+				p.mu.Unlock()
+			}()
+
+			pollCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
 
-			client := NewClient(r.Host, r.Username, r.Password)
-			if err := client.Connect(pollCtx); err != nil {
-				// Silently fail connection to avoid spamming logs
-				return
+			// Connect if not already connected
+			if cl.conn == nil {
+				if err := cl.Connect(pollCtx); err != nil {
+					return
+				}
+				slog.Info("traffic poller: successfully established persistent connection", "router", r.Name, "host", r.Host)
 			}
-			defer client.Close()
 
-			reply, err := client.run(pollCtx, "/interface/print", "=.proplist=name,rx-byte,tx-byte")
+			reply, err := cl.run(pollCtx, "/interface/print", "=.proplist=name,rx-byte,tx-byte")
 			if err != nil {
+				// Connection died, close it so we reconnect in the next cycle
+				cl.Close()
 				return
 			}
 
@@ -126,13 +177,6 @@ func (p *TrafficPoller) pollOnce(ctx context.Context) {
 				if exists {
 					dt := now.Sub(prev.time).Seconds()
 					if dt > 0.1 {
-						// Note: rx-byte is download for client from client's perspective, 
-						// but from router's perspective:
-						// Tx (transmit) from router is client's Rx (receive/download).
-						// Rx (receive) to router is client's Tx (transmit/upload).
-						// So:
-						// Client Rx (download) = Router Tx
-						// Client Tx (upload) = Router Rx
 						rxRate := int64(float64(txByte-prev.txBytes) / dt * 8)
 						txRate := int64(float64(rxByte-prev.rxBytes) / dt * 8)
 						if rxRate < 0 {
@@ -153,7 +197,7 @@ func (p *TrafficPoller) pollOnce(ctx context.Context) {
 				}
 				p.mu.Unlock()
 			}
-		}(router)
+		}(router, client)
 	}
 }
 

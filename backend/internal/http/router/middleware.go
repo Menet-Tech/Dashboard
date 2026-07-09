@@ -288,3 +288,19 @@ func gacsAuthMiddleware(authService auth.Service) func(http.Handler) http.Handle
 	}
 }
 
+func gacsWriteRoleMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+			next.ServeHTTP(w, r)
+			return
+		}
+		user, ok := auth.UserFromContext(r.Context())
+		if !ok || (user.Role != "admin" && user.Role != "petugas") {
+			writeJSONError(w, http.StatusForbidden, "akses ditolak: role tidak memiliki izin untuk modifikasi data")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+

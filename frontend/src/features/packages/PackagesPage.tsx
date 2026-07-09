@@ -111,14 +111,13 @@ export function PackagesPage({
     setSyncError(null);
     try {
       const data = await apiRequest<{ profiles: MikrotikProfileSync[] }>("/api/v1/integration/mikrotik/sync-packages-preview");
-      setSyncProfiles(data.profiles || []);
+      const unsynced = (data.profiles || []).filter((p) => !p.exists);
+      setSyncProfiles(unsynced);
       
       // Auto select ones that do not exist yet
       const initialSelection: Record<string, boolean> = {};
-      (data.profiles || []).forEach((p: MikrotikProfileSync) => {
-        if (!p.exists) {
-          initialSelection[p.name] = true;
-        }
+      unsynced.forEach((p: MikrotikProfileSync) => {
+        initialSelection[p.name] = true;
       });
       setSelectedSyncNames(initialSelection);
     } catch (err: any) {

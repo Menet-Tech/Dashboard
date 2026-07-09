@@ -14,7 +14,8 @@ export type CustomerLifecycleFilter =
   | "tertagih"
   | "jatuh_tempo"
   | "menunggak"
-  | "lunas";
+  | "lunas"
+  | "wifi_umum";
 
 export function useCustomers({ withFeedback, askForConfirmation, onSuccess }: Pick<HookDeps, "withFeedback" | "askForConfirmation" | "onSuccess">) {
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
@@ -36,15 +37,19 @@ export function useCustomers({ withFeedback, askForConfirmation, onSuccess }: Pi
 
   async function handleCustomerSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextErrors = validateCustomer(customerForm);
+    // For WiFi Umum nodes, due_day is meaningless — normalise to 1 before validation/submit
+    const formToSubmit = customerForm.status === "wifi_umum"
+      ? { ...customerForm, due_day: 1 }
+      : customerForm;
+    const nextErrors = validateCustomer(formToSubmit);
     setCustomerErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
     await withFeedback(async () => {
       if (editingCustomerId) {
-        await updateCustomer(editingCustomerId, customerForm);
+        await updateCustomer(editingCustomerId, formToSubmit);
         onSuccess("Pelanggan berhasil diperbarui.");
       } else {
-        await createCustomer(customerForm);
+        await createCustomer(formToSubmit);
         onSuccess("Pelanggan baru berhasil ditambahkan.");
       }
       setCustomerErrors({});

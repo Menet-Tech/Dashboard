@@ -106,11 +106,13 @@ func (s Service) Create(ctx context.Context, customer Customer) (Customer, error
 		return Customer{}, err
 	}
 
-	go func(c Customer) {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		_ = s.SyncToMikrotik(bgCtx, c)
-	}(created)
+	if val := ctx.Value("skip_mikrotik_sync"); val == nil || val.(bool) == false {
+		go func(c Customer) {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_ = s.SyncToMikrotik(bgCtx, c)
+		}(created)
+	}
 
 	return created, nil
 }
@@ -120,16 +122,31 @@ func (s Service) Update(ctx context.Context, id int64, customer Customer) (Custo
 		return Customer{}, err
 	}
 
+	oldCustomer, err := s.FindByID(ctx, id)
+	var oldUsername string
+	if err == nil {
+		oldUsername = strings.TrimSpace(oldCustomer.UserPPPoE)
+	}
+
 	updated, err := s.Repository.Update(ctx, id, normalizeCustomer(customer))
 	if err != nil {
 		return Customer{}, err
 	}
 
-	go func(c Customer) {
+	go func(c Customer, oldUser string) {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
+
+		newUser := strings.TrimSpace(c.UserPPPoE)
+		if oldUser != "" && !strings.EqualFold(oldUser, newUser) {
+			slog.Info("customer pppoe username changed, deleting old secret on MikroTik", "old", oldUser, "new", newUser)
+			oldC := c
+			oldC.UserPPPoE = oldUser
+			_ = s.DeleteFromMikrotik(bgCtx, oldC)
+		}
+
 		_ = s.SyncToMikrotik(bgCtx, c)
-	}(updated)
+	}(updated, oldUsername)
 
 	return updated, nil
 }
@@ -400,7 +417,7 @@ func validateCustomer(customer Customer) error {
 
 func isValidStatus(status string) bool {
 	switch status {
-	case "active", "limit", "suspended", "inactive", "pending":
+	case "active", "limit", "suspended", "inactive", "pending", "wifi_umum":
 		return true
 	default:
 		return false

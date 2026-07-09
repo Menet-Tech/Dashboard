@@ -134,6 +134,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 		Repository: vouchers.Repository{DB: db},
 	}
 	voucherHandler := handler.NewVoucherHandler(voucherService)
+	voucherHandler.Audit = auditService
 
 	r.Get("/health", healthHandler.Show)
 	r.Get("/livez", healthHandler.Live)
@@ -151,6 +152,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 		// Protected GACS routes using gacsAuthMiddleware
 		api.Group(func(protected chi.Router) {
 			protected.Use(gacsAuthMiddleware(authService))
+			protected.Use(gacsWriteRoleMiddleware)
 
 			protected.Get("/auth/user", gacsHandler.AuthUser)
 			protected.Post("/auth/logout", gacsHandler.AuthLogout)

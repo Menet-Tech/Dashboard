@@ -40,7 +40,7 @@ export type CustomerItem = {
   email?: string;
   sn_ont: string;
   due_day: number;
-  status: "active" | "limit" | "suspended" | "inactive" | "pending";
+  status: "active" | "limit" | "suspended" | "inactive" | "pending" | "wifi_umum";
   address: string;
   is_trial?: boolean;
   trial_started_at?: string;

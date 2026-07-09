@@ -76,9 +76,11 @@ const (
 	KeyWAChatbotEnabled        = "wa_chatbot_enabled"
 	KeyInactiveSuspendedDays   = "billing_inactive_suspended_days"
 	KeyWAQueueThrottleSeconds  = "wa_queue_throttle_seconds"
+	KeyMikrotikDeleteUnregisteredSecrets = "mikrotik_delete_unregistered"
 )
 
 var defaults = map[string]string{
+	KeyMikrotikDeleteUnregisteredSecrets: "0",
 	KeyReminderDays:            "3",
 	KeyLimitDays:               "5",
 	KeyMenunggakDays:           "30",

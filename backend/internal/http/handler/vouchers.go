@@ -2,16 +2,19 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
+	"menettech/dashboard/backend/internal/audit"
 	"menettech/dashboard/backend/internal/vouchers"
 )
 
 type VoucherHandler struct {
 	Service vouchers.Service
+	Audit   audit.Service
 }
 
 func NewVoucherHandler(service vouchers.Service) VoucherHandler {
@@ -48,6 +51,12 @@ func (h VoucherHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h VoucherHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	user, err := currentUser(r)
+	if err != nil {
+		WriteError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid voucher id")
@@ -62,6 +71,10 @@ func (h VoucherHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &id, "voucher.delete",
+		fmt.Sprintf("Admin %s menghapus voucher ID %d", user.Username, id),
+		getClientIP(r))
 
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"message": "voucher deleted successfully",

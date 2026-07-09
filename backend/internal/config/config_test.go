@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 	"time"
 )
@@ -106,6 +107,10 @@ func TestLoadUsesEnvironmentOverrides(t *testing.T) {
 }
 
 func TestValidateForProduction(t *testing.T) {
+	oldSecret := os.Getenv("JWT_SECRET")
+	defer os.Setenv("JWT_SECRET", oldSecret)
+	os.Setenv("JWT_SECRET", "super-secure-secret-key-123456789")
+
 	valid := Config{
 		Environment:            "production",
 		SessionCookieSecure:    true,
@@ -117,11 +122,10 @@ func TestValidateForProduction(t *testing.T) {
 		t.Fatalf("expected valid config, got error: %v", err)
 	}
 
-
-
 	invalid := valid
 	invalid.BootstrapAdminPassword = "password"
 	if err := ValidateForProduction(invalid); err == nil {
 		t.Fatal("expected error when bootstrap password is default")
 	}
 }
+

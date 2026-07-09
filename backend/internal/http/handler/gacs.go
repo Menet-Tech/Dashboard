@@ -1294,6 +1294,12 @@ func (h GacsHandler) SyncMappingData(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /api/mapping-data/reset
 func (h GacsHandler) ResetMappingData(w http.ResponseWriter, r *http.Request) {
+	ctxUser, ok := authUserFromContext(r.Context())
+	if !ok || ctxUser.Role != "admin" {
+		WriteJSON(w, http.StatusForbidden, map[string]any{"message": "Akses ditolak: hanya admin yang dapat mereset data mapping"})
+		return
+	}
+
 	var payload struct {
 		Password string `json:"password"`
 	}

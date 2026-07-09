@@ -170,6 +170,7 @@ export function CustomerFormCard({
           <option value="pending">Pending (Perpanjangan)</option>
           <option value="suspended">Suspended</option>
           <option value="inactive">Inactive</option>
+          <option value="wifi_umum">🛜 WiFi Umum (Fasilitas Umum)</option>
         </select>
       </label>
       

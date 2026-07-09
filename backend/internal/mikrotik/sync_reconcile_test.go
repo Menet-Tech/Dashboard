@@ -47,6 +47,12 @@ func TestRouterService_ReconcileSecrets(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Enable deleting unregistered secrets for this test
+	_, err = db.Exec(`INSERT INTO pengaturan (key, value) VALUES ('mikrotik_delete_unregistered', '1')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Create test customers
 	// - "outdated-user" (updated password to 'newpass', status 'active')
 	// - "new-user" (created, status 'active')

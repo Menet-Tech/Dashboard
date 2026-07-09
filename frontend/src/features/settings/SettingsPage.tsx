@@ -1964,11 +1964,25 @@ export function SettingsPage({
                           />
                           <span className="text-[10px] text-slate-400 dark:text-slate-500">Interval auto-sync router Utama ke Slave dalam hitungan jam. Isi 0 untuk menonaktifkan.</span>
                         </label>
+                        <label className="flex flex-col gap-1.5 font-sans">
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Hapus Akun Unregistered di MikroTik</span>
+                          <select
+                            className={inputClassName()}
+                            value={settingsForm["mikrotik_delete_unregistered"] ?? "0"}
+                            onChange={(e) =>
+                              onFormChange({ ...settingsForm, mikrotik_delete_unregistered: e.target.value })
+                            }
+                          >
+                            <option value="0">Nonaktif (Rekomendasi - Aman)</option>
+                            <option value="1">Aktif (Bahaya - Menghapus akun non-dashboard)</option>
+                          </select>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">Hapus akun PPPoE di MikroTik yang tidak terdaftar di database dashboard saat sinkronisasi/rekon.</span>
+                        </label>
                       </div>
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
                         <button
                           type="button"
-                          onClick={() => saveSection("MikroTik Global", ["mikrotik_isolir_profile", "mikrotik_inactive_profile", "mikrotik_auto_sync_hours"])}
+                          onClick={() => saveSection("MikroTik Global", ["mikrotik_isolir_profile", "mikrotik_inactive_profile", "mikrotik_auto_sync_hours", "mikrotik_delete_unregistered"])}
                           disabled={savingSection === "MikroTik Global"}
                           className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >

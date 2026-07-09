@@ -97,6 +97,12 @@ func (h BillHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h BillHandler) Generate(w http.ResponseWriter, r *http.Request) {
+	user, err := currentUser(r)
+	if err != nil {
+		WriteError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	var payload billGeneratePayload
 	if err := decodeJSON(r, &payload); err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid generate payload")
@@ -108,6 +114,10 @@ func (h BillHandler) Generate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, nil, "billing.generate",
+		fmt.Sprintf("Generate tagihan periode %s: %d tagihan dibuat oleh %s", payload.Period, result.Generated, user.Username),
+		getClientIP(r))
 
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"data": result,

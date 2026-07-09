@@ -229,7 +229,7 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 				FROM tagihan t
 				JOIN pelanggan p ON t.pelanggan_id = p.id
 				LEFT JOIN paket pk ON p.paket_id = pk.id
-				WHERE p.nomor_wa = ? AND t.status = 'belum_bayar' AND p.status NOT IN ('inactive', 'perpanjangan')
+				WHERE p.nomor_wa = ? AND t.status = 'belum_bayar' AND p.status NOT IN ('inactive', 'perpanjangan', 'wifi_umum')
 				  AND t.periode <= ?
 				ORDER BY t.periode ASC, t.id ASC
 			`, payload.PhoneNumber, targetPeriod)
@@ -239,7 +239,7 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 				FROM tagihan t
 				JOIN pelanggan p ON t.pelanggan_id = p.id
 				LEFT JOIN paket pk ON p.paket_id = pk.id
-				WHERE p.nomor_wa = ? AND t.status = 'belum_bayar' AND p.status NOT IN ('inactive', 'perpanjangan')
+				WHERE p.nomor_wa = ? AND t.status = 'belum_bayar' AND p.status NOT IN ('inactive', 'perpanjangan', 'wifi_umum')
 				ORDER BY t.periode ASC, t.id ASC
 			`, payload.PhoneNumber)
 		}
@@ -286,7 +286,7 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 				FROM tagihan t
 				JOIN pelanggan p ON t.pelanggan_id = p.id
 				LEFT JOIN paket pk ON p.paket_id = pk.id
-				WHERE t.id = ? AND p.status NOT IN ('inactive', 'perpanjangan')
+				WHERE t.id = ? AND p.status NOT IN ('inactive', 'perpanjangan', 'wifi_umum')
 			`, payload.BillID).Scan(&b.ID, &b.Period, &b.Nominal, &b.CustName, &b.PackageName, &b.HargaPaket, &b.Diskon, &b.DiscRef, &odpID, &b.DueDate)
 			if err == nil {
 				b.HasODP = odpID > 0

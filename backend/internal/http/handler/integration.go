@@ -336,11 +336,6 @@ func (h IntegrationHandler) SyncImport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if fallbackPackageID == 0 {
-		WriteError(w, http.StatusBadRequest, "tidak ada paket yang tersedia — tambahkan minimal satu paket terlebih dahulu")
-		return
-	}
-
 	type importResult struct {
 		Name    string `json:"name"`
 		Status  string `json:"status"` // "imported", "skipped", "error"
@@ -372,6 +367,68 @@ func (h IntegrationHandler) SyncImport(w http.ResponseWriter, r *http.Request) {
 		packageID := fallbackPackageID
 		if pid, found := packageByProfile[strings.ToLower(secret.Profile)]; found {
 			packageID = pid
+		} else if secret.Profile != "" {
+			// Profile exists on MikroTik but not as a Package on the Dashboard! Let's auto-create it.
+			mProfiles, mErr := client.ListProfiles(ctx)
+			if mErr == nil {
+				var matchedProfile *mikrotik.PPPoEProfile
+				for _, mp := range mProfiles {
+					if strings.EqualFold(mp.Name, secret.Profile) {
+						matchedProfile = &mp
+						break
+					}
+				}
+				if matchedProfile != nil {
+					// Parse speed from rate limit (e.g. 15M/15M -> 15)
+					speedVal := 10 // fallback
+					cleanLimit := strings.TrimSpace(strings.ToUpper(matchedProfile.RateLimit))
+					if idx := strings.Index(cleanLimit, "/"); idx != -1 {
+						cleanLimit = cleanLimit[idx+1:]
+					}
+					var floatSpeed float64
+					var unit string
+					if _, scanErr := fmt.Sscanf(cleanLimit, "%f%s", &floatSpeed, &unit); scanErr == nil {
+						if strings.HasPrefix(unit, "M") {
+							speedVal = int(floatSpeed)
+						} else if strings.HasPrefix(unit, "K") {
+							speedVal = int(floatSpeed / 1000.0)
+						} else if strings.HasPrefix(unit, "G") {
+							speedVal = int(floatSpeed * 1000.0)
+						} else {
+							speedVal = int(floatSpeed / 1000000.0)
+						}
+					}
+					if speedVal <= 0 {
+						speedVal = 10
+					}
+
+					newPkg := packages.Package{
+						Name:         matchedProfile.Name,
+						SpeedMbps:    speedVal,
+						Price:        0, // default, let user set it later
+						Description:  fmt.Sprintf("Auto-imported from MikroTik profile %s", matchedProfile.Name),
+						IPPool:       matchedProfile.RemoteAddress,
+						LocalAddress: matchedProfile.LocalAddress,
+					}
+
+					// Skip manipulating MikroTik back
+					importCtx := context.WithValue(ctx, "skip_mikrotik_sync", true)
+					createdPkg, createPkgErr := h.Packages.Create(importCtx, newPkg)
+					if createPkgErr == nil {
+						packageID = createdPkg.ID
+						packageByProfile[strings.ToLower(matchedProfile.Name)] = createdPkg.ID
+						if fallbackPackageID == 0 {
+							fallbackPackageID = createdPkg.ID
+						}
+					}
+				}
+			}
+		}
+
+		// Skip if no package could be resolved at all
+		if packageID == 0 {
+			results = append(results, importResult{Name: name, Status: "skipped", Message: fmt.Sprintf("tidak ada paket yang cocok untuk profile '%s' — buat paket di Dashboard terlebih dahulu", secret.Profile)})
+			continue
 		}
 
 		status := "active"
@@ -388,7 +445,8 @@ func (h IntegrationHandler) SyncImport(w http.ResponseWriter, r *http.Request) {
 			Status:        status,
 		}
 
-		_, createErr := h.Customers.Create(ctx, newCustomer)
+		importCtx := context.WithValue(ctx, "skip_mikrotik_sync", true)
+		_, createErr := h.Customers.Create(importCtx, newCustomer)
 		if createErr != nil {
 			results = append(results, importResult{Name: name, Status: "error", Message: createErr.Error()})
 			continue
@@ -584,7 +642,7 @@ func (h IntegrationHandler) TestSMTP(w http.ResponseWriter, r *http.Request) {
 		"Content-Type: text/plain; charset=UTF-8\r\n"+
 		"MIME-Version: 1.0\r\n"+
 		"\r\n"+
-		"Koneksi SMTP berhasil dikonfigurasi! Ini adalah email uji dari Menet-Tech Dashboard Control Panel.\r\n", 
+		"Koneksi SMTP berhasil dikonfigurasi! Ini adalah email uji dari Menet-Tech Dashboard Control Panel.\r\n",
 		payload.ToEmail, payload.FromEmail))
 
 	if strings.ToLower(payload.Encryption) == "ssl" || portStr == "465" {
@@ -853,10 +911,12 @@ func (h IntegrationHandler) SyncPackagesImport(w http.ResponseWriter, r *http.Re
 		}
 
 		newPkg := packages.Package{
-			Name:        profile.Name,
-			SpeedMbps:   speed,
-			Price:       price,
-			Description: "Sinkronisasi dari profil MikroTik " + profile.Name,
+			Name:         profile.Name,
+			SpeedMbps:    speed,
+			Price:        price,
+			Description:  "Sinkronisasi dari profil MikroTik " + profile.Name,
+			IPPool:       profile.RemoteAddress,
+			LocalAddress: profile.LocalAddress,
 		}
 
 		_, createErr := h.Packages.Create(ctx, newPkg)

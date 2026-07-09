@@ -1,9 +1,0 @@
-{
-    "ignore": [
-        "src/whatsapp/sessions/*",
-        "temp/*",
-        "logs/*",
-        "error.log",
-        "combined.log"
-    ]
-}

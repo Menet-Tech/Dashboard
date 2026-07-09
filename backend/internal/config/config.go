@@ -105,5 +105,10 @@ func ValidateForProduction(cfg Config) error {
 	if strings.TrimSpace(cfg.StoragePath) == "" {
 		return fmt.Errorf("STORAGE_PATH must not be empty")
 	}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if strings.TrimSpace(jwtSecret) == "" || jwtSecret == "fallback-secret-key-for-development-only" {
+		return fmt.Errorf("JWT_SECRET must be set to a secure random value in production")
+	}
 	return nil
 }
+

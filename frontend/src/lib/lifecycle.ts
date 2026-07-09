@@ -16,7 +16,8 @@ export type CustomerLifecycleKey =
   | "jatuh_tempo"
   | "menunggak"
   | "lunas"
-  | "nonaktif";
+  | "nonaktif"
+  | "wifi_umum";
 
 export type CustomerLifecycleEntry = {
   key: CustomerLifecycleKey;
@@ -208,7 +209,18 @@ export function buildCustomerLifecycleMap(
         ];
       }
 
-      // Customer status "pending" means they are in perpanjangan mode
+      // WiFi Umum: public/community hotspot — no billing, no WA
+      if (customer.status === "wifi_umum") {
+        return [
+          customer.id,
+          {
+            key: "wifi_umum" as const,
+            label: "WiFi Umum",
+            tone: "slate" as const,
+            note: "Titik hotspot fasilitas umum — tidak ada tagihan dan tidak ada notifikasi WA.",
+          },
+        ];
+      }
       if (customer.status === "pending") {
         const perpBill = (billsByCustomer.get(customer.id) ?? []).find(
           (b) => b.status !== "lunas",
@@ -271,6 +283,7 @@ export function readCustomerLifecycleFilter(): CustomerLifecycleKey {
     stored === "menunggak" ||
     stored === "lunas" ||
     stored === "all" ||
+    stored === "wifi_umum" ||
     stored === "exclude_inactive"
   ) {
     return stored;

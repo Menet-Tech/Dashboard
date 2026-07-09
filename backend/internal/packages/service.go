@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"sort"
 	"strings"
@@ -95,11 +96,61 @@ func (s Service) Update(ctx context.Context, id int64, pkg Package) (Package, er
 
 	// Clean up old profile if name changed
 	if oldName != "" && !strings.EqualFold(oldName, pkg.Name) {
+		// 1. Query all customer secrets under this package
+		type customerSecret struct {
+			Username string
+			Password string
+			Status   string
+		}
+		var secrets []customerSecret
+		rows, queryErr := s.Repository.DB.QueryContext(ctx, "SELECT user_pppoe, password_pppoe, status FROM pelanggan WHERE paket_id = ?", id)
+		if queryErr == nil {
+			for rows.Next() {
+				var sec customerSecret
+				if scanErr := rows.Scan(&sec.Username, &sec.Password, &sec.Status); scanErr == nil {
+					sec.Username = strings.TrimSpace(sec.Username)
+					if sec.Username != "" {
+						secrets = append(secrets, sec)
+					}
+				}
+			}
+			rows.Close()
+		}
+
+		// 2. Fetch configured isolir and inactive profiles
+		var isolirProfile string
+		_ = s.Repository.DB.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = 'mikrotik_isolir_profile'").Scan(&isolirProfile)
+		isolirProfile = strings.TrimSpace(isolirProfile)
+		if isolirProfile == "" {
+			isolirProfile = "isolir"
+		}
+
+		var inactiveProfile string
+		_ = s.Repository.DB.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = 'mikrotik_inactive_profile'").Scan(&inactiveProfile)
+		inactiveProfile = strings.TrimSpace(inactiveProfile)
+		if inactiveProfile == "" {
+			inactiveProfile = "nonaktif"
+		}
+
+		// 3. Connect to routers and update the secrets, then delete old profile
 		routerSvc := mikrotik.NewRouterService(s.Repository.DB)
 		if routers, err := routerSvc.ListActive(ctx); err == nil {
 			for _, r := range routers {
 				client := mikrotik.NewClient(r.Host, r.Username, r.Password)
 				if err := client.Connect(ctx); err == nil {
+					// Update secrets to use new profile name
+					for _, sec := range secrets {
+						profileName := pkg.Name
+						switch sec.Status {
+						case "limit":
+							profileName = isolirProfile
+						case "suspended", "inactive":
+							profileName = inactiveProfile
+						}
+						_ = client.SyncCustomer(ctx, sec.Username, sec.Password, profileName, sec.Status)
+					}
+
+					// Delete old profile
 					_ = client.DeletePPPProfile(ctx, oldName)
 					client.Close()
 				}
@@ -128,7 +179,13 @@ func (s Service) Delete(ctx context.Context, id int64, deletePool bool) error {
 				if err := client.Connect(ctx); err == nil {
 					_ = client.DeletePPPProfile(ctx, name)
 					if deletePool && ipPool != "" {
-						_ = client.DeleteIPPool(ctx, ipPool)
+						var poolInUse bool
+						errUse := s.Repository.DB.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM paket WHERE ip_pool = ?)", ipPool).Scan(&poolInUse)
+						if errUse == nil && !poolInUse {
+							_ = client.DeleteIPPool(ctx, ipPool)
+						} else {
+							slog.Info("reconcile: skip deleting IP Pool because it is still used by other packages", "ip_pool", ipPool)
+						}
 					}
 					client.Close()
 				}
@@ -145,6 +202,10 @@ func (s Service) syncPackageToMikrotik(ctx context.Context, pkg Package) (Packag
 
 	if pkg.IPPool == "" {
 		return pkg, nil // No IP pool configured, skip sync
+	}
+
+	if val := ctx.Value("skip_mikrotik_sync"); val != nil && val.(bool) == true {
+		return pkg, nil // Skip any MikroTik manipulation entirely
 	}
 
 	if pkg.IPPoolRange != "" {

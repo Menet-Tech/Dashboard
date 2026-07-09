@@ -264,6 +264,12 @@ func (h CustomerHandler) BulkUpdateStatus(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	const maxBulkUpdate = 100
+	if len(payload.IDs) > maxBulkUpdate {
+		WriteError(w, http.StatusBadRequest, fmt.Sprintf("terlalu banyak ID: maksimum %d per request", maxBulkUpdate))
+		return
+	}
+
 	// Validate status if provided
 	if payload.Status != nil {
 		status := strings.TrimSpace(*payload.Status)
@@ -389,6 +395,12 @@ func (h CustomerHandler) BulkDelete(w http.ResponseWriter, r *http.Request) {
 
 	if len(payload.IDs) == 0 {
 		WriteError(w, http.StatusBadRequest, "no customer ids provided")
+		return
+	}
+
+	const maxBulkDelete = 100
+	if len(payload.IDs) > maxBulkDelete {
+		WriteError(w, http.StatusBadRequest, fmt.Sprintf("terlalu banyak ID: maksimum %d per request", maxBulkDelete))
 		return
 	}
 
@@ -786,23 +798,51 @@ func (h CustomerHandler) MikrotikKick(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	host, err := h.Service.Settings.GetString(r.Context(), settings.KeyMikrotikHost)
-	if err != nil || host == "" {
-		WriteError(w, http.StatusBadRequest, "MikroTik host is not configured in settings")
-		return
-	}
+	// Build list of routers to try (prefer legacy single-router settings, then multi-router table)
+	var routers []mikrotik.Router
+	host, _ := h.Service.Settings.GetString(r.Context(), settings.KeyMikrotikHost)
 	mUser, _ := h.Service.Settings.GetString(r.Context(), settings.KeyMikrotikUser)
 	mPass, _ := h.Service.Settings.GetString(r.Context(), settings.KeyMikrotikPass)
+	if strings.TrimSpace(host) != "" && strings.TrimSpace(mUser) != "" {
+		routers = append(routers, mikrotik.Router{Name: "Router Utama", Host: host, Username: mUser, Password: mPass})
+	}
+	if h.Service.Repository.DB != nil {
+		routerSvc := mikrotik.NewRouterService(h.Service.Repository.DB)
+		if activeRouters, err := routerSvc.ListActive(r.Context()); err == nil {
+			for _, ar := range activeRouters {
+				duplicate := false
+				for _, existing := range routers {
+					if strings.EqualFold(existing.Host, ar.Host) {
+						duplicate = true
+						break
+					}
+				}
+				if !duplicate {
+					routers = append(routers, ar)
+				}
+			}
+		}
+	}
 
-	client := mikrotik.NewClient(host, mUser, mPass)
-	if err := client.Connect(r.Context()); err != nil {
-		WriteError(w, http.StatusBadGateway, fmt.Sprintf("failed to connect to MikroTik: %v", err))
+	if len(routers) == 0 {
+		WriteError(w, http.StatusBadRequest, "MikroTik belum dikonfigurasi")
 		return
 	}
-	defer client.Close()
 
-	if err := client.KickUser(r.Context(), username); err != nil {
-		WriteError(w, http.StatusBadGateway, fmt.Sprintf("failed to terminate PPPoE session: %v", err))
+	kicked := false
+	for _, router := range routers {
+		client := mikrotik.NewClient(router.Host, router.Username, router.Password)
+		if err := client.Connect(r.Context()); err != nil {
+			continue
+		}
+		kickErr := client.KickUser(r.Context(), username)
+		client.Close()
+		if kickErr == nil {
+			kicked = true
+		}
+	}
+	if !kicked {
+		WriteError(w, http.StatusBadGateway, "gagal memutus sesi PPPoE: tidak ada router yang dapat dijangkau atau sesi tidak ditemukan")
 		return
 	}
 

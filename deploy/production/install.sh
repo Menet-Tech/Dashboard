@@ -46,6 +46,14 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# ─── Parse Flags ───────────────────────────────────────────────────────────────
+UPDATE_MODE=false
+for arg in "$@"; do
+    if [[ "$arg" == "--update" ]] || [[ "$arg" == "-u" ]]; then
+        UPDATE_MODE=true
+    fi
+done
+
 # ─── Deteksi IP Server dari 'ip a' (antarmuka ke-2, non-loopback) ─────────────
 SERVER_IP=$(ip -4 addr show scope global | awk '/inet /{split($2, a, "/"); if (a[1] != "") {print a[1]; exit}}')
 if [[ -z "${SERVER_IP}" ]]; then
@@ -64,104 +72,111 @@ echo -e "  Server IP   : ${SERVER_IP}"
 echo -e "  Service user: ${SERVICE_USER}"
 echo ""
 
-# ─── Input password admin sebelum instalasi dimulai ───────────────────────────
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}🔐 PENGATURAN PASSWORD ADMIN DASHBOARD${NC}"
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "Password ini akan digunakan untuk login pertama ke dashboard."
-echo -e "Minimal 8 karakter."
-echo ""
-while true; do
-    read -r -s -p "Masukkan password admin : " ADMIN_PASSWORD
+if [[ "${UPDATE_MODE}" == "false" ]]; then
+    # ─── Input password admin sebelum instalasi dimulai ───────────────────────────
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}🔐 PENGATURAN PASSWORD ADMIN DASHBOARD${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "Password ini akan digunakan untuk login pertama ke dashboard."
+    echo -e "Minimal 8 karakter."
     echo ""
-    if [[ -z "${ADMIN_PASSWORD}" ]]; then
-        echo -e "${RED}Password tidak boleh kosong.${NC}"
-        continue
-    fi
-    if [[ ${#ADMIN_PASSWORD} -lt 8 ]]; then
-        echo -e "${RED}Password minimal 8 karakter.${NC}"
-        continue
-    fi
-    read -r -s -p "Konfirmasi password      : " ADMIN_PASSWORD_CONFIRM
+    while true; do
+        read -r -s -p "Masukkan password admin : " ADMIN_PASSWORD
+        echo ""
+        if [[ -z "${ADMIN_PASSWORD}" ]]; then
+            echo -e "${RED}Password tidak boleh kosong.${NC}"
+            continue
+        fi
+        if [[ ${#ADMIN_PASSWORD} -lt 8 ]]; then
+            echo -e "${RED}Password minimal 8 karakter.${NC}"
+            continue
+        fi
+        read -r -s -p "Konfirmasi password      : " ADMIN_PASSWORD_CONFIRM
+        echo ""
+        if [[ "${ADMIN_PASSWORD}" != "${ADMIN_PASSWORD_CONFIRM}" ]]; then
+            echo -e "${RED}Password tidak cocok! Silakan coba lagi.${NC}"
+            continue
+        fi
+        break
+    done
+    log_success "Password admin berhasil diatur"
     echo ""
-    if [[ "${ADMIN_PASSWORD}" != "${ADMIN_PASSWORD_CONFIRM}" ]]; then
-        echo -e "${RED}Password tidak cocok! Silakan coba lagi.${NC}"
-        continue
-    fi
-    break
-done
-log_success "Password admin berhasil diatur"
-echo ""
 
-# ─── Konfigurasi nginx: domain name ──────────────────────────────────
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}🌐 KONFIGURASI NGINX (Web Server)${NC}"
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "Jika menggunakan domain (misal: dashboard.menet.my.id), isi di bawah."
-echo -e "Jika hanya pakai IP server, kosongkan saja (tekan Enter)."
-echo ""
-read -r -p "Domain name (kosongkan jika pakai IP): " DOMAIN_INPUT
-if [[ -n "${DOMAIN_INPUT}" ]]; then
-    DOMAIN_NAME="${DOMAIN_INPUT}"
-    log_success "Domain dikonfigurasi: ${DOMAIN_NAME}"
-else
-    DOMAIN_NAME="${SERVER_IP}"
-    log_info "Menggunakan IP server sebagai server_name: ${DOMAIN_NAME}"
-fi
-echo ""
-
-# ─── Tanya HTTPS / certbot ───────────────────────────────────────────
-SETUP_HTTPS="n"
-if [[ "${DOMAIN_NAME}" != "${SERVER_IP}" ]]; then
-    echo -e "Domain terdeteksi. Aktifkan HTTPS otomatis dengan Let's Encrypt (certbot)?"
-    echo -e "${YELLOW}Catatan: Domain harus sudah diarahkan (DNS A record) ke IP ${SERVER_IP} terlebih dahulu.${NC}"
-    read -r -p "Setup HTTPS dengan certbot? (y/N): " https_choice
-    if [[ "${https_choice}" =~ ^[Yy]$ ]]; then
-        SETUP_HTTPS="y"
-        read -r -p "Email untuk notifikasi Let's Encrypt (opsional, tekan Enter untuk skip): " LE_EMAIL
-        log_success "HTTPS akan dikonfigurasi setelah nginx berjalan"
+    # ─── Konfigurasi nginx: domain name ──────────────────────────────────
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}🌐 KONFIGURASI NGINX (Web Server)${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "Jika menggunakan domain (misal: dashboard.menet.my.id), isi di bawah."
+    echo -e "Jika hanya pakai IP server, kosongkan saja (tekan Enter)."
+    echo ""
+    read -r -p "Domain name (kosongkan jika pakai IP): " DOMAIN_INPUT
+    if [[ -n "${DOMAIN_INPUT}" ]]; then
+        DOMAIN_NAME="${DOMAIN_INPUT}"
+        log_success "Domain dikonfigurasi: ${DOMAIN_NAME}"
     else
-        log_info "Melewati setup HTTPS."
+        DOMAIN_NAME="${SERVER_IP}"
+        log_info "Menggunakan IP server sebagai server_name: ${DOMAIN_NAME}"
     fi
-else
-    log_info "HTTPS memerlukan domain name, bukan IP. Melewati setup HTTPS."
-fi
-echo ""
+    echo ""
 
+    # ─── Tanya HTTPS / certbot ───────────────────────────────────────────
+    SETUP_HTTPS="n"
+    if [[ "${DOMAIN_NAME}" != "${SERVER_IP}" ]]; then
+        echo -e "Domain terdeteksi. Aktifkan HTTPS otomatis dengan Let's Encrypt (certbot)?"
+        echo -e "${YELLOW}Catatan: Domain harus sudah diarahkan (DNS A record) ke IP ${SERVER_IP} terlebih dahulu.${NC}"
+        read -r -p "Setup HTTPS dengan certbot? (y/N): " https_choice
+        if [[ "${https_choice}" =~ ^[Yy]$ ]]; then
+            SETUP_HTTPS="y"
+            read -r -p "Email untuk notifikasi Let's Encrypt (opsional, tekan Enter untuk skip): " LE_EMAIL
+            log_success "HTTPS akan dikonfigurasi setelah nginx berjalan"
+        else
+            log_info "Melewati setup HTTPS."
+        fi
+    else
+        log_info "HTTPS memerlukan domain name, bukan IP. Melewati setup HTTPS."
+    fi
+    echo ""
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ══════════════════════════════════════════════════════════════════════════════
 log_step "1/8 - Install Dependensi Sistem"
 # ══════════════════════════════════════════════════════════════════════════════
-log_info "Mengupdate package list..."
-apt-get update -y -q
+if [[ "${UPDATE_MODE}" == "false" ]]; then
+    log_info "Mengupdate package list..."
+    apt-get update -y -q
 
-log_info "Menginstal utilitas dasar..."
-apt-get install -y -q curl wget unzip git sqlite3 ca-certificates build-essential iproute2
+    log_info "Menginstal utilitas dasar..."
+    apt-get install -y -q curl wget unzip git sqlite3 ca-certificates build-essential iproute2
 
-log_info "Menginstal nginx..."
-apt-get install -y -q nginx
-log_success "nginx terinstal"
+    log_info "Menginstal nginx..."
+    apt-get install -y -q nginx
+    log_success "nginx terinstal"
 
-# ─── Node.js v20 LTS ──────────────────────────────────────────────────────────
-if ! command -v node &>/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d 'v')" -lt 18 ]]; then
-    log_info "Menginstal Node.js v20 LTS..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
-    apt-get install -y -q nodejs
-    log_success "Node.js $(node -v) & npm $(npm -v) terinstal"
+    # ─── Node.js v20 LTS ──────────────────────────────────────────────────────────
+    if ! command -v node &>/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d 'v')" -lt 18 ]]; then
+        log_info "Menginstal Node.js v20 LTS..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
+        apt-get install -y -q nodejs
+        log_success "Node.js $(node -v) & npm $(npm -v) terinstal"
+    else
+        log_info "Node.js sudah terpasang: $(node -v)"
+    fi
+
+    # ─── Puppeteer / Chromium system libraries ────────────────────────────────────
+    log_info "Menginstal library sistem untuk Chromium (Puppeteer)..."
+    # Package names compatible across Ubuntu 20.04 / 22.04 / 24.04
+    apt-get install -y -q \
+        libxss1 libatk1.0-0 libatk-bridge2.0-0 \
+        libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev libnss3 \
+        libdrm2 libxcomposite1 libxdamage1 libxrandr2 \
+        libxfixes3 libxkbcommon0 libpango-1.0-0 libcairo2 \
+        fonts-liberation libappindicator3-1 libasound2t64 2>/dev/null \
+        || apt-get install -y -q libasound2 2>/dev/null || true
+    log_success "Library sistem untuk Chromium terinstal"
 else
-    log_info "Node.js sudah terpasang: $(node -v)"
+    log_info "Mode update aktif: Melewati penginstalan dependensi sistem..."
 fi
-
-# ─── Puppeteer / Chromium system libraries ────────────────────────────────────
-log_info "Menginstal library sistem untuk Chromium (Puppeteer)..."
-# Package names compatible across Ubuntu 20.04 / 22.04 / 24.04
-apt-get install -y -q \
-    libxss1 libatk1.0-0 libatk-bridge2.0-0 \
-    libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev libnss3 \
-    libdrm2 libxcomposite1 libxdamage1 libxrandr2 \
-    libxfixes3 libxkbcommon0 libpango-1.0-0 libcairo2 \
-    fonts-liberation libappindicator3-1 libasound2t64 2>/dev/null \
-    || apt-get install -y -q libasound2 2>/dev/null || true
-log_success "Library sistem untuk Chromium terinstal"
 
 # ══════════════════════════════════════════════════════════════════════════════
 log_step "2/8 - Setup User Sistem"
@@ -183,6 +198,17 @@ log_success "Struktur direktori di ${INSTALL_DIR} siap"
 log_step "4/8 - Salin File Rilis"
 # ══════════════════════════════════════════════════════════════════════════════
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ─── Stop Services Sebelum Update Binary (Text file busy prevention) ───────────
+if [[ "${UPDATE_MODE}" == "true" ]]; then
+    log_info "Menghentikan layanan backend aktif untuk update binary..."
+    if systemctl is-active --quiet menettech-api 2>/dev/null; then
+        systemctl stop menettech-api || true
+    fi
+    if systemctl is-active --quiet menettech-worker 2>/dev/null; then
+        systemctl stop menettech-worker || true
+    fi
+fi
 
 # ─── Backend binary ───────────────────────────────────────────────────────────
 if [[ -f "${SCRIPT_DIR}/backend/api" ]]; then
@@ -310,13 +336,14 @@ chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
 # ──────────────────────────────────────────────────────────────────────────────
 log_step "6/8 - Konfigurasi nginx (Port 80 → Reverse Proxy)"
 # ──────────────────────────────────────────────────────────────────────────────
-# Hapus konfigurasi default nginx
-if [[ -f /etc/nginx/sites-enabled/default ]]; then
-    rm -f /etc/nginx/sites-enabled/default
-fi
+if [[ "${UPDATE_MODE}" == "false" ]]; then
+    # Hapus konfigurasi default nginx
+    if [[ -f /etc/nginx/sites-enabled/default ]]; then
+        rm -f /etc/nginx/sites-enabled/default
+    fi
 
-# Buat konfigurasi nginx dengan server_name dari input user
-cat > "${NGINX_CONF}" <<NGINX_EOF
+    # Buat konfigurasi nginx dengan server_name dari input user
+    cat > "${NGINX_CONF}" <<NGINX_EOF
 server {
     listen 80;
     server_name ${DOMAIN_NAME} _;
@@ -363,60 +390,69 @@ server {
 }
 NGINX_EOF
 
-# Aktifkan konfigurasi nginx
-ln -sf "${NGINX_CONF}" /etc/nginx/sites-enabled/menettech
+    # Aktifkan konfigurasi nginx
+    ln -sf "${NGINX_CONF}" /etc/nginx/sites-enabled/menettech
 
-# Validasi dan restart nginx
-if nginx -t 2>/dev/null; then
-    systemctl enable nginx
-    systemctl restart nginx
-    log_success "nginx dikonfigurasi dan berjalan di port 80 (server_name: ${DOMAIN_NAME})"
+    # Validasi dan restart nginx
+    if nginx -t 2>/dev/null; then
+        systemctl enable nginx
+        systemctl restart nginx
+        log_success "nginx dikonfigurasi dan berjalan di port 80 (server_name: ${DOMAIN_NAME})"
+    else
+        log_warn "Konfigurasi nginx gagal divalidasi. Jalankan 'nginx -t' untuk detail."
+    fi
 else
-    log_warn "Konfigurasi nginx gagal divalidasi. Jalankan 'nginx -t' untuk detail."
+    log_info "Mode update aktif: Melewati konfigurasi ulang nginx..."
 fi
 
 # ─── Setup HTTPS dengan certbot (jika dipilih) ─────────────────────────────────
-if [[ "${SETUP_HTTPS}" == "y" ]]; then
-    log_info "Menginstal certbot dan plugin nginx..."
-    apt-get install -y -q certbot python3-certbot-nginx
+if [[ "${UPDATE_MODE}" == "false" ]]; then
+    # ─── Setup HTTPS dengan certbot (jika dipilih) ─────────────────────────────────
+    if [[ "${SETUP_HTTPS}" == "y" ]]; then
+        log_info "Menginstal certbot dan plugin nginx..."
+        apt-get install -y -q certbot python3-certbot-nginx
 
-    CERTBOT_CMD="certbot --nginx -d ${DOMAIN_NAME} --non-interactive --agree-tos --redirect"
-    if [[ -n "${LE_EMAIL:-}" ]]; then
-        CERTBOT_CMD+" -m ${LE_EMAIL}"
-    else
-        CERTBOT_CMD+=" --register-unsafely-without-email"
-    fi
-
-    log_info "Menjalankan certbot untuk domain ${DOMAIN_NAME}..."
-    if eval "${CERTBOT_CMD}"; then
-        log_success "HTTPS berhasil dikonfigurasi! Dashboard dapat diakses di https://${DOMAIN_NAME}"
-        # Set SESSION_COOKIE_SECURE=true karena HTTPS aktif
-        if [[ -f "${INSTALL_DIR}/backend/.env" ]]; then
-            sed -i "s|SESSION_COOKIE_SECURE=.*|SESSION_COOKIE_SECURE=true|g" "${INSTALL_DIR}/backend/.env"
+        CERTBOT_CMD="certbot --nginx -d ${DOMAIN_NAME} --non-interactive --agree-tos --redirect"
+        if [[ -n "${LE_EMAIL:-}" ]]; then
+            CERTBOT_CMD+" -m ${LE_EMAIL}"
+        else
+            CERTBOT_CMD+=" --register-unsafely-without-email"
         fi
-        # Setup auto-renewal cron
-        (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --post-hook 'systemctl reload nginx'") | crontab -
-        log_success "Auto-renewal SSL certificate dikonfigurasi (cron setiap hari jam 03:00)"
-        ACCESS_URL="https://${DOMAIN_NAME}"
+
+        log_info "Menjalankan certbot untuk domain ${DOMAIN_NAME}..."
+        if eval "${CERTBOT_CMD}"; then
+            log_success "HTTPS berhasil dikonfigurasi! Dashboard dapat diakses di https://${DOMAIN_NAME}"
+            # Set SESSION_COOKIE_SECURE=true karena HTTPS aktif
+            if [[ -f "${INSTALL_DIR}/backend/.env" ]]; then
+                sed -i "s|SESSION_COOKIE_SECURE=.*|SESSION_COOKIE_SECURE=true|g" "${INSTALL_DIR}/backend/.env"
+            fi
+            # Setup auto-renewal cron
+            (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --post-hook 'systemctl reload nginx'") | crontab -
+            log_success "Auto-renewal SSL certificate dikonfigurasi (cron setiap hari jam 03:00)"
+            ACCESS_URL="https://${DOMAIN_NAME}"
+        else
+            log_warn "certbot gagal. Pastikan domain ${DOMAIN_NAME} sudah mengarah ke IP ${SERVER_IP}."
+            log_warn "Jalankan manual: certbot --nginx -d ${DOMAIN_NAME}"
+            # Set SESSION_COOKIE_SECURE=false karena gagal HTTPS (kembali ke HTTP)
+            if [[ -f "${INSTALL_DIR}/backend/.env" ]]; then
+                sed -i "s|SESSION_COOKIE_SECURE=.*|SESSION_COOKIE_SECURE=false|g" "${INSTALL_DIR}/backend/.env"
+            fi
+            ACCESS_URL="http://${DOMAIN_NAME}"
+        fi
     else
-        log_warn "certbot gagal. Pastikan domain ${DOMAIN_NAME} sudah mengarah ke IP ${SERVER_IP}."
-        log_warn "Jalankan manual: certbot --nginx -d ${DOMAIN_NAME}"
-        # Set SESSION_COOKIE_SECURE=false karena gagal HTTPS (kembali ke HTTP)
+        # Set SESSION_COOKIE_SECURE=false karena hanya menggunakan HTTP
         if [[ -f "${INSTALL_DIR}/backend/.env" ]]; then
             sed -i "s|SESSION_COOKIE_SECURE=.*|SESSION_COOKIE_SECURE=false|g" "${INSTALL_DIR}/backend/.env"
         fi
-        ACCESS_URL="http://${DOMAIN_NAME}"
+        if [[ "${DOMAIN_NAME}" != "${SERVER_IP}" ]]; then
+            ACCESS_URL="http://${DOMAIN_NAME}"
+        else
+            ACCESS_URL="http://${SERVER_IP}"
+        fi
     fi
 else
-    # Set SESSION_COOKIE_SECURE=false karena hanya menggunakan HTTP
-    if [[ -f "${INSTALL_DIR}/backend/.env" ]]; then
-        sed -i "s|SESSION_COOKIE_SECURE=.*|SESSION_COOKIE_SECURE=false|g" "${INSTALL_DIR}/backend/.env"
-    fi
-    if [[ "${DOMAIN_NAME}" != "${SERVER_IP}" ]]; then
-        ACCESS_URL="http://${DOMAIN_NAME}"
-    else
-        ACCESS_URL="http://${SERVER_IP}"
-    fi
+    log_info "Mode update aktif: Melewati certbot/HTTPS setup..."
+    ACCESS_URL="http://${SERVER_IP}"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════

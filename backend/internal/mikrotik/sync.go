@@ -135,7 +135,23 @@ func (s *RouterService) SyncMainToSlaves(ctx context.Context) (*SyncResult, erro
 }
 
 // ReconcileProfiles ensures that all PPP profiles defined in the database packages exist on the given router client.
+// It first fetches existing profiles from the router in a single call, then only writes if something actually differs.
+// This prevents unnecessary /ppp/profile/set operations that would briefly disrupt active PPPoE sessions.
 func (s *RouterService) ReconcileProfiles(ctx context.Context, client *Client) error {
+	// Fetch all existing profiles from the router once
+	existingProfiles, err := client.ListProfiles(ctx)
+	if err != nil {
+		// If we can't read profiles, skip reconcile to avoid blind overwrites
+		return fmt.Errorf("failed to list profiles from router before reconcile: %w", err)
+	}
+	existingMap := make(map[string]PPPoEProfile, len(existingProfiles))
+	for _, p := range existingProfiles {
+		existingMap[strings.ToLower(strings.TrimSpace(p.Name))] = p
+	}
+
+	// Fetch IP pools once (used for pool name resolution)
+	pools, _ := client.ListIPPools(ctx)
+
 	rows, err := s.DB.QueryContext(ctx, "SELECT nama, kecepatan_mbps, COALESCE(ip_pool, ''), COALESCE(local_address, '') FROM paket")
 	if err != nil {
 		return fmt.Errorf("failed to query packages: %w", err)
@@ -155,17 +171,33 @@ func (s *RouterService) ReconcileProfiles(ctx context.Context, client *Client) e
 		}
 
 		rateLimit := fmt.Sprintf("%dM/%dM", speedMbps, speedMbps)
-		// Resolve the exact pool name case-sensitively from the router's pools if configured
+
+		// Resolve the exact pool name case-sensitively from the cached pool list
 		actualPoolName := ipPool
-		if ipPool != "" {
-			if pools, err := client.ListIPPools(ctx); err == nil {
-				for _, p := range pools {
-					if strings.EqualFold(p.Name, ipPool) {
-						actualPoolName = p.Name
-						break
-					}
-				}
+		for _, p := range pools {
+			if strings.EqualFold(p.Name, ipPool) {
+				actualPoolName = p.Name
+				break
 			}
+		}
+
+		// --- DIFF CHECK: only write to router if something actually differs ---
+		if existing, found := existingMap[strings.ToLower(name)]; found {
+			alreadySynced := existing.RateLimit == rateLimit
+			if localAddress != "" {
+				alreadySynced = alreadySynced && strings.EqualFold(existing.LocalAddress, localAddress)
+			}
+			if actualPoolName != "" {
+				alreadySynced = alreadySynced && strings.EqualFold(existing.RemoteAddress, actualPoolName)
+			}
+			if alreadySynced {
+				continue // Already in sync, skip — no write to router
+			}
+			slog.Info("reconcile profiles: profile out of sync, updating",
+				"profile", name,
+				"current_rate", existing.RateLimit, "desired_rate", rateLimit,
+				"current_pool", existing.RemoteAddress, "desired_pool", actualPoolName,
+			)
 		}
 
 		if err := client.SyncPPPProfile(ctx, name, localAddress, actualPoolName, rateLimit); err != nil {
@@ -203,6 +235,10 @@ func (s *RouterService) ReconcileSecrets(ctx context.Context, r Router) error {
 	if inactiveProfile == "" {
 		inactiveProfile = "nonaktif"
 	}
+
+	var deleteUnregistered string
+	_ = s.DB.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = ?", "mikrotik_delete_unregistered").Scan(&deleteUnregistered)
+	deleteUnregistered = strings.TrimSpace(deleteUnregistered)
 
 	// 3. Fetch all active/inactive customers with PPPoE configured from the database
 	type dbSecret struct {
@@ -285,7 +321,7 @@ func (s *RouterService) ReconcileSecrets(ctx context.Context, r Router) error {
 			// Secret exists on router, check if we need to update it
 			if rSec.Password != dbSec.Password || rSec.Profile != targetProfile || rSec.Disabled != disabled {
 				// Out of sync! Update it
-				if err := client.SyncCustomer(ctx, dbSec.Username, dbSec.Password, dbSec.Profile, dbSec.Status); err != nil {
+				if err := client.SyncCustomer(ctx, dbSec.Username, dbSec.Password, targetProfile, dbSec.Status); err != nil {
 					slog.Error("reconcile: failed to update customer secret", "router", r.Name, "username", dbSec.Username, "error", err)
 				}
 			}
@@ -293,20 +329,17 @@ func (s *RouterService) ReconcileSecrets(ctx context.Context, r Router) error {
 			delete(routerSecretsMap, usernameLower)
 		} else {
 			// Secret does not exist on router, add it
-			if err := client.SyncCustomer(ctx, dbSec.Username, dbSec.Password, dbSec.Profile, dbSec.Status); err != nil {
+			if err := client.SyncCustomer(ctx, dbSec.Username, dbSec.Password, targetProfile, dbSec.Status); err != nil {
 				slog.Error("reconcile: failed to add customer secret", "router", r.Name, "username", dbSec.Username, "error", err)
 			}
 		}
 	}
 
-	// 7. Remove remaining secrets on the router that are not in the database
-	for _, rSec := range routerSecretsMap {
-		if rSec.Name != "" {
-			if err := client.DeleteSecret(ctx, rSec.Name); err != nil {
-				slog.Error("reconcile: failed to delete customer secret", "router", r.Name, "username", rSec.Name, "error", err)
-			}
-		}
-	}
+	// NOTE: Automatic deletion of secrets on the router that are not in the database
+	// is intentionally disabled. Secrets are NEVER deleted automatically to prevent
+	// accidental data loss on production routers. Deletion only happens when an admin
+	// explicitly presses "Hapus" (Delete) in the Dashboard for a specific customer.
+	_ = deleteUnregistered // retained for potential future use as a read-only metric
 
 	return nil
 }
