@@ -19,8 +19,8 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("open sqlite database: %w", err)
 	}
 
-	db.SetMaxOpenConns(100)
-	db.SetMaxIdleConns(10)
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 
 	if _, err := db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
 		_ = db.Close()
@@ -32,7 +32,7 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("enable sqlite wal mode: %w", err)
 	}
 
-	if _, err := db.Exec("PRAGMA busy_timeout = 5000;"); err != nil {
+	if _, err := db.Exec("PRAGMA busy_timeout = 15000;"); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("set sqlite busy timeout: %w", err)
 	}

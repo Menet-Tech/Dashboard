@@ -20,7 +20,7 @@ export function validatePackage(form: {
 }): FieldErrors {
   const errors: FieldErrors = {};
   if (!form.name.trim()) errors.name = "Nama paket wajib diisi.";
-  if (form.speed_mbps <= 0) errors.speed_mbps = "Kecepatan harus lebih dari 0 Mbps.";
+  if (form.speed_mbps < 0) errors.speed_mbps = "Kecepatan tidak boleh bernilai negatif.";
   if (form.price <= 0) errors.price = "Harga harus lebih dari 0.";
   return errors;
 }

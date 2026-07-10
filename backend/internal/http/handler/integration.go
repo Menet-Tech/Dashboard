@@ -70,11 +70,7 @@ func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Check WhatsApp
 	waGatewayURL, _ := h.Settings.GetString(ctx, settings.KeyWAGatewayURL)
-	trimmedWAGatewayURL := strings.TrimSpace(waGatewayURL)
-	if envValue := strings.TrimSpace(os.Getenv("WA_GATEWAY_URL")); envValue != "" && (trimmedWAGatewayURL == "" || trimmedWAGatewayURL == "http://localhost:3001") {
-		waGatewayURL = envValue
-		trimmedWAGatewayURL = envValue
-	}
+	waGatewayURL = settings.ResolveWAGatewayURL(waGatewayURL)
 	waAPIKey, _ := h.Settings.GetString(ctx, settings.KeyWAAPIKey)
 	waAccountID, _ := h.Settings.GetString(ctx, settings.KeyWAAccountID)
 	trimmedWAAccountID := strings.TrimSpace(waAccountID)
@@ -85,16 +81,9 @@ func (h IntegrationHandler) Check(w http.ResponseWriter, r *http.Request) {
 		waAccountID = "default"
 	}
 
-	// Treat an empty URL or the bare localhost default as "not configured" — the
-	// user must explicitly save a real URL+API-key in settings for this to be active.
-	waConfigured := trimmedWAGatewayURL != "" &&
-		trimmedWAGatewayURL != "http://localhost:3001" &&
-		strings.TrimSpace(waAPIKey) != ""
-
-	// Apply localhost fallback only for the actual HTTP request (after the configured gate).
-	if strings.TrimSpace(waGatewayURL) == "" {
-		waGatewayURL = "http://localhost:3001"
-	}
+	// The local default gateway is valid in production systemd installs; API key
+	// presence is the real signal that WhatsApp integration is configured.
+	waConfigured := strings.TrimSpace(waAPIKey) != ""
 
 	waStatus := "not_configured"
 	if waConfigured {
@@ -380,26 +369,28 @@ func (h IntegrationHandler) SyncImport(w http.ResponseWriter, r *http.Request) {
 				}
 				if matchedProfile != nil {
 					// Parse speed from rate limit (e.g. 15M/15M -> 15)
-					speedVal := 10 // fallback
+					speedVal := 0 // default to 0 (Unlimited/Bypass)
 					cleanLimit := strings.TrimSpace(strings.ToUpper(matchedProfile.RateLimit))
-					if idx := strings.Index(cleanLimit, "/"); idx != -1 {
-						cleanLimit = cleanLimit[idx+1:]
-					}
-					var floatSpeed float64
-					var unit string
-					if _, scanErr := fmt.Sscanf(cleanLimit, "%f%s", &floatSpeed, &unit); scanErr == nil {
-						if strings.HasPrefix(unit, "M") {
-							speedVal = int(floatSpeed)
-						} else if strings.HasPrefix(unit, "K") {
-							speedVal = int(floatSpeed / 1000.0)
-						} else if strings.HasPrefix(unit, "G") {
-							speedVal = int(floatSpeed * 1000.0)
-						} else {
-							speedVal = int(floatSpeed / 1000000.0)
+					if cleanLimit != "" {
+						if idx := strings.Index(cleanLimit, "/"); idx != -1 {
+							cleanLimit = cleanLimit[idx+1:]
 						}
-					}
-					if speedVal <= 0 {
-						speedVal = 10
+						var floatSpeed float64
+						var unit string
+						if _, scanErr := fmt.Sscanf(cleanLimit, "%f%s", &floatSpeed, &unit); scanErr == nil {
+							if strings.HasPrefix(unit, "M") {
+								speedVal = int(floatSpeed)
+							} else if strings.HasPrefix(unit, "K") {
+								speedVal = int(floatSpeed / 1000.0)
+							} else if strings.HasPrefix(unit, "G") {
+								speedVal = int(floatSpeed * 1000.0)
+							} else {
+								speedVal = int(floatSpeed / 1000000.0)
+							}
+						}
+						if speedVal <= 0 {
+							speedVal = 10 // fallback if parsing failed but rate limit was non-empty
+						}
 					}
 
 					newPkg := packages.Package{

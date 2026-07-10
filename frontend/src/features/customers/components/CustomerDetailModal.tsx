@@ -529,12 +529,12 @@ export function CustomerDetailModal({
                             <div>
                               <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Profile Paket</span>
                               <strong className="text-indigo-600 font-semibold bg-indigo-50 border border-indigo-100 rounded px-1 py-0.5 block w-max mt-0.5">
-                                {ontStatus.mikrotik_secret.profile}
+                                {ontStatus.mikrotik_secret.Profile}
                               </strong>
                             </div>
                             <div>
                               <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Status PPP</span>
-                              {ontStatus.mikrotik_secret.disabled ? (
+                              {ontStatus.mikrotik_secret.Disabled ? (
                                 <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[10px] font-bold block w-max mt-0.5">Disabled / Terisolir</span>
                               ) : (
                                 <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-bold block w-max mt-0.5">Active / Enabled</span>
@@ -542,15 +542,15 @@ export function CustomerDetailModal({
                             </div>
                             <div className="col-span-2">
                               <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Last Caller ID (MAC)</span>
-                              <code className="text-slate-600 font-mono font-semibold block mt-0.5">{ontStatus.mikrotik_secret.last_caller_id || "-"}</code>
+                              <code className="text-slate-600 font-mono font-semibold block mt-0.5">{ontStatus.mikrotik_secret.LastCallerID || "-"}</code>
                             </div>
                             <div className="col-span-2">
                               <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Last Logged Out</span>
-                              <span className="text-slate-700 font-medium block mt-0.5">{ontStatus.mikrotik_secret.last_logged_out || "-"}</span>
+                              <span className="text-slate-700 font-medium block mt-0.5">{ontStatus.mikrotik_secret.LastLoggedOut || "-"}</span>
                             </div>
                             <div className="col-span-2">
                               <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Disconnect Reason</span>
-                              <span className="text-slate-700 font-semibold block mt-0.5 leading-relaxed">{ontStatus.mikrotik_secret.last_disconnect_reason || "-"}</span>
+                              <span className="text-slate-700 font-semibold block mt-0.5 leading-relaxed">{ontStatus.mikrotik_secret.LastDisconnectReason || "-"}</span>
                             </div>
                           </div>
                         ) : (
@@ -574,15 +574,15 @@ export function CustomerDetailModal({
                             </div>
                             <div>
                               <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">IP Address Sesi</span>
-                              <code className="text-indigo-600 font-mono font-semibold block mt-0.5">{ontStatus.mikrotik_active.address}</code>
+                              <code className="text-indigo-600 font-mono font-semibold block mt-0.5">{ontStatus.mikrotik_active.Address}</code>
                             </div>
                             <div className="col-span-2">
                               <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Uptime Sesi</span>
-                              <strong className="text-slate-700 block mt-0.5 font-semibold">{ontStatus.mikrotik_active.uptime}</strong>
+                              <strong className="text-slate-700 block mt-0.5 font-semibold">{ontStatus.mikrotik_active.Uptime}</strong>
                             </div>
                             <div className="col-span-2">
                               <span className="text-[9px] text-slate-400 block font-sans uppercase font-bold">Caller ID Sesi</span>
-                              <code className="text-slate-600 font-mono block mt-0.5">{ontStatus.mikrotik_active.caller_id || "-"}</code>
+                              <code className="text-slate-600 font-mono block mt-0.5">{ontStatus.mikrotik_active.CallerID || "-"}</code>
                             </div>
                           </div>
                         ) : (

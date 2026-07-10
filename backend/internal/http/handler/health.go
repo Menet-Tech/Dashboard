@@ -88,15 +88,10 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	acsPassword, _ := h.Settings.GetString(ctx, settings.KeyACSPassword)
 	billingAutoEnabled := strings.TrimSpace(billingAutoEnabledValue) != "0"
 
-	// Treat empty URL or the bare localhost default as configured since the service manager
-	// defaults to http://localhost:3001 when empty. A non-empty API key is required.
-	waURLTrimmed := strings.TrimSpace(waGatewayURL)
+	// A non-empty API key is enough for the local gateway; the URL resolver
+	// normalizes the historical localhost default to IPv4 loopback.
+	waGatewayURL = settings.ResolveWAGatewayURL(waGatewayURL)
 	waConfigured := strings.TrimSpace(waAPIKey) != ""
-
-	// Apply localhost fallback only for the actual HTTP reachability check.
-	if waURLTrimmed == "" {
-		waGatewayURL = "http://localhost:3001"
-	}
 
 	discordConfigured := strings.TrimSpace(discordWebhookURL) != ""
 
@@ -162,9 +157,6 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	} else {
 		alerts = append(alerts, "backup hari ini belum berjalan")
 	}
-
-
-
 
 	// Real-time online checks
 	waOnline := false

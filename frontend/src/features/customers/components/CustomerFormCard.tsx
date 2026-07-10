@@ -59,7 +59,7 @@ export function CustomerFormCard({
           <option value={0}>Pilih paket</option>
           {packages.map((pkg) => (
             <option key={pkg.id} value={pkg.id}>
-              {pkg.name} - {pkg.speed_mbps} Mbps
+              {pkg.name} - {pkg.speed_mbps === 0 ? "Bypass" : `${pkg.speed_mbps} Mbps`}
             </option>
           ))}
         </select>

@@ -11,153 +11,171 @@ import (
 )
 
 const (
-	KeyReminderDays          = "billing_reminder_days"
-	KeyLimitDays             = "billing_limit_days"
-	KeyMenunggakDays         = "billing_menunggak_days"
-	KeyTrialGraceDays        = "trial_overdue_grace_days"
-	KeyTrialPeriodDays       = "trial_period_days"
-	KeyTrialAutoGenerate     = "trial_auto_generate_bills"
-	KeyTrialEnabled          = "trial_enabled"
-	KeyBillingAutoEnabled    = "billing_auto_generate_enabled"
-	KeyBillingGenerateDay    = "billing_generate_day"
-	KeyBillingGenerateTime   = "billing_generate_time"
-	KeyBillingRetryAttempts  = "billing_generate_retry_attempts"
-	KeyBillingRetryBackoff   = "billing_generate_retry_backoff_seconds"
-	KeyWAGatewayURL          = "wa_gateway_url"
-	KeyWAAccountID           = "wa_account_id"
-	KeyWABillingAccountID    = "wa_billing_account_id"
-	KeyWAReminderAccountID   = "wa_reminder_account_id"
-	KeyWADueAccountID        = "wa_due_account_id"
-	KeyWALimitAccountID      = "wa_limit_account_id"
-	KeyWAPaymentAccountID    = "wa_payment_account_id"
-	KeyWAAPIKey              = "wa_api_key"
-	KeyWorkerIntervalSecs    = "worker_interval_seconds"
-	KeyWorkerLockTTLSeconds  = "worker_lock_ttl_seconds"
-	KeyBackupAutoEnabled     = "backup_auto_enabled"
-	KeyBackupAutoTime        = "backup_auto_time"
-	KeyBackupRetentionCount  = "backup_retention_count"
-	KeyDiscordWebhookURL     = "discord_webhook_url"
-	KeyDiscordNotifyPayment  = "discord_notify_payment"
-	KeyDiscordNotifyGenerate = "discord_notify_generate"
-	KeyDiscordNotifyWorker   = "discord_notify_worker"
-	KeyDiscordNotifyGacsOffline = "discord_notify_gacs_offline"
-	KeyDiscordBotToken         = "discord_bot_token"
-	KeyDiscordBotApplicationID = "discord_bot_application_id"
-	KeyDiscordBotGuildID       = "discord_bot_guild_id"
-	KeyMikrotikHost          = "mikrotik_host"
-	KeyMikrotikUser          = "mikrotik_user"
-	KeyMikrotikPass          = "mikrotik_pass"
-	KeyMikrotikTestUsername  = "mikrotik_test_username"
-	KeyChatbotTriggerBilling  = "chatbot_trigger_billing"
-	KeyChatbotTriggerRegister = "chatbot_trigger_register"
-	KeyChatbotTriggerSupport  = "chatbot_trigger_support"
-	KeyChatbotTriggerPackages = "chatbot_trigger_packages"
-	KeyChatbotTriggerFAQ      = "chatbot_trigger_faq"
-	KeyChatbotTriggerAdmin    = "chatbot_trigger_admin"
-	KeyACSURL                = "acs_url"
-	KeyACSUsername           = "acs_username"
-	KeyACSPassword           = "acs_password"
-	KeyGacsRxPowerExcellent  = "gacs_rx_power_excellent"
-	KeyGacsRxPowerFair       = "gacs_rx_power_fair"
-	KeyGacsPortalAPIKey      = "gacs_portal_api_key"
-	KeySMTPHost              = "smtp_host"
-	KeySMTPPort              = "smtp_port"
-	KeySMTPUsername          = "smtp_username"
-	KeySMTPPassword          = "smtp_password"
-	KeySMTPFromEmail         = "smtp_from_email"
-	KeySMTPEncryption        = "smtp_encryption"
-	KeySMTPEnabled           = "smtp_enabled"
-	KeyMikrotikIsolirProfile   = "mikrotik_isolir_profile"
-	KeyMikrotikInactiveProfile = "mikrotik_inactive_profile"
-	KeyWAGatewayEnabled        = "wa_gateway_enabled"
-	KeyDiscordBotEnabled       = "discord_bot_enabled"
-	KeyMikrotikAutoSyncHours   = "mikrotik_auto_sync_hours"
-	KeyMikrotikLastAutoSyncAt  = "mikrotik_last_auto_sync_at"
-	KeyWAChatbotEnabled        = "wa_chatbot_enabled"
-	KeyInactiveSuspendedDays   = "billing_inactive_suspended_days"
-	KeyWAQueueThrottleSeconds  = "wa_queue_throttle_seconds"
+	DefaultWAGatewayURL       = "http://127.0.0.1:3001"
+	LegacyDefaultWAGatewayURL = "http://localhost:3001"
+
+	KeyReminderDays                      = "billing_reminder_days"
+	KeyLimitDays                         = "billing_limit_days"
+	KeyMenunggakDays                     = "billing_menunggak_days"
+	KeyTrialGraceDays                    = "trial_overdue_grace_days"
+	KeyTrialPeriodDays                   = "trial_period_days"
+	KeyTrialAutoGenerate                 = "trial_auto_generate_bills"
+	KeyTrialEnabled                      = "trial_enabled"
+	KeyBillingAutoEnabled                = "billing_auto_generate_enabled"
+	KeyBillingGenerateDay                = "billing_generate_day"
+	KeyBillingGenerateTime               = "billing_generate_time"
+	KeyBillingRetryAttempts              = "billing_generate_retry_attempts"
+	KeyBillingRetryBackoff               = "billing_generate_retry_backoff_seconds"
+	KeyWAGatewayURL                      = "wa_gateway_url"
+	KeyWAAccountID                       = "wa_account_id"
+	KeyWABillingAccountID                = "wa_billing_account_id"
+	KeyWAReminderAccountID               = "wa_reminder_account_id"
+	KeyWADueAccountID                    = "wa_due_account_id"
+	KeyWALimitAccountID                  = "wa_limit_account_id"
+	KeyWAPaymentAccountID                = "wa_payment_account_id"
+	KeyWAAPIKey                          = "wa_api_key"
+	KeyWorkerIntervalSecs                = "worker_interval_seconds"
+	KeyWorkerLockTTLSeconds              = "worker_lock_ttl_seconds"
+	KeyBackupAutoEnabled                 = "backup_auto_enabled"
+	KeyBackupAutoTime                    = "backup_auto_time"
+	KeyBackupRetentionCount              = "backup_retention_count"
+	KeyDiscordWebhookURL                 = "discord_webhook_url"
+	KeyDiscordNotifyPayment              = "discord_notify_payment"
+	KeyDiscordNotifyGenerate             = "discord_notify_generate"
+	KeyDiscordNotifyWorker               = "discord_notify_worker"
+	KeyDiscordNotifyGacsOffline          = "discord_notify_gacs_offline"
+	KeyDiscordBotToken                   = "discord_bot_token"
+	KeyDiscordBotApplicationID           = "discord_bot_application_id"
+	KeyDiscordBotGuildID                 = "discord_bot_guild_id"
+	KeyMikrotikHost                      = "mikrotik_host"
+	KeyMikrotikUser                      = "mikrotik_user"
+	KeyMikrotikPass                      = "mikrotik_pass"
+	KeyMikrotikTestUsername              = "mikrotik_test_username"
+	KeyChatbotTriggerBilling             = "chatbot_trigger_billing"
+	KeyChatbotTriggerRegister            = "chatbot_trigger_register"
+	KeyChatbotTriggerSupport             = "chatbot_trigger_support"
+	KeyChatbotTriggerPackages            = "chatbot_trigger_packages"
+	KeyChatbotTriggerFAQ                 = "chatbot_trigger_faq"
+	KeyChatbotTriggerAdmin               = "chatbot_trigger_admin"
+	KeyACSURL                            = "acs_url"
+	KeyACSUsername                       = "acs_username"
+	KeyACSPassword                       = "acs_password"
+	KeyGacsRxPowerExcellent              = "gacs_rx_power_excellent"
+	KeyGacsRxPowerFair                   = "gacs_rx_power_fair"
+	KeyGacsPortalAPIKey                  = "gacs_portal_api_key"
+	KeySMTPHost                          = "smtp_host"
+	KeySMTPPort                          = "smtp_port"
+	KeySMTPUsername                      = "smtp_username"
+	KeySMTPPassword                      = "smtp_password"
+	KeySMTPFromEmail                     = "smtp_from_email"
+	KeySMTPEncryption                    = "smtp_encryption"
+	KeySMTPEnabled                       = "smtp_enabled"
+	KeyMikrotikIsolirProfile             = "mikrotik_isolir_profile"
+	KeyMikrotikInactiveProfile           = "mikrotik_inactive_profile"
+	KeyWAGatewayEnabled                  = "wa_gateway_enabled"
+	KeyDiscordBotEnabled                 = "discord_bot_enabled"
+	KeyMikrotikAutoSyncHours             = "mikrotik_auto_sync_hours"
+	KeyMikrotikLastAutoSyncAt            = "mikrotik_last_auto_sync_at"
+	KeyWAChatbotEnabled                  = "wa_chatbot_enabled"
+	KeyInactiveSuspendedDays             = "billing_inactive_suspended_days"
+	KeyWAQueueThrottleSeconds            = "wa_queue_throttle_seconds"
 	KeyMikrotikDeleteUnregisteredSecrets = "mikrotik_delete_unregistered"
 )
 
 var defaults = map[string]string{
 	KeyMikrotikDeleteUnregisteredSecrets: "0",
-	KeyReminderDays:            "3",
-	KeyLimitDays:               "5",
-	KeyMenunggakDays:           "30",
-	KeyInactiveSuspendedDays:   "20",
-	KeyWAQueueThrottleSeconds:  "120",
-	KeyTrialGraceDays:          "4",
-	KeyTrialPeriodDays:         "3",
-	KeyTrialAutoGenerate:       "1",
-	KeyTrialEnabled:            "1",
-	KeyBillingAutoEnabled:      "1",
-	KeyBillingGenerateDay:      "1",
-	KeyBillingGenerateTime:     "00:05",
-	KeyBillingRetryAttempts:    "3",
-	KeyBillingRetryBackoff:     "2",
-	KeyWAGatewayURL:            "http://localhost:3001",
-	KeyWAAccountID:             "default",
-	KeyWABillingAccountID:      "",
-	KeyWAReminderAccountID:     "",
-	KeyWADueAccountID:          "",
-	KeyWALimitAccountID:        "",
-	KeyWAPaymentAccountID:      "",
-	KeyWAAPIKey:                "",
-	KeyWorkerIntervalSecs:      "60",
-	KeyWorkerLockTTLSeconds:    "180",
-	KeyBackupAutoEnabled:       "1",
-	KeyBackupAutoTime:          "02:00",
-	KeyBackupRetentionCount:    "7",
-	KeyDiscordWebhookURL:       "",
-	KeyDiscordNotifyPayment:    "1",
-	KeyDiscordNotifyGenerate:   "1",
-	KeyDiscordNotifyWorker:     "1",
-	KeyDiscordNotifyGacsOffline: "1",
-	KeyDiscordBotToken:         "",
-	KeyDiscordBotApplicationID: "",
-	KeyDiscordBotGuildID:       "",
-	KeyMikrotikHost:            "",
-	KeyMikrotikUser:            "",
-	KeyMikrotikPass:            "",
-	KeyMikrotikTestUsername:    "test-user",
-	KeyMikrotikIsolirProfile:   "isolir",
-	KeyMikrotikInactiveProfile: "nonaktif",
-	KeyMikrotikAutoSyncHours:   "0",
-	KeyChatbotTriggerBilling:    "1",
-	KeyChatbotTriggerRegister: "1",
-	KeyChatbotTriggerSupport:  "2",
-	KeyChatbotTriggerPackages: "3",
-	KeyChatbotTriggerFAQ:      "4",
-	KeyChatbotTriggerAdmin:    "5",
-	KeyACSURL:                 "",
-	KeyACSUsername:            "",
-	KeyACSPassword:            "",
-	KeyGacsRxPowerExcellent:  "-27",
-	KeyGacsRxPowerFair:       "-25",
-	KeyGacsPortalAPIKey:      "",
-	KeySMTPHost:              "",
-	KeySMTPPort:              "587",
-	KeySMTPUsername:          "",
-	KeySMTPPassword:          "",
-	KeySMTPFromEmail:         "",
-	KeySMTPEncryption:        "tls",
-	KeySMTPEnabled:           "0",
-	KeyWAGatewayEnabled:        "0",
-	KeyDiscordBotEnabled:       "0",
-	KeyWAChatbotEnabled:        "1",
-	"appName":                 "Menet-Tech Dashboard Go",
-	"portalApiKey":            "",
-	"vpPppoeUsername":         "VirtualParameters.pppoeUsername",
-	"vpWanBridge":             "VirtualParameters.wanBridge",
-	"vpRxPower":               "VirtualParameters.RXPower",
-	"vpTemperature":           "VirtualParameters.gettemp",
-	"vpActiveDevices":         "VirtualParameters.activedevices",
-	"vpSuperAdmin":            "VirtualParameters.superAdmin",
-	"vpSuperPassword":         "VirtualParameters.superPassword",
-	"vpUserAdmin":             "VirtualParameters.userAdmin",
-	"vpUserPassword":          "VirtualParameters.userPassword",
-	"rxPowerThresholds":       "{}",
-	"autoRefreshIntervals":    "{}",
+	KeyReminderDays:                      "3",
+	KeyLimitDays:                         "5",
+	KeyMenunggakDays:                     "30",
+	KeyInactiveSuspendedDays:             "20",
+	KeyWAQueueThrottleSeconds:            "120",
+	KeyTrialGraceDays:                    "4",
+	KeyTrialPeriodDays:                   "3",
+	KeyTrialAutoGenerate:                 "1",
+	KeyTrialEnabled:                      "1",
+	KeyBillingAutoEnabled:                "1",
+	KeyBillingGenerateDay:                "1",
+	KeyBillingGenerateTime:               "00:05",
+	KeyBillingRetryAttempts:              "3",
+	KeyBillingRetryBackoff:               "2",
+	KeyWAGatewayURL:                      DefaultWAGatewayURL,
+	KeyWAAccountID:                       "default",
+	KeyWABillingAccountID:                "",
+	KeyWAReminderAccountID:               "",
+	KeyWADueAccountID:                    "",
+	KeyWALimitAccountID:                  "",
+	KeyWAPaymentAccountID:                "",
+	KeyWAAPIKey:                          "",
+	KeyWorkerIntervalSecs:                "60",
+	KeyWorkerLockTTLSeconds:              "180",
+	KeyBackupAutoEnabled:                 "1",
+	KeyBackupAutoTime:                    "02:00",
+	KeyBackupRetentionCount:              "7",
+	KeyDiscordWebhookURL:                 "",
+	KeyDiscordNotifyPayment:              "1",
+	KeyDiscordNotifyGenerate:             "1",
+	KeyDiscordNotifyWorker:               "1",
+	KeyDiscordNotifyGacsOffline:          "1",
+	KeyDiscordBotToken:                   "",
+	KeyDiscordBotApplicationID:           "",
+	KeyDiscordBotGuildID:                 "",
+	KeyMikrotikHost:                      "",
+	KeyMikrotikUser:                      "",
+	KeyMikrotikPass:                      "",
+	KeyMikrotikTestUsername:              "test-user",
+	KeyMikrotikIsolirProfile:             "isolir",
+	KeyMikrotikInactiveProfile:           "nonaktif",
+	KeyMikrotikAutoSyncHours:             "0",
+	KeyChatbotTriggerBilling:             "1",
+	KeyChatbotTriggerRegister:            "1",
+	KeyChatbotTriggerSupport:             "2",
+	KeyChatbotTriggerPackages:            "3",
+	KeyChatbotTriggerFAQ:                 "4",
+	KeyChatbotTriggerAdmin:               "5",
+	KeyACSURL:                            "",
+	KeyACSUsername:                       "",
+	KeyACSPassword:                       "",
+	KeyGacsRxPowerExcellent:              "-27",
+	KeyGacsRxPowerFair:                   "-25",
+	KeyGacsPortalAPIKey:                  "",
+	KeySMTPHost:                          "",
+	KeySMTPPort:                          "587",
+	KeySMTPUsername:                      "",
+	KeySMTPPassword:                      "",
+	KeySMTPFromEmail:                     "",
+	KeySMTPEncryption:                    "tls",
+	KeySMTPEnabled:                       "0",
+	KeyWAGatewayEnabled:                  "0",
+	KeyDiscordBotEnabled:                 "0",
+	KeyWAChatbotEnabled:                  "1",
+	"appName":                            "Menet-Tech Dashboard Go",
+	"portalApiKey":                       "",
+	"vpPppoeUsername":                    "VirtualParameters.pppoeUsername",
+	"vpWanBridge":                        "VirtualParameters.wanBridge",
+	"vpRxPower":                          "VirtualParameters.RXPower",
+	"vpTemperature":                      "VirtualParameters.gettemp",
+	"vpActiveDevices":                    "VirtualParameters.activedevices",
+	"vpSuperAdmin":                       "VirtualParameters.superAdmin",
+	"vpSuperPassword":                    "VirtualParameters.superPassword",
+	"vpUserAdmin":                        "VirtualParameters.userAdmin",
+	"vpUserPassword":                     "VirtualParameters.userPassword",
+	"rxPowerThresholds":                  "{}",
+	"autoRefreshIntervals":               "{}",
+}
+
+func IsDefaultWAGatewayURL(value string) bool {
+	trimmed := strings.TrimRight(strings.TrimSpace(value), "/")
+	return trimmed == "" || trimmed == DefaultWAGatewayURL || trimmed == LegacyDefaultWAGatewayURL
+}
+
+func ResolveWAGatewayURL(value string) string {
+	if envValue := strings.TrimSpace(os.Getenv("WA_GATEWAY_URL")); envValue != "" && IsDefaultWAGatewayURL(value) {
+		return envValue
+	}
+	if IsDefaultWAGatewayURL(value) {
+		return DefaultWAGatewayURL
+	}
+	return strings.TrimSpace(value)
 }
 
 func IsAllowedKey(key string) bool {

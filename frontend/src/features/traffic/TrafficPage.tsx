@@ -363,7 +363,9 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                       <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200">{cust.name}</td>
                       <td className="px-6 py-4 text-slate-500 font-mono text-xs">{cust.user_pppoe}</td>
                       <td className="px-6 py-4 text-slate-500">{cust.package_name || "-"}</td>
-                      <td className="px-6 py-4 font-semibold text-slate-700 dark:text-slate-350">{cust.limitMbps} Mbps</td>
+                      <td className="px-6 py-4 font-semibold text-slate-700 dark:text-slate-350">
+                        {cust.limitMbps === 0 ? "Bypass" : `${cust.limitMbps} Mbps`}
+                      </td>
                       <td className={`px-6 py-4 font-bold ${isRed ? "text-rose-600 dark:text-rose-450" : isYellow ? "text-amber-600 dark:text-amber-450" : "text-emerald-600 dark:text-emerald-450"}`}>
                         {formatBps(cust.stats.rx_rate)}
                       </td>
@@ -417,7 +419,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                   {selectedCust.name}
                 </h3>
                 <p className="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">
-                  PPPoE User: {selectedCust.user_pppoe} • Limit: {activeLimit} Mbps
+                  PPPoE User: {selectedCust.user_pppoe} • Limit: {activeLimit === 0 ? "Bypass" : `${activeLimit} Mbps`}
                 </p>
               </div>
               <button

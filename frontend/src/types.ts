@@ -286,6 +286,7 @@ export type MapEdge = {
   distance?: number;
   waypoints?: [number, number][];
   notes?: string;
+  counts_as_port?: boolean;
   created_at?: string;
   updated_at?: string;
 };

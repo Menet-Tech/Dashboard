@@ -46,8 +46,8 @@ func (s Service) Create(ctx context.Context, pkg Package) (Package, error) {
 		return Package{}, errors.New("package name is required")
 	}
 
-	if pkg.SpeedMbps <= 0 {
-		return Package{}, errors.New("package speed must be greater than 0")
+	if pkg.SpeedMbps < 0 {
+		return Package{}, errors.New("package speed must not be negative")
 	}
 
 	if pkg.Price < 0 {
@@ -70,8 +70,8 @@ func (s Service) Update(ctx context.Context, id int64, pkg Package) (Package, er
 		return Package{}, errors.New("package name is required")
 	}
 
-	if pkg.SpeedMbps <= 0 {
-		return Package{}, errors.New("package speed must be greater than 0")
+	if pkg.SpeedMbps < 0 {
+		return Package{}, errors.New("package speed must not be negative")
 	}
 
 	if pkg.Price < 0 {
@@ -267,7 +267,10 @@ func (s Service) syncPackageToMikrotik(ctx context.Context, pkg Package) (Packag
 	}
 
 	// 3. Sync PPP Profile across all active routers
-	rateLimit := fmt.Sprintf("%dM/%dM", pkg.SpeedMbps, pkg.SpeedMbps)
+	rateLimit := ""
+	if pkg.SpeedMbps > 0 {
+		rateLimit = fmt.Sprintf("%dM/%dM", pkg.SpeedMbps, pkg.SpeedMbps)
+	}
 	for _, r := range routers {
 		client := mikrotik.NewClient(r.Host, r.Username, r.Password)
 		if err := client.Connect(ctx); err != nil {

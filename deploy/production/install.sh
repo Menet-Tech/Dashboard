@@ -231,11 +231,24 @@ if [[ ! -f "${INSTALL_DIR}/backend/.env" ]]; then
         # Escape karakter khusus di password agar aman untuk sed
         ADMIN_PASSWORD_ESCAPED=$(printf '%s\n' "${ADMIN_PASSWORD}" | sed 's/[\&/|]/\\&/g')
         sed -i "s|BOOTSTRAP_ADMIN_PASSWORD=.*|BOOTSTRAP_ADMIN_PASSWORD=${ADMIN_PASSWORD_ESCAPED}|g" "${INSTALL_DIR}/backend/.env"
+        # ─── Auto-generate JWT_SECRET (wajib untuk keamanan produksi) ─────────
+        JWT_SECRET_VAL=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p)
+        sed -i "s|JWT_SECRET=.*|JWT_SECRET=${JWT_SECRET_VAL}|g" "${INSTALL_DIR}/backend/.env"
+        log_success "JWT_SECRET di-generate otomatis (random 256-bit)"
         log_success "File .env backend dibuat, password admin telah diset"
     fi
 else
     log_info "File .env backend sudah ada, melewati penyalinan."
     log_warn "Password yang Anda input tidak diterapkan ke .env yang sudah ada."
+    # ─── Patch JWT_SECRET jika masih kosong/lemah di .env lama ───────────────
+    EXISTING_JWT=$(grep -E '^JWT_SECRET=' "${INSTALL_DIR}/backend/.env" | cut -d'=' -f2- | tr -d ' ')
+    if [[ -z "${EXISTING_JWT}" ]] || [[ "${EXISTING_JWT}" == "your-secret-key" ]] || [[ "${EXISTING_JWT}" == "change-me" ]] || [[ ${#EXISTING_JWT} -lt 32 ]]; then
+        JWT_SECRET_VAL=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p)
+        sed -i "s|JWT_SECRET=.*|JWT_SECRET=${JWT_SECRET_VAL}|g" "${INSTALL_DIR}/backend/.env"
+        log_success "JWT_SECRET lama kosong/tidak aman — di-generate ulang otomatis"
+    else
+        log_info "JWT_SECRET sudah ada, melewati regenerasi."
+    fi
 fi
 
 # ─── Frontend (static files) ─────────────────────────────────────────────────

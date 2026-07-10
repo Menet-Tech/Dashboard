@@ -39,16 +39,17 @@ type MappingNode struct {
 }
 
 type MappingEdge struct {
-	ID        int64           `json:"id,omitempty"`
-	EdgeID    string          `json:"edge_id"`
-	Source    string          `json:"source"`
-	Target    string          `json:"target"`
-	FiberType *string         `json:"fiber_type,omitempty"` // 'feeder', 'distribution', 'drop', etc.
-	Distance  *float64        `json:"distance,omitempty"`
-	Waypoints json.RawMessage `json:"waypoints,omitempty"` // coordinates JSON string
-	Notes     *string         `json:"notes,omitempty"`
-	CreatedAt string          `json:"created_at,omitempty"`
-	UpdatedAt string          `json:"updated_at,omitempty"`
+	ID           int64           `json:"id,omitempty"`
+	EdgeID       string          `json:"edge_id"`
+	Source       string          `json:"source"`
+	Target       string          `json:"target"`
+	FiberType    *string         `json:"fiber_type,omitempty"` // 'feeder', 'distribution', 'drop', etc.
+	Distance     *float64        `json:"distance,omitempty"`
+	Waypoints    json.RawMessage `json:"waypoints,omitempty"` // coordinates JSON string
+	Notes        *string         `json:"notes,omitempty"`
+	CountsAsPort bool            `json:"counts_as_port"`
+	CreatedAt    string          `json:"created_at,omitempty"`
+	UpdatedAt    string          `json:"updated_at,omitempty"`
 }
 
 // GetMapSettings retrieves the Leaflet map configuration.
@@ -222,7 +223,7 @@ func DeleteNode(ctx context.Context, db *sql.DB, nodeID string) error {
 
 // GetEdges gets all edges.
 func GetEdges(ctx context.Context, db *sql.DB) ([]MappingEdge, error) {
-	rows, err := db.QueryContext(ctx, "SELECT id, edge_id, source, target, fiber_type, distance, waypoints, notes, created_at, updated_at FROM mapping_edges ORDER BY created_at DESC")
+	rows, err := db.QueryContext(ctx, "SELECT id, edge_id, source, target, fiber_type, distance, waypoints, notes, counts_as_port, created_at, updated_at FROM mapping_edges ORDER BY created_at DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -232,10 +233,12 @@ func GetEdges(ctx context.Context, db *sql.DB) ([]MappingEdge, error) {
 	for rows.Next() {
 		var e MappingEdge
 		var waypointsVal sql.NullString
-		err = rows.Scan(&e.ID, &e.EdgeID, &e.Source, &e.Target, &e.FiberType, &e.Distance, &waypointsVal, &e.Notes, &e.CreatedAt, &e.UpdatedAt)
+		var countsAsPortInt int
+		err = rows.Scan(&e.ID, &e.EdgeID, &e.Source, &e.Target, &e.FiberType, &e.Distance, &waypointsVal, &e.Notes, &countsAsPortInt, &e.CreatedAt, &e.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
+		e.CountsAsPort = countsAsPortInt == 1
 		if waypointsVal.Valid && waypointsVal.String != "" {
 			e.Waypoints = json.RawMessage(waypointsVal.String)
 		} else {
@@ -248,16 +251,18 @@ func GetEdges(ctx context.Context, db *sql.DB) ([]MappingEdge, error) {
 
 // GetEdge gets a single edge.
 func GetEdge(ctx context.Context, db *sql.DB, edgeID string) (*MappingEdge, error) {
-	row := db.QueryRowContext(ctx, "SELECT id, edge_id, source, target, fiber_type, distance, waypoints, notes, created_at, updated_at FROM mapping_edges WHERE edge_id = ?", edgeID)
+	row := db.QueryRowContext(ctx, "SELECT id, edge_id, source, target, fiber_type, distance, waypoints, notes, counts_as_port, created_at, updated_at FROM mapping_edges WHERE edge_id = ?", edgeID)
 	var e MappingEdge
 	var waypointsVal sql.NullString
-	err := row.Scan(&e.ID, &e.EdgeID, &e.Source, &e.Target, &e.FiberType, &e.Distance, &waypointsVal, &e.Notes, &e.CreatedAt, &e.UpdatedAt)
+	var countsAsPortInt int
+	err := row.Scan(&e.ID, &e.EdgeID, &e.Source, &e.Target, &e.FiberType, &e.Distance, &waypointsVal, &e.Notes, &countsAsPortInt, &e.CreatedAt, &e.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
+	e.CountsAsPort = countsAsPortInt == 1
 	if waypointsVal.Valid && waypointsVal.String != "" {
 		e.Waypoints = json.RawMessage(waypointsVal.String)
 	} else {
@@ -267,7 +272,7 @@ func GetEdge(ctx context.Context, db *sql.DB, edgeID string) (*MappingEdge, erro
 }
 
 // ValidateEdgeCapacity checks if source node has available connection capacity.
-func ValidateEdgeCapacity(ctx context.Context, db *sql.DB, source, target string, fiberType *string) error {
+func ValidateEdgeCapacity(ctx context.Context, db *sql.DB, source, target string, fiberType *string, countsAsPort bool) error {
 	var srcType string
 	var srcCapacity sql.NullInt64
 	err := db.QueryRowContext(ctx, "SELECT type, capacity FROM mapping_nodes WHERE node_id = ?", source).Scan(&srcType, &srcCapacity)
@@ -313,19 +318,20 @@ func ValidateEdgeCapacity(ctx context.Context, db *sql.DB, source, target string
 		}
 	}
 
-	// 2. Check ODP Capacity
-	if srcType == "odp" && (tgtType == "ont" || (tgtType == "odp" && fType == "odp_to_odp")) {
+	// 2. Check ODP Capacity — ONT yang memakai slot, ODP→ODP dihitung jika countsAsPort true
+	isPortUsage := tgtType == "ont" || (tgtType == "odp" && countsAsPort)
+	if srcType == "odp" && isPortUsage {
 		if srcCapacity.Valid && srcCapacity.Int64 > 0 {
-			query := "SELECT COUNT(*) FROM mapping_edges WHERE source = ?"
+			query := `
+				SELECT COUNT(*) FROM mapping_edges 
+				WHERE source = ? 
+				AND (
+					target IN (SELECT node_id FROM mapping_nodes WHERE type = 'ont')
+					OR (target IN (SELECT node_id FROM mapping_nodes WHERE type = 'odp') AND counts_as_port = 1)
+				)
+			`
 			var count int
-			if tgtType == "ont" {
-				query += " AND target IN (SELECT node_id FROM mapping_nodes WHERE type = 'ont')"
-				err = db.QueryRowContext(ctx, query, source).Scan(&count)
-			} else {
-				query += " AND target IN (SELECT node_id FROM mapping_nodes WHERE type = 'odp') AND fiber_type = 'odp_to_odp'"
-				err = db.QueryRowContext(ctx, query, source).Scan(&count)
-			}
-			if err != nil {
+			if err = db.QueryRowContext(ctx, query, source).Scan(&count); err != nil {
 				return err
 			}
 			if int64(count) >= srcCapacity.Int64 {
@@ -340,7 +346,7 @@ func ValidateEdgeCapacity(ctx context.Context, db *sql.DB, source, target string
 // CreateEdge creates a new connection link after validating slot capacity.
 func CreateEdge(ctx context.Context, db *sql.DB, e *MappingEdge) error {
 	// First validate slot capacity
-	if err := ValidateEdgeCapacity(ctx, db, e.Source, e.Target, e.FiberType); err != nil {
+	if err := ValidateEdgeCapacity(ctx, db, e.Source, e.Target, e.FiberType, e.CountsAsPort); err != nil {
 		return err
 	}
 
@@ -350,10 +356,15 @@ func CreateEdge(ctx context.Context, db *sql.DB, e *MappingEdge) error {
 		waypointsStr = &str
 	}
 
+	countsAsPortInt := 0
+	if e.CountsAsPort {
+		countsAsPortInt = 1
+	}
+
 	res, err := db.ExecContext(ctx, `
-		INSERT INTO mapping_edges (edge_id, source, target, fiber_type, distance, waypoints, notes)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		e.EdgeID, e.Source, e.Target, e.FiberType, e.Distance, waypointsStr, e.Notes,
+		INSERT INTO mapping_edges (edge_id, source, target, fiber_type, distance, waypoints, notes, counts_as_port)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.EdgeID, e.Source, e.Target, e.FiberType, e.Distance, waypointsStr, e.Notes, countsAsPortInt,
 	)
 	if err != nil {
 		return err
@@ -373,15 +384,21 @@ func UpdateEdge(ctx context.Context, db *sql.DB, edgeID string, e *MappingEdge) 
 		waypointsStr = &str
 	}
 
+	countsAsPortInt := 0
+	if e.CountsAsPort {
+		countsAsPortInt = 1
+	}
+
 	res, err := db.ExecContext(ctx, `
 		UPDATE mapping_edges SET
 			fiber_type = COALESCE(?, fiber_type),
 			distance = COALESCE(?, distance),
 			waypoints = COALESCE(?, waypoints),
 			notes = COALESCE(?, notes),
+			counts_as_port = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE edge_id = ?`,
-		e.FiberType, e.Distance, waypointsStr, e.Notes, edgeID,
+		e.FiberType, e.Distance, waypointsStr, e.Notes, countsAsPortInt, edgeID,
 	)
 	if err != nil {
 		return err
@@ -590,8 +607,8 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 
 	// 3. Insert edges
 	edgeStmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO mapping_edges (edge_id, source, target, fiber_type, distance, waypoints, notes)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO mapping_edges (edge_id, source, target, fiber_type, distance, waypoints, notes, counts_as_port)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 	)
 	if err != nil {
 		return err
@@ -612,7 +629,11 @@ func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges
 		if newVal, exists := oldNodeIDToNewNodeID[target]; exists {
 			target = newVal
 		}
-		_, err = edgeStmt.ExecContext(ctx, e.EdgeID, source, target, e.FiberType, e.Distance, waypointsStr, e.Notes)
+		countsAsPortInt := 0
+		if e.CountsAsPort {
+			countsAsPortInt = 1
+		}
+		_, err = edgeStmt.ExecContext(ctx, e.EdgeID, source, target, e.FiberType, e.Distance, waypointsStr, e.Notes, countsAsPortInt)
 		if err != nil {
 			return err
 		}

@@ -775,7 +775,9 @@ export function CustomersPage({
                         }`}
                       >
                         <span>{pkg.name}</span>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500">{pkg.speed_mbps} Mbps</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                          {pkg.speed_mbps === 0 ? "Bypass" : `${pkg.speed_mbps} Mbps`}
+                        </span>
                       </button>
                     ))}
                 </div>

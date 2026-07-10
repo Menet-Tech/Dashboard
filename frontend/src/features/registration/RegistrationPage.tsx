@@ -621,7 +621,7 @@ export function RegistrationPage({
                     <option value="">Pilih paket internet</option>
                     {packages.map((pkg) => (
                       <option key={pkg.id} value={pkg.name}>
-                        {pkg.name} ({pkg.speed_mbps} Mbps)
+                        {pkg.name} ({pkg.speed_mbps === 0 ? "Bypass" : `${pkg.speed_mbps} Mbps`})
                       </option>
                     ))}
                   </select>
@@ -875,7 +875,7 @@ export function RegistrationPage({
                     <option value="">Pilih paket internet</option>
                     {packages.map((pkg) => (
                       <option key={pkg.id} value={pkg.name}>
-                        {pkg.name} ({pkg.speed_mbps} Mbps)
+                        {pkg.name} ({pkg.speed_mbps === 0 ? "Bypass" : `${pkg.speed_mbps} Mbps`})
                       </option>
                     ))}
                   </select>

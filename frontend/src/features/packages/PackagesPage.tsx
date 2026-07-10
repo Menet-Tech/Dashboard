@@ -246,7 +246,9 @@ export function PackagesPage({
                 packages.map((pkg) => (
                   <tr key={pkg.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">{pkg.name}</td>
-                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">{pkg.speed_mbps} Mbps</td>
+                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">
+                      {pkg.speed_mbps === 0 ? "Bypass / Tanpa Limit" : `${pkg.speed_mbps} Mbps`}
+                    </td>
                     <td className="px-6 py-4 text-slate-950 dark:text-slate-150 font-bold">{formatCurrency(pkg.price)}</td>
                     <td className="px-6 py-4 text-slate-800 dark:text-slate-200 font-bold text-center">
                       <span className="bg-slate-100 px-2.5 py-1 rounded-full text-xs font-semibold">
@@ -330,13 +332,16 @@ export function PackagesPage({
               <input
                 className={inputClassName(packageErrors.speed_mbps)}
                 type="number"
-                min={1}
+                min={0}
                 value={packageForm.speed_mbps}
                 onChange={(e) =>
                   onFormChange((curr) => ({ ...curr, speed_mbps: Number(e.target.value) }))
                 }
                 required
               />
+              <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                Masukkan 0 untuk bypass limit (Unlimited / Tanpa Batasan rate limit).
+              </span>
               {renderInlineError(packageErrors.speed_mbps)}
             </label>
 

@@ -161,9 +161,7 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 
 	// Get configuration
 	waGatewayURL, _ := s.settingsSvc.GetString(ctx, settings.KeyWAGatewayURL)
-	if waGatewayURL == "" {
-		waGatewayURL = "http://localhost:3001"
-	}
+	waGatewayURL = settings.ResolveWAGatewayURL(waGatewayURL)
 	waAPIKey, _ := s.settingsSvc.GetString(ctx, settings.KeyWAAPIKey)
 	waAccountID, _ := s.settingsSvc.GetString(ctx, settings.KeyWAAccountID)
 	if waAccountID == "" {
@@ -194,7 +192,7 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 	env = append(env, fmt.Sprintf("DASHBOARD_INTERNAL_API_KEY=%s", waAPIKey))
 	env = append(env, fmt.Sprintf("API_KEY=%s", waAPIKey))
 	env = append(env, fmt.Sprintf("WA_ACCOUNT_ID=%s", waAccountID))
-	
+
 	// Pass home or user-specific Puppeteer variables
 	if homeDir := os.Getenv("HOME"); homeDir != "" {
 		env = append(env, fmt.Sprintf("HOME=%s", homeDir))

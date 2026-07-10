@@ -165,6 +165,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   const [edgeFiberTypeInput, setEdgeFiberTypeInput] = useState("feeder");
   const [edgeDistanceInput, setEdgeDistanceInput] = useState("");
   const [edgeNotesInput, setEdgeNotesInput] = useState("");
+  const [edgeCountsAsPort, setEdgeCountsAsPort] = useState(false);
   // Port input when manually connecting an ONT that has no ODP assignment yet
   const [edgeOdpPortInput, setEdgeOdpPortInput] = useState("");
   // Tracks whether the edge being drawn is a new ODP→ONT link needing a port assignment
@@ -472,6 +473,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         );
         setEdgeDistanceInput(String(dist));
         setEdgeNotesInput("");
+        setEdgeCountsAsPort(false);
         setEdgeOdpPortInput("");
         setPendingOdpAssignment(null);
 
@@ -721,6 +723,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               fiber_type: edgeFiberTypeInput,
               distance: distNum,
               notes: edgeNotesInput.trim() || undefined,
+              counts_as_port: edgeCountsAsPort,
             }
           : edge
       );
@@ -737,6 +740,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         fiber_type: edgeFiberTypeInput,
         distance: distNum,
         notes: edgeNotesInput.trim() || undefined,
+        counts_as_port: edgeCountsAsPort,
       };
       updatedEdges = [...edges, newEdge];
       pushSuccess("Kabel baru berhasil ditambahkan.");
@@ -764,6 +768,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
     setFirstNodeForEdge(null);
     setPendingOdpAssignment(null);
     setEdgeOdpPortInput("");
+    setEdgeCountsAsPort(false);
     setActiveTool("select");
     void syncData(nodes, updatedEdges);
   };
@@ -1389,6 +1394,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                           setEdgeFiberTypeInput(edge.fiber_type || "feeder");
                           setEdgeDistanceInput(String(edge.distance || ""));
                           setEdgeNotesInput(edge.notes || "");
+                          setEdgeCountsAsPort(!!edge.counts_as_port);
                           setIsEdgeModalOpen(true);
                         }}
                         className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition"
@@ -2217,6 +2223,28 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   placeholder="Contoh: Core 1 red, redup di ODP..."
                 />
               </div>
+
+              {(() => {
+                const srcNode = nodes.find((n) => n.node_id === edgeSourceInput);
+                const tgtNode = nodes.find((n) => n.node_id === edgeTargetInput);
+                if (srcNode?.type === "odp" && tgtNode?.type === "odp") {
+                  return (
+                    <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <input
+                        type="checkbox"
+                        id="countsAsPort"
+                        checked={edgeCountsAsPort}
+                        onChange={(e) => setEdgeCountsAsPort(e.target.checked)}
+                        className="w-4 h-4 text-indigo-600 bg-white border-slate-350 rounded focus:ring-indigo-500"
+                      />
+                      <label htmlFor="countsAsPort" className="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                        🔌 Gunakan / Makan Port ODP (Default: Tidak)
+                      </label>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               {pendingOdpAssignment && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
