@@ -49,6 +49,12 @@ func setupTestDB(t *testing.T) *sql.DB {
 			created_at DATETIME,
 			updated_at DATETIME
 		);
+		CREATE TABLE mapping_edges (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			source TEXT,
+			target TEXT,
+			counts_as_port INTEGER DEFAULT 0
+		);
 	`)
 	if err != nil {
 		t.Fatalf("create test tables: %v", err)

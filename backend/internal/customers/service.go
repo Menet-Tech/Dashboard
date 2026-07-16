@@ -92,9 +92,24 @@ func (s Service) Create(ctx context.Context, customer Customer) (Customer, error
 		}
 	}
 
-	if trialEnabled {
+	if customer.Status == "trial" || customer.IsTrial {
 		customer.IsTrial = true
+		customer.Status = "trial"
+		if customer.TrialDays <= 0 {
+			customer.TrialDays = trialPeriodDays
+		}
+		if customer.TrialStartedAt == nil {
+			nowStr := time.Now().UTC().Format(time.RFC3339)
+			customer.TrialStartedAt = &nowStr
+		}
+	} else if trialEnabled {
+		customer.IsTrial = true
+		customer.Status = "trial"
 		customer.TrialDays = trialPeriodDays
+		if customer.TrialStartedAt == nil {
+			nowStr := time.Now().UTC().Format(time.RFC3339)
+			customer.TrialStartedAt = &nowStr
+		}
 	} else {
 		customer.IsTrial = false
 		customer.TrialDays = 0
@@ -126,6 +141,21 @@ func (s Service) Update(ctx context.Context, id int64, customer Customer) (Custo
 	var oldUsername string
 	if err == nil {
 		oldUsername = strings.TrimSpace(oldCustomer.UserPPPoE)
+	}
+
+	// Handle trial status assignment on update
+	if customer.Status == "trial" && !customer.IsTrial {
+		customer.IsTrial = true
+		if customer.TrialDays <= 0 {
+			customer.TrialDays = 3
+		}
+		if customer.TrialStartedAt == nil {
+			nowStr := time.Now().UTC().Format(time.RFC3339)
+			customer.TrialStartedAt = &nowStr
+		}
+	} else if customer.Status != "trial" && customer.IsTrial {
+		// If status changed away from trial, clear trial flag
+		customer.IsTrial = false
 	}
 
 	updated, err := s.Repository.Update(ctx, id, normalizeCustomer(customer))
@@ -417,7 +447,7 @@ func validateCustomer(customer Customer) error {
 
 func isValidStatus(status string) bool {
 	switch status {
-	case "active", "limit", "suspended", "inactive", "pending", "wifi_umum":
+	case "active", "limit", "suspended", "inactive", "pending", "wifi_umum", "trial":
 		return true
 	default:
 		return false
@@ -649,17 +679,24 @@ func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Cu
 		return Customer{}, err
 	}
 
+	isTrialVal := 0
+	if customer.IsTrial {
+		isTrialVal = 1
+	}
+
 	result, err := r.DB.ExecContext(ctx, `
 		UPDATE pelanggan
 		SET nama = ?, paket_id = ?, user_pppoe = ?, password_pppoe = ?, nomor_wa = ?, sn_ont = ?, tgl_jatuh_tempo = ?, status = ?, alamat = ?,
 		    diskon = ?, tipe_diskon = ?, referred_by_id = ?, referral_balance = ?, referral_code = ?, voucher_discount = ?,
 		    ont_status = ?, ont_ip = ?, ont_uptime = ?, ont_rx_power = ?, ont_tx_power = ?, pppoe_status = ?, pppoe_ip = ?, pppoe_uptime = ?, last_sync_at = ?,
-		    odp_id = ?, odp_port = ?, voucher_auto_apply = ?, email = ?, updated_at = CURRENT_TIMESTAMP
+		    odp_id = ?, odp_port = ?, voucher_auto_apply = ?, email = ?,
+		    is_trial = ?, trial_started_at = ?, trial_days = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address,
 		customer.Diskon, customer.TipeDiskon, customer.ReferredByID, customer.ReferralBalance, toNullString(customer.ReferralCode), customer.VoucherDiscount,
 		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt,
-		customer.OdpID, customer.OdpPort, customer.VoucherAutoApply, customer.Email, id)
+		customer.OdpID, customer.OdpPort, customer.VoucherAutoApply, customer.Email,
+		isTrialVal, customer.TrialStartedAt, customer.TrialDays, id)
 	if err != nil {
 		return Customer{}, fmt.Errorf("update customer: %w", err)
 	}

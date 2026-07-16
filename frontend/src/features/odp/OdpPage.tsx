@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Loader2, Plus, Edit3, Trash2, ShieldAlert, Send, MapPin, Map } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Loader2, Plus, Edit3, Trash2, ShieldAlert, Send, MapPin, Map, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { StatusPill, EmptyTableRow } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
 import type { OdpItem, User, CustomerItem } from "../../types";
@@ -17,6 +17,63 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
   const [odps, setOdps] = useState<OdpItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const [sortField, setSortField] = useState<string | null>("nama");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const requestSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortedOdps = useMemo(() => {
+    if (!sortField) return odps;
+    return [...odps].sort((a, b) => {
+      let aVal = (a as any)[sortField];
+      let bVal = (b as any)[sortField];
+
+      const isNumericField = sortField === "ports" || sortField === "customer_count";
+      if (aVal === null || aVal === undefined) aVal = isNumericField ? 0 : "";
+      if (bVal === null || bVal === undefined) bVal = isNumericField ? 0 : "";
+
+      if (isNumericField) {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal).trim().toLowerCase();
+      const bStr = String(bVal).trim().toLowerCase();
+      return sortDirection === "asc"
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [odps, sortField, sortDirection]);
+
+  const renderSortableHeader = (label: string, field: string, align: "left" | "center" = "left") => {
+    const isSorted = sortField === field;
+    return (
+      <th 
+        className={`px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-105 dark:hover:bg-slate-805 transition-colors text-slate-500 ${align === "center" ? "text-center" : "text-left"}`}
+        onClick={() => requestSort(field)}
+      >
+        <div className={`inline-flex items-center gap-1.5 ${align === "center" ? "justify-center w-full" : ""}`}>
+          <span>{label}</span>
+          {isSorted ? (
+            sortDirection === "asc" ? (
+              <ChevronUp size={12} className="text-indigo-605 dark:text-indigo-400 stroke-[3]" />
+            ) : (
+              <ChevronDown size={12} className="text-indigo-655 dark:text-indigo-400 stroke-[3]" />
+            )
+          ) : (
+            <ArrowUpDown size={12} className="text-slate-355 dark:text-slate-600 opacity-50 transition-opacity" />
+          )}
+        </div>
+      </th>
+    );
+  };
 
   // Modal forms
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -235,12 +292,12 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
           <table className="w-full text-left border-collapse text-sm min-w-[800px]">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
               <tr>
-                <th className="px-6 py-4 font-semibold">Nama Node ODP</th>
-                <th className="px-6 py-4 font-semibold">Lokasi / Koordinat</th>
-                <th className="px-6 py-4 font-semibold">Splitter Ratio</th>
-                <th className="px-6 py-4 font-semibold">Deskripsi</th>
-                <th className="px-6 py-4 font-semibold text-center">Port Terpakai / Total</th>
-                <th className="px-6 py-4 font-semibold text-center">Aksi</th>
+                {renderSortableHeader("Nama Node ODP", "nama")}
+                {renderSortableHeader("Lokasi / Koordinat", "lokasi")}
+                {renderSortableHeader("Splitter Ratio", "splitter_ratio")}
+                {renderSortableHeader("Deskripsi", "deskripsi")}
+                {renderSortableHeader("Port Terpakai / Total", "customer_count", "center")}
+                <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -250,10 +307,10 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
                     <Loader2 className="animate-spin text-indigo-600 mx-auto" />
                   </td>
                 </tr>
-              ) : odps.length === 0 ? (
+              ) : sortedOdps.length === 0 ? (
                 <EmptyTableRow message="Belum ada node ODP yang terdaftar." colSpan={6} />
               ) : (
-                odps.map((item) => (
+                sortedOdps.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">
                       <div className="flex items-center gap-2">

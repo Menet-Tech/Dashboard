@@ -76,8 +76,8 @@ describe('⏰ ScheduledMessages Service — Unit Tests', () => {
 
     it('harus menolak jadwal bulanan di tanggal tidak aman', () => {
         expect(() => {
-            buildSchedule({ type: 'monthly', day: '31', time: '08:00' });
-        }).toThrow('1-28');
+            buildSchedule({ type: 'monthly', day: '32', time: '08:00' });
+        }).toThrow('1-31');
     });
 
     it('harus menolak jam bulanan invalid', () => {

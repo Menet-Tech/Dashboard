@@ -2,6 +2,7 @@ package mikrotik
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -107,6 +108,60 @@ func (c *Client) LimitUser(ctx context.Context, username, profile string) error 
 	}
 
 	return nil
+}
+
+// ExportBackup retrieves specific configuration parts (pools, profiles, secrets)
+// and returns them as a JSON-encoded byte array for backup purposes.
+func (c *Client) ExportBackup(ctx context.Context) ([]byte, error) {
+	if c.conn == nil {
+		if err := c.Connect(ctx); err != nil {
+			return nil, err
+		}
+		defer c.Close()
+	}
+
+	backupData := map[string]interface{}{}
+
+	// helper to fetch and parse
+	fetchAndParse := func(cmd string) ([]map[string]string, error) {
+		reply, err := c.run(ctx, cmd)
+		if err != nil {
+			return nil, err
+		}
+		var list []map[string]string
+		for _, sentence := range reply {
+			if len(sentence) > 0 && sentence[0] == "!re" {
+				m := make(map[string]string)
+				for _, word := range sentence[1:] {
+					if strings.HasPrefix(word, "=") {
+						parts := strings.SplitN(word[1:], "=", 2)
+						if len(parts) == 2 {
+							m[parts[0]] = parts[1]
+						}
+					}
+				}
+				list = append(list, m)
+			}
+		}
+		return list, nil
+	}
+
+	ipPools, err := fetchAndParse("/ip/pool/print")
+	if err == nil {
+		backupData["ip_pools"] = ipPools
+	}
+
+	pppProfiles, err := fetchAndParse("/ppp/profile/print")
+	if err == nil {
+		backupData["ppp_profiles"] = pppProfiles
+	}
+
+	pppSecrets, err := fetchAndParse("/ppp/secret/print")
+	if err == nil {
+		backupData["ppp_secrets"] = pppSecrets
+	}
+
+	return json.MarshalIndent(backupData, "", "  ")
 }
 
 // TestConnection verifies the RouterOS host is reachable and credentials work.
@@ -769,7 +824,9 @@ func (c *Client) SyncPPPProfile(ctx context.Context, name, localAddr, remoteAddr
 		if remoteAddr != "" {
 			args = append(args, "=remote-address="+remoteAddr)
 		}
-		args = append(args, "=rate-limit="+rateLimit)
+		if rateLimit != "" {
+			args = append(args, "=rate-limit="+rateLimit)
+		}
 
 		setReply, err := c.run(ctx, args...)
 		if err != nil {
@@ -785,7 +842,9 @@ func (c *Client) SyncPPPProfile(ctx context.Context, name, localAddr, remoteAddr
 	if remoteAddr != "" {
 		args = append(args, "=remote-address="+remoteAddr)
 	}
-	args = append(args, "=rate-limit="+rateLimit)
+	if rateLimit != "" {
+		args = append(args, "=rate-limit="+rateLimit)
+	}
 
 	addReply, err := c.run(ctx, args...)
 	if err != nil {

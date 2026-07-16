@@ -1,8 +1,8 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useMemo, type FormEvent } from "react";
 import { formatCurrency } from "../../utils/format";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow, RupiahInput } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
-import { Loader2, Plus, RefreshCw, Check, AlertTriangle } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Check, AlertTriangle, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import type { PackageItem } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
 import { fetchMikrotikIPPools, type MikrotikIPPoolItem, apiRequest } from "../../lib/api";
@@ -65,6 +65,63 @@ export function PackagesPage({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSyncOpen, setIsSyncOpen] = useState(false);
   const { showAlert } = useDialog();
+
+  const [sortField, setSortField] = useState<string | null>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const requestSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortedPackages = useMemo(() => {
+    if (!sortField) return packages;
+    return [...packages].sort((a, b) => {
+      let aVal = (a as any)[sortField];
+      let bVal = (b as any)[sortField];
+
+      const isNumericField = sortField === "price" || sortField === "speed_mbps" || sortField === "customer_count";
+      if (aVal === null || aVal === undefined) aVal = isNumericField ? 0 : "";
+      if (bVal === null || bVal === undefined) bVal = isNumericField ? 0 : "";
+
+      if (isNumericField) {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal).trim().toLowerCase();
+      const bStr = String(bVal).trim().toLowerCase();
+      return sortDirection === "asc"
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [packages, sortField, sortDirection]);
+
+  const renderSortableHeader = (label: string, field: string, align: "left" | "center" = "left") => {
+    const isSorted = sortField === field;
+    return (
+      <th 
+        className={`px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-slate-500 ${align === "center" ? "text-center" : "text-left"}`}
+        onClick={() => requestSort(field)}
+      >
+        <div className={`inline-flex items-center gap-1.5 ${align === "center" ? "justify-center w-full" : ""}`}>
+          <span>{label}</span>
+          {isSorted ? (
+            sortDirection === "asc" ? (
+              <ChevronUp size={12} className="text-indigo-660 dark:text-indigo-400 stroke-[3]" />
+            ) : (
+              <ChevronDown size={12} className="text-indigo-660 dark:text-indigo-400 stroke-[3]" />
+            )
+          ) : (
+            <ArrowUpDown size={12} className="text-slate-350 dark:text-slate-600 opacity-50 transition-opacity" />
+          )}
+        </div>
+      </th>
+    );
+  };
 
   // IP Pools list
   const [ipPools, setIpPools] = useState<MikrotikIPPoolItem[]>([]);
@@ -232,18 +289,18 @@ export function PackagesPage({
           <table className="w-full text-left border-collapse text-sm min-w-[600px]">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-sans">
               <tr>
-                <th className="px-6 py-4 font-semibold">Nama Paket / Profile MikroTik</th>
-                <th className="px-6 py-4 font-semibold">Kecepatan bandwidth</th>
-                <th className="px-6 py-4 font-semibold">Harga Bulanan</th>
-                <th className="px-6 py-4 font-semibold text-center">Pelanggan Aktif</th>
-                <th className="px-6 py-4 font-semibold text-center">Aksi</th>
+                {renderSortableHeader("Nama Paket / Profile MikroTik", "name")}
+                {renderSortableHeader("Kecepatan bandwidth", "speed_mbps")}
+                {renderSortableHeader("Harga Bulanan", "price")}
+                {renderSortableHeader("Pelanggan Aktif", "customer_count", "center")}
+                <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {packages.length === 0 ? (
+              {sortedPackages.length === 0 ? (
                 <EmptyTableRow message="Belum ada master paket. Tambahkan paket pertama untuk mulai operasional." colSpan={5} />
               ) : (
-                packages.map((pkg) => (
+                sortedPackages.map((pkg) => (
                   <tr key={pkg.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">{pkg.name}</td>
                     <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">

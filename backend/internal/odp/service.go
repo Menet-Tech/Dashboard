@@ -81,7 +81,8 @@ func (s Service) Delete(ctx context.Context, id int64) error {
 
 func (r Repository) List(ctx context.Context) ([]Odp, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), o.ports, COALESCE(o.splitter_ratio, '1:8'), COALESCE(o.latitude, 0.0), COALESCE(o.longitude, 0.0), COUNT(c.id)
+		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), o.ports, COALESCE(o.splitter_ratio, '1:8'), COALESCE(o.latitude, 0.0), COALESCE(o.longitude, 0.0),
+		       (COUNT(c.id) + COALESCE((SELECT COUNT(1) FROM mapping_edges e WHERE e.source = 'odp-' || o.id AND e.counts_as_port = 1), 0))
 		FROM odp o
 		LEFT JOIN pelanggan c ON c.odp_id = o.id
 		GROUP BY o.id, o.nama, o.lokasi, o.deskripsi, o.ports, o.splitter_ratio, o.latitude, o.longitude
@@ -110,7 +111,8 @@ func (r Repository) List(ctx context.Context) ([]Odp, error) {
 func (r Repository) FindByID(ctx context.Context, id int64) (Odp, error) {
 	var item Odp
 	err := r.DB.QueryRowContext(ctx, `
-		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), o.ports, COALESCE(o.splitter_ratio, '1:8'), COALESCE(o.latitude, 0.0), COALESCE(o.longitude, 0.0), COUNT(c.id)
+		SELECT o.id, o.nama, o.lokasi, COALESCE(o.deskripsi, ''), o.ports, COALESCE(o.splitter_ratio, '1:8'), COALESCE(o.latitude, 0.0), COALESCE(o.longitude, 0.0), 
+		       (COUNT(c.id) + COALESCE((SELECT COUNT(1) FROM mapping_edges e WHERE e.source = 'odp-' || o.id AND e.counts_as_port = 1), 0))
 		FROM odp o
 		LEFT JOIN pelanggan c ON c.odp_id = o.id
 		WHERE o.id = ?

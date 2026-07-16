@@ -2,13 +2,14 @@ package billing
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
-	"log/slog"
 
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/notifications"
@@ -220,12 +221,12 @@ func (s Service) MarkPaid(ctx context.Context, billID int64, method string, user
 			if err != nil {
 				return
 			}
-			
+
 			var adminUser string = "Sistem"
 			if userID > 0 {
 				_ = s.Repository.DB.QueryRowContext(bgCtx, "SELECT username FROM users WHERE id = ?", userID).Scan(&adminUser)
 			}
-			
+
 			embed := notifications.DiscordEmbed{
 				Title:       "💰 Pembayaran Tagihan Diterima",
 				Description: fmt.Sprintf("Tagihan milik pelanggan **%s** telah lunas.", detail.CustomerName),
@@ -411,6 +412,25 @@ func (s Service) QueueEmailForTrigger(ctx context.Context, billID int64, trigger
 				"Terima kasih,\nLayanan Billing",
 				templateData["nama"], templateData["invoice_number"], templateData["paket"], templateData["kecepatan_paket"], templateData["periode"], templateData["nominal"], templateData["jatuh_tempo"])
 		}
+	}
+	var existingEmailID int64
+	err = s.Repository.DB.QueryRowContext(ctx, `
+		SELECT id
+		FROM email_queue
+		WHERE to_email = ?
+		  AND subject = ?
+		  AND body = ?
+		  AND status IN ('pending', 'failed')
+		ORDER BY id DESC
+		LIMIT 1
+	`, email, subject, body).Scan(&existingEmailID)
+	if err == nil {
+		slog.Info("duplicate email notification skipped", "existing_id", existingEmailID, "trigger", triggerKey, "to", email)
+		return
+	}
+	if err != sql.ErrNoRows {
+		slog.Error("failed to check duplicate email notification", "trigger", triggerKey, "error", err)
+		return
 	}
 
 	_, err = s.Repository.DB.ExecContext(ctx, `
@@ -670,7 +690,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 					_ = options.SendDiscord(ctx, msg)
 				}
 
-			// Phase 2: suspension -> options.LimitDays + 15
+				// Phase 2: suspension -> options.LimitDays + 15
 			} else if od >= options.LimitDays+15 {
 				wasAlreadySuspended := item.CustomerStatus == "suspended" || item.CustomerStatus == "inactive"
 
@@ -754,14 +774,14 @@ func (s Service) sendGroupedNotifications(ctx context.Context, options Automatio
 	for i, c := range unsent {
 		totalAmount += c.Amount
 		pkgPrice := c.Amount + c.Diskon + c.DiskonReferral
-		
+
 		if i > 0 {
 			detailBlock.WriteString("\n")
 		}
 		detailBlock.WriteString(fmt.Sprintf("> Nama Pengguna: %s\n", c.CustomerName))
 		detailBlock.WriteString(fmt.Sprintf("> Paket: %s\n", c.PackageName))
 		detailBlock.WriteString(fmt.Sprintf("> Harga: Rp %s.", formatThousandSeparator(pkgPrice)))
-		
+
 		totalDisc := c.Diskon + c.DiskonReferral
 		if totalDisc > 0 {
 			detailBlock.WriteString("\n")
@@ -983,7 +1003,6 @@ type billCandidate struct {
 	TrialDays       int
 }
 
-
 type automationCandidate struct {
 	Bill
 	CustomerStatus         string
@@ -1088,7 +1107,6 @@ func trialExpiryTrigger(_ customers.Customer, _ Bill, _ int) (string, bool) {
 	return "trial_expired", true
 }
 
-
 func resolveTrialEndedAt(trialStartedAt *string, trialDays int) (time.Time, bool) {
 	if trialStartedAt == nil || strings.TrimSpace(*trialStartedAt) == "" || trialDays <= 0 {
 		return time.Time{}, false
@@ -1148,7 +1166,40 @@ func formatIDRCurrency(amount int) string {
 }
 
 func (s Service) PrepareMarkPaid(ctx context.Context, billID int64, method string, userID int64) error {
-	return s.Repository.PrepareMarkPaid(ctx, billID, method, userID)
+	err := s.Repository.PrepareMarkPaid(ctx, billID, method, userID)
+	if err != nil {
+		return err
+	}
+
+	if s.Discord != nil {
+		go func() {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			detail, err := s.FindByID(bgCtx, billID)
+			if err != nil {
+				return
+			}
+			var adminUser string = "Sistem"
+			if userID > 0 {
+				_ = s.Repository.DB.QueryRowContext(bgCtx, "SELECT username FROM users WHERE id = ?", userID).Scan(&adminUser)
+			}
+			embed := notifications.DiscordEmbed{
+				Title:       "⏳ Tagihan Ditandai Lunas (Menunggu Verifikasi)",
+				Description: fmt.Sprintf("Tagihan milik pelanggan **%s** ditandai lunas oleh **%s**. Menunggu verifikasi otomatis selama 10 menit.", detail.CustomerName, adminUser),
+				Color:       16766720, // Gold/Yellow (#f1c40f)
+				Fields: []notifications.EmbedField{
+					{Name: "Pelanggan", Value: detail.CustomerName, Inline: true},
+					{Name: "Nomor Invoice", Value: detail.InvoiceNumber, Inline: true},
+					{Name: "Nominal", Value: formatIDRCurrency(detail.Amount), Inline: true},
+					{Name: "Metode", Value: method, Inline: true},
+					{Name: "Diproses Oleh", Value: adminUser, Inline: true},
+				},
+			}
+			_ = s.Discord.SendEmbed(bgCtx, embed)
+		}()
+	}
+
+	return nil
 }
 
 func (s Service) PrepareExtension(ctx context.Context, billID int64) error {
@@ -1156,7 +1207,46 @@ func (s Service) PrepareExtension(ctx context.Context, billID int64) error {
 }
 
 func (s Service) CancelPendingAction(ctx context.Context, billID int64) error {
-	return s.Repository.CancelPendingAction(ctx, billID)
+	detail, err := s.FindByID(ctx, billID)
+	if err != nil {
+		return s.Repository.CancelPendingAction(ctx, billID)
+	}
+
+	err = s.Repository.CancelPendingAction(ctx, billID)
+	if err != nil {
+		return err
+	}
+
+	if s.Discord != nil {
+		go func() {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			var actionType string
+			switch detail.Status {
+			case "pending_paid":
+				actionType = "Tanda Lunas"
+			case "pending_extension":
+				actionType = "Tanda Perpanjangan"
+			default:
+				actionType = "Tindakan"
+			}
+
+			embed := notifications.DiscordEmbed{
+				Title:       fmt.Sprintf("🚫 %s Dibatalkan", actionType),
+				Description: fmt.Sprintf("%s untuk pelanggan **%s** telah dibatalkan. Status tagihan kembali menjadi belum bayar.", actionType, detail.CustomerName),
+				Color:       15158332, // Red (#e74c3c)
+				Fields: []notifications.EmbedField{
+					{Name: "Pelanggan", Value: detail.CustomerName, Inline: true},
+					{Name: "Nomor Invoice", Value: detail.InvoiceNumber, Inline: true},
+					{Name: "Nominal", Value: formatIDRCurrency(detail.Amount), Inline: true},
+				},
+			}
+			_ = s.Discord.SendEmbed(bgCtx, embed)
+		}()
+	}
+
+	return nil
 }
 
 func (s Service) CommitExtension(ctx context.Context, billID int64) error {

@@ -162,6 +162,8 @@ func (r Repository) FindByID(ctx context.Context, billID int64, menunggakDays in
 	item.DisplayStatus = computeDisplayStatus(item.Status, item.DueDate, menunggakDays, now)
 	if item.Status == "belum_bayar" && item.CustomerStatus == "pending" {
 		item.DisplayStatus = "perpanjangan"
+	} else if item.PaymentMethod == "perpanjangan" {
+		item.DisplayStatus = "perpanjangan"
 	}
 
 	paymentHistory, err := r.paymentHistory(ctx, billID)
@@ -971,6 +973,8 @@ func scanBill(scanner interface {
 	item.DisplayStatus = computeDisplayStatus(item.Status, item.DueDate, menunggakDays, now)
 	if item.Status == "belum_bayar" && customerStatus == "pending" {
 		item.DisplayStatus = "perpanjangan"
+	} else if item.PaymentMethod == "perpanjangan" {
+		item.DisplayStatus = "perpanjangan"
 	}
 	return item, nil
 }
@@ -1079,6 +1083,9 @@ func (r Repository) ListDelayedActions(ctx context.Context) ([]DelayedBill, erro
 			return nil, err
 		}
 		list = append(list, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating delayed actions: %w", err)
 	}
 	return list, nil
 }

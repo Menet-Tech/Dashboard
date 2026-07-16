@@ -20,15 +20,16 @@ const buildSchedule = (config = {}) => {
     if (type === 'monthly') {
         const day = Number(config.day);
         const time = String(config.time || '').trim();
-        if (!Number.isInteger(day) || day < 1 || day > 28) {
-            throw new Error('Tanggal jadwal bulanan harus angka 1-28 agar aman di semua bulan');
+        if (!Number.isInteger(day) || day < 1 || day > 31) {
+            throw new Error('Tanggal jadwal bulanan harus angka 1-31');
         }
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
             throw new Error('Jam jadwal bulanan harus format HH:mm');
         }
 
+        // Gunakan daily cron, validasi tanggal akan dilakukan di registerJob
         const [hour, minute] = time.split(':');
-        const cronExpr = `${minute} ${hour} ${day} * *`;
+        const cronExpr = `${minute} ${hour} * * *`;
         if (!cron.validate(cronExpr)) {
             throw new Error('Ekspresi cron jadwal bulanan tidak valid');
         }
@@ -88,6 +89,19 @@ const registerJob = (entry) => {
 
     const isRecurring = entry.type === 'monthly';
     const job = cron.schedule(entry.cronExpr, async () => {
+        if (isRecurring && entry.day) {
+            const today = new Date();
+            const currentDay = today.getDate();
+            const targetDay = entry.day;
+            const isLastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() === currentDay;
+            
+            // Hanya kirim jika hari ini adalah target hari, 
+            // ATAU hari ini adalah hari terakhir di bulan ini dan target hari lebih besar dari hari ini (contoh: target 31, bulan Feb hnya smpai 28)
+            if (currentDay !== targetDay && !(isLastDayOfMonth && targetDay > currentDay)) {
+                return; 
+            }
+        }
+
         logger.info(`[Scheduled] Sending scheduled message ${entry.id} to ${entry.to} via ${entry.accountId}`);
         try {
             await sendTextMessage(entry.accountId, entry.to, entry.text);

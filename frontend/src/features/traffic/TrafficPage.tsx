@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Line } from "react-chartjs-2";
-import { Search, Activity, ArrowUp, ArrowDown, X, Info } from "lucide-react";
+import { Search, Activity, ArrowUp, ArrowDown, X, Info, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import type { CustomerItem, PackageItem } from "../../types";
 import { fetchTrafficStats, type TrafficStats } from "../../lib/api";
 
@@ -34,6 +34,41 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
   const [trafficData, setTrafficData] = useState<Record<string, TrafficStats>>({});
   const [selectedCust, setSelectedCust] = useState<CustomerItem | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
+
+  const [sortField, setSortField] = useState<string | null>("usagePercent");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const requestSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const renderSortableHeader = (label: string, field: string, align: "left" | "center" = "left") => {
+    const isSorted = sortField === field;
+    return (
+      <th 
+        className={`px-6 py-4 font-semibold select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-550 dark:text-slate-400 ${align === "center" ? "text-center" : "text-left"}`}
+        onClick={() => requestSort(field)}
+      >
+        <div className={`inline-flex items-center gap-1.5 ${align === "center" ? "justify-center w-full" : ""}`}>
+          <span>{label}</span>
+          {isSorted ? (
+            sortDirection === "asc" ? (
+              <ChevronUp size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+            ) : (
+              <ChevronDown size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+            )
+          ) : (
+            <ArrowUpDown size={12} className="text-slate-300 dark:text-slate-600 opacity-50 transition-opacity" />
+          )}
+        </div>
+      </th>
+    );
+  };
 
   // Polling loop for traffic stats (every 2.5s)
   useEffect(() => {
@@ -174,6 +209,40 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
       };
     });
   }, [filteredCustomers, trafficData, packages]);
+
+  const sortedCustomers = useMemo(() => {
+    const list = processedCustomers;
+    if (!sortField) return list;
+    return [...list].sort((a, b) => {
+      let aVal: any = null;
+      let bVal: any = null;
+
+      if (sortField === "rx_rate") {
+        aVal = a.stats?.rx_rate || 0;
+        bVal = b.stats?.rx_rate || 0;
+      } else if (sortField === "tx_rate") {
+        aVal = a.stats?.tx_rate || 0;
+        bVal = b.stats?.tx_rate || 0;
+      } else {
+        aVal = (a as any)[sortField];
+        bVal = (b as any)[sortField];
+      }
+
+      const isNumericField = sortField === "limitMbps" || sortField === "usagePercent" || sortField === "rx_rate" || sortField === "tx_rate";
+      if (aVal === null || aVal === undefined) aVal = isNumericField ? 0 : "";
+      if (bVal === null || bVal === undefined) bVal = isNumericField ? 0 : "";
+
+      if (isNumericField) {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal).trim().toLowerCase();
+      const bStr = String(bVal).trim().toLowerCase();
+      return sortDirection === "asc"
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [processedCustomers, sortField, sortDirection]);
 
   // Overall page stats
   const totals = useMemo(() => {
@@ -326,25 +395,25 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
           <table className="w-full text-left border-collapse text-sm">
             <thead className="bg-slate-55/60 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-850/80 text-slate-500 dark:text-slate-400 text-xs uppercase font-extrabold tracking-wider">
               <tr>
-                <th className="px-6 py-4 font-semibold">Nama Pelanggan</th>
-                <th className="px-6 py-4 font-semibold">PPPoE Username</th>
-                <th className="px-6 py-4 font-semibold">Paket / Profil</th>
-                <th className="px-6 py-4 font-semibold">Limit Kecepatan</th>
-                <th className="px-6 py-4 font-semibold text-emerald-600 dark:text-emerald-400">Download (Rx)</th>
-                <th className="px-6 py-4 font-semibold text-pink-600 dark:text-pink-400">Upload (Tx)</th>
-                <th className="px-6 py-4 font-semibold">Utilisasi</th>
-                <th className="px-6 py-4 font-semibold text-center">Status</th>
+                {renderSortableHeader("Nama Pelanggan", "name")}
+                {renderSortableHeader("PPPoE Username", "user_pppoe")}
+                {renderSortableHeader("Paket / Profil", "package_name")}
+                {renderSortableHeader("Limit Kecepatan", "limitMbps")}
+                {renderSortableHeader("Download (Rx)", "rx_rate")}
+                {renderSortableHeader("Upload (Tx)", "tx_rate")}
+                {renderSortableHeader("Utilisasi", "usagePercent")}
+                <th className="px-6 py-4 font-semibold text-center text-slate-500">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-850/40">
-              {processedCustomers.length === 0 ? (
+              {sortedCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
                     Tidak ada pelanggan PPPoE aktif yang cocok dengan pencarian.
                   </td>
                 </tr>
               ) : (
-                processedCustomers.map((cust) => {
+                sortedCustomers.map((cust) => {
                   const isRed = cust.isCritical;
                   const isYellow = cust.isWarning;
 

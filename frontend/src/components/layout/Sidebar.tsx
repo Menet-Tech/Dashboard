@@ -23,6 +23,7 @@ import {
   ChevronDown,
   TrendingUp,
   FolderOpen,
+  Box,
 } from "lucide-react";
 
 export type NavItem = {
@@ -63,6 +64,7 @@ const iconMap: Record<ViewKey, React.ComponentType<{ className?: string }>> = {
   devices: Cpu,
   "network-map": Map,
   "payment-confirmations": ClipboardCheck,
+  inventory: Box,
 };
 
 const groups = [
@@ -78,7 +80,7 @@ const groups = [
     title: "Infrastruktur",
     icon: Network,
     gradient: "from-purple-600/10 via-pink-600/5 to-transparent dark:from-purple-500/20 dark:via-pink-500/10",
-    keys: ["odp", "network-map", "devices", "traffic", "tickets"] as ViewKey[],
+    keys: ["inventory", "odp", "network-map", "devices", "traffic", "tickets"] as ViewKey[],
   },
   {
     id: "komunikasi",

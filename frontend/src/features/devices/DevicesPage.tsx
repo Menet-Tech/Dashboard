@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { apiRequest, checkWAN, checkGponEpon, type GacsDevice, type GacsDeviceDetail, type GacsFault } from "../../lib/api";
 import { formatDateTime } from "../../utils/format";
 import { Modal } from "../../components/ui/Modal";
@@ -19,7 +19,10 @@ import {
   MapPin,
   MessageSquare,
   Globe,
-  Database
+  Database,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown
 } from "lucide-react";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -979,6 +982,47 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
   const [activeTab, setActiveTab] = useState<"registered" | "all" | "faults">("registered");
   const [detailId, setDetailId] = useState<string | null>(null);
 
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  // Reset sorting state when activeTab changes
+  useEffect(() => {
+    setSortField(null);
+    setSortDirection("asc");
+  }, [activeTab]);
+
+  const requestSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const renderSortableHeader = (label: string, field: string) => {
+    const isSorted = sortField === field;
+    return (
+      <th 
+        className="px-5 py-3 text-left font-semibold select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500"
+        onClick={() => requestSort(field)}
+      >
+        <div className="inline-flex items-center gap-1.5">
+          <span>{label}</span>
+          {isSorted ? (
+            sortDirection === "asc" ? (
+              <ChevronUp size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+            ) : (
+              <ChevronDown size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+            )
+          ) : (
+            <ArrowUpDown size={12} className="text-slate-300 dark:text-slate-600 opacity-50 transition-opacity" />
+          )}
+        </div>
+      </th>
+    );
+  };
+
   const loadDevices = useCallback(async () => {
     setLoading(true);
     try {
@@ -1050,6 +1094,45 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
       d.customer_name?.toLowerCase().includes(q)
     );
   });
+
+  const sortedDevices = useMemo(() => {
+    if (!sortField) return filtered;
+    return [...filtered].sort((a, b) => {
+      let aVal: any = null;
+      let bVal: any = null;
+
+      if (sortField === "device") {
+        aVal = deviceLabel(a);
+        bVal = deviceLabel(b);
+      } else if (sortField === "serial") {
+        aVal = a._deviceId._SerialNumber || "";
+        bVal = b._deviceId._SerialNumber || "";
+      } else if (sortField === "status") {
+        aVal = onlineStatus(a._lastInform);
+        bVal = onlineStatus(b._lastInform);
+      } else if (sortField === "last_inform") {
+        aVal = a._lastInform || "";
+        bVal = b._lastInform || "";
+      } else if (sortField === "rx_power") {
+        aVal = parseFloat(a._summary?.rx_power ?? "") || -99;
+        bVal = parseFloat(b._summary?.rx_power ?? "") || -99;
+      }
+
+      if (aVal === null || aVal === undefined) aVal = "";
+      if (bVal === null || bVal === undefined) bVal = "";
+
+      const isNumericField = sortField === "rx_power";
+      if (isNumericField) {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal).trim().toLowerCase();
+      const bStr = String(bVal).trim().toLowerCase();
+      return sortDirection === "asc"
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [filtered, sortField, sortDirection]);
 
   const onlineCount = devices.filter((d) => onlineStatus(d._lastInform) === "online").length;
   const offlineCount = devices.filter((d) => onlineStatus(d._lastInform) === "offline").length;
@@ -1131,25 +1214,25 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                   <table className="compact-table w-full text-xs">
                     <thead className="bg-slate-50 text-slate-650 font-semibold border-b border-slate-200">
                       <tr>
-                        <th className="px-5 py-3 text-left">Perangkat</th>
-                        <th className="px-5 py-3 text-left">Serial Number</th>
-                        <th className="px-5 py-3 text-left">Status</th>
-                        <th className="px-5 py-3 text-left">Last Inform</th>
-                        <th className="px-5 py-3 text-left">SSID / PPPoE</th>
-                        <th className="px-5 py-3 text-left">RX Power</th>
-                        <th className="px-5 py-3 text-left">Tag</th>
-                        <th className="px-5 py-3 text-left">Aksi</th>
+                        {renderSortableHeader("Perangkat", "device")}
+                        {renderSortableHeader("Serial Number", "serial")}
+                        {renderSortableHeader("Status", "status")}
+                        {renderSortableHeader("Last Inform", "last_inform")}
+                        <th className="px-5 py-3 text-left text-slate-500 font-semibold">SSID / PPPoE</th>
+                        {renderSortableHeader("RX Power", "rx_power")}
+                        <th className="px-5 py-3 text-left text-slate-500 font-semibold">Tag</th>
+                        <th className="px-5 py-3 text-left text-slate-500 font-semibold">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-250 bg-white">
-                      {filtered.length === 0 ? (
+                      {sortedDevices.length === 0 ? (
                         <tr>
                           <td colSpan={8} className="px-5 py-12 text-center text-slate-400 font-medium">
                             {search ? "Tidak ada perangkat yang cocok." : "Tidak ada perangkat terdaftar di GenieACS."}
                           </td>
                         </tr>
                       ) : (
-                        filtered.map((d) => {
+                        sortedDevices.map((d) => {
                           const status = onlineStatus(d._lastInform);
                           const rxPowerFloat = parseFloat(d._summary?.rx_power ?? "");
                           const rxPowerColor = isNaN(rxPowerFloat) ? "text-slate-400" :

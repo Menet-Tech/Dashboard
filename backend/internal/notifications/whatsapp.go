@@ -39,15 +39,16 @@ type BillMessagePayload struct {
 }
 
 type QueuedMessage struct {
-	ID         int64
-	AccountID  string
-	ToNumber   string
-	Body       string
-	Status     string
-	Attempts   int
-	BillID     sql.NullInt64
-	TriggerKey sql.NullString
-	IsManual   bool
+	ID           int64
+	AccountID    string
+	ToNumber     string
+	Body         string
+	Status       string
+	Attempts     int
+	BillID       sql.NullInt64
+	TriggerKey   sql.NullString
+	GroupBillIDs sql.NullString
+	IsManual     bool
 }
 
 func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePayload) error {
@@ -136,6 +137,9 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 							bills = append(bills, b)
 						}
 					}
+					if err := rows.Err(); err != nil {
+						slog.Error("error iterating lunas bills", "error", err)
+					}
 					rows.Close()
 				}
 
@@ -209,37 +213,48 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 			_ = s.Logs.DB.QueryRowContext(ctx, "SELECT periode, jatuh_tempo FROM tagihan WHERE id = ?", payload.BillID).Scan(&targetPeriod, &targetDueDate)
 
 			var unpaidBills []struct {
-				ID          int64
-				Period      string
-				Nominal     float64
-				CustName    string
-				PackageName string
-				HargaPaket  float64
-				Diskon      float64
-				DiscRef     float64
-				HasODP      bool
-				DueDate     string
+				ID            int64
+				Period        string
+				Nominal       float64
+				CustName      string
+				PackageName   string
+				HargaPaket    float64
+				Diskon        float64
+				DiscRef       float64
+				HasODP        bool
+				DueDate       string
+				PaymentMethod string
 			}
 
 			var rows *sql.Rows
 			var err error
 			if targetPeriod != "" {
 				rows, err = s.Logs.DB.QueryContext(ctx, `
-				SELECT t.id, t.periode, t.nominal, p.nama, COALESCE(pk.nama, ''), COALESCE(pk.harga, 0), t.diskon, t.diskon_referral, COALESCE(p.odp_id, 0), t.jatuh_tempo
+				SELECT t.id, t.periode, t.nominal, p.nama, COALESCE(pk.nama, ''), COALESCE(pk.harga, 0), t.diskon, t.diskon_referral, COALESCE(p.odp_id, 0), t.jatuh_tempo, COALESCE(t.payment_method, '')
 				FROM tagihan t
 				JOIN pelanggan p ON t.pelanggan_id = p.id
 				LEFT JOIN paket pk ON p.paket_id = pk.id
-				WHERE p.nomor_wa = ? AND t.status = 'belum_bayar' AND p.status NOT IN ('inactive', 'perpanjangan', 'wifi_umum')
+				WHERE p.nomor_wa = ?
+				  AND (t.status = 'belum_bayar' OR (t.payment_method = 'perpanjangan' AND EXISTS (
+				      SELECT 1 FROM tagihan t2
+				      WHERE t2.pelanggan_id = t.pelanggan_id AND t2.status = 'belum_bayar'
+				  )))
+				  AND p.status NOT IN ('inactive', 'perpanjangan', 'wifi_umum')
 				  AND t.periode <= ?
 				ORDER BY t.periode ASC, t.id ASC
 			`, payload.PhoneNumber, targetPeriod)
 			} else {
 				rows, err = s.Logs.DB.QueryContext(ctx, `
-				SELECT t.id, t.periode, t.nominal, p.nama, COALESCE(pk.nama, ''), COALESCE(pk.harga, 0), t.diskon, t.diskon_referral, COALESCE(p.odp_id, 0), t.jatuh_tempo
+				SELECT t.id, t.periode, t.nominal, p.nama, COALESCE(pk.nama, ''), COALESCE(pk.harga, 0), t.diskon, t.diskon_referral, COALESCE(p.odp_id, 0), t.jatuh_tempo, COALESCE(t.payment_method, '')
 				FROM tagihan t
 				JOIN pelanggan p ON t.pelanggan_id = p.id
 				LEFT JOIN paket pk ON p.paket_id = pk.id
-				WHERE p.nomor_wa = ? AND t.status = 'belum_bayar' AND p.status NOT IN ('inactive', 'perpanjangan', 'wifi_umum')
+				WHERE p.nomor_wa = ?
+				  AND (t.status = 'belum_bayar' OR (t.payment_method = 'perpanjangan' AND EXISTS (
+				      SELECT 1 FROM tagihan t2
+				      WHERE t2.pelanggan_id = t.pelanggan_id AND t2.status = 'belum_bayar'
+				  )))
+				  AND p.status NOT IN ('inactive', 'perpanjangan', 'wifi_umum')
 				ORDER BY t.periode ASC, t.id ASC
 			`, payload.PhoneNumber)
 			}
@@ -247,52 +262,75 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 			if err == nil {
 				for rows.Next() {
 					var b struct {
-						ID          int64
-						Period      string
-						Nominal     float64
-						CustName    string
-						PackageName string
-						HargaPaket  float64
-						Diskon      float64
-						DiscRef     float64
-						HasODP      bool
-						DueDate     string
+						ID            int64
+						Period        string
+						Nominal       float64
+						CustName      string
+						PackageName   string
+						HargaPaket    float64
+						Diskon        float64
+						DiscRef       float64
+						HasODP        bool
+						DueDate       string
+						PaymentMethod string
 					}
 					var odpID int64
-					if err := rows.Scan(&b.ID, &b.Period, &b.Nominal, &b.CustName, &b.PackageName, &b.HargaPaket, &b.Diskon, &b.DiscRef, &odpID, &b.DueDate); err == nil {
+					if err := rows.Scan(&b.ID, &b.Period, &b.Nominal, &b.CustName, &b.PackageName, &b.HargaPaket, &b.Diskon, &b.DiscRef, &odpID, &b.DueDate, &b.PaymentMethod); err == nil {
 						b.HasODP = odpID > 0
 						unpaidBills = append(unpaidBills, b)
 					}
+				}
+				if err := rows.Err(); err != nil {
+					slog.Error("error iterating unpaid bills", "error", err)
 				}
 				rows.Close()
 			}
 
 			if len(unpaidBills) == 0 {
 				var b struct {
-					ID          int64
-					Period      string
-					Nominal     float64
-					CustName    string
-					PackageName string
-					HargaPaket  float64
-					Diskon      float64
-					DiscRef     float64
-					HasODP      bool
-					DueDate     string
+					ID            int64
+					Period        string
+					Nominal       float64
+					CustName      string
+					PackageName   string
+					HargaPaket    float64
+					Diskon        float64
+					DiscRef       float64
+					HasODP        bool
+					DueDate       string
+					PaymentMethod string
 				}
 				var odpID int64
 				err := s.Logs.DB.QueryRowContext(ctx, `
-				SELECT t.id, t.periode, t.nominal, p.nama, COALESCE(pk.nama, ''), COALESCE(pk.harga, 0), t.diskon, t.diskon_referral, COALESCE(p.odp_id, 0), t.jatuh_tempo
+				SELECT t.id, t.periode, t.nominal, p.nama, COALESCE(pk.nama, ''), COALESCE(pk.harga, 0), t.diskon, t.diskon_referral, COALESCE(p.odp_id, 0), t.jatuh_tempo, COALESCE(t.payment_method, '')
 				FROM tagihan t
 				JOIN pelanggan p ON t.pelanggan_id = p.id
 				LEFT JOIN paket pk ON p.paket_id = pk.id
 				WHERE t.id = ? AND p.status NOT IN ('inactive', 'perpanjangan', 'wifi_umum')
-			`, payload.BillID).Scan(&b.ID, &b.Period, &b.Nominal, &b.CustName, &b.PackageName, &b.HargaPaket, &b.Diskon, &b.DiscRef, &odpID, &b.DueDate)
+			`, payload.BillID).Scan(&b.ID, &b.Period, &b.Nominal, &b.CustName, &b.PackageName, &b.HargaPaket, &b.Diskon, &b.DiscRef, &odpID, &b.DueDate, &b.PaymentMethod)
 				if err == nil {
 					b.HasODP = odpID > 0
 					unpaidBills = append(unpaidBills, b)
 					if targetDueDate == "" {
 						targetDueDate = b.DueDate
+					}
+				}
+			}
+
+			// If we have perpanjangan bills, adjust the carryover bill's nominal
+			var perpanjanganTotal float64
+			for _, b := range unpaidBills {
+				if b.PaymentMethod == "perpanjangan" {
+					perpanjanganTotal += b.Nominal
+				}
+			}
+			if perpanjanganTotal > 0 {
+				for i, b := range unpaidBills {
+					if b.PaymentMethod != "perpanjangan" {
+						unpaidBills[i].Nominal = b.Nominal - perpanjanganTotal
+						if unpaidBills[i].Nominal < 0 {
+							unpaidBills[i].Nominal = 0
+						}
 					}
 				}
 			}
@@ -471,6 +509,57 @@ func (s WhatsAppService) QueueDirectMessage(ctx context.Context, accountID, toNu
 	return s.QueueMessage(ctx, accountID, toNumber, body, 0, "", false)
 }
 
+func (s WhatsAppService) QueueGroupedMessage(ctx context.Context, accountID, toNumber, body string, billIDs []int64, triggerKey string) error {
+	if len(billIDs) == 0 {
+		return s.QueueDirectMessage(ctx, accountID, toNumber, body)
+	}
+
+	billID := billIDs[0]
+	var bID sql.NullInt64
+	if billID > 0 {
+		bID = sql.NullInt64{Int64: billID, Valid: true}
+	}
+	var tKey sql.NullString
+	if triggerKey != "" {
+		tKey = sql.NullString{String: triggerKey, Valid: true}
+	}
+
+	if billID > 0 && strings.TrimSpace(triggerKey) != "" {
+		var existingID int64
+		err := s.Logs.DB.QueryRowContext(ctx, `
+			SELECT id
+			FROM whatsapp_queue
+			WHERE bill_id = ?
+			  AND trigger_key = ?
+			  AND to_number = ?
+			  AND status IN ('pending', 'failed')
+			ORDER BY id DESC
+			LIMIT 1
+		`, billID, triggerKey, toNumber).Scan(&existingID)
+		if err == nil {
+			slog.Info("queue: duplicate grouped whatsapp automation skipped", "existing_id", existingID, "bill_id", billID, "trigger", triggerKey, "to", toNumber)
+			return nil
+		}
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("check existing grouped whatsapp_queue: %w", err)
+		}
+	}
+
+	groupJSON, err := json.Marshal(billIDs)
+	if err != nil {
+		return fmt.Errorf("marshal grouped bill ids: %w", err)
+	}
+
+	_, err = s.Logs.DB.ExecContext(ctx, `
+		INSERT INTO whatsapp_queue (account_id, to_number, body, status, attempts, bill_id, trigger_key, group_bill_ids, is_manual)
+		VALUES (?, ?, ?, 'pending', 0, ?, ?, ?, 0)
+	`, accountID, toNumber, body, bID, tKey, string(groupJSON))
+	if err != nil {
+		return fmt.Errorf("insert grouped whatsapp_queue: %w", err)
+	}
+	return nil
+}
+
 func (s WhatsAppService) SendDirectMessage(ctx context.Context, accountID, toNumber, body string) error {
 	return s.sendDirect(ctx, QueuedMessage{
 		AccountID: accountID,
@@ -528,7 +617,7 @@ func (s WhatsAppService) QueueMessage(ctx context.Context, accountID, toNumber, 
 
 func (s WhatsAppService) ProcessQueue(ctx context.Context) (bool, bool, error) {
 	row := s.Logs.DB.QueryRowContext(ctx, `
-		SELECT id, account_id, to_number, body, status, attempts, bill_id, trigger_key, is_manual
+		SELECT id, account_id, to_number, body, status, attempts, bill_id, trigger_key, COALESCE(group_bill_ids, ''), is_manual
 		FROM whatsapp_queue
 		WHERE status = 'pending' AND attempts < 3
 		ORDER BY id ASC
@@ -537,7 +626,7 @@ func (s WhatsAppService) ProcessQueue(ctx context.Context) (bool, bool, error) {
 
 	var msg QueuedMessage
 	var isManualVal int
-	err := row.Scan(&msg.ID, &msg.AccountID, &msg.ToNumber, &msg.Body, &msg.Status, &msg.Attempts, &msg.BillID, &msg.TriggerKey, &isManualVal)
+	err := row.Scan(&msg.ID, &msg.AccountID, &msg.ToNumber, &msg.Body, &msg.Status, &msg.Attempts, &msg.BillID, &msg.TriggerKey, &msg.GroupBillIDs, &isManualVal)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, false, nil
@@ -596,8 +685,14 @@ func (s WhatsAppService) ProcessQueue(ctx context.Context) (bool, bool, error) {
 			slog.Error("failed to mark message as sent", "id", msg.ID, "error", err)
 		}
 
-		if msg.BillID.Valid && msg.TriggerKey.Valid {
-			_ = s.Logs.RecordWithMessage(ctx, msg.BillID.Int64, msg.TriggerKey.String, msg.ToNumber, "sent", "OK", msg.Body)
+		notificationBillIDs := msg.NotificationBillIDs()
+		if len(notificationBillIDs) > 0 && msg.TriggerKey.Valid {
+			for _, billID := range notificationBillIDs {
+				recordErr := s.Logs.RecordWithMessage(ctx, billID, msg.TriggerKey.String, msg.ToNumber, "sent", "OK", msg.Body)
+				if recordErr != nil {
+					slog.Error("failed to record notification log", "bill_id", billID, "trigger", msg.TriggerKey.String, "error", recordErr)
+				}
+			}
 			if s.Discord != nil {
 				typeStr := "Otomatis"
 				if msg.IsManual {
@@ -636,8 +731,11 @@ func (s WhatsAppService) ProcessQueue(ctx context.Context) (bool, bool, error) {
 		slog.Error("failed to update failed message status", "id", msg.ID, "error", err)
 	}
 
-	if status == "failed" && msg.BillID.Valid && msg.TriggerKey.Valid {
-		_ = s.Logs.RecordWithMessage(ctx, msg.BillID.Int64, msg.TriggerKey.String, msg.ToNumber, "failed", errMsg, msg.Body)
+	notificationBillIDs := msg.NotificationBillIDs()
+	if status == "failed" && len(notificationBillIDs) > 0 && msg.TriggerKey.Valid {
+		for _, billID := range notificationBillIDs {
+			_ = s.Logs.RecordWithMessage(ctx, billID, msg.TriggerKey.String, msg.ToNumber, "failed", errMsg, msg.Body)
+		}
 		if s.Discord != nil {
 			typeStr := "Otomatis"
 			if msg.IsManual {
@@ -659,8 +757,32 @@ func (s WhatsAppService) ProcessQueue(ctx context.Context) (bool, bool, error) {
 		}
 	}
 
-	slog.Error("queue: whatsapp message failed to send", "id", msg.ID, "to", msg.ToNumber, "attempts", msg.Attempts, "error", sendErr)
 	return true, msg.IsManual, nil
+}
+
+func (msg QueuedMessage) NotificationBillIDs() []int64 {
+	if msg.GroupBillIDs.Valid && strings.TrimSpace(msg.GroupBillIDs.String) != "" {
+		var billIDs []int64
+		if err := json.Unmarshal([]byte(msg.GroupBillIDs.String), &billIDs); err == nil {
+			seen := make(map[int64]bool, len(billIDs))
+			filtered := make([]int64, 0, len(billIDs))
+			for _, billID := range billIDs {
+				if billID <= 0 || seen[billID] {
+					continue
+				}
+				seen[billID] = true
+				filtered = append(filtered, billID)
+			}
+			if len(filtered) > 0 {
+				return filtered
+			}
+		}
+	}
+
+	if msg.BillID.Valid && msg.BillID.Int64 > 0 {
+		return []int64{msg.BillID.Int64}
+	}
+	return nil
 }
 
 func (s WhatsAppService) sendDirect(ctx context.Context, msg QueuedMessage) error {
@@ -761,7 +883,22 @@ func (r NotificationLogRepository) AlreadySent(ctx context.Context, billID int64
 	`, billID, triggerKey).Scan(&count); err != nil {
 		return false, fmt.Errorf("check notification log: %w", err)
 	}
-	return count > 0, nil
+	if count > 0 {
+		return true, nil
+	}
+
+	var queueCount int
+	if err := r.DB.QueryRowContext(ctx, `
+		SELECT COUNT(1)
+		FROM whatsapp_queue
+		WHERE bill_id = ?
+		  AND trigger_key = ?
+		  AND status IN ('pending', 'failed')
+	`, billID, triggerKey).Scan(&queueCount); err != nil {
+		return false, fmt.Errorf("check whatsapp queue: %w", err)
+	}
+
+	return queueCount > 0, nil
 }
 
 func (r NotificationLogRepository) Record(ctx context.Context, billID int64, triggerKey, sentTo, status, response string) error {
@@ -792,11 +929,21 @@ type NotificationLog struct {
 
 func (r NotificationLogRepository) FindLogs(ctx context.Context, billID int64) ([]NotificationLog, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT id, bill_id, trigger_key, COALESCE(sent_to, ''), status, COALESCE(response_message, ''), COALESCE(message, ''), created_at
+		SELECT id, bill_id, trigger_key, COALESCE(sent_to, '') AS sent_to, status, COALESCE(response_message, '') AS response_message, COALESCE(message, '') AS message, created_at
 		FROM notification_logs
 		WHERE bill_id = ?
-		ORDER BY id DESC
-	`, billID)
+		UNION ALL
+		SELECT -id AS id, COALESCE(bill_id, 0) AS bill_id, COALESCE(trigger_key, '') AS trigger_key, to_number AS sent_to, 'queued' AS status, 
+		       CASE 
+		           WHEN error_message IS NOT NULL AND error_message != '' THEN error_message
+		           ELSE 'Dalam Antrean'
+		       END AS response_message,
+		       body AS message,
+		       created_at
+		FROM whatsapp_queue
+		WHERE bill_id = ? AND (status = 'pending' OR (status = 'failed' AND attempts < 3))
+		ORDER BY created_at DESC, id DESC
+	`, billID, billID)
 	if err != nil {
 		return nil, fmt.Errorf("find notification logs: %w", err)
 	}

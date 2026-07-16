@@ -179,15 +179,16 @@ func runWorker(cfg config.Config, logger *slog.Logger, db *sql.DB) {
 	emailService := notifications.NewEmailService(settingsService, db)
 
 	service := worker.Service{
-		Logger:    logger,
-		Billing:   billingService,
-		Settings:  settingsService,
-		WhatsApp:  whatsAppService,
-		Discord:   discordService,
-		Backup:    backupService,
-		Customers: customersService,
-		Email:     emailService,
-		DB:        db,
+		Logger:      logger,
+		Billing:     billingService,
+		Settings:    settingsService,
+		WhatsApp:    whatsAppService,
+		Discord:     discordService,
+		Backup:      backupService,
+		Customers:   customersService,
+		Email:       emailService,
+		StoragePath: cfg.StoragePath,
+		DB:          db,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

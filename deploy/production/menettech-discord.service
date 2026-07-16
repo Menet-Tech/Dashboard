@@ -8,6 +8,8 @@ User=menettech
 Group=menettech
 WorkingDirectory=/opt/menettech-go/integration
 EnvironmentFile=/opt/menettech-go/integration/.env
+Environment=GOGC=20
+Environment=GOMEMLIMIT=30MiB
 ExecStart=/opt/menettech-go/integration/discord-bot
 Restart=always
 RestartSec=5
@@ -15,6 +17,9 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
+# Soft memory warning at 40MB; hard ceiling 55MB
+MemoryHigh=40M
+MemoryMax=55M
 
 [Install]
 WantedBy=multi-user.target

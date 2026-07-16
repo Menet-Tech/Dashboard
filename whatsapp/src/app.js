@@ -6,8 +6,6 @@ const routes = require('./routes');
 const { errorHandler } = require('./middleware/errorHandler');
 const { rateLimiter } = require('./middleware/rateLimiter');
 const { ipWhitelist } = require('./middleware/ipWhitelist');
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./docs/swagger');
 const crypto = require('crypto');
 
 const app = express();
@@ -37,6 +35,14 @@ app.use('/temp/media', express.static(path.join(__dirname, '../temp/media'), {
     maxAge: '1h'
 }));
 
+// Static folder untuk persistent uploads (gambar autoreply)
+app.use('/uploads', express.static(path.join(__dirname, '../storage/uploads'), {
+    maxAge: '7d'
+}));
+app.use('/wa/uploads', express.static(path.join(__dirname, '../storage/uploads'), {
+    maxAge: '7d'
+}));
+
 // Cegah akses langsung ke /temp/ selain media
 app.use('/temp', (req, res) => {
     res.status(403).send('Forbidden');
@@ -45,8 +51,12 @@ app.use('/temp', (req, res) => {
 // Routes
 app.use('/api', routes);
 
-// Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Swagger UI – only loaded when DISABLE_SWAGGER != 'true' (saves ~5-10MB heap in production)
+if (process.env.DISABLE_SWAGGER !== 'true') {
+    const swaggerUi = require('swagger-ui-express');
+    const swaggerSpec = require('./docs/swagger');
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+}
 
 // Health check (tanpa middleware readiness)
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

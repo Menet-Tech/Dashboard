@@ -8,7 +8,8 @@ User=menettech
 Group=menettech
 WorkingDirectory=/opt/menettech-go/integration/whatsapp
 EnvironmentFile=/opt/menettech-go/integration/whatsapp/.env
-ExecStart=/usr/bin/node src/server.js
+Environment=DISABLE_SWAGGER=true
+ExecStart=/usr/bin/node --max-old-space-size=160 src/server.js
 Restart=always
 RestartSec=5
 NoNewPrivileges=true
@@ -16,6 +17,10 @@ PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
 ReadWritePaths=/opt/menettech-go/integration/whatsapp
+# Node.js + Puppeteer/Chromium: soft warning at 200MB; hard ceiling 250MB
+# Kalau sering muncul "OOM" atau restart loop → naikkan MemoryMax ke 300M
+MemoryHigh=200M
+MemoryMax=250M
 
 [Install]
 WantedBy=multi-user.target

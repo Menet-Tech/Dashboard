@@ -42,8 +42,8 @@ export function validateCustomer(form: {
   if (!isWifiUmum) {
     if (!form.user_pppoe.trim()) errors.user_pppoe = "Username PPPoE wajib diisi.";
     if (!form.password_pppoe.trim()) errors.password_pppoe = "Password PPPoE wajib diisi.";
-    if (form.due_day < 1 || form.due_day > 28)
-      errors.due_day = "Jatuh tempo bulanan harus antara 1-28.";
+    if (form.due_day < 1 || form.due_day > 31)
+      errors.due_day = "Jatuh tempo bulanan harus antara 1-31.";
   }
 
   if (form.diskon !== undefined && form.tipe_diskon === "percent") {

@@ -15,7 +15,7 @@ const ipWhitelist = (req, res, next) => {
     // Normalisasi IPv6-mapped IPv4
     const normalized = clientIp.replace(/^::ffff:/, '');
 
-    if (allowed.includes(normalized) || allowed.includes(clientIp)) {
+    if (allowed.includes(normalized) || allowed.includes(clientIp) || clientIp === '::1' || clientIp === '127.0.0.1') {
         return next();
     }
 

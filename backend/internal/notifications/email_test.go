@@ -75,3 +75,80 @@ func TestEmailServiceQueueAndProcess(t *testing.T) {
 		t.Fatalf("expected status to be 'sent', got %q", status)
 	}
 }
+
+func TestEmailQueueSkipsDuplicatePendingRows(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open sqlite memory db: %v", err)
+	}
+	defer db.Close()
+
+	if err := migrate.Apply(db); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	emailSvc := NewEmailService(settings.Service{Repository: settings.Repository{DB: db}}, db)
+	ctx := context.Background()
+
+	if err := emailSvc.QueueEmail(ctx, "dup@domain.com", "Subject", "Body"); err != nil {
+		t.Fatalf("queue first email: %v", err)
+	}
+	if err := emailSvc.QueueEmail(ctx, " dup@domain.com ", " Subject ", " Body "); err != nil {
+		t.Fatalf("queue duplicate email: %v", err)
+	}
+
+	var count int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(1) FROM email_queue`).Scan(&count); err != nil {
+		t.Fatalf("count email queue rows: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected duplicate email queue to be skipped, got %d rows", count)
+	}
+}
+
+func TestEmailProcessQueueTreatsSendFailureAsProcessed(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open sqlite memory db: %v", err)
+	}
+	defer db.Close()
+
+	if err := migrate.Apply(db); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	settingsSvc := settings.Service{Repository: settings.Repository{DB: db}}
+	ctx := context.Background()
+	for key, value := range map[string]string{
+		"smtp_enabled":    "true",
+		"smtp_host":       "127.0.0.1",
+		"smtp_port":       "1",
+		"smtp_from_email": "noreply@example.com",
+	} {
+		if err := settingsSvc.Set(ctx, key, value); err != nil {
+			t.Fatalf("set %s: %v", key, err)
+		}
+	}
+
+	emailSvc := NewEmailService(settingsSvc, db)
+	if err := emailSvc.QueueEmail(ctx, "test@domain.com", "Subject", "Body"); err != nil {
+		t.Fatalf("queue email: %v", err)
+	}
+
+	processed, err := emailSvc.ProcessQueue(ctx)
+	if err != nil {
+		t.Fatalf("process queue should not return SMTP transport errors: %v", err)
+	}
+	if !processed {
+		t.Fatal("expected queue item to be processed")
+	}
+
+	var status string
+	var attempts int
+	if err := db.QueryRowContext(ctx, `SELECT status, attempts FROM email_queue WHERE id = 1`).Scan(&status, &attempts); err != nil {
+		t.Fatalf("query email queue status: %v", err)
+	}
+	if status != "pending" || attempts != 1 {
+		t.Fatalf("expected pending status with one attempt, got status=%q attempts=%d", status, attempts)
+	}
+}

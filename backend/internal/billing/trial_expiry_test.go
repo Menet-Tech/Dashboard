@@ -46,6 +46,11 @@ func (m *mockDiscordSender) IsEventEnabled(ctx context.Context, event string) bo
 	return true
 }
 
+func (m *mockDiscordSender) SendFile(ctx context.Context, msg, filename string, data []byte) error {
+	m.messages = append(m.messages, msg+" "+filename)
+	return nil
+}
+
 func TestProcessTrialExpiryGeneratesBillsForExpiredTrials(t *testing.T) {
 	db := trialTestDB(t)
 	settingsService := settings.Service{Repository: settings.Repository{DB: db}}

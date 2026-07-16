@@ -1,7 +1,7 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useMemo, type FormEvent } from "react";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
-import { Plus } from "lucide-react";
+import { Plus, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import type { EmailTemplateItem } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
 import {
@@ -46,6 +46,64 @@ export function EmailTemplatesPage({
   const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const requestSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortedTemplates = useMemo(() => {
+    const list = templates || [];
+    if (!sortField) return list;
+    return [...list].sort((a, b) => {
+      let aVal = (a as any)[sortField];
+      let bVal = (b as any)[sortField];
+
+      const isNumericField = sortField === "is_active";
+      if (aVal === null || aVal === undefined) aVal = isNumericField ? 0 : "";
+      if (bVal === null || bVal === undefined) bVal = isNumericField ? 0 : "";
+
+      if (isNumericField) {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal).trim().toLowerCase();
+      const bStr = String(bVal).trim().toLowerCase();
+      return sortDirection === "asc"
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [templates, sortField, sortDirection]);
+
+  const renderSortableHeader = (label: string, field: string) => {
+    const isSorted = sortField === field;
+    return (
+      <th 
+        className="px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-slate-500"
+        onClick={() => requestSort(field)}
+      >
+        <div className="inline-flex items-center gap-1.5">
+          <span>{label}</span>
+          {isSorted ? (
+            sortDirection === "asc" ? (
+              <ChevronUp size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+            ) : (
+              <ChevronDown size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+            )
+          ) : (
+            <ArrowUpDown size={12} className="text-slate-300 dark:text-slate-600 opacity-50 transition-opacity" />
+          )}
+        </div>
+      </th>
+    );
+  };
 
   const loadTemplates = async () => {
     try {
@@ -164,19 +222,19 @@ export function EmailTemplatesPage({
           <table className="w-full text-left border-collapse text-sm min-w-[800px]">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-sans">
               <tr>
-                <th className="px-6 py-4 font-semibold">Nama Template</th>
-                <th className="px-6 py-4 font-semibold">Trigger Key</th>
-                <th className="px-6 py-4 font-semibold">Status</th>
-                <th className="px-6 py-4 font-semibold">Subject Email</th>
-                <th className="px-6 py-4 font-semibold">Isi Template</th>
-                <th className="px-6 py-4 font-semibold text-center">Aksi</th>
+                {renderSortableHeader("Nama Template", "name")}
+                {renderSortableHeader("Trigger Key", "trigger_key")}
+                {renderSortableHeader("Status", "is_active")}
+                {renderSortableHeader("Subject Email", "subject")}
+                <th className="px-6 py-4 font-semibold text-slate-500">Isi Template</th>
+                <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {templates.length === 0 ? (
+              {sortedTemplates.length === 0 ? (
                 <EmptyTableRow message="Belum ada template email yang tersimpan." colSpan={6} />
               ) : (
-                templates.map((item) => (
+                sortedTemplates.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">{item.name}</td>
                     <td className="px-6 py-4 text-indigo-600 dark:text-indigo-400 font-mono text-xs font-semibold">{item.trigger_key}</td>
@@ -284,8 +342,8 @@ export function EmailTemplatesPage({
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Isi Email</span>
               <textarea
-                className={inputClassName(templateErrors.content)}
-                rows={6}
+                className={`${inputClassName(templateErrors.content)} min-h-[200px] resize-y`}
+                rows={12}
                 value={templateForm.content}
                 onChange={(e) => setTemplateForm((curr) => ({ ...curr, content: e.target.value }))}
                 placeholder="Tulis pesan. Gunakan placeholder seperti {nama}, {nominal}, {jatuh_tempo} untuk data dinamis."

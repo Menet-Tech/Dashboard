@@ -708,8 +708,8 @@ func compressImageIfPossible(data []byte, extension string) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	// Encode as JPEG with 75% quality for high compression ratio
-	err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 75})
+	// Encode as JPEG with 35% quality for high compression ratio
+	err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 35})
 	if err != nil {
 		return data, nil
 	}

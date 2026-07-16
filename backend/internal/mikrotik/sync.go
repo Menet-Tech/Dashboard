@@ -170,7 +170,10 @@ func (s *RouterService) ReconcileProfiles(ctx context.Context, client *Client) e
 			continue
 		}
 
-		rateLimit := fmt.Sprintf("%dM/%dM", speedMbps, speedMbps)
+		var rateLimit string
+		if speedMbps > 0 {
+			rateLimit = fmt.Sprintf("%dM/%dM", speedMbps, speedMbps)
+		}
 
 		// Resolve the exact pool name case-sensitively from the cached pool list
 		actualPoolName := ipPool

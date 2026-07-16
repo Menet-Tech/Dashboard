@@ -1255,4 +1255,41 @@ export function createPaymentConfirmation(payload: {
   });
 }
 
+// Inventory API
+import type { InventoryItem, InventoryLog } from "../types";
 
+export function fetchInventoryItems() {
+  return request<{ data: InventoryItem[] }>("/api/v1/inventory");
+}
+
+export function createInventoryItem(input: Omit<InventoryItem, "id" | "created_at" | "updated_at">) {
+  return request<{ data: InventoryItem }>("/api/v1/inventory", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateInventoryItem(id: number, input: Omit<InventoryItem, "id" | "created_at" | "updated_at">) {
+  return request<{ data: InventoryItem }>(`/api/v1/inventory/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteInventoryItem(id: number) {
+  return request<{ message: string }>(`/api/v1/inventory/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchInventoryLogs(itemId?: number) {
+  const url = itemId ? `/api/v1/inventory/logs?item_id=${itemId}` : "/api/v1/inventory/logs";
+  return request<{ data: InventoryLog[] }>(url);
+}
+
+export function createInventoryLog(itemId: number, input: Omit<InventoryLog, "id" | "item_id" | "created_by" | "created_at">) {
+  return request<{ message: string }>(`/api/v1/inventory/${itemId}/logs`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}

@@ -1,37 +1,40 @@
 package worker
 
 import (
+	"archive/zip"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-
+	"menettech/dashboard/backend/internal/acs"
 	"menettech/dashboard/backend/internal/backup"
 	"menettech/dashboard/backend/internal/billing"
+	"menettech/dashboard/backend/internal/customers"
+	"menettech/dashboard/backend/internal/mikrotik"
 	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/settings"
-	"menettech/dashboard/backend/internal/customers"
-	"menettech/dashboard/backend/internal/acs"
-	"menettech/dashboard/backend/internal/mikrotik"
 )
 
 type Service struct {
-	Logger    *slog.Logger
-	Billing   billing.Service
-	Settings  settings.Service
-	WhatsApp  notifications.WhatsAppService
-	Discord   notifications.DiscordSender
-	Backup    *backup.Service
-	Customers customers.Service
-	Email     *notifications.EmailService
-	DB        *sql.DB
+	Logger      *slog.Logger
+	Billing     billing.Service
+	Settings    settings.Service
+	WhatsApp    notifications.WhatsAppService
+	Discord     notifications.DiscordSender
+	Backup      *backup.Service
+	Customers   customers.Service
+	Email       *notifications.EmailService
+	StoragePath string
+	DB          *sql.DB
 }
 
 const scheduledBillingLockTTL = 30 * time.Minute
@@ -124,6 +127,10 @@ func (s Service) startEmailQueueProcessor(ctx context.Context) {
 		return
 	}
 	s.Logger.Info("email queue processor started")
+	// Adaptive idle sleep: backs off from 500ms up to 5s when queue is empty,
+	// resets immediately when a message is processed.
+	idleSleep := 500 * time.Millisecond
+	const maxIdleSleep = 5 * time.Second
 	for {
 		select {
 		case <-ctx.Done():
@@ -133,14 +140,19 @@ func (s Service) startEmailQueueProcessor(ctx context.Context) {
 			processed, err := s.Email.ProcessQueue(ctx)
 			if err != nil {
 				s.Logger.Error("email queue processing encountered error", "error", err)
+				idleSleep = 500 * time.Millisecond
 				time.Sleep(2 * time.Second)
 				continue
 			}
 
 			if processed {
+				idleSleep = 500 * time.Millisecond
 				time.Sleep(1 * time.Second) // 1s throttle between mails
 			} else {
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(idleSleep)
+				if idleSleep < maxIdleSleep {
+					idleSleep = min(idleSleep*2, maxIdleSleep)
+				}
 			}
 		}
 	}
@@ -149,7 +161,7 @@ func (s Service) startEmailQueueProcessor(ctx context.Context) {
 func (s Service) getQueueThrottleDuration(ctx context.Context) time.Duration {
 	throttleSecs, _ := s.Settings.GetInt(ctx, "wa_queue_throttle_seconds")
 	if throttleSecs <= 0 {
-		throttleSecs = 120 // default 120 seconds (2 minutes)
+		throttleSecs = 5 // default 5 seconds
 	}
 	return time.Duration(throttleSecs) * time.Second
 }
@@ -160,6 +172,10 @@ func (s Service) startQueueProcessor(ctx context.Context) {
 		return
 	}
 	s.Logger.Info("whatsapp queue processor started")
+	// Adaptive idle sleep: backs off from 500ms up to 5s when queue is empty,
+	// resets immediately when a message is processed.
+	idleSleep := 500 * time.Millisecond
+	const maxIdleSleep = 5 * time.Second
 	for {
 		select {
 		case <-ctx.Done():
@@ -168,12 +184,22 @@ func (s Service) startQueueProcessor(ctx context.Context) {
 		default:
 			processed, isManual, err := s.WhatsApp.ProcessQueue(ctx)
 			if err != nil {
-				s.Logger.Error("queue processing encountered error", "error", err)
-				time.Sleep(2 * time.Second)
+				// If processed is true, it means it was a send failure (gateway error).
+				// We act as a circuit breaker and pause for 60 seconds.
+				if processed {
+					s.Logger.Error("whatsapp gateway error detected, pausing queue for 60 seconds (circuit breaker)", "error", err)
+					idleSleep = 500 * time.Millisecond
+					time.Sleep(60 * time.Second)
+				} else {
+					s.Logger.Error("queue processing encountered error", "error", err)
+					idleSleep = 500 * time.Millisecond
+					time.Sleep(2 * time.Second)
+				}
 				continue
 			}
 
 			if processed {
+				idleSleep = 500 * time.Millisecond
 				if isManual {
 					s.Logger.Info("manual WhatsApp notification processed, skipping queue throttle delay")
 					time.Sleep(1 * time.Second) // 1s safety interval for manual trigger
@@ -181,8 +207,11 @@ func (s Service) startQueueProcessor(ctx context.Context) {
 					time.Sleep(s.getQueueThrottleDuration(ctx))
 				}
 			} else {
-				// No pending messages, wait a short time before checking again
-				time.Sleep(500 * time.Millisecond)
+				// No pending messages, back off adaptively to reduce DB query pressure.
+				time.Sleep(idleSleep)
+				if idleSleep < maxIdleSleep {
+					idleSleep = min(idleSleep*2, maxIdleSleep)
+				}
 			}
 		}
 	}
@@ -215,6 +244,14 @@ func (s Service) RunOnce(ctx context.Context) error {
 
 	if err := s.runScheduledMikrotikSync(ctx, now); err != nil {
 		s.Logger.Error("scheduled mikrotik sync failed", "error", err)
+	}
+
+	if err := s.runArchiver(ctx, now); err != nil {
+		s.Logger.Error("storage archiver failed", "error", err)
+	}
+
+	if err := s.runAutoCleanup(ctx, now); err != nil {
+		s.Logger.Error("auto cleanup failed", "error", err)
 	}
 
 	// Process trial expiry and auto-generate bills
@@ -261,12 +298,7 @@ func (s Service) RunOnce(ctx context.Context) error {
 		SendWhatsApp: func(ctx context.Context, payload billing.AutomationMessage) error {
 			var waErr error
 			if payload.CustomBody != "" {
-				waErr = s.WhatsApp.QueueDirectMessage(ctx, "default", payload.PhoneNumber, payload.CustomBody)
-				if waErr == nil {
-					for _, bID := range payload.GroupBillIDs {
-						_ = s.WhatsApp.Logs.Record(ctx, bID, payload.TriggerKey, payload.PhoneNumber, "sent", "OK")
-					}
-				}
+				waErr = s.WhatsApp.QueueGroupedMessage(ctx, "default", payload.PhoneNumber, payload.CustomBody, payload.GroupBillIDs, payload.TriggerKey)
 			} else {
 				waErr = s.WhatsApp.SendTemplate(ctx, notifications.BillMessagePayload{
 					BillID:      payload.BillID,
@@ -393,21 +425,71 @@ func (s Service) runScheduledBackup(ctx context.Context, now time.Time) error {
 		return err
 	}
 
-	s.Logger.Info("auto backup created", "filename", filename)
+	dbPath := filepath.Join(s.Backup.BackupDir, filename)
+
+	tempZipFile, err := os.CreateTemp(s.Backup.BackupDir, "backup-*.zip")
+	if err != nil {
+		return fmt.Errorf("create temp zip: %w", err)
+	}
+	tempZipPath := tempZipFile.Name()
+
+	zipWriter := zip.NewWriter(tempZipFile)
+
+	dbFile, err := os.Open(dbPath)
+	if err == nil {
+		w, _ := zipWriter.Create("dashboard.db")
+		io.Copy(w, dbFile)
+		dbFile.Close()
+	}
+
+	// Fetch MikroTik backups
+	if s.DB != nil {
+		routerSvc := mikrotik.NewRouterService(s.DB)
+		if routers, err := routerSvc.ListActive(ctx); err == nil && len(routers) > 0 {
+			for _, r := range routers {
+				client := mikrotik.NewClient(r.Host, r.Username, r.Password)
+				if data, err := client.ExportBackup(ctx); err == nil && len(data) > 0 {
+					w, _ := zipWriter.Create(fmt.Sprintf("mikrotik_%s.json", r.Name))
+					w.Write(data)
+				}
+			}
+		} else {
+			// Legacy fallback
+			mikrotikHost, _ := s.Settings.GetString(ctx, settings.KeyMikrotikHost)
+			mikrotikUser, _ := s.Settings.GetString(ctx, settings.KeyMikrotikUser)
+			mikrotikPass, _ := s.Settings.GetString(ctx, settings.KeyMikrotikPass)
+			if strings.TrimSpace(mikrotikHost) != "" && strings.TrimSpace(mikrotikUser) != "" {
+				client := mikrotik.NewClient(mikrotikHost, mikrotikUser, mikrotikPass)
+				if data, err := client.ExportBackup(ctx); err == nil && len(data) > 0 {
+					w, _ := zipWriter.Create("mikrotik.json")
+					w.Write(data)
+				}
+			}
+		}
+	}
+
+	zipWriter.Close()
+	tempZipFile.Close()
+
+	os.Remove(dbPath)
+
+	finalZipPath, err := s.Backup.RotateZipBackups(tempZipPath, 3)
+	if err != nil {
+		s.Logger.Error("failed to rotate backups", "error", err)
+		finalZipPath = tempZipPath
+	}
+	
+	finalZipName := filepath.Base(finalZipPath)
+
+	s.Logger.Info("auto backup created", "filename", finalZipName)
 	// Bug #24: store full RFC3339 timestamp instead of just date string
 	// to avoid edge-case double-backup when worker restarts near midnight.
 	_ = s.Settings.Set(ctx, "worker_last_backup_at", now.UTC().Format(time.RFC3339))
-	_ = s.Settings.Set(ctx, "worker_last_backup_filename", filename)
+	_ = s.Settings.Set(ctx, "worker_last_backup_filename", finalZipName)
 
 	if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
-		_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
-			Title:       "💾 Auto Backup Sukses",
-			Description: "Database sistem berhasil dicadangkan secara otomatis.",
-			Color:       3066993, // Green (#2ecc71)
-			Fields: []notifications.EmbedField{
-				{Name: "Nama Berkas", Value: filename, Inline: false},
-			},
-		})
+		zipBytes, _ := os.ReadFile(finalZipPath)
+		_ = s.Discord.SendFile(ctx, "✅ **Auto Backup Sukses!**\nDatabase Dashboard dan Konfigurasi MikroTik berhasil dicadangkan.", finalZipName, zipBytes)
 	}
 
 	return nil
@@ -428,8 +510,8 @@ func (s Service) runScheduledBilling(ctx context.Context, now time.Time) error {
 	if generateDay < 1 {
 		generateDay = 1
 	}
-	if generateDay > 28 {
-		generateDay = 28
+	if generateDay > 31 {
+		generateDay = 31
 	}
 	if retryAttempts <= 0 {
 		retryAttempts = 1
@@ -828,6 +910,7 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 						}
 					} else {
 						s.Logger.Error("worker status pooling: failed to get device ONT status from GenieACS", "serial", serialNum, "error", err)
+						isOntOnline = wasOntOnline // Preserve previous state to prevent false offline alerts
 					}
 				} else {
 					if cust.OntStatus != "" {
@@ -840,74 +923,72 @@ func (s Service) runIntegrationPooling(ctx context.Context, now time.Time) error
 					}
 				}
 
-				// Discord Alert on State Change
-				becamePppoeOffline := false
-				if pppoeUsername != "" {
-					becamePppoeOffline = wasPppoeOnline && !isPppoeOnline
-				}
-				becameOntOffline := false
-				if serialNum != "" && err == nil {
-					becameOntOffline = wasOntOnline && !isOntOnline
+				// Aggregate State Calculation for Discord Alert
+				hasPppoe := pppoeUsername != ""
+				hasOnt := serialNum != ""
+
+				// To prevent alert fatigue, we base the "connection state" primarily on MikroTik (PPPoE).
+				// If PPPoE is down, Internet is definitely down. 
+				// If PPPoE is up but GenieACS is down, it's likely a false positive or just TR069 timeout.
+				var wasConnected bool
+				var isConnected bool
+
+				if hasPppoe {
+					wasConnected = wasPppoeOnline
+					isConnected = isPppoeOnline
+				} else if hasOnt {
+					wasConnected = wasOntOnline
+					isConnected = isOntOnline
+				} else {
+					wasConnected = true
+					isConnected = true
 				}
 
-				if becamePppoeOffline || becameOntOffline {
+				// Only trigger alert if the primary connection state transitioned
+				if isConnected != wasConnected {
 					if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_gacs_offline") {
 						var statusStr string
 						var color int
+						var titleStr string
 
-						hasPppoe := pppoeUsername != ""
-						hasOnt := serialNum != "" && err == nil
-
-						if hasPppoe && hasOnt {
-							if !isPppoeOnline && !isOntOnline {
-								statusStr = "offline"
-								color = 15158332 // Red (#e74c3c)
-							} else if !isPppoeOnline {
-								statusStr = "disconnected"
-								color = 16776960 // Yellow (#f1c40f)
+						if !isConnected {
+							titleStr = "🚨 KONEKSI TERPUTUS (OFFLINE) 🚨"
+							if hasPppoe {
+								statusStr = "DISCONNECTED 🔴 (Koneksi Internet / MikroTik Terputus)"
 							} else {
-								statusStr = "down"
-								color = 15105570 // Orange (#e67e22)
+								statusStr = "DOWN 🔴 (Koneksi Perangkat / ONT Terputus)"
 							}
-						} else if hasPppoe {
-							if !isPppoeOnline {
-								statusStr = "disconnected"
-								color = 16776960
-							}
-						} else if hasOnt {
-							if !isOntOnline {
-								statusStr = "down"
-								color = 15105570
-							}
+							color = 15158332 // Red
+						} else {
+							titleStr = "✅ KONEKSI PULIH (ONLINE) ✅"
+							statusStr = "ONLINE 🟢 (Koneksi Internet Normal)"
+							color = 3066993 // Green
+						}
+						waktuKejadian := time.Now().Format("2006-01-02 15:04:05")
+						rxPower := cust.OntRxPower
+						txPower := cust.OntTxPower
+						if hasOnt && err == nil {
+							rxPower = status.RxOpticalPower
+							txPower = status.TxOpticalPower
 						}
 
-						if statusStr != "" {
-							matiKapan := time.Now().Format("2006-01-02 15:04:05")
-							rxPower := cust.OntRxPower
-							txPower := cust.OntTxPower
-							if serialNum != "" && err == nil {
-								rxPower = status.RxOpticalPower
-								txPower = status.TxOpticalPower
-							}
-
-							embed := notifications.DiscordEmbed{
-								Title:       "🚨 CLIENT CONNECTION UPDATE 🚨",
-								Description: fmt.Sprintf("Koneksi pelanggan **%s** mengalami gangguan.", cust.Name),
-								Color:       color,
-								Fields: []notifications.EmbedField{
-									{Name: "Nama Pelanggan", Value: cust.Name, Inline: true},
-									{Name: "User PPPoE", Value: cust.UserPPPoE, Inline: true},
-									{Name: "Serial Number (SN)", Value: cust.SNOnt, Inline: true},
-									{Name: "Waktu Kejadian", Value: matiKapan, Inline: true},
-									{Name: "Redaman Terakhir (Rx)", Value: fmt.Sprintf("%s (Tx: %s)", rxPower, txPower), Inline: false},
-									{Name: "Status Terdeteksi", Value: strings.ToUpper(statusStr) + " 🔴", Inline: true},
-								},
-							}
-
-							go func(emb notifications.DiscordEmbed) {
-								_ = s.Discord.SendEmbed(context.Background(), emb)
-							}(embed)
+						embed := notifications.DiscordEmbed{
+							Title:       titleStr,
+							Description: fmt.Sprintf("Update status koneksi untuk pelanggan **%s**.", cust.Name),
+							Color:       color,
+							Fields: []notifications.EmbedField{
+								{Name: "Nama Pelanggan", Value: cust.Name, Inline: true},
+								{Name: "User PPPoE", Value: cust.UserPPPoE, Inline: true},
+								{Name: "Serial Number (SN)", Value: cust.SNOnt, Inline: true},
+								{Name: "Waktu Kejadian", Value: waktuKejadian, Inline: true},
+								{Name: "Redaman Terakhir (Rx)", Value: fmt.Sprintf("%s (Tx: %s)", rxPower, txPower), Inline: false},
+								{Name: "Status Terdeteksi", Value: statusStr, Inline: false},
+							},
 						}
+
+						go func(emb notifications.DiscordEmbed) {
+							_ = s.Discord.SendEmbed(context.Background(), emb)
+						}(embed)
 					}
 				}
 
@@ -967,4 +1048,3 @@ func (s Service) runScheduledMikrotikSync(ctx context.Context, now time.Time) er
 	_ = s.Settings.Set(ctx, "mikrotik_last_auto_sync_at", now.UTC().Format(time.RFC3339))
 	return nil
 }
-

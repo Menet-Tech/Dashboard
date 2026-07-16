@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { StatusPill, EmptyTableRow, inputClassName, renderInlineError } from "../../components/ui";
-import { Trash2, CheckCircle2, UserPlus, Plus } from "lucide-react";
+import { Trash2, CheckCircle2, UserPlus, Plus, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
 import type { ConfirmDialogState } from "../../hooks/types";
 import type { ContactForm } from "../../lib/gatewayApi";
@@ -62,6 +62,68 @@ export function RegistrationPage({
 }: RegistrationPageProps) {
   const [leads, setLeads] = useState<ContactForm[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const [sortField, setSortField] = useState<string | null>("created_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const requestSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortedLeads = useMemo(() => {
+    if (!sortField) return leads;
+    return [...leads].sort((a, b) => {
+      let aVal: any = null;
+      let bVal: any = null;
+
+      if (sortField === "created_at" || sortField === "status") {
+        aVal = a[sortField as keyof ContactForm];
+        bVal = b[sortField as keyof ContactForm];
+      } else {
+        // e.g. "name", "address", "ssid", "user_pppoe", "paket"
+        aVal = a.data?.[sortField] || "";
+        bVal = b.data?.[sortField] || "";
+      }
+
+      if (aVal === null || aVal === undefined) aVal = "";
+      if (bVal === null || bVal === undefined) bVal = "";
+
+      const aStr = String(aVal).trim().toLowerCase();
+      const bStr = String(bVal).trim().toLowerCase();
+      return sortDirection === "asc"
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [leads, sortField, sortDirection]);
+
+  const renderSortableHeader = (label: string, field: string) => {
+    const isSorted = sortField === field;
+    return (
+      <th 
+        className="px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-105 dark:hover:bg-slate-805 transition-colors text-slate-500"
+        onClick={() => requestSort(field)}
+      >
+        <div className="inline-flex items-center gap-1.5">
+          <span>{label}</span>
+          {isSorted ? (
+            sortDirection === "asc" ? (
+              <ChevronUp size={12} className="text-indigo-605 dark:text-indigo-400 stroke-[3]" />
+            ) : (
+              <ChevronDown size={12} className="text-indigo-655 dark:text-indigo-400 stroke-[3]" />
+            )
+          ) : (
+            <ArrowUpDown size={12} className="text-slate-355 dark:text-slate-600 opacity-50 transition-opacity" />
+          )}
+        </div>
+      </th>
+    );
+  };
+
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [convertPreview, setConvertPreview] = useState<ContactForm | null>(null);
   const [convertForm, setConvertForm] = useState<{
@@ -409,21 +471,21 @@ export function RegistrationPage({
           <table className="w-full text-left border-collapse text-sm min-w-[1000px]">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-sans">
               <tr>
-                <th className="px-6 py-4 font-semibold">Waktu Masuk</th>
-                <th className="px-6 py-4 font-semibold">Nama / WhatsApp</th>
-                <th className="px-6 py-4 font-semibold">Alamat</th>
-                <th className="px-6 py-4 font-semibold">SSID & Password</th>
-                <th className="px-6 py-4 font-semibold">PPPoE & Perangkat</th>
-                <th className="px-6 py-4 font-semibold">Paket / Ref</th>
-                <th className="px-6 py-4 font-semibold">Status</th>
-                <th className="px-6 py-4 font-semibold text-center">Aksi</th>
+                {renderSortableHeader("Waktu Masuk", "created_at")}
+                {renderSortableHeader("Nama / WhatsApp", "name")}
+                {renderSortableHeader("Alamat", "address")}
+                {renderSortableHeader("SSID & Password", "ssid")}
+                {renderSortableHeader("PPPoE & Perangkat", "user_pppoe")}
+                {renderSortableHeader("Paket / Ref", "paket")}
+                {renderSortableHeader("Status", "status")}
+                <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {leads.length === 0 ? (
+              {sortedLeads.length === 0 ? (
                 <EmptyTableRow message={loading ? "Memuat pendaftaran..." : "Belum ada pendaftaran di database."} colSpan={8} />
               ) : (
-                leads.map((lead) => {
+                sortedLeads.map((lead) => {
                   const d = lead.data || {};
                   const isManual = d.source === "manual";
                   const dateStr = new Date(lead.created_at).toLocaleString("id-ID", {

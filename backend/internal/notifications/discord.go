@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"time"
 
@@ -33,6 +34,7 @@ type DiscordEmbed struct {
 type DiscordSender interface {
 	SendAlert(ctx context.Context, message string) error
 	SendEmbed(ctx context.Context, embed DiscordEmbed) error
+	SendFile(ctx context.Context, message string, filename string, fileData []byte) error
 	IsEventEnabled(ctx context.Context, eventKey string) bool
 }
 
@@ -141,4 +143,57 @@ func (s *DiscordService) IsEventEnabled(ctx context.Context, eventKey string) bo
 		return false
 	}
 	return val == "1" || val == "true"
+}
+
+func (s *DiscordService) SendFile(ctx context.Context, message string, filename string, fileData []byte) error {
+	webhookURL, err := s.Settings.GetString(ctx, "discord_webhook_url")
+	if err != nil || webhookURL == "" {
+		return nil // Webhook not configured, skip silently
+	}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Add payload_json for the message content
+	if message != "" {
+		payload := discordPayload{Content: message}
+		payloadBytes, _ := json.Marshal(payload)
+		err = writer.WriteField("payload_json", string(payloadBytes))
+		if err != nil {
+			return fmt.Errorf("write payload_json: %w", err)
+		}
+	}
+
+	// Add the file
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return fmt.Errorf("create form file: %w", err)
+	}
+	_, err = part.Write(fileData)
+	if err != nil {
+		return fmt.Errorf("write file data: %w", err)
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, body)
+	if err != nil {
+		return fmt.Errorf("create discord file request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := s.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("send discord file request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("discord file upload responded with status: %d", resp.StatusCode)
+	}
+
+	return nil
 }

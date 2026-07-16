@@ -29,6 +29,22 @@ const sendTextMessage = async (accountId, to, text, quotedMessageId = null, is_m
     const client = getClient(accountId);
     const chatId = formatPhoneNumber(to);
     const options = quotedMessageId ? { quotedMessageId } : {};
+    
+    // OpSec: Simulate typing delay for automated messages
+    if (!is_manual) {
+        try {
+            await client.sendPresenceAvailable();
+            const chat = await client.getChatById(chatId);
+            if (chat) {
+                await chat.sendStateTyping();
+            }
+            const delayMs = Math.floor(Math.random() * 2000) + 1500;
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        } catch (e) {
+            // Abaikan error jika chat belum ada atau fitur tidak didukung
+        }
+    }
+
     try {
         const result = await client.sendMessage(chatId, text, options);
         if (!is_manual && result && result.id) {

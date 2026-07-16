@@ -183,3 +183,45 @@ func (s *Service) pruneOldBackups() error {
 
 	return nil
 }
+
+// RotateZipBackups renames newZipPath to a timestamped format and keeps only the latest maxRetain zip backups.
+// Returns the final path of the new backup.
+func (s *Service) RotateZipBackups(newZipPath string, maxRetain int) (string, error) {
+	timestamp := time.Now().UTC().Format("2006-01-02_15-04-05")
+	finalName := fmt.Sprintf("backup_%s.zip", timestamp)
+	finalPath := filepath.Join(s.BackupDir, finalName)
+
+	if err := os.Rename(newZipPath, finalPath); err != nil {
+		return "", fmt.Errorf("failed to move new zip to %s: %w", finalPath, err)
+	}
+
+	entries, err := os.ReadDir(s.BackupDir)
+	if err != nil {
+		return finalPath, nil
+	}
+
+	type fileInfo struct {
+		name    string
+		modTime time.Time
+	}
+	var zips []fileInfo
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".zip" && strings.HasPrefix(entry.Name(), "backup_") {
+			if info, err := entry.Info(); err == nil {
+				zips = append(zips, fileInfo{name: entry.Name(), modTime: info.ModTime()})
+			}
+		}
+	}
+
+	sort.Slice(zips, func(i, j int) bool {
+		return zips[i].modTime.After(zips[j].modTime)
+	})
+
+	if len(zips) > maxRetain {
+		for _, b := range zips[maxRetain:] {
+			_ = os.Remove(filepath.Join(s.BackupDir, b.name))
+		}
+	}
+
+	return finalPath, nil
+}

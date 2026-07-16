@@ -394,6 +394,7 @@ export function SettingsPage({
   const [deletingRouter, setDeletingRouter] = useState<MikrotikRouterItem | null>(null);
   const [routerTestStatus, setRouterTestStatus] = useState<Record<number, { success: boolean; message: string }>>({});
   const [testingRouterId, setTestingRouterId] = useState<number | null>(null);
+  const [togglingRouterId, setTogglingRouterId] = useState<number | null>(null);
   const [newRouterRole, setNewRouterRole] = useState("none");
   const [newRouterSlavePort, setNewRouterSlavePort] = useState("ether2");
   const [routerInterfaces, setRouterInterfaces] = useState<string[]>(["ether1", "ether2", "ether3", "ether4", "ether5"]);
@@ -1386,14 +1387,14 @@ export function SettingsPage({
                                 className={inputClassName(settingsErrors.billing_generate_day)}
                                 type="number"
                                 min="1"
-                                max="28"
+                                max="31"
                                 value={settingsForm["billing_generate_day"] ?? "1"}
                                 onChange={(e) =>
                                   onFormChange({ ...settingsForm, billing_generate_day: e.target.value })
                                 }
                               />
                               {renderInlineError(settingsErrors.billing_generate_day)}
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500">Tanggal generator billing berjalan (1-28).</span>
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500">Tanggal generator billing berjalan (1-31).</span>
                             </label>
 
                             <label className="flex flex-col gap-1.5">
@@ -1653,6 +1654,33 @@ export function SettingsPage({
                                 </div>
 
                                 <div className="flex gap-2 mt-4 pt-3 border-t border-slate-50 dark:border-slate-800/65 justify-end">
+                                  {/* Enable / Disable toggle */}
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      setTogglingRouterId(router.id);
+                                      try {
+                                        const updated = await updateMikrotikRouter(router.id, { is_active: !router.is_active });
+                                        setRouters((prev) =>
+                                          prev.map((r) => r.id === router.id ? { ...r, is_active: updated.data.is_active } : r)
+                                        );
+                                        pushSuccess(updated.data.is_active ? `Router ${router.name} diaktifkan.` : `Router ${router.name} dinonaktifkan.`);
+                                      } catch (err: any) {
+                                        pushError(err.message || String(err));
+                                      } finally {
+                                        setTogglingRouterId(null);
+                                      }
+                                    }}
+                                    disabled={togglingRouterId !== null || testingRouterId !== null}
+                                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50 ${
+                                      router.is_active
+                                        ? "text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-955/20 dark:hover:bg-rose-955/40"
+                                        : "text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-955/20 dark:hover:bg-emerald-955/40"
+                                    }`}
+                                  >
+                                    {togglingRouterId === router.id ? <Loader2 size={10} className="animate-spin" /> : null}
+                                    {router.is_active ? "Nonaktifkan" : "Aktifkan"}
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={async () => {
@@ -1686,7 +1714,7 @@ export function SettingsPage({
                                         setTestingRouterId(null);
                                       }
                                     }}
-                                    disabled={testingRouterId !== null}
+                                    disabled={testingRouterId !== null || togglingRouterId !== null}
                                     className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
                                   >
                                     {testingRouterId === router.id ? <Loader2 size={10} className="animate-spin" /> : null}
@@ -1839,6 +1867,18 @@ export function SettingsPage({
                             </label>
                           </div>
                         )}
+
+                        <label className="flex items-center gap-2 mb-2 pt-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newRouterIsActive}
+                            onChange={(e) => setNewRouterIsActive(e.target.checked)}
+                            className="accent-indigo-600 w-4 h-4 rounded border-gray-300 dark:border-slate-700"
+                          />
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                            Aktifkan / Matikan Koneksi ke Server
+                          </span>
+                        </label>
 
                         <div className="flex gap-2 pt-2">
                           {editingRouterId && (

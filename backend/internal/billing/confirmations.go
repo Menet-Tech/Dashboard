@@ -218,6 +218,9 @@ func (s Service) ListPendingConfirmations(ctx context.Context) ([]PaymentConfirm
 
 		list = append(list, pc)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating pending confirmations: %w", err)
+	}
 	return list, nil
 }
 

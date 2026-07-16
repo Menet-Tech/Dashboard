@@ -68,7 +68,8 @@ export function ReportsPage({
     return activeCustomers.reduce((acc, c) => {
       const price = c.package_price || 0;
       const disc = c.diskon || 0;
-      return acc + Math.max(0, price - disc);
+      const actualDisc = c.tipe_diskon === "percent" ? (price * disc) / 100 : disc;
+      return acc + Math.max(0, price - actualDisc);
     }, 0);
   }, [activeCustomers]);
 

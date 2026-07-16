@@ -156,3 +156,49 @@ func TestWhatsAppProcessQueueSkipsExistingDuplicateBeforeSend(t *testing.T) {
 		t.Fatalf("expected duplicate row to be marked failed with an error message, got status=%q error=%q", status, errMsg)
 	}
 }
+
+func TestWhatsAppGroupedMessageLogsAllBillsAfterGatewaySuccess(t *testing.T) {
+	ctx := context.Background()
+	svc, db := newWhatsAppTestService(t)
+	svc.HTTPClient = &http.Client{
+		Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
+		}),
+	}
+
+	if err := svc.QueueGroupedMessage(ctx, "default", "+62 899-4796-947", "combined body", []int64{10, 11, 10}, "tagihan-h7"); err != nil {
+		t.Fatalf("queue grouped message: %v", err)
+	}
+
+	var count int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(1) FROM notification_logs`).Scan(&count); err != nil {
+		t.Fatalf("count notification logs before send: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected no notification logs before gateway success, got %d", count)
+	}
+
+	processed, isManual, err := svc.ProcessQueue(ctx)
+	if err != nil {
+		t.Fatalf("process grouped queue: %v", err)
+	}
+	if !processed {
+		t.Fatal("expected grouped queue item to be processed")
+	}
+	if isManual {
+		t.Fatal("expected grouped automation queue item")
+	}
+
+	if err := db.QueryRowContext(ctx, `
+		SELECT COUNT(1)
+		FROM notification_logs
+		WHERE trigger_key = 'tagihan-h7'
+		  AND status = 'sent'
+		  AND bill_id IN (10, 11)
+	`).Scan(&count); err != nil {
+		t.Fatalf("count grouped notification logs after send: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("expected sent logs for both grouped bills, got %d", count)
+	}
+}

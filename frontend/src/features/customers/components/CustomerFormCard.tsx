@@ -138,11 +138,8 @@ export function CustomerFormCard({
       </label>
       <label className="flex flex-col gap-1">
         <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Tanggal Jatuh Tempo Bulanan</span>
-        <input
+        <select
           className={inputClassName(customerErrors.due_day)}
-          type="number"
-          min={1}
-          max={31}
           value={customerForm.due_day}
           onChange={(e) =>
             onFormChange((curr) => ({
@@ -150,7 +147,13 @@ export function CustomerFormCard({
               due_day: Number(e.target.value),
             }))
           }
-        />
+        >
+          {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+            <option key={day} value={day}>
+              Tanggal {day}
+            </option>
+          ))}
+        </select>
         {renderInlineError(customerErrors.due_day)}
       </label>
       <label className="flex flex-col gap-1">
@@ -170,9 +173,37 @@ export function CustomerFormCard({
           <option value="pending">Pending (Perpanjangan)</option>
           <option value="suspended">Suspended</option>
           <option value="inactive">Inactive</option>
+          <option value="trial">Trial</option>
           <option value="wifi_umum">🛜 WiFi Umum (Fasilitas Umum)</option>
         </select>
       </label>
+
+      {/* Trial days — only visible when status is "trial" */}
+      {customerForm.status === "trial" && (
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+            Durasi Trial (Hari)
+          </span>
+          <input
+            type="number"
+            min={1}
+            max={365}
+            className={inputClassName()}
+            value={customerForm.trial_days}
+            onChange={(e) =>
+              onFormChange((curr) => ({
+                ...curr,
+                trial_days: Math.max(1, Number(e.target.value)),
+                is_trial: true,
+              }))
+            }
+            placeholder="Jumlah hari trial"
+          />
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+            Pelanggan akan otomatis diset sebagai pelanggan trial.
+          </span>
+        </label>
+      )}
       
 
 

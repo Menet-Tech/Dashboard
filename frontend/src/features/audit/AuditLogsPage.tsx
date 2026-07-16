@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { StatusPill, inputClassName } from "../../components/ui";
 import { formatDateTime } from "../../utils/format";
+import { ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import type { AuditLogItem } from "../../types";
 
 type AuditLogsPageProps = {
@@ -13,6 +14,41 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
   const [actionFilter, setActionFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+
+  const [sortField, setSortField] = useState<string | null>("created_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const requestSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const renderSortableHeader = (label: string, field: string) => {
+    const isSorted = sortField === field;
+    return (
+      <th 
+        className="px-6 py-4 font-medium select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500"
+        onClick={() => requestSort(field)}
+      >
+        <div className="inline-flex items-center gap-1.5">
+          <span>{label}</span>
+          {isSorted ? (
+            sortDirection === "asc" ? (
+              <ChevronUp size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+            ) : (
+              <ChevronDown size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+            )
+          ) : (
+            <ArrowUpDown size={12} className="text-slate-300 dark:text-slate-600 opacity-50 transition-opacity" />
+          )}
+        </div>
+      </th>
+    );
+  };
 
   const uniqueActions = useMemo(() => {
     const actions = new Set<string>();
@@ -32,6 +68,29 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
       return matchAction && matchDate && matchSearch;
     });
   }, [auditLogs, actionFilter, dateFilter, searchTerm]);
+
+  const sortedLogs = useMemo(() => {
+    const list = filteredLogs;
+    if (!sortField) return list;
+    return [...list].sort((a, b) => {
+      let aVal = (a as any)[sortField];
+      let bVal = (b as any)[sortField];
+
+      const isNumericField = sortField === "id";
+      if (aVal === null || aVal === undefined) aVal = isNumericField ? 0 : "";
+      if (bVal === null || bVal === undefined) bVal = isNumericField ? 0 : "";
+
+      if (isNumericField) {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal).trim().toLowerCase();
+      const bStr = String(bVal).trim().toLowerCase();
+      return sortDirection === "asc"
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [filteredLogs, sortField, sortDirection]);
 
   return (
     <section className="grid gap-6">
@@ -95,22 +154,22 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
           <table className="w-full text-left border-collapse text-sm">
             <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
               <tr>
-                <th className="px-6 py-4 font-medium">Waktu</th>
-                <th className="px-6 py-4 font-medium">User</th>
-                <th className="px-6 py-4 font-medium">IP</th>
-                <th className="px-6 py-4 font-medium">Aksi</th>
-                <th className="px-6 py-4 font-medium">Detail</th>
+                {renderSortableHeader("Waktu", "created_at")}
+                {renderSortableHeader("User", "username")}
+                {renderSortableHeader("IP", "ip_address")}
+                {renderSortableHeader("Aksi", "action")}
+                <th className="px-6 py-4 font-medium text-slate-500">Detail</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredLogs.length === 0 ? (
+              {sortedLogs.length === 0 ? (
                 <tr>
                   <td className="px-6 py-12 text-center text-slate-400" colSpan={5}>
                     {auditLogs.length === 0 ? "Belum ada audit log." : "Tidak ada log yang cocok dengan filter."}
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
+                sortedLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 text-slate-700 whitespace-nowrap">{formatDateTime(log.created_at)}</td>
                     <td className="px-6 py-4 text-slate-700 font-medium">{log.username ?? (log.user_id ? `#${log.user_id}` : "-")}</td>

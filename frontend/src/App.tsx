@@ -107,6 +107,10 @@ const TrafficPage = lazy(() =>
   import("./features/traffic/TrafficPage").then((module) => ({ default: module.TrafficPage }))
 );
 
+const InventoryPage = lazy(() =>
+  import("./features/inventory/InventoryPage").then((module) => ({ default: module.default }))
+);
+
 type NavItem = {
   key: ViewKey;
   label: string;
@@ -122,6 +126,7 @@ const navItems: NavItem[] = [
   { key: "packages", label: "Paket Internet", caption: "Kecepatan & harga" },
   { key: "discounts", label: "Diskon & Referral", caption: "MGM & voucher khusus" },
   // === Operasional ===
+  { key: "inventory", label: "Inventaris Gudang", caption: "Kelola stok barang" },
   { key: "odp", label: "Data ODP", caption: "Status & maintenance node" },
   { key: "network-map", label: "Peta Jaringan", caption: "Topologi fiber & ODP" },
   { key: "devices", label: "Perangkat ONT", caption: "Kelola CPE via GenieACS" },
@@ -524,6 +529,8 @@ export default function App() {
                   referral_balance: customer.referral_balance ?? 0,
                   odp_id: customer.odp_id ?? 0,
                   odp_port: customer.odp_port ?? undefined,
+                  is_trial: customer.is_trial ?? false,
+                  trial_days: customer.trial_days ?? 3,
                 });
               }}
               onCancelEdit={() => {
@@ -572,6 +579,10 @@ export default function App() {
               pushSuccess={feedback.pushSuccess}
               pushError={feedback.pushError}
             />
+          ) : null}
+
+          {view === "inventory" ? (
+            <InventoryPage />
           ) : null}
 
           {view === "traffic" ? (

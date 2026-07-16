@@ -40,7 +40,7 @@ export type CustomerItem = {
   email?: string;
   sn_ont: string;
   due_day: number;
-  status: "active" | "limit" | "suspended" | "inactive" | "pending" | "wifi_umum";
+  status: "active" | "limit" | "suspended" | "inactive" | "pending" | "wifi_umum" | "trial";
   address: string;
   is_trial?: boolean;
   trial_started_at?: string;
@@ -105,6 +105,28 @@ export type NotificationLog = {
   status: string;
   response_message: string;
   message?: string;
+  created_at: string;
+};
+
+export type InventoryItem = {
+  id: number;
+  name: string;
+  description: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InventoryLog = {
+  id: number;
+  item_id: number;
+  type: "in" | "out";
+  quantity: number;
+  reference: string;
+  notes: string;
+  created_by: string;
   created_at: string;
 };
 
@@ -247,7 +269,8 @@ export type ViewKey =
   | "devices"
   | "network-map"
   | "payment-confirmations"
-  | "traffic";
+  | "traffic"
+  | "inventory";
 
 export type MapSettings = {
   id?: number;

@@ -1,9 +1,11 @@
-import { Fragment, type FormEvent } from "react";
+import { Fragment, useState, useMemo, type FormEvent } from "react";
+import { ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { formatCurrency } from "../../utils/format";
 import { displayStatusLabel, displayStatusTone } from "../../utils/status";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
 import { notifyBill, grantBillExtension } from "../../lib/api";
 import { useDialog } from "../../context/DialogContext";
+import { copyToClipboard } from "../../utils/clipboard";
 import type { ConfirmDialogState } from "../../hooks/types";
 import type { BillItem, User, NotificationLog } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
@@ -81,6 +83,63 @@ export function BillsPage({
 
   const isBusy = (actionKey: string) => submitting && busyAction === actionKey;
   const { showConfirm } = useDialog();
+
+  const [sortField, setSortField] = useState<string | null>("invoice_number");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const requestSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortedBills = useMemo(() => {
+    if (!sortField) return bills;
+    return [...bills].sort((a, b) => {
+      let aVal = (a as any)[sortField];
+      let bVal = (b as any)[sortField];
+
+      const isNumericField = sortField === "amount";
+      if (aVal === null || aVal === undefined) aVal = isNumericField ? 0 : "";
+      if (bVal === null || bVal === undefined) bVal = isNumericField ? 0 : "";
+
+      if (isNumericField) {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal).trim().toLowerCase();
+      const bStr = String(bVal).trim().toLowerCase();
+      return sortDirection === "asc"
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [bills, sortField, sortDirection]);
+
+  const renderSortableHeader = (label: string, field: string) => {
+    const isSorted = sortField === field;
+    return (
+      <th 
+        className="px-6 py-4 font-medium select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-gray-500"
+        onClick={() => requestSort(field)}
+      >
+        <div className="inline-flex items-center gap-1.5">
+          <span>{label}</span>
+          {isSorted ? (
+            sortDirection === "asc" ? (
+              <ChevronUp size={12} className="text-indigo-650 dark:text-indigo-400 stroke-[3]" />
+            ) : (
+              <ChevronDown size={12} className="text-indigo-650 dark:text-indigo-400 stroke-[3]" />
+            )
+          ) : (
+            <ArrowUpDown size={12} className="text-slate-350 dark:text-slate-600 opacity-50 transition-opacity" />
+          )}
+        </div>
+      </th>
+    );
+  };
 
   const handleSendManualWA = async (id: number, triggerKey: string) => {
     pushToast("slate", "Mengirim notifikasi WhatsApp...");
@@ -188,25 +247,25 @@ export function BillsPage({
           </div>
         </div>
 
-        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+         <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
           <table className="w-full text-left border-collapse text-sm">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
               <tr>
-                <th className="px-6 py-4 font-medium">Invoice</th>
-                <th className="px-6 py-4 font-medium">Pelanggan</th>
-                <th className="px-6 py-4 font-medium">Periode</th>
-                <th className="px-6 py-4 font-medium">Jatuh Tempo</th>
-                <th className="px-6 py-4 font-medium">Nominal</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium">Bukti</th>
+                {renderSortableHeader("Invoice", "invoice_number")}
+                {renderSortableHeader("Pelanggan", "customer_name")}
+                {renderSortableHeader("Periode", "period")}
+                {renderSortableHeader("Jatuh Tempo", "due_date")}
+                {renderSortableHeader("Nominal", "amount")}
+                {renderSortableHeader("Status", "display_status")}
+                {renderSortableHeader("Bukti", "proof_path")}
                 <th className="px-6 py-4 font-medium">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {bills.length === 0 ? (
+              {sortedBills.length === 0 ? (
                 <EmptyTableRow message="Tidak ada data tagihan yang sesuai." colSpan={8} />
               ) : (
-                bills.map((bill) => (
+                sortedBills.map((bill) => (
                   <Fragment key={bill.id}>
                     <tr>
                       <td className="px-6 py-4 text-gray-700 font-semibold">{bill.invoice_number}</td>
@@ -353,36 +412,56 @@ export function BillsPage({
                     {expandedBillId === bill.id && (
                       <tr className="expanded-row">
                         <td className="px-6 py-4 text-gray-700" colSpan={8}>
-                          <div className="expanded-content p-4 bg-slate-50 rounded-xl">
-                            <h4 className="font-bold text-slate-800 mb-2">Riwayat Notifikasi</h4>
+                          <div className="expanded-content p-5 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-900/60 shadow-inner">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-bold text-xs text-slate-850 dark:text-slate-200 tracking-wide uppercase">Riwayat Notifikasi</h4>
+                              {notificationLogs[bill.id]?.length ? (
+                                <span className="text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold px-2 py-0.5 rounded-full">
+                                  {notificationLogs[bill.id].length} terkirim
+                                </span>
+                              ) : null}
+                            </div>
                             {notificationLogs[bill.id]?.length ? (
-                              <div className="overflow-hidden border border-slate-200 rounded-lg">
-                                <table className="compact-table w-full text-xs">
-                                  <thead className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+                              <div className="overflow-y-auto max-h-72 border border-slate-200 dark:border-slate-800 rounded-xl scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 shadow-sm">
+                                <table className="compact-table w-full text-xs border-collapse">
+                                  <thead className="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10">
                                     <tr>
-                                      <th className="px-4 py-2 text-left">Waktu</th>
-                                      <th className="px-4 py-2 text-left">Tujuan</th>
-                                      <th className="px-4 py-2 text-left">Trigger</th>
-                                      <th className="px-4 py-2 text-left">Status</th>
-                                      <th className="px-4 py-2 text-left">Response</th>
-                                      <th className="px-4 py-2 text-center">Aksi</th>
+                                      <th className="px-4 py-3 text-left">Waktu</th>
+                                      <th className="px-4 py-3 text-left">Tujuan</th>
+                                      <th className="px-4 py-3 text-left">Trigger</th>
+                                      <th className="px-4 py-3 text-left">Status</th>
+                                      <th className="px-4 py-3 text-left">Response</th>
+                                      <th className="px-4 py-3 text-center">Aksi</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-slate-200 bg-white">
+                                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-950/30">
                                     {notificationLogs[bill.id].map((log) => (
-                                      <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-4 py-2 text-slate-500">{new Date(log.created_at).toLocaleString()}</td>
-                                        <td className="px-4 py-2 text-slate-700">{log.sent_to}</td>
-                                        <td className="px-4 py-2 text-slate-700">{log.trigger_key}</td>
-                                        <td className="px-4 py-2 text-slate-700">
+                                      <tr key={log.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-900/40 transition-colors">
+                                        <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400 font-mono text-[10px]">
+                                          {new Date(log.created_at).toLocaleString('id-ID')}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 font-medium">{log.sent_to}</td>
+                                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 font-semibold">
+                                          <span className="bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-400 px-1.5 py-0.5 rounded text-[10px]">
+                                            {log.trigger_key}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-350">
                                           <StatusPill
-                                            label={log.status}
-                                            tone={log.status === "sent" ? "green" : "slate"}
+                                            label={log.status.toUpperCase()}
+                                            tone={log.status === "sent" ? "green" : log.status === "queued" ? "slate" : "red"}
                                           />
                                         </td>
-                                        <td className="px-4 py-2 text-slate-500">{log.response_message}</td>
-                                        <td className="px-4 py-2 text-center">
-                                          <div className="inline-flex items-center gap-1">
+                                        <td className="px-4 py-2.5">
+                                          <div 
+                                            className="text-slate-500 dark:text-slate-400 max-w-[240px] truncate font-sans" 
+                                            title={log.response_message}
+                                          >
+                                            {log.response_message || "-"}
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-2.5 text-center">
+                                          <div className="inline-flex items-center shadow-sm rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800">
                                             {/* Tombol Buka WA */}
                                             <button
                                               type="button"
@@ -397,7 +476,7 @@ export function BillsPage({
                                                 const url = `https://wa.me/${phone}?text=${encodeURIComponent(log.message || "")}`;
                                                 window.open(url, "_blank");
                                               }}
-                                              className="inline-flex items-center gap-1 bg-green-50 hover:bg-green-100 text-green-700 text-[10px] font-bold py-1 px-2 rounded-l-lg border border-green-200 transition"
+                                              className="inline-flex items-center gap-1 bg-green-50 hover:bg-green-100/80 dark:bg-green-950/20 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold py-1.5 px-3 border-r border-slate-200 dark:border-slate-800 transition-colors"
                                               title="Buka WhatsApp langsung"
                                             >
                                               <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
@@ -408,7 +487,7 @@ export function BillsPage({
                                             {/* Tombol Salin Link */}
                                             <button
                                               type="button"
-                                              onClick={() => {
+                                              onClick={async () => {
                                                 const cleanPhone = log.sent_to.replace(/[^0-9]/g, "");
                                                 let phone = cleanPhone;
                                                 if (phone.startsWith("0")) {
@@ -417,10 +496,14 @@ export function BillsPage({
                                                   phone = "62" + phone;
                                                 }
                                                 const url = `https://wa.me/${phone}?text=${encodeURIComponent(log.message || "")}`;
-                                                void navigator.clipboard.writeText(url);
-                                                pushSuccess("Link wa.me berhasil disalin ke clipboard");
+                                                try {
+                                                  await copyToClipboard(url);
+                                                  pushSuccess("Link wa.me berhasil disalin ke clipboard");
+                                                } catch (err: any) {
+                                                  pushError(err.message || "Gagal menyalin link");
+                                                }
                                               }}
-                                              className="inline-flex items-center gap-1 bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold py-1 px-2 rounded-r-lg border border-l-0 border-slate-200 transition"
+                                              className="inline-flex items-center gap-1 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 text-slate-650 dark:text-slate-400 text-[10px] font-bold py-1.5 px-3 transition-colors"
                                               title="Salin link wa.me ke clipboard"
                                             >
                                               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -437,7 +520,7 @@ export function BillsPage({
                                 </table>
                               </div>
                             ) : (
-                              <p className="muted text-xs">Belum ada riwayat notifikasi WhatsApp.</p>
+                              <p className="muted text-xs italic dark:text-slate-500">Belum ada riwayat notifikasi WhatsApp.</p>
                             )}
                           </div>
                         </td>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { CustomerItem, User, VoucherItem, CustomerVoucherItem, VoucherUsageLogItem } from "../../types";
 import {
   updateCustomer,
@@ -17,7 +17,7 @@ import {
   type ReferralWithdrawalItem
 } from "../../lib/api";
 import { formatCurrency } from "../../utils/format";
-import { Info, ArrowUpRight, ArrowDownLeft, Gift, Percent, Search, Trash2, Edit3, Plus, X, Ticket, Settings, Clock, CheckCircle, XCircle, FileText, Camera } from "lucide-react";
+import { Info, ArrowUpRight, ArrowDownLeft, Gift, Percent, Search, Trash2, Edit3, Plus, X, Ticket, Settings, Clock, CheckCircle, XCircle, FileText, Camera, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { useDialog } from "../../context/DialogContext";
 
 type DiscountsPageProps = {
@@ -145,14 +145,138 @@ export function DiscountsPage({
     (c.referral_code && c.referral_code.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // List of customers who have special discounts
-  const discountCustomers = filteredCustomers.filter((c) => c.diskon > 0);
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // List of customers with active referrals (either have balance, referred someone, or have a code)
-  const referralCustomers = filteredCustomers.filter((c) => {
-    const referredOthers = customers.some((other) => other.referred_by_id === c.id);
-    return c.referral_balance > 0 || referredOthers || c.referral_code;
-  });
+  // Reset sorting state when tab changes to avoid mismatched sort columns
+  useEffect(() => {
+    setSortField(null);
+    setSortDirection("asc");
+  }, [activeTab]);
+
+  const requestSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const renderSortableHeader = (label: string, field: string, align: "left" | "center" = "left") => {
+    const isSorted = sortField === field;
+    return (
+      <th 
+        className={`px-6 py-4 font-semibold select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 ${align === "center" ? "text-center" : "text-left"}`}
+        onClick={() => requestSort(field)}
+      >
+        <div className={`inline-flex items-center gap-1.5 ${align === "center" ? "justify-center w-full" : ""}`}>
+          <span>{label}</span>
+          {isSorted ? (
+            sortDirection === "asc" ? (
+              <ChevronUp size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+            ) : (
+              <ChevronDown size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+            )
+          ) : (
+            <ArrowUpDown size={12} className="text-slate-300 dark:text-slate-600 opacity-50 transition-opacity" />
+          )}
+        </div>
+      </th>
+    );
+  };
+
+  // List of customers who have special discounts (sorted)
+  const sortedDiscountCustomers = useMemo(() => {
+    const list = filteredCustomers.filter((c) => c.diskon > 0);
+    if (!sortField) return list;
+    return [...list].sort((a, b) => {
+      let aVal = (a as any)[sortField];
+      let bVal = (b as any)[sortField];
+
+      if (sortField === "final_price") {
+        const aPrice = a.package_price || 0;
+        const aDisc = a.diskon || 0;
+        aVal = a.tipe_diskon === "percent" ? aPrice - (aPrice * aDisc) / 100 : aPrice - aDisc;
+
+        const bPrice = b.package_price || 0;
+        const bDisc = b.diskon || 0;
+        bVal = b.tipe_diskon === "percent" ? bPrice - (bPrice * bDisc) / 100 : bPrice - bDisc;
+      }
+
+      const isNumericField = sortField === "package_price" || sortField === "diskon" || sortField === "final_price";
+      if (aVal === null || aVal === undefined) aVal = isNumericField ? 0 : "";
+      if (bVal === null || bVal === undefined) bVal = isNumericField ? 0 : "";
+
+      if (isNumericField) {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal).trim().toLowerCase();
+      const bStr = String(bVal).trim().toLowerCase();
+      return sortDirection === "asc"
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [filteredCustomers, sortField, sortDirection]);
+
+  // List of customers with active referrals (sorted)
+  const sortedReferralCustomers = useMemo(() => {
+    const list = filteredCustomers.filter((c) => {
+      const referredOthers = customers.some((other) => other.referred_by_id === c.id);
+      return c.referral_balance > 0 || referredOthers || c.referral_code;
+    });
+    if (!sortField) return list;
+    return [...list].sort((a, b) => {
+      let aVal = (a as any)[sortField];
+      let bVal = (b as any)[sortField];
+
+      if (sortField === "referred_count") {
+        aVal = customers.filter((other) => other.referred_by_id === a.id).length;
+        bVal = customers.filter((other) => other.referred_by_id === b.id).length;
+      }
+
+      const isNumericField = sortField === "referral_balance" || sortField === "voucher_discount" || sortField === "referred_count";
+      if (aVal === null || aVal === undefined) aVal = isNumericField ? 0 : "";
+      if (bVal === null || bVal === undefined) bVal = isNumericField ? 0 : "";
+
+      if (isNumericField) {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal).trim().toLowerCase();
+      const bStr = String(bVal).trim().toLowerCase();
+      return sortDirection === "asc"
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [filteredCustomers, customers, sortField, sortDirection]);
+
+  // Sorted withdrawals list
+  const sortedWithdrawalsList = useMemo(() => {
+    const list = withdrawalsList.filter((w) =>
+      w.customer_name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    if (!sortField) return list;
+    return [...list].sort((a, b) => {
+      let aVal = (a as any)[sortField];
+      let bVal = (b as any)[sortField];
+
+      const isNumericField = sortField === "amount";
+      if (aVal === null || aVal === undefined) aVal = isNumericField ? 0 : "";
+      if (bVal === null || bVal === undefined) bVal = isNumericField ? 0 : "";
+
+      if (isNumericField) {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal).trim().toLowerCase();
+      const bStr = String(bVal).trim().toLowerCase();
+      return sortDirection === "asc"
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [withdrawalsList, searchQuery, sortField, sortDirection]);
 
   // Customers who DO NOT have a discount yet (for new discount dropdown)
   const nonDiscountCustomers = customers.filter((c) => c.diskon === 0);
@@ -463,7 +587,7 @@ export function DiscountsPage({
             }`}
           >
             <Percent size={14} />
-            Diskon Khusus ({discountCustomers.length})
+            Diskon Khusus ({sortedDiscountCustomers.length})
           </button>
           <button
             onClick={() => {
@@ -477,7 +601,7 @@ export function DiscountsPage({
             }`}
           >
             <Gift size={14} />
-            Referral MGM ({referralCustomers.length})
+            Referral MGM ({sortedReferralCustomers.length})
           </button>
           <button
             onClick={() => {
@@ -614,16 +738,16 @@ export function DiscountsPage({
             <table className="w-full text-left border-collapse text-sm">
               <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
                 <tr>
-                  <th className="px-6 py-4 font-semibold">Nama Pelanggan</th>
-                  <th className="px-6 py-4 font-semibold">Paket Aktif</th>
-                  <th className="px-6 py-4 font-semibold">Harga Asli</th>
-                  <th className="px-6 py-4 font-semibold">Nominal Diskon</th>
-                  <th className="px-6 py-4 font-semibold">Total Setelah Diskon</th>
-                  {!isViewer && <th className="px-6 py-4 font-semibold text-center">Aksi</th>}
+                  {renderSortableHeader("Nama Pelanggan", "name")}
+                  {renderSortableHeader("Paket Aktif", "package_name")}
+                  {renderSortableHeader("Harga Asli", "package_price")}
+                  {renderSortableHeader("Nominal Diskon", "diskon")}
+                  {renderSortableHeader("Total Setelah Diskon", "final_price")}
+                  {!isViewer && <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
-                {discountCustomers.length === 0 ? (
+                {sortedDiscountCustomers.length === 0 ? (
                   <tr>
                     <td colSpan={isViewer ? 5 : 6} className="px-6 py-10 text-center text-slate-400">
                       {searchQuery
@@ -632,7 +756,7 @@ export function DiscountsPage({
                     </td>
                   </tr>
                 ) : (
-                  discountCustomers.map((customer) => {
+                  sortedDiscountCustomers.map((customer) => {
                     const price = customer.package_price || 0;
                     const discount = customer.diskon || 0;
                     const finalPrice = Math.max(
@@ -690,24 +814,24 @@ export function DiscountsPage({
             <table className="w-full text-left border-collapse text-sm">
               <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
                 <tr>
-                  <th className="px-6 py-4 font-semibold">Pelanggan</th>
-                  <th className="px-6 py-4 font-semibold">Kode Referral</th>
-                  <th className="px-6 py-4 font-semibold">Saldo Referral</th>
-                  <th className="px-6 py-4 font-semibold">Voucher Diskon</th>
-                  <th className="px-6 py-4 font-semibold">Teman yang Diajak</th>
-                  <th className="px-6 py-4 font-semibold">Rekomendasi Oleh</th>
-                  {!isViewer && <th className="px-6 py-4 font-semibold text-center">Aksi / Klaim Reward</th>}
+                  {renderSortableHeader("Pelanggan", "name")}
+                  {renderSortableHeader("Kode Referral", "referral_code")}
+                  {renderSortableHeader("Saldo Referral", "referral_balance")}
+                  {renderSortableHeader("Voucher Diskon", "voucher_discount")}
+                  {renderSortableHeader("Teman yang Diajak", "referred_count")}
+                  {renderSortableHeader("Rekomendasi Oleh", "referred_by_name")}
+                  {!isViewer && <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi / Klaim Reward</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
-                {referralCustomers.length === 0 ? (
+                {sortedReferralCustomers.length === 0 ? (
                   <tr>
                     <td colSpan={isViewer ? 6 : 7} className="px-6 py-10 text-center text-slate-400">
                       Tidak ada pelanggan dengan data program referral aktif. Gunakan tombol 'Atur Referral Baru' di atas.
                     </td>
                   </tr>
                 ) : (
-                  referralCustomers.map((customer) => {
+                  sortedReferralCustomers.map((customer) => {
                     // Count how many people were referred by this customer id
                     const referredCount = customers.filter(
                       (other) => other.referred_by_id === customer.id
@@ -1007,29 +1131,25 @@ export function DiscountsPage({
             <table className="w-full text-left border-collapse text-sm">
               <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
                 <tr>
-                  <th className="px-6 py-4 font-semibold">Pelanggan</th>
-                  <th className="px-6 py-4 font-semibold">Nominal</th>
-                  <th className="px-6 py-4 font-semibold">Metode</th>
-                  <th className="px-6 py-4 font-semibold">Tujuan / Rekening</th>
-                  <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 font-semibold">Tanggal</th>
-                  <th className="px-6 py-4 font-semibold">Catatan / Bukti</th>
-                  {!isViewer && <th className="px-6 py-4 font-semibold text-center">Aksi</th>}
+                  {renderSortableHeader("Pelanggan", "customer_name")}
+                  {renderSortableHeader("Nominal", "amount")}
+                  {renderSortableHeader("Metode", "method")}
+                  {renderSortableHeader("Tujuan / Rekening", "destination")}
+                  {renderSortableHeader("Status", "status")}
+                  {renderSortableHeader("Tanggal", "created_at")}
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Catatan / Bukti</th>
+                  {!isViewer && <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
-                {withdrawalsList.length === 0 ? (
+                {sortedWithdrawalsList.length === 0 ? (
                   <tr>
                     <td colSpan={isViewer ? 7 : 8} className="px-6 py-10 text-center text-slate-400">
                       Tidak ada permintaan penarikan saldo referral.
                     </td>
                   </tr>
                 ) : (
-                  withdrawalsList
-                    .filter((w) =>
-                      w.customer_name.toLowerCase().includes(searchQuery.toLowerCase())
-                    )
-                    .map((w) => {
+                  sortedWithdrawalsList.map((w) => {
                       return (
                         <tr key={w.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
                           <td className="px-6 py-4">

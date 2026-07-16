@@ -12,3 +12,20 @@
         systemctl reload menettech-worker > /dev/null 2>/dev/null || true
     endscript
 }
+
+# WhatsApp Gateway logs (Node.js/winston) – rotated separately with shorter retention
+# because WA logs are verbose and grow quickly.
+# Uses 'copytruncate' instead of a postrotate signal because Node.js has no SIGUSR2
+# handler by default (sending SIGUSR2 to an unhandled Node.js process terminates it).
+# copytruncate: logrotate copies the file first, then truncates the original in-place,
+# so the process keeps writing to the same fd without any restart or signal needed.
+/opt/menettech-go/integration/whatsapp/*.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    copytruncate
+}
+

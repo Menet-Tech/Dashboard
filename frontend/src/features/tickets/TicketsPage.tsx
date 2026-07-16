@@ -14,6 +14,7 @@ import { StatusPill } from "../../components/ui/StatusPill";
 import { toErrorMessage } from "../../utils/format";
 import { useDialog } from "../../context/DialogContext";
 import { useWhatsAppGateway } from "../../hooks/useWhatsAppGateway";
+import { copyToClipboard } from "../../utils/clipboard";
 import {
   Loader2,
   Plus,
@@ -584,11 +585,15 @@ export function TicketsPage({
                         {/* Salin Link */}
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             const phone = detail.no_hp.replace("@c.us", "").replace("@lid", "").replace(/[+\-\s]/g, "").replace(/^0/, "62");
                             const url = `https://wa.me/${phone}?text=${encodeURIComponent(replyText)}`;
-                            void navigator.clipboard.writeText(url);
-                            pushSuccess("Link wa.me berhasil disalin ke clipboard");
+                            try {
+                              await copyToClipboard(url);
+                              pushSuccess("Link wa.me berhasil disalin ke clipboard");
+                            } catch (err: any) {
+                              pushError(err.message || "Gagal menyalin link");
+                            }
                           }}
                           className="bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-l-0 border-slate-200 dark:border-slate-700 font-semibold py-2 px-3 rounded-r-xl text-xs shadow-sm transition-colors flex items-center justify-center cursor-pointer gap-1"
                           title="Salin link wa.me ke clipboard"

@@ -33,6 +33,8 @@ export type CustomerFormState = {
   referral_balance: number;
   odp_id: number;
   odp_port?: number;
+  is_trial: boolean;
+  trial_days: number;
 };
 
 export const defaultCustomerForm = (): CustomerFormState => ({
@@ -52,6 +54,8 @@ export const defaultCustomerForm = (): CustomerFormState => ({
   referral_balance: 0,
   odp_id: 0,
   odp_port: undefined,
+  is_trial: false,
+  trial_days: 3,
 });
 
 type CustomersPageProps = {

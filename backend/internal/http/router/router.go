@@ -23,6 +23,7 @@ import (
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/http/handler"
 	"menettech/dashboard/backend/internal/integration"
+	"menettech/dashboard/backend/internal/inventory"
 	"menettech/dashboard/backend/internal/mikrotik"
 	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/odp"
@@ -135,6 +136,11 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	}
 	voucherHandler := handler.NewVoucherHandler(voucherService)
 	voucherHandler.Audit = auditService
+
+	inventoryService := inventory.Service{
+		Repository: inventory.Repository{DB: db},
+	}
+	inventoryHandler := handler.NewInventoryHandler(inventoryService, auditService)
 
 	r.Get("/health", healthHandler.Show)
 	r.Get("/livez", healthHandler.Live)
@@ -363,6 +369,14 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 				staff.Post("/bills/confirmations/upload-base64", billHandler.UploadConfirmationProofBase64)
 				staff.Post("/tickets/{id}/messages", ticketHandler.AddMessage)
 				staff.Post("/tickets/{id}/close", ticketHandler.Close)
+
+				staff.Get("/inventory", inventoryHandler.ListItems)
+				staff.Post("/inventory", inventoryHandler.CreateItem)
+				staff.Put("/inventory/{id}", inventoryHandler.UpdateItem)
+				staff.Delete("/inventory/{id}", inventoryHandler.DeleteItem)
+				staff.Get("/inventory/logs", inventoryHandler.ListLogs)
+				staff.Post("/inventory/{id}/logs", inventoryHandler.AddLog)
+
 				staff.Post("/broadcast", broadcastHandler.Send)
 				staff.Post("/chatbot/forms", chatbotFormHandler.Create)
 				staff.Patch("/chatbot/forms/{id}", chatbotFormHandler.UpdateStatus)

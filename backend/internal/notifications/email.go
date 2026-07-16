@@ -36,7 +36,26 @@ func (s *EmailService) QueueEmail(ctx context.Context, toEmail, subject, body st
 		return nil // skip silently if empty
 	}
 
-	_, err := s.DB.ExecContext(ctx, `
+	var existingID int64
+	err := s.DB.QueryRowContext(ctx, `
+		SELECT id
+		FROM email_queue
+		WHERE to_email = ?
+		  AND subject = ?
+		  AND body = ?
+		  AND status IN ('pending', 'failed')
+		ORDER BY id DESC
+		LIMIT 1
+	`, toEmail, subject, body).Scan(&existingID)
+	if err == nil {
+		slog.Info("duplicate email queue skipped", "existing_id", existingID, "to", toEmail, "subject", subject)
+		return nil
+	}
+	if err != sql.ErrNoRows {
+		return fmt.Errorf("check existing email_queue: %w", err)
+	}
+
+	_, err = s.DB.ExecContext(ctx, `
 		INSERT INTO email_queue (to_email, subject, body, status, attempts)
 		VALUES (?, ?, ?, 'pending', 0)
 	`, toEmail, subject, body)
@@ -110,7 +129,7 @@ func (s *EmailService) ProcessQueue(ctx context.Context) (bool, error) {
 	}
 
 	slog.Error("queue: email message failed to send", "id", id, "to", toEmail, "attempts", attempts, "error", sendErr)
-	return true, sendErr
+	return true, nil
 }
 
 // SendDirect connects to the SMTP server and transmits the message immediately.
@@ -142,13 +161,13 @@ func (s *EmailService) SendDirect(ctx context.Context, to, subject, body string)
 	}
 
 	// Format MIME RFC822 message headers and body
-	msg := []byte(fmt.Sprintf("To: %s\r\n"+
+	msg := fmt.Appendf(nil, "To: %s\r\n"+
 		"From: %s\r\n"+
 		"Subject: %s\r\n"+
 		"Content-Type: text/plain; charset=UTF-8\r\n"+
 		"MIME-Version: 1.0\r\n"+
 		"\r\n"+
-		"%s\r\n", to, fromEmail, subject, body))
+		"%s\r\n", to, fromEmail, subject, body)
 
 	// Direct SSL/TLS (commonly on port 465)
 	if strings.ToLower(encryption) == "ssl" || portStr == "465" {

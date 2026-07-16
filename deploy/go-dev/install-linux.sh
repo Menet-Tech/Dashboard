@@ -234,8 +234,33 @@ build_frontend() {
 deploy_whatsapp() {
     if [[ -d "./whatsapp" ]]; then
         log_info "Menyalin WhatsApp Gateway source code..."
+        
+        # Backup WhatsApp storage (session tokens) agar tidak ter-logout saat update
+        if [[ -d "${INSTALL_DIR}/whatsapp/storage" ]]; then
+            log_info "Mencadangkan sesi WhatsApp..."
+            cp -r "${INSTALL_DIR}/whatsapp/storage" "/tmp/whatsapp_storage_backup"
+        fi
+
+        # Perhatikan agar .env tidak terhapus jika ada di dalam folder whatsapp, 
+        # walau best practice-nya .env ada di backend.
+        if [[ -f "${INSTALL_DIR}/whatsapp/.env" ]]; then
+            cp "${INSTALL_DIR}/whatsapp/.env" "/tmp/whatsapp_env_backup"
+        fi
+
         rm -rf "${INSTALL_DIR}/whatsapp/"*
         cp -r ./whatsapp/* "${INSTALL_DIR}/whatsapp/"
+        
+        # Restore WhatsApp storage
+        if [[ -d "/tmp/whatsapp_storage_backup" ]]; then
+            log_info "Mengembalikan sesi WhatsApp..."
+            cp -r "/tmp/whatsapp_storage_backup" "${INSTALL_DIR}/whatsapp/storage"
+            rm -rf "/tmp/whatsapp_storage_backup"
+        fi
+        
+        if [[ -f "/tmp/whatsapp_env_backup" ]]; then
+            cp "/tmp/whatsapp_env_backup" "${INSTALL_DIR}/whatsapp/.env"
+            rm -f "/tmp/whatsapp_env_backup"
+        fi
         
         # JALANKAN npm install di server jika Node.js tersedia
         if command -v npm &> /dev/null; then

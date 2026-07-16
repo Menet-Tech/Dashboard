@@ -85,7 +85,13 @@ export function useBills({ withFeedback, askForConfirmation, onSuccess, onError 
     const file = proofFiles[id];
     if (!file) { onError("Pilih file bukti bayar terlebih dahulu."); return; }
     await withFeedback(async () => {
-      await uploadBillProof(id, file);
+      let fileToUpload = file;
+      if (file.type.startsWith('image/')) {
+         onSuccess("Sedang mengkompres gambar...");
+         const { compressImage } = await import('../lib/imageCompression');
+         fileToUpload = await compressImage(file, 0.5); // Max 500KB
+      }
+      await uploadBillProof(id, fileToUpload);
       setProofFiles((current) => ({ ...current, [id]: null }));
       onSuccess("Bukti bayar berhasil diunggah.");
       await refreshBills();
