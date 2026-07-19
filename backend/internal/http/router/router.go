@@ -79,6 +79,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 		Repository: customers.Repository{DB: db},
 		Settings:   settingsService,
 	}, auditService, cfg.StoragePath)
+	customerHandler.WhatsApp = whatsAppService
 	odpHandler := handler.NewOdpHandler(odp.Service{
 		Repository: odp.Repository{DB: db},
 	})
@@ -104,7 +105,10 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	settingsHandler := handler.NewSettingsHandler(settingsService, serviceMgr)
 	notificationHandler := handler.NewNotificationHandler(notifications.NotificationLogRepository{DB: db})
 	backupDir := filepath.Join(cfg.StoragePath, "backups")
-	backupHandler := &handler.BackupHandler{Service: backup.NewService(db, backupDir, cfg.SQLitePath)}
+	backupHandler := &handler.BackupHandler{
+		Service: backup.NewService(db, backupDir, cfg.SQLitePath),
+		Discord: discordService,
+	}
 	integrationHandler := handler.NewIntegrationHandler(settingsService, whatsAppService, discordService)
 	integrationHandler.Customers = customers.Service{
 		Repository: customers.Repository{DB: db},
@@ -145,7 +149,12 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	r.Get("/health", healthHandler.Show)
 	r.Get("/livez", healthHandler.Live)
 	r.Get("/readyz", healthHandler.Ready)
-	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(filepath.Join(cfg.StoragePath, "uploads")))))
+	uploadsFileServer := http.StripPrefix("/uploads/", http.FileServer(http.Dir(filepath.Join(cfg.StoragePath, "uploads"))))
+	r.Handle("/uploads/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		uploadsFileServer.ServeHTTP(w, r)
+	}))
 
 	r.Route("/api", func(api chi.Router) {
 		// Public routes

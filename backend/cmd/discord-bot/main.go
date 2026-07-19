@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"sort"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -168,8 +167,8 @@ var slashCommands = []*discordgo.ApplicationCommand{
 			{
 				Type:        discordgo.ApplicationCommandOptionString,
 				Name:        "nama",
-				Description: "Nama pelanggan (partial match)",
-				Required:    true,
+				Description: "Nama pelanggan (partial match, opsional)",
+				Required:    false,
 			},
 		},
 	},
@@ -354,10 +353,23 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		embed = buildTagihanEmbed(limit, periode)
 	case "pelanggan":
 		name := ""
-		if len(cmdData.Options) > 0 {
-			name = cmdData.Options[0].StringValue()
+		for _, opt := range cmdData.Options {
+			if opt.Name == "nama" {
+				name = opt.StringValue()
+			}
 		}
-		embed, components = buildPelangganEmbed(name, 0)
+		components = buildPelangganEmbedV2(name, 0)
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Flags:      32768, // MessageFlagsComponentsV2
+				Components: components,
+			},
+		})
+		if err != nil {
+			logger.Error("respond to interaction", "error", err)
+		}
+		return
 	case "pengaturan":
 		embed = handlePengaturanCommand(i, cmdData.Options)
 	case "reboot":
@@ -499,7 +511,7 @@ type customerRow struct {
 	DueDay      int
 }
 
-func queryCustomers(name string, offset int) ([]customerRow, error) {
+func queryCustomers(name string, offset int, limit int) ([]customerRow, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -509,8 +521,8 @@ func queryCustomers(name string, offset int) ([]customerRow, error) {
 		LEFT JOIN paket p ON p.id = c.paket_id
 		WHERE c.nama LIKE ?
 		ORDER BY c.nama
-		LIMIT 10 OFFSET ?
-	`, "%"+name+"%", offset)
+		LIMIT ? OFFSET ?
+	`, "%"+name+"%", limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -642,10 +654,62 @@ func buildTagihanEmbed(limit int, periode string) *discordgo.MessageEmbed {
 	}
 }
 
-func buildPelangganEmbed(name string, offset int) (*discordgo.MessageEmbed, []discordgo.MessageComponent) {
-	customers, err := queryCustomers(name, offset)
+// ─── Discord Components V2 Definitions ────────────────────────────────────────
+
+type ContainerComponent struct {
+	AccentColor int                          `json:"accent_color,omitempty"`
+	Components  []discordgo.MessageComponent `json:"components"`
+}
+
+func (c ContainerComponent) Type() discordgo.ComponentType {
+	return 17 // ComponentTypeContainer
+}
+
+func (c ContainerComponent) MarshalJSON() ([]byte, error) {
+	type Alias ContainerComponent
+	return json.Marshal(&struct {
+		Type int `json:"type"`
+		Alias
+	}{
+		Type:  17,
+		Alias: Alias(c),
+	})
+}
+
+type SectionComponent struct {
+	Content   string                     `json:"content"`
+	Accessory discordgo.MessageComponent `json:"accessory,omitempty"`
+}
+
+func (s SectionComponent) Type() discordgo.ComponentType {
+	return 9 // ComponentTypeSection
+}
+
+func (s SectionComponent) MarshalJSON() ([]byte, error) {
+	type Alias SectionComponent
+	return json.Marshal(&struct {
+		Type int `json:"type"`
+		Alias
+	}{
+		Type:  9,
+		Alias: Alias(s),
+	})
+}
+
+func buildPelangganEmbedV2(name string, offset int) []discordgo.MessageComponent {
+	// Query 4 customers per page to fit 5 Action Rows limit (4 items + 1 nav row)
+	customers, err := queryCustomers(name, offset, 4)
 	if err != nil {
-		return errorEmbed("Gagal membaca pelanggan: " + err.Error()), nil
+		return []discordgo.MessageComponent{
+			ContainerComponent{
+				AccentColor:   15158332, // Red
+				Components: []discordgo.MessageComponent{
+					SectionComponent{
+						Content:       "❌ Gagal membaca pelanggan: " + err.Error(),
+					},
+				},
+			},
+		}
 	}
 
 	if len(customers) == 0 {
@@ -653,53 +717,52 @@ func buildPelangganEmbed(name string, offset int) (*discordgo.MessageEmbed, []di
 		if name == "" {
 			desc = "Tidak ada pelanggan pada halaman ini."
 		}
-		return &discordgo.MessageEmbed{
-			Title:       "🔍 Cari Pelanggan",
-			Description: desc,
-			Color:       15105570, // Orange
-		}, nil
-	}
-
-	fields := []*discordgo.MessageEmbedField{}
-	var selectOptions []discordgo.SelectMenuOption
-
-	for _, c := range customers {
-		statusLabel := "Aktif 🟢"
-		switch c.Status {
-		case "limit":
-			statusLabel = "Terisolir/Limit 🟡"
-		case "inactive":
-			statusLabel = "Nonaktif 🔴"
+		return []discordgo.MessageComponent{
+			ContainerComponent{
+				AccentColor:   15105570, // Orange
+				Components: []discordgo.MessageComponent{
+					SectionComponent{
+						Content:       "🔍 **Cari Pelanggan**\n\n" + desc,
+					},
+				},
+			},
 		}
-		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:   c.Name,
-			Value:  fmt.Sprintf("Status: **%s**\nPaket: %s\nWhatsApp: %s\nJatuh Tempo: Tgl %d", statusLabel, c.PackageName, c.Whatsapp, c.DueDay),
-			Inline: false,
-		})
-
-		selectOptions = append(selectOptions, discordgo.SelectMenuOption{
-			Label:       c.Name,
-			Value:       fmt.Sprintf("%d", c.ID),
-			Description: fmt.Sprintf("%s - %s", statusLabel, c.PackageName),
-		})
 	}
+
+	var containerComponents []discordgo.MessageComponent
 
 	titleName := fmt.Sprintf("\"%s\"", name)
 	if name == "" {
 		titleName = "Semua"
 	}
-	embed := &discordgo.MessageEmbed{
-		Title:       fmt.Sprintf("🔍 Hasil Pencarian Pelanggan: %s", titleName),
-		Description: fmt.Sprintf("Ditemukan daftar pelanggan (Halaman %d). Silakan pilih pelanggan pada menu di bawah untuk melihat detail lengkap.", (offset/10)+1),
-		Color:       3447003, // Blue
-		Fields:      fields,
-	}
+	headerText := fmt.Sprintf("🔍 **Hasil Pencarian Pelanggan: %s**\nDitemukan daftar pelanggan (Halaman %d). Silakan klik nama pelanggan atau tombol `➕` di sebelahnya untuk melihat detail.", titleName, (offset/4)+1)
+	containerComponents = append(containerComponents, SectionComponent{
+		Content:       headerText,
+	})
 
-	// Build Components
-	selectMenu := discordgo.SelectMenu{
-		CustomID:    "pelanggan_select",
-		Placeholder: "Pilih pelanggan untuk melihat detail...",
-		Options:     selectOptions,
+	for idx, c := range customers {
+		statusEmoji := "🟢"
+		switch c.Status {
+		case "limit":
+			statusEmoji = "🟡"
+		case "inactive":
+			statusEmoji = "🔴"
+		}
+		displayIdx := idx + offset + 1
+		itemText := fmt.Sprintf("**%d. %s %s**\n*%s • WA: %s • Tempo: Tgl %d*", displayIdx, statusEmoji, c.Name, c.PackageName, c.Whatsapp, c.DueDay)
+
+		customIDPlus := fmt.Sprintf("pelanggan_add_%d_%s_%d", c.ID, url.QueryEscape(name), offset)
+
+		btnPlus := discordgo.Button{
+			Label:    "➕",
+			Style:    discordgo.PrimaryButton,
+			CustomID: customIDPlus,
+		}
+
+		containerComponents = append(containerComponents, SectionComponent{
+			Content:       itemText,
+			Accessory:     btnPlus,
+		})
 	}
 
 	btnPrev := discordgo.Button{
@@ -713,85 +776,36 @@ func buildPelangganEmbed(name string, offset int) (*discordgo.MessageEmbed, []di
 		Label:    "Next ▶️",
 		Style:    discordgo.PrimaryButton,
 		CustomID: fmt.Sprintf("pelanggan_next_%s_%d", url.QueryEscape(name), offset),
-		Disabled: len(customers) < 10,
+		Disabled: len(customers) < 4,
 	}
 
-	components := []discordgo.MessageComponent{
-		discordgo.ActionsRow{
-			Components: []discordgo.MessageComponent{selectMenu},
+	containerComponents = append(containerComponents, discordgo.ActionsRow{
+		Components: []discordgo.MessageComponent{btnPrev, btnNext},
+	})
+
+	return []discordgo.MessageComponent{
+		ContainerComponent{
+			AccentColor:   3447003, // Blue
+			Components:    containerComponents,
 		},
-		discordgo.ActionsRow{
-			Components: []discordgo.MessageComponent{btnPrev, btnNext},
-		},
-	}
-
-	return embed, components
-}
-
-func handleComponentInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	data := i.MessageComponentData()
-
-	switch data.CustomID {
-	case "pelanggan_select":
-		if len(data.Values) > 0 {
-			customerID := data.Values[0]
-			embed := buildPelangganDetailEmbed(customerID)
-			_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Embeds: []*discordgo.MessageEmbed{embed},
-					Flags:  discordgo.MessageFlagsEphemeral,
-				},
-			})
-		}
-	default:
-		if strings.HasPrefix(data.CustomID, "pelanggan_prev_") || strings.HasPrefix(data.CustomID, "pelanggan_next_") {
-			parts := strings.Split(data.CustomID, "_")
-			if len(parts) >= 4 {
-				name, _ := url.QueryUnescape(parts[2])
-				offset := 0
-				fmt.Sscanf(parts[3], "%d", &offset)
-
-				if parts[1] == "prev" {
-					offset -= 10
-				} else {
-					offset += 10
-				}
-
-				if offset < 0 {
-					offset = 0
-				}
-
-				embed, components := buildPelangganEmbed(name, offset)
-				if embed.Timestamp == "" {
-					embed.Timestamp = time.Now().Format(time.RFC3339)
-				}
-				if embed.Footer == nil {
-					embed.Footer = &discordgo.MessageEmbedFooter{
-						Text: "Menet-Tech Dashboard Bot",
-					}
-				}
-				
-				_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseUpdateMessage,
-					Data: &discordgo.InteractionResponseData{
-						Embeds:     []*discordgo.MessageEmbed{embed},
-						Components: components,
-					},
-				})
-			}
-		}
 	}
 }
 
-func buildPelangganDetailEmbed(customerIDStr string) *discordgo.MessageEmbed {
-	customerID, _ := strconv.ParseInt(customerIDStr, 10, 64)
-	
+func buildPelangganDetailEmbedWithComponentsV2(customerID int64, name string, offset int) []discordgo.MessageComponent {
 	cust, err := customersSvc.FindByID(context.Background(), customerID)
 	if err != nil {
-		return errorEmbed("Gagal memuat detail pelanggan.")
+		return []discordgo.MessageComponent{
+			ContainerComponent{
+				AccentColor:   15158332,
+				Components: []discordgo.MessageComponent{
+					SectionComponent{
+						Content:       "❌ Gagal memuat detail pelanggan.",
+					},
+				},
+			},
+		}
 	}
-	
+
 	statusLabel := "Aktif 🟢"
 	switch cust.Status {
 	case "limit":
@@ -799,7 +813,7 @@ func buildPelangganDetailEmbed(customerIDStr string) *discordgo.MessageEmbed {
 	case "inactive":
 		statusLabel = "Nonaktif (DHCP Only) 🔴"
 	}
-	
+
 	valOrDash := func(s string) string {
 		if s == "" {
 			return "-"
@@ -807,23 +821,371 @@ func buildPelangganDetailEmbed(customerIDStr string) *discordgo.MessageEmbed {
 		return s
 	}
 
-	return &discordgo.MessageEmbed{
-		Title:       fmt.Sprintf("📄 Detail Pelanggan: %s", cust.Name),
-		Color:       3447003,
-		Fields: []*discordgo.MessageEmbedField{
-			{Name: "ID Pelanggan", Value: fmt.Sprintf("%d", cust.ID), Inline: true},
-			{Name: "Status", Value: statusLabel, Inline: true},
-			{Name: "Nomor WhatsApp", Value: valOrDash(cust.WhatsApp), Inline: true},
-			{Name: "Alamat", Value: valOrDash(cust.Address), Inline: false},
-			{Name: "Jatuh Tempo", Value: fmt.Sprintf("Tgl %d tiap bulan", cust.DueDay), Inline: true},
-			{Name: "User PPPoE", Value: valOrDash(cust.UserPPPoE), Inline: true},
-			{Name: "IP Router (PPPoE)", Value: valOrDash(cust.PppoeIP), Inline: true},
-			{Name: "SN ONT", Value: valOrDash(cust.SNOnt), Inline: true},
-			{Name: "ONT Rx Power", Value: valOrDash(cust.OntRxPower), Inline: true},
-			{Name: "ONT Tx Power", Value: valOrDash(cust.OntTxPower), Inline: true},
+	var containerComponents []discordgo.MessageComponent
+
+	headerText := fmt.Sprintf("📄 **Detail Pelanggan: %s**", cust.Name)
+	containerComponents = append(containerComponents, SectionComponent{
+		Content:       headerText,
+	})
+
+	detailsText := fmt.Sprintf(
+		"**ID Pelanggan:** %d\n"+
+			"**Status:** %s\n"+
+			"**Nomor WhatsApp:** %s\n"+
+			"**Alamat:** %s\n"+
+			"**Jatuh Tempo:** Tgl %d tiap bulan\n"+
+			"**User PPPoE:** %s\n"+
+			"**IP Router (PPPoE):** %s\n"+
+			"**SN ONT:** %s\n"+
+			"**ONT Rx Power:** %s\n"+
+			"**ONT Tx Power:** %s",
+		cust.ID, statusLabel, valOrDash(cust.WhatsApp), valOrDash(cust.Address),
+		cust.DueDay, valOrDash(cust.UserPPPoE), valOrDash(cust.PppoeIP),
+		valOrDash(cust.SNOnt), valOrDash(cust.OntRxPower), valOrDash(cust.OntTxPower),
+	)
+	containerComponents = append(containerComponents, SectionComponent{
+		Content:       detailsText,
+	})
+
+	btnOnt := discordgo.Button{
+		Label:    "📡 Status ONT",
+		Style:    discordgo.SecondaryButton,
+		CustomID: fmt.Sprintf("pelanggan_act_ont_%d_%s_%d", customerID, url.QueryEscape(name), offset),
+	}
+	btnSync := discordgo.Button{
+		Label:    "🔄 Sync Router",
+		Style:    discordgo.SecondaryButton,
+		CustomID: fmt.Sprintf("pelanggan_act_sync_%d_%s_%d", customerID, url.QueryEscape(name), offset),
+	}
+	btnReboot := discordgo.Button{
+		Label:    "⚡ Reboot ONT",
+		Style:    discordgo.SecondaryButton,
+		CustomID: fmt.Sprintf("pelanggan_act_reboot_%d_%s_%d", customerID, url.QueryEscape(name), offset),
+	}
+	btnKick := discordgo.Button{
+		Label:    "👢 Kick Session",
+		Style:    discordgo.SecondaryButton,
+		CustomID: fmt.Sprintf("pelanggan_act_kick_%d_%s_%d", customerID, url.QueryEscape(name), offset),
+	}
+	containerComponents = append(containerComponents, discordgo.ActionsRow{
+		Components: []discordgo.MessageComponent{btnOnt, btnSync, btnReboot, btnKick},
+	})
+
+	selectStatus := discordgo.SelectMenu{
+		CustomID:    fmt.Sprintf("pelanggan_act_statusmenu_%d_%s_%d", customerID, url.QueryEscape(name), offset),
+		Placeholder: "Ubah Status Layanan...",
+		Options: []discordgo.SelectMenuOption{
+			{Label: "Aktif 🟢", Value: "active"},
+			{Label: "Terisolir/Limit 🟡", Value: "limit"},
+			{Label: "Nonaktif (DHCP Only) 🔴", Value: "inactive"},
+		},
+	}
+	containerComponents = append(containerComponents, discordgo.ActionsRow{
+		Components: []discordgo.MessageComponent{selectStatus},
+	})
+
+	btnBack := discordgo.Button{
+		Label:    "❌ Kembali",
+		Style:    discordgo.DangerButton,
+		CustomID: fmt.Sprintf("pelanggan_back_%s_%d", url.QueryEscape(name), offset),
+	}
+	containerComponents = append(containerComponents, discordgo.ActionsRow{
+		Components: []discordgo.MessageComponent{btnBack},
+	})
+
+	return []discordgo.MessageComponent{
+		ContainerComponent{
+			AccentColor:   3447003, // Blue
+			Components:    containerComponents,
 		},
 	}
 }
+
+func buildActionResultV2(embed *discordgo.MessageEmbed, customerID int64, name string, offset int) []discordgo.MessageComponent {
+	accent := 3066993 // Green
+	if embed.Color == 15158332 || embed.Color == 15105570 {
+		accent = int(embed.Color)
+	}
+
+	btnBack := discordgo.Button{
+		Label:    "❌ Kembali",
+		Style:    discordgo.DangerButton,
+		CustomID: fmt.Sprintf("pelanggan_view_%d_%s_%d", customerID, url.QueryEscape(name), offset),
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("**%s**\n\n", embed.Title))
+	if embed.Description != "" {
+		sb.WriteString(embed.Description)
+		sb.WriteString("\n\n")
+	}
+	for _, field := range embed.Fields {
+		sb.WriteString(fmt.Sprintf("**%s:** %s\n", field.Name, field.Value))
+	}
+
+	return []discordgo.MessageComponent{
+		ContainerComponent{
+			AccentColor:   accent,
+			Components: []discordgo.MessageComponent{
+				SectionComponent{
+					Content:       strings.TrimSpace(sb.String()),
+				},
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{btnBack},
+				},
+			},
+		},
+	}
+}
+
+func runCustomerAction(action string, customerID int64, initiator string) *discordgo.MessageEmbed {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	cust, err := customersSvc.FindByID(ctx, customerID)
+	if err != nil {
+		return errorEmbed("Pelanggan tidak ditemukan")
+	}
+
+	switch action {
+	case "reboot":
+		if strings.TrimSpace(cust.SNOnt) == "" {
+			return errorEmbed(fmt.Sprintf("Pelanggan **%s** tidak memiliki Serial Number ONT terkonfigurasi.", cust.Name))
+		}
+		acsURL, err := settingsSvc.GetString(ctx, settings.KeyACSURL)
+		if err != nil || acsURL == "" {
+			acsURL = "http://localhost:7557"
+		}
+		acsUser, _ := settingsSvc.GetString(ctx, settings.KeyACSUsername)
+		acsPass, _ := settingsSvc.GetString(ctx, settings.KeyACSPassword)
+		acsClient := acs.NewClient(acsURL, acsUser, acsPass)
+
+		err = acsClient.RebootDevice(ctx, cust.SNOnt)
+		if err != nil {
+			return errorEmbed(fmt.Sprintf("Gagal mengirim perintah reboot untuk ONT **%s** (SN: %s): %v", cust.Name, cust.SNOnt, err))
+		}
+		_ = auditSvc.Record(ctx, nil, nil, "discord.ont_reboot", fmt.Sprintf("User %s rebooted ONT for customer %s (SN: %s) via Discord bot", initiator, cust.Name, cust.SNOnt))
+		return successEmbed("Reboot Terkirim", fmt.Sprintf("Perintah reboot berhasil dikirim ke GenieACS untuk pelanggan **%s** (SN: %s). ONT akan segera dimuat ulang.", cust.Name, cust.SNOnt))
+
+	case "sync":
+		if strings.TrimSpace(cust.UserPPPoE) == "" {
+			return errorEmbed(fmt.Sprintf("Pelanggan **%s** tidak memiliki user PPPoE terkonfigurasi.", cust.Name))
+		}
+		err = customersSvc.SyncToMikrotik(ctx, cust)
+		if err != nil {
+			return errorEmbed(fmt.Sprintf("Gagal melakukan sinkronisasi credentials pelanggan **%s** ke MikroTik: %v", cust.Name, err))
+		}
+		_ = auditSvc.Record(ctx, nil, nil, "discord.customer_sync", fmt.Sprintf("User %s synced customer %s to MikroTik via Discord bot", initiator, cust.Name))
+		return successEmbed("Sinkronisasi Berhasil", fmt.Sprintf("Berhasil mensinkronkan PPPoE credentials pelanggan **%s** (User: %s) ke MikroTik.", cust.Name, cust.UserPPPoE))
+
+	case "kick":
+		if strings.TrimSpace(cust.UserPPPoE) == "" {
+			return errorEmbed(fmt.Sprintf("Pelanggan **%s** tidak memiliki user PPPoE terkonfigurasi.", cust.Name))
+		}
+		mikrotikHost, _ := settingsSvc.GetString(ctx, settings.KeyMikrotikHost)
+		mikrotikUser, _ := settingsSvc.GetString(ctx, settings.KeyMikrotikUser)
+		mikrotikPass, _ := settingsSvc.GetString(ctx, settings.KeyMikrotikPass)
+		if strings.TrimSpace(mikrotikHost) == "" || strings.TrimSpace(mikrotikUser) == "" {
+			return errorEmbed("MikroTik host atau user belum terkonfigurasi di pengaturan sistem.")
+		}
+		client := mikrotik.NewClient(mikrotikHost, mikrotikUser, mikrotikPass)
+		if err := client.Connect(ctx); err != nil {
+			return errorEmbed(fmt.Sprintf("Gagal terhubung ke MikroTik: %v", err))
+		}
+		defer client.Close()
+
+		err = client.KickUser(ctx, cust.UserPPPoE)
+		if err != nil {
+			return errorEmbed(fmt.Sprintf("Gagal memutuskan sesi aktif PPPoE pelanggan **%s** (User: %s) di MikroTik: %v", cust.Name, cust.UserPPPoE, err))
+		}
+		_ = auditSvc.Record(ctx, nil, nil, "discord.customer_kick", fmt.Sprintf("User %s kicked active PPPoE session for customer %s (User: %s) via Discord bot", initiator, cust.Name, cust.UserPPPoE))
+		return successEmbed("Sesi Diputuskan", fmt.Sprintf("Sesi aktif PPPoE pelanggan **%s** (User: %s) berhasil diputuskan (kick) di MikroTik.", cust.Name, cust.UserPPPoE))
+
+	case "ont":
+		if strings.TrimSpace(cust.SNOnt) == "" {
+			return errorEmbed(fmt.Sprintf("Pelanggan **%s** tidak memiliki Serial Number ONT terkonfigurasi.", cust.Name))
+		}
+		acsURL, err := settingsSvc.GetString(ctx, settings.KeyACSURL)
+		if err != nil || acsURL == "" {
+			acsURL = "http://localhost:7557"
+		}
+		acsUser, _ := settingsSvc.GetString(ctx, settings.KeyACSUsername)
+		acsPass, _ := settingsSvc.GetString(ctx, settings.KeyACSPassword)
+		acsClient := acs.NewClient(acsURL, acsUser, acsPass)
+
+		status, err := acsClient.GetDeviceStatus(ctx, cust.SNOnt)
+		if err != nil {
+			return errorEmbed(fmt.Sprintf("Gagal mengambil status ONT dari GenieACS untuk pelanggan **%s** (SN: %s): %v", cust.Name, cust.SNOnt, err))
+		}
+		statusEmoji := "ONLINE 🟢"
+		color := 3066993 // Green (#2ecc71)
+		if status.Status == "offline" {
+			statusEmoji = "OFFLINE 🔴"
+			color = 15158332 // Red (#e74c3c)
+		}
+		return &discordgo.MessageEmbed{
+			Title: "📡 Detail Status ONT Pelanggan",
+			Color: color,
+			Fields: []*discordgo.MessageEmbedField{
+				{Name: "Nama Pelanggan", Value: cust.Name, Inline: true},
+				{Name: "User PPPoE", Value: cust.UserPPPoE, Inline: true},
+				{Name: "Model ONT", Value: status.Model, Inline: true},
+				{Name: "Serial Number", Value: fmt.Sprintf("`%s`", status.SerialNumber), Inline: true},
+				{Name: "IP Address", Value: status.IPAddress, Inline: true},
+				{Name: "Uptime ONT", Value: status.Uptime, Inline: true},
+				{Name: "Redaman (Rx Optical)", Value: fmt.Sprintf("`%s` (Tx: `%s`)", status.RxOpticalPower, status.TxOpticalPower), Inline: false},
+				{Name: "Status Koneksi", Value: statusEmoji, Inline: true},
+				{Name: "Last Inform", Value: status.LastInformTime.Format("2006-01-02 15:04:05"), Inline: true},
+			},
+		}
+	}
+
+	return errorEmbed("Action tidak dikenal")
+}
+
+func handleComponentInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	data := i.MessageComponentData()
+
+	if strings.HasPrefix(data.CustomID, "pelanggan_") {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		parts := strings.Split(data.CustomID, "_")
+		if len(parts) < 2 {
+			return
+		}
+
+		// 1. Prev / Next List
+		if parts[1] == "prev" || parts[1] == "next" {
+			if len(parts) >= 4 {
+				name, _ := url.QueryUnescape(parts[2])
+				offset := 0
+				fmt.Sscanf(parts[3], "%d", &offset)
+
+				if parts[1] == "prev" {
+					offset -= 4
+				} else {
+					offset += 4
+				}
+				if offset < 0 {
+					offset = 0
+				}
+
+				components := buildPelangganEmbedV2(name, offset)
+				_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseUpdateMessage,
+					Data: &discordgo.InteractionResponseData{
+						Flags:      32768, // MessageFlagsComponentsV2
+						Components: components,
+					},
+				})
+			}
+			return
+		}
+
+		// 2. Back to List
+		if parts[1] == "back" {
+			if len(parts) >= 4 {
+				name, _ := url.QueryUnescape(parts[2])
+				offset := 0
+				fmt.Sscanf(parts[3], "%d", &offset)
+
+				components := buildPelangganEmbedV2(name, offset)
+				_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseUpdateMessage,
+					Data: &discordgo.InteractionResponseData{
+						Flags:      32768, // MessageFlagsComponentsV2
+						Components: components,
+					},
+				})
+			}
+			return
+		}
+
+		// 3. View Customer Detail
+		if parts[1] == "view" || parts[1] == "add" {
+			if len(parts) >= 5 {
+				custID := int64(0)
+				fmt.Sscanf(parts[2], "%d", &custID)
+				name, _ := url.QueryUnescape(parts[3])
+				offset := 0
+				fmt.Sscanf(parts[4], "%d", &offset)
+
+				components := buildPelangganDetailEmbedWithComponentsV2(custID, name, offset)
+				_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseUpdateMessage,
+					Data: &discordgo.InteractionResponseData{
+						Flags:      32768, // MessageFlagsComponentsV2
+						Components: components,
+					},
+				})
+			}
+			return
+		}
+
+		// 4. Update Status Menu (Select Menu)
+		if parts[1] == "act" && parts[2] == "statusmenu" {
+			if len(parts) >= 6 && len(data.Values) > 0 {
+				custID := int64(0)
+				fmt.Sscanf(parts[3], "%d", &custID)
+				name, _ := url.QueryUnescape(parts[4])
+				offset := 0
+				fmt.Sscanf(parts[5], "%d", &offset)
+				selectedStatus := data.Values[0]
+
+				// Update DB status
+				err := customersSvc.UpdateStatus(ctx, custID, selectedStatus)
+				var resultEmbed *discordgo.MessageEmbed
+				if err != nil {
+					resultEmbed = errorEmbed(fmt.Sprintf("Gagal memperbarui status: %v", err))
+				} else {
+					discordUser := getDiscordUser(i)
+					_ = auditSvc.Record(ctx, nil, nil, "discord.customer_update_status", fmt.Sprintf("User %s changed customer ID %d status to %s via Discord bot", discordUser, custID, selectedStatus))
+					resultEmbed = successEmbed("Status Diperbarui", fmt.Sprintf("Berhasil mengubah status menjadi **%s**.", selectedStatus))
+				}
+
+				resultComponents := buildActionResultV2(resultEmbed, custID, name, offset)
+				_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseUpdateMessage,
+					Data: &discordgo.InteractionResponseData{
+						Flags:      32768, // MessageFlagsComponentsV2
+						Components: resultComponents,
+					},
+				})
+			}
+			return
+		}
+
+		// 5. Actions: ont, sync, reboot, kick
+		if parts[1] == "act" {
+			if len(parts) >= 6 {
+				action := parts[2]
+				custID := int64(0)
+				fmt.Sscanf(parts[3], "%d", &custID)
+				name, _ := url.QueryUnescape(parts[4])
+				offset := 0
+				fmt.Sscanf(parts[5], "%d", &offset)
+
+				// Acknowledge source
+				_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseDeferredMessageUpdate,
+				})
+
+				discordUser := getDiscordUser(i)
+				resultEmbed := runCustomerAction(action, custID, discordUser)
+
+				resultComponents := buildActionResultV2(resultEmbed, custID, name, offset)
+
+				_, _ = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+					Embeds:     &[]*discordgo.MessageEmbed{},
+					Components: &resultComponents,
+				})
+			}
+			return
+		}
+	}
+}
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

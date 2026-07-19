@@ -1,9 +1,13 @@
 package backup
 
 import (
+	"archive/zip"
+	"bytes"
+	"compress/flate"
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -38,7 +42,7 @@ func NewService(db *sql.DB, backupDir, liveDBPath string) *Service {
 		DB:         db,
 		BackupDir:  backupDir,
 		LiveDBPath: liveDBPath,
-		MaxRetain:  7, // retain last 7 backups by default
+		MaxRetain:  3, // retain last 3 backups by default
 	}
 }
 
@@ -92,7 +96,8 @@ func (s *Service) ListBackups() ([]BackupInfo, error) {
 
 	var backups []BackupInfo
 	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".db" {
+		ext := filepath.Ext(entry.Name())
+		if entry.IsDir() || (ext != ".db" && ext != ".enc") || strings.HasPrefix(entry.Name(), "backup_mikrotik_") {
 			continue
 		}
 
@@ -117,7 +122,8 @@ func (s *Service) ListBackups() ([]BackupInfo, error) {
 }
 
 func (s *Service) GetBackupPath(filename string) (string, error) {
-	if filepath.Ext(filename) != ".db" {
+	ext := filepath.Ext(filename)
+	if ext != ".db" && ext != ".enc" && ext != ".zip" {
 		return "", fmt.Errorf("invalid backup filename")
 	}
 	// Basic directory traversal protection
@@ -134,12 +140,20 @@ func (s *Service) GetBackupPath(filename string) (string, error) {
 }
 
 func (s *Service) VerifyBackup(ctx context.Context, filename string) (VerificationResult, error) {
-	path, err := s.GetBackupPath(filename)
+	tempDbFile, err := os.CreateTemp("", "verify-db-*.db")
 	if err != nil {
+		return VerificationResult{}, fmt.Errorf("create temp file: %w", err)
+	}
+	tempPath := tempDbFile.Name()
+	tempDbFile.Close()
+	defer os.Remove(tempPath)
+
+	password := s.getBackupPassword(ctx)
+	if err := s.ExtractBackupDatabase(filename, tempPath, password); err != nil {
 		return VerificationResult{}, err
 	}
 
-	db, err := sql.Open("sqlite", path)
+	db, err := sql.Open("sqlite", tempPath)
 	if err != nil {
 		return VerificationResult{}, fmt.Errorf("open backup db: %w", err)
 	}
@@ -224,4 +238,214 @@ func (s *Service) RotateZipBackups(newZipPath string, maxRetain int) (string, er
 	}
 
 	return finalPath, nil
+}
+
+func (s *Service) getBackupPassword(ctx context.Context) string {
+	var value string
+	row := s.DB.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = 'backup_encryption_password'")
+	_ = row.Scan(&value)
+
+	value = strings.TrimSpace(value)
+	if value != "" {
+		return value
+	}
+
+	if envVal := strings.TrimSpace(os.Getenv("DASHBOARD_INTERNAL_API_KEY")); envVal != "" {
+		return envVal
+	}
+
+	return "menettech_backup_pass"
+}
+
+func (s *Service) ExtractBackupDatabase(filename, destPath string, password string) error {
+	path, err := s.GetBackupPath(filename)
+	if err != nil {
+		return err
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read backup file: %w", err)
+	}
+
+	var dbBytes []byte
+
+	if len(data) >= 16 && string(data[:16]) == "SQLite format 3\x00" {
+		dbBytes = data
+	} else if len(data) >= 4 && string(data[:4]) == "PK\x03\x04" {
+		dbBytes, err = s.extractFromZip(data, password)
+		if err != nil {
+			return err
+		}
+	} else if len(data) >= 8 && string(data[:8]) == SaltedMagic {
+		decrypted, err := DecryptAES256CBC(data, password)
+		if err != nil {
+			return fmt.Errorf("gagal mendekripsi backup. Pastikan password enkripsi backup di Pengaturan sudah benar: %w", err)
+		}
+		if len(decrypted) >= 4 && string(decrypted[:4]) == "PK\x03\x04" {
+			dbBytes, err = s.extractFromZip(decrypted, password)
+			if err != nil {
+				return err
+			}
+		} else if len(decrypted) >= 16 && string(decrypted[:16]) == "SQLite format 3\x00" {
+			dbBytes = decrypted
+		} else {
+			return fmt.Errorf("format data hasil dekripsi tidak dikenal")
+		}
+	} else {
+		return fmt.Errorf("format file backup tidak dikenal")
+	}
+
+	if err := os.WriteFile(destPath, dbBytes, 0644); err != nil {
+		return fmt.Errorf("write extracted database: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) extractFromZip(zipBytes []byte, password string) ([]byte, error) {
+	reader, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
+	if err != nil {
+		return nil, fmt.Errorf("open zip reader: %w", err)
+	}
+
+	// 1. First look for plain dashboard.db
+	for _, f := range reader.File {
+		if f.Name == "dashboard.db" {
+			rc, err := f.Open()
+			if err != nil {
+				return nil, fmt.Errorf("open zip entry dashboard.db: %w", err)
+			}
+			defer rc.Close()
+			return io.ReadAll(rc)
+		}
+	}
+
+	// 2. Then look for encrypted dashboard.db.enc
+	for _, f := range reader.File {
+		if f.Name == "dashboard.db.enc" {
+			rc, err := f.Open()
+			if err != nil {
+				return nil, fmt.Errorf("open zip entry dashboard.db.enc: %w", err)
+			}
+			defer rc.Close()
+			encBytes, err := io.ReadAll(rc)
+			if err != nil {
+				return nil, fmt.Errorf("read zip entry dashboard.db.enc: %w", err)
+			}
+			decrypted, err := DecryptAES256CBC(encBytes, password)
+			if err != nil {
+				return nil, fmt.Errorf("gagal mendekripsi dashboard.db.enc. Pastikan password enkripsi backup di Pengaturan sudah benar: %w", err)
+			}
+			return decrypted, nil
+		}
+	}
+
+	return nil, fmt.Errorf("dashboard.db atau dashboard.db.enc tidak ditemukan di dalam archive zip")
+}
+
+
+
+func (s *Service) HasLocalBackupToday(ctx context.Context) (bool, string, error) {
+	files, err := os.ReadDir(s.BackupDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, "", nil
+		}
+		return false, "", err
+	}
+
+	todayDate := time.Now().UTC().Format("2006-01-02")
+	prefix := "dashboard_" + todayDate
+
+	for _, file := range files {
+		if !file.IsDir() && strings.HasPrefix(file.Name(), prefix) && strings.HasSuffix(file.Name(), ".db") {
+			return true, file.Name(), nil
+		}
+	}
+
+	return false, "", nil
+}
+
+func (s *Service) isBackupEncryptionEnabled(ctx context.Context) bool {
+	var value string
+	row := s.DB.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = 'backup_encryption_enabled'")
+	_ = row.Scan(&value)
+	return strings.TrimSpace(value) != "0"
+}
+
+func (s *Service) BuildDiscordBackupZip(ctx context.Context, localDbFilename string, mikrotikBackups map[string][]byte, password string) ([]byte, error) {
+	if password == "" {
+		password = s.getBackupPassword(ctx)
+	}
+
+	// Read database file
+	dbPath := filepath.Join(s.BackupDir, localDbFilename)
+	dbBytes, err := os.ReadFile(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("read local db: %w", err)
+	}
+
+	encrypt := s.isBackupEncryptionEnabled(ctx)
+
+	var dbFileBytes []byte
+	var dbEntryName string
+	if encrypt {
+		dbEntryName = "dashboard.db.enc"
+		dbFileBytes, err = EncryptAES256CBC(dbBytes, password)
+		if err != nil {
+			return nil, fmt.Errorf("encrypt db bytes: %w", err)
+		}
+	} else {
+		dbEntryName = "dashboard.db"
+		dbFileBytes = dbBytes
+	}
+
+	var zipBuf bytes.Buffer
+	zipWriter := zip.NewWriter(&zipBuf)
+
+	zipWriter.RegisterCompressor(zip.Deflate, func(out io.Writer) (io.WriteCloser, error) {
+		return flate.NewWriter(out, flate.BestCompression)
+	})
+
+	// Add database entry to ZIP
+	w, err := zipWriter.Create(dbEntryName)
+	if err != nil {
+		return nil, fmt.Errorf("create zip entry %s: %w", dbEntryName, err)
+	}
+	if _, err := w.Write(dbFileBytes); err != nil {
+		return nil, fmt.Errorf("write zip entry %s: %w", dbEntryName, err)
+	}
+
+	// Add MikroTik configurations to ZIP
+	for name, data := range mikrotikBackups {
+		if len(data) > 0 {
+			var mtFileBytes []byte
+			var mtEntryName string
+			if encrypt {
+				mtEntryName = fmt.Sprintf("mikrotik_%s.json.enc", name)
+				mtFileBytes, err = EncryptAES256CBC(data, password)
+				if err != nil {
+					return nil, fmt.Errorf("encrypt mikrotik bytes for %s: %w", name, err)
+				}
+			} else {
+				mtEntryName = fmt.Sprintf("mikrotik_%s.json", name)
+				mtFileBytes = data
+			}
+
+			w, err := zipWriter.Create(mtEntryName)
+			if err != nil {
+				return nil, fmt.Errorf("create zip entry %s: %w", mtEntryName, err)
+			}
+			if _, err := w.Write(mtFileBytes); err != nil {
+				return nil, fmt.Errorf("write zip entry %s: %w", mtEntryName, err)
+			}
+		}
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		return nil, fmt.Errorf("close zip writer: %w", err)
+	}
+
+	return zipBuf.Bytes(), nil
 }

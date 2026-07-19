@@ -190,12 +190,26 @@ else {
 Write-Step 6 $TOTAL_STEPS "Menyalin WhatsApp Gateway source (tanpa node_modules)..."
 $waSrc = Join-Path $repoRoot "whatsapp"
 $waDest = Join-Path $releasesDir "integration\whatsapp"
-$excludeDirs = @("node_modules", ".wwebjs_cache", ".wwebjs_auth", "coverage", ".jest-cache", "storage")
 
-Get-ChildItem -Path $waSrc | Where-Object {
-    $_.Name -notin $excludeDirs
+Get-ChildItem -Path $waSrc -Recurse | Where-Object {
+    $_.FullName -notmatch "\\node_modules" -and
+    $_.FullName -notmatch "\\\.wwebjs_cache" -and
+    $_.FullName -notmatch "\\\.wwebjs_auth" -and
+    $_.FullName -notmatch "\\coverage" -and
+    $_.FullName -notmatch "\\\.jest-cache" -and
+    $_.FullName -notmatch "\\storage" -and
+    $_.FullName -notmatch "\\sessions"
 } | ForEach-Object {
-    Copy-Item -Path $_.FullName -Destination $waDest -Recurse -Force
+    $targetPath = $_.FullName.Replace($waSrc, $waDest)
+    if ($_.PSIsContainer) {
+        New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+    } else {
+        $parentDir = Split-Path -Parent $targetPath
+        if (-not (Test-Path $parentDir)) {
+            New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+        }
+        Copy-Item -Path $_.FullName -Destination $targetPath -Force
+    }
 }
 Write-OK "WhatsApp Gateway disalin ke Releases\integration\whatsapp\"
 

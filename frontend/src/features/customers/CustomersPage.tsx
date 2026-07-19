@@ -122,12 +122,21 @@ export function CustomersPage({
 
   const handleSelectSecret = (name: string, password: string, guessedPackageId: number) => {
     onCancelEdit();
+    const today = new Date();
+    const defaultTrialDays = 3;
+    today.setDate(today.getDate() + defaultTrialDays + 5);
+    const calculatedDueDay = today.getDate();
+
     onFormChange((curr) => ({
       ...curr,
       name: name,
       user_pppoe: name,
       password_pppoe: password,
       package_id: guessedPackageId,
+      status: "trial",
+      is_trial: true,
+      trial_days: defaultTrialDays,
+      due_day: calculatedDueDay,
     }));
     setIsSyncModalOpen(false);
     onSetFormOpen(true);

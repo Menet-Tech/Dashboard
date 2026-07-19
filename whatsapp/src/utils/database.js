@@ -151,6 +151,17 @@ const getMessageById = (id) => {
     return db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
 };
 
+const getLastOutboundMessage = (toNumber) => {
+    const db = getDb();
+    const cleanNum = toNumber.replace(/@(c\.us|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62');
+    return db.prepare(`
+        SELECT * FROM messages
+        WHERE (to_number = ? OR to_number LIKE ? OR to_number = ? OR to_number LIKE ?) AND direction = 'outbound'
+        ORDER BY created_at DESC
+        LIMIT 1
+    `).get(cleanNum, `%${cleanNum}%`, toNumber, `%${toNumber}%`);
+};
+
 // ─── Chatbot Sessions ───────────────────────────────────────────────────────
 
 const getSession = (phone) => {
@@ -439,6 +450,7 @@ module.exports = {
     saveMessage,
     getMessages,
     getMessageById,
+    getLastOutboundMessage,
     getSession,
     upsertSession,
     deleteSession,

@@ -1,15 +1,12 @@
 package worker
 
 import (
-	"archive/zip"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -91,6 +88,11 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 			acquired, err := s.acquireWorkerLease(ctx, owner, lockTTLSeconds)
 			if err != nil {
 				s.Logger.Error("worker lease refresh failed", "error", err)
+				errStr := err.Error()
+				if strings.Contains(errStr, "malformed") || strings.Contains(errStr, "I/O error") || strings.Contains(errStr, "database is closed") || strings.Contains(errStr, "no such table") {
+					s.Logger.Error("Fatal database error detected. Exiting worker for self-healing/restart...")
+					os.Exit(1)
+				}
 				continue
 			}
 			if !acquired {
@@ -106,6 +108,11 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 			acquiredLease = true
 			if err := s.RunOnce(ctx); err != nil {
 				s.Logger.Error("worker run failed", "error", err)
+				errStr := err.Error()
+				if strings.Contains(errStr, "malformed") || strings.Contains(errStr, "I/O error") || strings.Contains(errStr, "database is closed") || strings.Contains(errStr, "no such table") {
+					s.Logger.Error("Fatal database error during worker run. Exiting worker for self-healing/restart...")
+					os.Exit(1)
+				}
 				if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
 					_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
 						Title:       "⚠️ Worker Loop Error",
@@ -410,47 +417,44 @@ func (s Service) runScheduledBackup(ctx context.Context, now time.Time) error {
 		}
 	}
 
-	filename, err := s.Backup.CreateBackup(ctx)
+	// 1. Check if a local database backup was already created today
+	hasLocal, filename, err := s.Backup.HasLocalBackupToday(ctx)
 	if err != nil {
-		if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
-			_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
-				Title:       "⚠️ Auto Backup Gagal",
-				Description: "Sistem gagal melakukan pencadangan database otomatis.",
-				Color:       15158332, // Red (#e74c3c)
-				Fields: []notifications.EmbedField{
-					{Name: "Error", Value: err.Error(), Inline: false},
-				},
-			})
+		s.Logger.Error("failed to check for today's local backup", "error", err)
+	}
+
+	var backupTypeMsg string
+	if hasLocal {
+		s.Logger.Info("local database backup already exists today, skipping db dump", "filename", filename)
+		backupTypeMsg = "Konfigurasi MikroTik (Menggunakan database lokal hari ini)"
+	} else {
+		s.Logger.Info("no local database backup today, creating new local db backup")
+		filename, err = s.Backup.CreateBackup(ctx)
+		if err != nil {
+			if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
+				_ = s.Discord.SendEmbed(ctx, notifications.DiscordEmbed{
+					Title:       "⚠️ Auto Backup Gagal",
+					Description: "Sistem gagal melakukan pencadangan otomatis.",
+					Color:       15158332, // Red (#e74c3c)
+					Fields: []notifications.EmbedField{
+						{Name: "Error", Value: err.Error(), Inline: false},
+					},
+				})
+			}
+			return err
 		}
-		return err
+		backupTypeMsg = "Database Dashboard dan Konfigurasi MikroTik"
 	}
 
-	dbPath := filepath.Join(s.Backup.BackupDir, filename)
-
-	tempZipFile, err := os.CreateTemp(s.Backup.BackupDir, "backup-*.zip")
-	if err != nil {
-		return fmt.Errorf("create temp zip: %w", err)
-	}
-	tempZipPath := tempZipFile.Name()
-
-	zipWriter := zip.NewWriter(tempZipFile)
-
-	dbFile, err := os.Open(dbPath)
-	if err == nil {
-		w, _ := zipWriter.Create("dashboard.db")
-		io.Copy(w, dbFile)
-		dbFile.Close()
-	}
-
-	// Fetch MikroTik backups
+	// 2. Fetch active MikroTik configurations
+	mikrotikBackups := make(map[string][]byte)
 	if s.DB != nil {
 		routerSvc := mikrotik.NewRouterService(s.DB)
 		if routers, err := routerSvc.ListActive(ctx); err == nil && len(routers) > 0 {
 			for _, r := range routers {
 				client := mikrotik.NewClient(r.Host, r.Username, r.Password)
 				if data, err := client.ExportBackup(ctx); err == nil && len(data) > 0 {
-					w, _ := zipWriter.Create(fmt.Sprintf("mikrotik_%s.json", r.Name))
-					w.Write(data)
+					mikrotikBackups[r.Name] = data
 				}
 			}
 		} else {
@@ -461,35 +465,30 @@ func (s Service) runScheduledBackup(ctx context.Context, now time.Time) error {
 			if strings.TrimSpace(mikrotikHost) != "" && strings.TrimSpace(mikrotikUser) != "" {
 				client := mikrotik.NewClient(mikrotikHost, mikrotikUser, mikrotikPass)
 				if data, err := client.ExportBackup(ctx); err == nil && len(data) > 0 {
-					w, _ := zipWriter.Create("mikrotik.json")
-					w.Write(data)
+					mikrotikBackups["default"] = data
 				}
 			}
 		}
 	}
 
-	zipWriter.Close()
-	tempZipFile.Close()
-
-	os.Remove(dbPath)
-
-	finalZipPath, err := s.Backup.RotateZipBackups(tempZipPath, 3)
+	// 3. Build encrypted zip payload for Discord
+	zipBytes, err := s.Backup.BuildDiscordBackupZip(ctx, filename, mikrotikBackups, "")
 	if err != nil {
-		s.Logger.Error("failed to rotate backups", "error", err)
-		finalZipPath = tempZipPath
+		s.Logger.Error("failed to build Discord backup zip", "error", err)
+		return err
 	}
-	
-	finalZipName := filepath.Base(finalZipPath)
 
-	s.Logger.Info("auto backup created", "filename", finalZipName)
-	// Bug #24: store full RFC3339 timestamp instead of just date string
-	// to avoid edge-case double-backup when worker restarts near midnight.
+	s.Logger.Info("auto backup created", "filename", filename)
+
 	_ = s.Settings.Set(ctx, "worker_last_backup_at", now.UTC().Format(time.RFC3339))
-	_ = s.Settings.Set(ctx, "worker_last_backup_filename", finalZipName)
+	_ = s.Settings.Set(ctx, "worker_last_backup_filename", filename)
 
+	// 4. Send encrypted backup ZIP file to Discord
 	if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
-		zipBytes, _ := os.ReadFile(finalZipPath)
-		_ = s.Discord.SendFile(ctx, "✅ **Auto Backup Sukses!**\nDatabase Dashboard dan Konfigurasi MikroTik berhasil dicadangkan.", finalZipName, zipBytes)
+		timestamp := time.Now().Format("2006-01-02_15-04-05")
+		zipFilename := fmt.Sprintf("backup_auto_%s.zip", timestamp)
+		msg := fmt.Sprintf("✅ **Auto Backup Sukses!**\n%s berhasil dicadangkan (Terenkripsi di dalam ZIP).", backupTypeMsg)
+		_ = s.Discord.SendFile(ctx, msg, zipFilename, zipBytes)
 	}
 
 	return nil

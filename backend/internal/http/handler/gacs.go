@@ -1887,6 +1887,10 @@ func (h GacsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 			settingsObj[k] = v
 		}
 	}
+	if err := rows.Err(); err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	// Add default add_wan setting
 	settingsObj["add_wan"] = "no"
@@ -2725,6 +2729,10 @@ func (h GacsHandler) GetWifiSecurities(w http.ResponseWriter, r *http.Request) {
 			w.SecurityTypes = parts
 			list = append(list, w)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"success": true, "data": list})
 }

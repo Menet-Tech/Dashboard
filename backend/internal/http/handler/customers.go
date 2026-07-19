@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"menettech/dashboard/backend/internal/audit"
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/mikrotik"
+	"menettech/dashboard/backend/internal/notifications"
 	"menettech/dashboard/backend/internal/settings"
 )
 
@@ -24,6 +26,7 @@ type CustomerHandler struct {
 	Service     customers.Service
 	Audit       audit.Service
 	StoragePath string
+	WhatsApp    notifications.WhatsAppService
 }
 
 type statusPayload struct {
@@ -98,6 +101,21 @@ func (h CustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user, _ := currentUser(r)
 	ip := getClientIP(r)
 	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &item.ID, "customer.create", fmt.Sprintf("Pelanggan %s (PPPoE: %s, Paket: %s) berhasil dibuat", item.Name, item.UserPPPoE, item.PackageName), ip)
+
+	if item.IsTrial && item.WhatsApp != "" && h.WhatsApp.Logs.DB != nil {
+		go func(c customers.Customer) {
+			bgCtx := context.Background()
+			_ = h.WhatsApp.SendTemplate(bgCtx, notifications.BillMessagePayload{
+				TriggerKey:  "trial_started",
+				PhoneNumber: c.WhatsApp,
+				MessageData: map[string]string{
+					"nama":                c.Name,
+					"hari_limit":          strconv.Itoa(c.TrialDays),
+					"tanggal_akhir_trial": formatDateLabel(time.Now().AddDate(0, 0, c.TrialDays).Format("2006-01-02")),
+				},
+			})
+		}(item)
+	}
 
 	WriteJSON(w, http.StatusCreated, map[string]any{
 		"data": item,
@@ -1169,6 +1187,24 @@ func (h CustomerHandler) storeProofFile(source io.Reader, originalName string, m
 	}
 
 	return "/uploads/payment-proofs/" + filename, nil
+}
+
+func formatDateLabel(raw string) string {
+	t, err := time.Parse("2006-01-02", raw)
+	if err != nil {
+		t, err = time.Parse("2006-01-02 15:04:05", raw)
+		if err != nil {
+			t, err = time.Parse(time.RFC3339, raw)
+			if err != nil {
+				return raw
+			}
+		}
+	}
+	months := [...]string{
+		"Januari", "Februari", "Maret", "April", "Mei", "Juni",
+		"Juli", "Agustus", "September", "Oktober", "November", "Desember",
+	}
+	return fmt.Sprintf("%d %s %d", t.Day(), months[t.Month()-1], t.Year())
 }
 
 

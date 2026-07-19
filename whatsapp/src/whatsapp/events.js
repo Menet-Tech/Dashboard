@@ -224,6 +224,19 @@ const setupEvents = (client, accountId) => {
                                 const primary = unpaidBills[0];
                                 const linkedIds = unpaidBills.slice(1).map(item => item.bill.id).join(',');
                                 await createPaymentConfirmation(primary.bill.id, primary.customer.id, proofPath, message.body || "Diunggah via WA (Chatbot Off)", linkedIds);
+
+                                try {
+                                    const { getTemplateByTrigger } = require('../services/isp.service');
+                                    const { renderTemplate } = require('../services/chatbot/utils');
+                                    const successTpl = await getTemplateByTrigger('auto_reply_payment_proof').catch(() => null);
+                                    const successMsg = successTpl 
+                                        ? renderTemplate(successTpl.content || successTpl.isi_template, { nama: primary.customer.name })
+                                        : "Terima kasih! Bukti transfer Anda telah diterima secara otomatis dan sedang dalam proses verifikasi (pending) oleh admin.";
+                                    
+                                    await sendTextMessage(accountId, realFrom, successMsg);
+                                } catch (replyErr) {
+                                    logger.error(`[${accountId}] Gagal mengirim balasan konfirmasi (Chatbot Off): ${replyErr.message}`);
+                                }
                             }
                             logger.info(`[${accountId}] Sukses memproses bukti transfer dari ${realFrom} (Chatbot Off)`);
                         }

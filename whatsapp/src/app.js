@@ -32,15 +32,27 @@ app.use(rateLimiter);
 
 // Static folder untuk file temporary (media)
 app.use('/temp/media', express.static(path.join(__dirname, '../temp/media'), {
-    maxAge: '1h'
+    maxAge: '1h',
+    setHeaders: (res) => {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+    }
 }));
 
 // Static folder untuk persistent uploads (gambar autoreply)
 app.use('/uploads', express.static(path.join(__dirname, '../storage/uploads'), {
-    maxAge: '7d'
+    maxAge: '7d',
+    setHeaders: (res) => {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+    }
 }));
 app.use('/wa/uploads', express.static(path.join(__dirname, '../storage/uploads'), {
-    maxAge: '7d'
+    maxAge: '7d',
+    setHeaders: (res) => {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+    }
 }));
 
 // Cegah akses langsung ke /temp/ selain media

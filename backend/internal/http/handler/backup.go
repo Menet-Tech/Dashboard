@@ -2,18 +2,21 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
-
 	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"menettech/dashboard/backend/internal/backup"
+	"menettech/dashboard/backend/internal/mikrotik"
+	"menettech/dashboard/backend/internal/notifications"
 )
 
 type BackupHandler struct {
 	Service *backup.Service
+	Discord notifications.DiscordSender
 }
 
 func (h *BackupHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -36,10 +39,40 @@ func (h *BackupHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusForbidden, "hanya admin yang dapat membuat backup")
 		return
 	}
-	filename, err := h.Service.CreateBackup(r.Context())
+
+	ctx := r.Context()
+
+	// 1. Create plain database-only backup locally
+	filename, err := h.Service.CreateBackup(ctx)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	// 2. Fetch active MikroTik configurations
+	mikrotikBackups := make(map[string][]byte)
+	routerSvc := mikrotik.NewRouterService(h.Service.DB)
+	routers, err := routerSvc.ListActive(ctx)
+	if err == nil && len(routers) > 0 {
+		for _, rt := range routers {
+			client := mikrotik.NewClient(rt.Host, rt.Username, rt.Password)
+			if data, err := client.ExportBackup(ctx); err == nil && len(data) > 0 {
+				mikrotikBackups[rt.Name] = data
+			}
+		}
+	}
+
+	// 3. Build encrypted zip payload for Discord (both DB and Mikrotik encrypted inside)
+	if h.Discord != nil && h.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
+		zipBytes, err := h.Service.BuildDiscordBackupZip(ctx, filename, mikrotikBackups, "")
+		if err == nil {
+			timestamp := time.Now().Format("2006-01-02_15-04-05")
+			zipFilename := fmt.Sprintf("backup_manual_%s.zip", timestamp)
+			_ = h.Discord.SendFile(ctx, "✅ **Backup Manual Sukses!**\nDatabase Dashboard dan Konfigurasi MikroTik berhasil dicadangkan (Terenkripsi di dalam ZIP).", zipFilename, zipBytes)
+		} else {
+			// Log error but don't fail the API response
+			fmt.Printf("Warning: failed to build Discord backup zip: %v\n", err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

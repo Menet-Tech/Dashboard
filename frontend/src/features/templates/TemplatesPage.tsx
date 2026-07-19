@@ -186,6 +186,35 @@ export function TemplatesPage({
     }, `toggle-auto-reply-${rule.id}`);
   }
 
+  async function handleUpdateAutoReplyRule(
+    id: string,
+    ruleForm: {
+      accountId: string;
+      keyword: string;
+      reply: string;
+      matchType: AutoReplyRule["match_type"];
+      priority: number;
+      image?: File;
+    }
+  ) {
+    if (!gatewayUrl) return;
+    await withFeedback(async () => {
+      const formData = new FormData();
+      formData.append("accountId", ruleForm.accountId);
+      formData.append("keyword", ruleForm.keyword);
+      formData.append("reply", ruleForm.reply);
+      formData.append("matchType", ruleForm.matchType);
+      formData.append("priority", String(ruleForm.priority));
+      if (ruleForm.image) {
+        formData.append("image", ruleForm.image);
+      }
+      await updateAutoReplyRule(gatewayUrl, apiKey, id, formData);
+      const res = await getAutoReplyRules(gatewayUrl, apiKey);
+      setAutoReplyRules(res.data);
+      pushSuccess("Rule auto-response berhasil diperbarui");
+    }, `update-auto-reply-${id}`);
+  }
+
   async function handleDeleteAutoReplyRule(id: string) {
     if (!gatewayUrl) return;
     askForConfirmation({
@@ -610,6 +639,7 @@ export function TemplatesPage({
           onSaveChatbotSettings={handleSaveChatbotSettings}
           autoReplyRules={autoReplyRules}
           onAddAutoReplyRule={handleAddAutoReplyRule}
+          onUpdateAutoReplyRule={handleUpdateAutoReplyRule}
           onToggleAutoReplyRule={handleToggleAutoReplyRule}
           onDeleteAutoReplyRule={handleDeleteAutoReplyRule}
           chatbotSessions={chatbotSessions}
@@ -629,6 +659,7 @@ export function TemplatesPage({
           onSaveChatbotSettings={handleSaveChatbotSettings}
           autoReplyRules={autoReplyRules}
           onAddAutoReplyRule={handleAddAutoReplyRule}
+          onUpdateAutoReplyRule={handleUpdateAutoReplyRule}
           onToggleAutoReplyRule={handleToggleAutoReplyRule}
           onDeleteAutoReplyRule={handleDeleteAutoReplyRule}
           chatbotSessions={chatbotSessions}

@@ -291,6 +291,7 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 func TestIntegrationHandlerCheck(t *testing.T) {
+	t.Setenv("DASHBOARD_INTERNAL_API_KEY", "")
 	t.Run("WA and Discord not configured", func(t *testing.T) {
 		db := handlerTestDB(t)
 		svc := settings.Service{Repository: settings.Repository{DB: db}}

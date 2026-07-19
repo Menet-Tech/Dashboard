@@ -1,5 +1,6 @@
 global.automatedMessageIds = global.automatedMessageIds || new Set();
 
+const logger = require('../utils/logger');
 const getClient = (accountId) => {
     return require('../whatsapp/client').getClient(accountId);
 };
@@ -47,6 +48,7 @@ const sendTextMessage = async (accountId, to, text, quotedMessageId = null, is_m
 
     try {
         const result = await client.sendMessage(chatId, text, options);
+        logger.debug(`[sendTextMessage] result type=${typeof result}, hasId=${!!(result && result.id)}, result=${JSON.stringify(result?.id)}`);
         if (!is_manual && result && result.id) {
             global.automatedMessageIds.add(result.id.id);
             global.automatedMessageIds.add(result.id._serialized);
@@ -64,7 +66,8 @@ const sendTextMessage = async (accountId, to, text, quotedMessageId = null, is_m
         } catch (_) { }
         return result;
     } catch (err) {
-        if (err.message.includes('invalid number')) {
+        logger.error(`[sendTextMessage] client.sendMessage threw: ${err?.message || err}`, { chatId, errType: err?.constructor?.name });
+        if (err.message && err.message.includes('invalid number')) {
             throw new WhatsAppError('Nomor tidak valid');
         }
         throw new WhatsAppError('Gagal mengirim pesan: ' + err.message);

@@ -868,6 +868,18 @@ export default function App() {
         </div>
       </div>
 
+      {activeDetailCustomer && (
+        <CustomerDetailModal
+          customer={activeDetailCustomer}
+          onClose={() => setActiveDetailCustomer(null)}
+          user={user}
+          pushSuccess={feedback.pushSuccess}
+          pushError={feedback.pushError}
+          onRefresh={reloadProtectedData}
+          onEndTrial={(id) => void customersHook.handlers.handleEndTrial(id)}
+        />
+      )}
+
       <ToastStack toasts={feedback.toasts} />
 
       {feedback.confirmDialog ? (
@@ -930,18 +942,6 @@ export default function App() {
           </form>
         </Modal>
       ) : null}
-
-      {activeDetailCustomer && (
-        <CustomerDetailModal
-          customer={activeDetailCustomer}
-          onClose={() => setActiveDetailCustomer(null)}
-          user={user}
-          pushSuccess={feedback.pushSuccess}
-          pushError={feedback.pushError}
-          onRefresh={reloadProtectedData}
-          onEndTrial={(id) => void customersHook.handlers.handleEndTrial(id)}
-        />
-      )}
 
 
     </main>

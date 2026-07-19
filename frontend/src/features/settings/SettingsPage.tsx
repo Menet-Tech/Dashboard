@@ -732,6 +732,7 @@ export function SettingsPage({
   const [syncError, setSyncError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importDueDay, setImportDueDay] = useState(1);
+  const [importActivateTrial, setImportActivateTrial] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [importResults, setImportResults] = useState<MikrotikImportResult[] | null>(null);
 
@@ -741,6 +742,7 @@ export function SettingsPage({
     setSyncSecrets(null);
     setSelected(new Set());
     setImportResults(null);
+    setImportActivateTrial(false);
     try {
       const data = await apiRequest<{ secrets: MikrotikSyncSecret[] }>("/api/v1/integration/mikrotik/sync-preview");
       setSyncSecrets(data.secrets || []);
@@ -776,7 +778,11 @@ export function SettingsPage({
     try {
       const data = await apiRequest<{ results: MikrotikImportResult[] }>("/api/v1/integration/mikrotik/sync-import", {
         method: "POST",
-        body: JSON.stringify({ names: Array.from(selected), default_due_day: importDueDay }),
+        body: JSON.stringify({
+          names: Array.from(selected),
+          default_due_day: importDueDay,
+          activate_trial: importActivateTrial,
+        }),
       });
       setImportResults(data.results);
       // refresh preview
@@ -1499,12 +1505,55 @@ export function SettingsPage({
                                 className={inputClassName()}
                                 type="number"
                                 min="1"
-                                value={settingsForm["backup_retention_count"] ?? "7"}
+                                value={settingsForm["backup_retention_count"] ?? "3"}
                                 onChange={(e) =>
                                   onFormChange({ ...settingsForm, backup_retention_count: e.target.value })
                                 }
                               />
                               <span className="text-[10px] text-slate-400 dark:text-slate-500">Jumlah file backup tersimpan sebelum diganti.</span>
+                            </label>
+
+                            <label className="flex flex-col gap-1.5">
+                              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Enkripsi Backup</span>
+                              <select
+                                className={inputClassName()}
+                                value={settingsForm["backup_encryption_enabled"] ?? "1"}
+                                onChange={(e) =>
+                                  onFormChange({ ...settingsForm, backup_encryption_enabled: e.target.value })
+                                }
+                              >
+                                <option value="1">Aktif</option>
+                                <option value="0">Nonaktif</option>
+                              </select>
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500">Gunakan enkripsi password saat membungkus file ke dalam ZIP.</span>
+                            </label>
+
+                            <label className="flex flex-col gap-1.5">
+                              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Password Enkripsi Backup</span>
+                              <input
+                                className={inputClassName()}
+                                type="password"
+                                value={settingsForm["backup_encryption_password"] ?? ""}
+                                onChange={(e) =>
+                                  onFormChange({ ...settingsForm, backup_encryption_password: e.target.value })
+                                }
+                                placeholder="Masukkan password enkripsi"
+                              />
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500">Password untuk mengunci/mengenkripsi file backup (kosongkan untuk menggunakan token default).</span>
+                            </label>
+
+                            <label className="flex flex-col gap-1.5">
+                              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Discord Backup Channel ID</span>
+                              <input
+                                className={inputClassName()}
+                                type="text"
+                                value={settingsForm["backup_discord_channel_id"] ?? ""}
+                                onChange={(e) =>
+                                  onFormChange({ ...settingsForm, backup_discord_channel_id: e.target.value })
+                                }
+                                placeholder="Masukkan ID Channel Discord (opsional)"
+                              />
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500">ID channel khusus untuk mengirim file backup (kosongkan untuk menggunakan default webhook).</span>
                             </label>
                           </div>
 
@@ -1566,7 +1615,8 @@ export function SettingsPage({
                             "billing_auto_generate_enabled", "billing_generate_day", "billing_generate_time",
                             "billing_generate_retry_attempts", "billing_generate_retry_backoff_seconds",
                             "worker_interval_seconds", "backup_auto_enabled", "backup_auto_time",
-                            "backup_retention_count", "trial_enabled", "trial_period_days", "trial_overdue_grace_days"
+                            "backup_retention_count", "backup_encryption_password", "backup_discord_channel_id", "backup_encryption_enabled",
+                            "trial_enabled", "trial_period_days", "trial_overdue_grace_days"
                           ])}
                           disabled={savingSection === "Billing"}
                           className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
@@ -2420,6 +2470,18 @@ export function SettingsPage({
                                   onChange={(e) => setImportDueDay(Number(e.target.value))}
                                   className="w-16 text-center text-xs border border-slate-300 dark:border-slate-850 bg-white dark:bg-slate-900 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 font-mono"
                                 />
+                              </div>
+                              <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-2">
+                                <input
+                                  id="import-activate-trial"
+                                  type="checkbox"
+                                  checked={importActivateTrial}
+                                  onChange={(e) => setImportActivateTrial(e.target.checked)}
+                                  className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 bg-white dark:bg-slate-900"
+                                />
+                                <label htmlFor="import-activate-trial" className="text-xs text-slate-600 dark:text-slate-400 font-semibold cursor-pointer select-none">
+                                  Aktifkan Trial
+                                </label>
                               </div>
                               <button
                                 type="button"

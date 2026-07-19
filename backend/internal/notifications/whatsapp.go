@@ -532,7 +532,7 @@ func (s WhatsAppService) QueueGroupedMessage(ctx context.Context, accountID, toN
 			WHERE bill_id = ?
 			  AND trigger_key = ?
 			  AND to_number = ?
-			  AND status IN ('pending', 'failed')
+			  AND status IN ('pending', 'processing', 'sent', 'failed')
 			ORDER BY id DESC
 			LIMIT 1
 		`, billID, triggerKey, toNumber).Scan(&existingID)
@@ -592,7 +592,7 @@ func (s WhatsAppService) QueueMessage(ctx context.Context, accountID, toNumber, 
 			WHERE bill_id = ?
 			  AND trigger_key = ?
 			  AND to_number = ?
-			  AND status IN ('pending', 'failed')
+			  AND status IN ('pending', 'processing', 'sent', 'failed')
 			ORDER BY id DESC
 			LIMIT 1
 		`, billID, triggerKey, toNumber).Scan(&existingID)
@@ -616,17 +616,23 @@ func (s WhatsAppService) QueueMessage(ctx context.Context, accountID, toNumber, 
 }
 
 func (s WhatsAppService) ProcessQueue(ctx context.Context) (bool, bool, error) {
-	row := s.Logs.DB.QueryRowContext(ctx, `
+	tx, err := s.Logs.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return false, false, err
+	}
+	defer tx.Rollback()
+
+	row := tx.QueryRowContext(ctx, `
 		SELECT id, account_id, to_number, body, status, attempts, bill_id, trigger_key, COALESCE(group_bill_ids, ''), is_manual
 		FROM whatsapp_queue
 		WHERE status = 'pending' AND attempts < 3
-		ORDER BY id ASC
+		ORDER BY is_manual DESC, id ASC
 		LIMIT 1
 	`)
 
 	var msg QueuedMessage
 	var isManualVal int
-	err := row.Scan(&msg.ID, &msg.AccountID, &msg.ToNumber, &msg.Body, &msg.Status, &msg.Attempts, &msg.BillID, &msg.TriggerKey, &msg.GroupBillIDs, &isManualVal)
+	err = row.Scan(&msg.ID, &msg.AccountID, &msg.ToNumber, &msg.Body, &msg.Status, &msg.Attempts, &msg.BillID, &msg.TriggerKey, &msg.GroupBillIDs, &isManualVal)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, false, nil
@@ -637,25 +643,28 @@ func (s WhatsAppService) ProcessQueue(ctx context.Context) (bool, bool, error) {
 
 	if !msg.IsManual && msg.BillID.Valid && msg.TriggerKey.Valid {
 		var existingID int64
-		err := s.Logs.DB.QueryRowContext(ctx, `
+		err := tx.QueryRowContext(ctx, `
 			SELECT id
 			FROM whatsapp_queue
 			WHERE id < ?
 			  AND bill_id = ?
 			  AND trigger_key = ?
 			  AND to_number = ?
-			  AND status IN ('pending', 'sent', 'failed')
+			  AND status IN ('pending', 'processing', 'sent', 'failed')
 			ORDER BY id ASC
 			LIMIT 1
 		`, msg.ID, msg.BillID.Int64, msg.TriggerKey.String, msg.ToNumber).Scan(&existingID)
 		if err == nil {
-			_, updateErr := s.Logs.DB.ExecContext(ctx, `
+			_, updateErr := tx.ExecContext(ctx, `
 				UPDATE whatsapp_queue
 				SET status = 'failed', error_message = ?
 				WHERE id = ?
 			`, fmt.Sprintf("duplicate automation queue skipped; existing queue id %d", existingID), msg.ID)
 			if updateErr != nil {
 				slog.Error("failed to mark duplicate whatsapp queue as skipped", "id", msg.ID, "existing_id", existingID, "error", updateErr)
+			}
+			if commitErr := tx.Commit(); commitErr != nil {
+				return false, false, fmt.Errorf("commit duplicate mark: %w", commitErr)
 			}
 			slog.Info("queue: duplicate whatsapp automation skipped before send", "id", msg.ID, "existing_id", existingID, "bill_id", msg.BillID.Int64, "trigger", msg.TriggerKey.String, "to", msg.ToNumber)
 			return true, msg.IsManual, nil
@@ -665,11 +674,18 @@ func (s WhatsAppService) ProcessQueue(ctx context.Context) (bool, bool, error) {
 		}
 	}
 
-	_, _ = s.Logs.DB.ExecContext(ctx, `
+	_, err = tx.ExecContext(ctx, `
 		UPDATE whatsapp_queue
-		SET attempts = attempts + 1
+		SET status = 'processing', attempts = attempts + 1
 		WHERE id = ?
 	`, msg.ID)
+	if err != nil {
+		return false, false, fmt.Errorf("lock queue row: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return false, false, fmt.Errorf("commit lock: %w", err)
+	}
 	msg.Attempts++
 
 	sendErr := s.sendDirect(ctx, msg)
@@ -805,7 +821,7 @@ func (s WhatsAppService) sendDirect(ctx context.Context, msg QueuedMessage) erro
 
 	timeoutSecs, _ := s.Settings.GetInt(ctx, "wa_client_timeout_seconds")
 	if timeoutSecs <= 0 {
-		timeoutSecs = 15
+		timeoutSecs = 60
 	}
 
 	client := s.HTTPClient
@@ -832,6 +848,12 @@ func (s WhatsAppService) sendDirect(ctx context.Context, msg QueuedMessage) erro
 	request.Header.Set("X-API-Key", apiKey)
 	if strings.TrimSpace(msg.AccountID) != "" {
 		request.Header.Set("X-Account-Id", msg.AccountID)
+	}
+	// Idempotency key: queue row ID + attempt number.
+	// If the gateway receives the same key twice, it knows it's a retry and can
+	// skip re-sending while still returning 200 OK.
+	if msg.ID > 0 {
+		request.Header.Set("X-Idempotency-Key", fmt.Sprintf("queue-%d-attempt-%d", msg.ID, msg.Attempts))
 	}
 
 	response, err := client.Do(request)

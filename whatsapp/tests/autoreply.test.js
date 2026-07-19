@@ -86,6 +86,16 @@ describe('🤖 AutoReply Service — Unit Tests', () => {
         expect(findReply('tidak ada yang cocok')).toBeNull();
     });
 
+    it('findReply() harus mendukung multiple keyword dengan koma', () => {
+        addRule('harga, biaya, bayar', 'Harga Rp 50.000', 'contains');
+        addRule('lunas, beres', 'Status Lunas', 'exact');
+        
+        expect(findReply('berapa biaya internet?')).toBe('Harga Rp 50.000');
+        expect(findReply('cara bayar gmn?')).toBe('Harga Rp 50.000');
+        expect(findReply('lunas')).toBe('Status Lunas');
+        expect(findReply('lunas beres')).toBeNull(); // exact match fails for combined text
+    });
+
     it('rule yang disabled tidak boleh ikut matching', () => {
         const rule = addRule('test', 'test reply', 'contains');
         const { toggleRule } = require('../src/services/autoReply.service');

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/bwmarrin/discordgo"
 	"menettech/dashboard/backend/internal/settings"
 )
 
@@ -146,6 +147,22 @@ func (s *DiscordService) IsEventEnabled(ctx context.Context, eventKey string) bo
 }
 
 func (s *DiscordService) SendFile(ctx context.Context, message string, filename string, fileData []byte) error {
+	// Try sending via Discord Bot if backup_discord_channel_id and discord_bot_token are configured
+	channelID, _ := s.Settings.GetString(ctx, "backup_discord_channel_id")
+	botToken, _ := s.Settings.GetString(ctx, "discord_bot_token")
+	if channelID != "" && botToken != "" {
+		dg, err := discordgo.New("Bot " + botToken)
+		if err == nil {
+			dg.Client = s.HTTPClient
+			fileReader := bytes.NewReader(fileData)
+			_, err = dg.ChannelFileSendWithMessage(channelID, message, filename, fileReader)
+			if err == nil {
+				return nil
+			}
+			// If bot fails, fall back to webhook
+		}
+	}
+
 	webhookURL, err := s.Settings.GetString(ctx, "discord_webhook_url")
 	if err != nil || webhookURL == "" {
 		return nil // Webhook not configured, skip silently

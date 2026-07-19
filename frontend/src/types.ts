@@ -161,6 +161,9 @@ export type SettingsState = {
   backup_auto_enabled?: string;
   backup_auto_time?: string;
   backup_retention_count?: string;
+  backup_encryption_password?: string;
+  backup_discord_channel_id?: string;
+  backup_encryption_enabled?: string;
   mikrotik_host?: string;
   mikrotik_user?: string;
   mikrotik_pass?: string;

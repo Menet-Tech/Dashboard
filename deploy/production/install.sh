@@ -54,6 +54,12 @@ for arg in "$@"; do
     fi
 done
 
+# Auto-detect update mode if existing installation is found
+if [[ -f "${INSTALL_DIR}/backend/.env" ]]; then
+    log_info "Mendeteksi instalasi aktif di ${INSTALL_DIR}. Mengaktifkan mode UPDATE secara otomatis."
+    UPDATE_MODE=true
+fi
+
 # ─── Deteksi IP Server dari 'ip a' (antarmuka ke-2, non-loopback) ─────────────
 SERVER_IP=$(ip -4 addr show scope global | awk '/inet /{split($2, a, "/"); if (a[1] != "") {print a[1]; exit}}')
 if [[ -z "${SERVER_IP}" ]]; then

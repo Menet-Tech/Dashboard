@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/smtp"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -253,6 +254,8 @@ type syncImportPayload struct {
 	DefaultPackageID int64 `json:"default_package_id"`
 	// DefaultDueDay is the tgl_jatuh_tempo to assign (1-31).
 	DefaultDueDay int `json:"default_due_day"`
+	// ActivateTrial specifies whether imported customers should have trial enabled.
+	ActivateTrial bool `json:"activate_trial"`
 }
 
 // SyncImport bulk-creates customers from MikroTik PPPoE secrets.
@@ -437,10 +440,32 @@ func (h IntegrationHandler) SyncImport(w http.ResponseWriter, r *http.Request) {
 		}
 
 		importCtx := context.WithValue(ctx, "skip_mikrotik_sync", true)
-		_, createErr := h.Customers.Create(importCtx, newCustomer)
+		if payload.ActivateTrial {
+			newCustomer.IsTrial = true
+			newCustomer.Status = "trial"
+		} else {
+			importCtx = context.WithValue(importCtx, "skip_trial_activation", true)
+		}
+
+		createdCust, createErr := h.Customers.Create(importCtx, newCustomer)
 		if createErr != nil {
 			results = append(results, importResult{Name: name, Status: "error", Message: createErr.Error()})
 			continue
+		}
+
+		if payload.ActivateTrial && createdCust.WhatsApp != "" && h.WhatsApp.Logs.DB != nil {
+			go func(c customers.Customer) {
+				bgCtx := context.Background()
+				_ = h.WhatsApp.SendTemplate(bgCtx, notifications.BillMessagePayload{
+					TriggerKey:  "trial_started",
+					PhoneNumber: c.WhatsApp,
+					MessageData: map[string]string{
+						"nama":                c.Name,
+						"hari_limit":          strconv.Itoa(c.TrialDays),
+						"tanggal_akhir_trial": formatDateLabel(time.Now().AddDate(0, 0, c.TrialDays).Format("2006-01-02")),
+					},
+				})
+			}(createdCust)
 		}
 
 		importedCount++
@@ -627,14 +652,14 @@ func (h IntegrationHandler) TestSMTP(w http.ResponseWriter, r *http.Request) {
 		auth = smtp.PlainAuth("", payload.Username, payload.Password, payload.Host)
 	}
 
-	msg := []byte(fmt.Sprintf("To: %s\r\n"+
+	msg := fmt.Appendf(nil, "To: %s\r\n"+
 		"From: %s\r\n"+
 		"Subject: Test SMTP Connection\r\n"+
 		"Content-Type: text/plain; charset=UTF-8\r\n"+
 		"MIME-Version: 1.0\r\n"+
 		"\r\n"+
 		"Koneksi SMTP berhasil dikonfigurasi! Ini adalah email uji dari Menet-Tech Dashboard Control Panel.\r\n",
-		payload.ToEmail, payload.FromEmail))
+		payload.ToEmail, payload.FromEmail)
 
 	if strings.ToLower(payload.Encryption) == "ssl" || portStr == "465" {
 		tlsconfig := &tls.Config{

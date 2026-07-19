@@ -136,8 +136,109 @@ export function CustomerFormCard({
           placeholder="Serial Number ONT"
         />
       </label>
+
+      <div className="flex items-center gap-3 pt-6">
+        <label className="relative flex items-center cursor-pointer select-none">
+          <input
+            type="checkbox"
+            id="is_trial"
+            className="sr-only peer"
+            checked={customerForm.status === "trial" || customerForm.is_trial}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              onFormChange((curr) => {
+                const nextStatus = checked ? "trial" : "active";
+                let nextDueDay = curr.due_day;
+                if (checked) {
+                  const today = new Date();
+                  today.setDate(today.getDate() + curr.trial_days + 5);
+                  nextDueDay = today.getDate();
+                }
+                return {
+                  ...curr,
+                  is_trial: checked,
+                  status: nextStatus,
+                  due_day: nextDueDay,
+                };
+              });
+            }}
+          />
+          <div className="w-9 h-5 bg-slate-200 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-350 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+          <span className="ml-3 text-xs font-bold text-slate-700 dark:text-slate-300">
+            Aktifkan Masa Trial (Percobaan)
+          </span>
+        </label>
+      </div>
+
       <label className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Tanggal Jatuh Tempo Bulanan</span>
+        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Status Layanan</span>
+        <select
+          className={inputClassName()}
+          value={customerForm.status}
+          onChange={(e) => {
+            const nextStatus = e.target.value as CustomerItem["status"];
+            const isTrial = nextStatus === "trial";
+            onFormChange((curr) => {
+              let nextDueDay = curr.due_day;
+              if (isTrial) {
+                const today = new Date();
+                today.setDate(today.getDate() + curr.trial_days + 5);
+                nextDueDay = today.getDate();
+              }
+              return {
+                ...curr,
+                status: nextStatus,
+                is_trial: isTrial,
+                due_day: nextDueDay,
+              };
+            });
+          }}
+        >
+          <option value="active">Active</option>
+          <option value="limit">Limit</option>
+          <option value="pending">Pending (Perpanjangan)</option>
+          <option value="suspended">Suspended</option>
+          <option value="inactive">Inactive</option>
+          <option value="trial">Trial</option>
+          <option value="wifi_umum">🛜 WiFi Umum (Fasilitas Umum)</option>
+        </select>
+      </label>
+
+      {/* Trial days — only visible when status is "trial" or is_trial is true */}
+      {(customerForm.status === "trial" || customerForm.is_trial) && (
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+            Durasi Trial (Hari)
+          </span>
+          <input
+            type="number"
+            min={1}
+            max={365}
+            className={inputClassName()}
+            value={customerForm.trial_days}
+            onChange={(e) => {
+              const val = Math.max(1, Number(e.target.value));
+              onFormChange((curr) => {
+                const today = new Date();
+                today.setDate(today.getDate() + val + 5);
+                return {
+                  ...curr,
+                  trial_days: val,
+                  is_trial: true,
+                  due_day: today.getDate(),
+                };
+              });
+            }}
+            placeholder="Jumlah hari trial"
+          />
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+            Pelanggan akan otomatis diset sebagai pelanggan trial.
+          </span>
+        </label>
+      )}
+
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Tanggal Jatuh Tempo Bulanan</span>
         <select
           className={inputClassName(customerErrors.due_day)}
           value={customerForm.due_day}
@@ -156,56 +257,6 @@ export function CustomerFormCard({
         </select>
         {renderInlineError(customerErrors.due_day)}
       </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Status Layanan</span>
-        <select
-          className={inputClassName()}
-          value={customerForm.status}
-          onChange={(e) =>
-            onFormChange((curr) => ({
-              ...curr,
-              status: e.target.value as CustomerItem["status"],
-            }))
-          }
-        >
-          <option value="active">Active</option>
-          <option value="limit">Limit</option>
-          <option value="pending">Pending (Perpanjangan)</option>
-          <option value="suspended">Suspended</option>
-          <option value="inactive">Inactive</option>
-          <option value="trial">Trial</option>
-          <option value="wifi_umum">🛜 WiFi Umum (Fasilitas Umum)</option>
-        </select>
-      </label>
-
-      {/* Trial days — only visible when status is "trial" */}
-      {customerForm.status === "trial" && (
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
-            Durasi Trial (Hari)
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={365}
-            className={inputClassName()}
-            value={customerForm.trial_days}
-            onChange={(e) =>
-              onFormChange((curr) => ({
-                ...curr,
-                trial_days: Math.max(1, Number(e.target.value)),
-                is_trial: true,
-              }))
-            }
-            placeholder="Jumlah hari trial"
-          />
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">
-            Pelanggan akan otomatis diset sebagai pelanggan trial.
-          </span>
-        </label>
-      )}
-      
-
 
       {/* ODP Node selector */}
       <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4">

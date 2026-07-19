@@ -92,6 +92,10 @@ func (s Service) Create(ctx context.Context, customer Customer) (Customer, error
 		}
 	}
 
+	if val := ctx.Value("skip_trial_activation"); val != nil && val.(bool) {
+		trialEnabled = false
+	}
+
 	if customer.Status == "trial" || customer.IsTrial {
 		customer.IsTrial = true
 		customer.Status = "trial"

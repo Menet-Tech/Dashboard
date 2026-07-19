@@ -693,6 +693,55 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
       pushSuccess("Node baru berhasil ditambahkan.");
     }
 
+    if (nodeTypeInput === "ont" && selectedCustomerId) {
+      const matchedCust = customers.find((c) => c.id === selectedCustomerId);
+      if (matchedCust && matchedCust.odp_id) {
+        const odpItem = existingOdps.find((o) => o.id === matchedCust.odp_id);
+        if (odpItem) {
+          const odpNode = updatedNodes.find((n) => n.type === "odp" && n.name === odpItem.nama);
+          if (odpNode) {
+            const activeOntId = nodeIdInput.trim();
+            // Remove any existing edge of type odp_ont for this ONT that connects to a DIFFERENT odp node
+            updatedEdges = updatedEdges.filter((e) => {
+              const isSourceOnt = e.source === activeOntId;
+              const isTargetOnt = e.target === activeOntId;
+              if (isSourceOnt || isTargetOnt) {
+                const otherNodeId = isSourceOnt ? e.target : e.source;
+                const otherNode = updatedNodes.find((n) => n.node_id === otherNodeId);
+                if (otherNode && otherNode.type === "odp" && otherNode.node_id !== odpNode.node_id) {
+                  return false;
+                }
+              }
+              return true;
+            });
+
+            // Check if current connection already exists
+            const edgeExists = updatedEdges.some((e) =>
+              (e.source === activeOntId && e.target === odpNode.node_id) ||
+              (e.source === odpNode.node_id && e.target === activeOntId)
+            );
+
+            if (!edgeExists) {
+              const dist = calculateDistance(
+                parseLatitude(odpNode.latitude),
+                parseLongitude(odpNode.longitude),
+                parseLatitude(nodeLatInput),
+                parseLongitude(nodeLngInput)
+              );
+              const autoEdge: MapEdge = {
+                edge_id: `LINE-${Date.now().toString().slice(-6)}`,
+                source: odpNode.node_id,
+                target: activeOntId,
+                fiber_type: "odp_ont",
+                distance: dist,
+              };
+              updatedEdges.push(autoEdge);
+            }
+          }
+        }
+      }
+    }
+
     setNodes(updatedNodes);
     setEdges(updatedEdges);
     setIsNodeModalOpen(false);
@@ -1048,11 +1097,12 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         return "#3b82f6"; // Blue
       case "odp_ont":
       case "drop":
+      case "dop":
         return "#10b981"; // Emerald Green
       case "ont_ont":
         return "#f59e0b"; // Amber/Yellow
       default:
-        return "#9ca3af"; // Grey
+        return "#f97316"; // Orange
     }
   };
 
@@ -1368,9 +1418,17 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                         <span className="text-slate-500 dark:text-slate-400">Tujuan:</span>
                         <span className="font-semibold">{edge.target}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-slate-500 dark:text-slate-400">Tipe:</span>
-                        <span className="font-semibold capitalize text-indigo-600 dark:text-indigo-400">{edge.fiber_type}</span>
+                        <span className="font-semibold flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getFiberColor(edge.fiber_type) }} />
+                          {edge.fiber_type === "server_odc" ? "Server ke ODC" :
+                           edge.fiber_type === "server_odp" ? "Server ke ODP" :
+                           edge.fiber_type === "odc_odp" ? "ODC ke ODP" :
+                           edge.fiber_type === "odp_ont" ? "ODP ke ONT (Drop)" :
+                           edge.fiber_type === "ont_ont" ? "ONT ke ONT" :
+                           edge.fiber_type || "Lainnya"}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-500 dark:text-slate-400">Jarak:</span>
@@ -1509,6 +1567,109 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                         </div>
                       )}
                     </div>
+                    
+                    {node.type === "odp" && (() => {
+                      const capacity = node.capacity || 8;
+                      const connectedOnts = edges
+                        .filter(e => e.source === node.node_id || e.target === node.node_id)
+                        .map(e => {
+                          const otherId = e.source === node.node_id ? e.target : e.source;
+                          return nodes.find(n => n.node_id === otherId && n.type === "ont");
+                        })
+                        .filter((n): n is MapNode => !!n);
+
+                      const parentNode = edges
+                        .filter(e => e.source === node.node_id || e.target === node.node_id)
+                        .map(e => {
+                          const otherId = e.source === node.node_id ? e.target : e.source;
+                          return nodes.find(n => n.node_id === otherId && (n.type === "odc" || n.type === "server"));
+                        })
+                        .find(n => !!n);
+
+                      const usagePercent = Math.min((connectedOnts.length / capacity) * 100, 100);
+                      const isFull = connectedOnts.length >= capacity;
+                      const availablePorts = Math.max(capacity - connectedOnts.length, 0);
+
+                      return (
+                        <div className="mt-3.5 space-y-3.5 border-t pt-3.5 border-slate-100 dark:border-slate-800">
+                          {/* Slot Usage */}
+                          <div>
+                            <div className="flex justify-between text-xs font-bold mb-1">
+                              <span className="text-slate-500">Slot Usage</span>
+                              <span className="text-slate-800 dark:text-slate-200">
+                                {connectedOnts.length} / {capacity}
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-150 dark:bg-slate-800/80 rounded-full h-2 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  isFull ? "bg-red-500" : "bg-emerald-500"
+                                }`}
+                                style={{ width: `${usagePercent}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                              <span>Tingkat Kepadatan</span>
+                              <span className={isFull ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
+                                {availablePorts} port tersedia
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Connected From */}
+                          {parentNode && (
+                            <div className="bg-slate-50 dark:bg-slate-900/40 p-2 rounded-lg border dark:border-slate-800">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Connected From</p>
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                {parentNode.name} ({parentNode.type.toUpperCase()})
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Connected to ONTs */}
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                              Connected to ONTs ({connectedOnts.length})
+                            </p>
+                            {connectedOnts.length === 0 ? (
+                              <p className="text-xs text-slate-400 italic">Belum ada ONT terhubung</p>
+                            ) : (
+                              <div className="max-h-24 overflow-y-auto space-y-1 pr-1 scrollbar-thin scrollbar-thumb-slate-200">
+                                {connectedOnts.map((ont) => {
+                                  const isOntOffline = isNodeOffline(ont);
+                                  return (
+                                    <div
+                                      key={ont.node_id}
+                                      className="flex items-center justify-between text-[11px] py-1 px-1.5 rounded bg-slate-50/50 dark:bg-slate-900/20 hover:bg-slate-100/50 dark:hover:bg-slate-800/40 border dark:border-slate-800"
+                                    >
+                                      <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[130px]" title={ont.name}>
+                                        {ont.name}
+                                      </span>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${isOntOffline ? "bg-red-500" : "bg-emerald-500"}`} />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Copy Info Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const info = `ODP Name: ${node.name}\nCoordinates: ${node.latitude}, ${node.longitude}\nUsage: ${connectedOnts.length}/${capacity} Ports`;
+                              void navigator.clipboard.writeText(info);
+                              pushSuccess("Info ODP disalin ke clipboard!");
+                            }}
+                            className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-750 dark:text-slate-300 text-[10px] font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                          >
+                            Copy Info
+                          </button>
+                        </div>
+                      );
+                    })()}
                     
                     {node.notes && (
                       <p className="text-[10px] italic bg-slate-50 dark:bg-slate-800 p-1.5 border dark:border-slate-700 rounded text-slate-500 dark:text-slate-400 mb-3">

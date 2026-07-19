@@ -22,8 +22,9 @@ jest.mock('../src/utils/database', () => ({
     saveMessage: jest.fn().mockReturnValue('saved-id'),
     getMessages: jest.fn().mockReturnValue([]),
     getMessageById: jest.fn().mockReturnValue(null),
-    getDb: jest.fn(),
+    getDb: jest.fn().mockReturnValue(null), // return null signals DB unavailable in controller
 }));
+
 
 const app = require('../src/app');
 const API_KEY = process.env.API_KEY;

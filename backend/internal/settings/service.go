@@ -80,6 +80,9 @@ const (
 	KeyInactiveSuspendedDays             = "billing_inactive_suspended_days"
 	KeyWAQueueThrottleSeconds            = "wa_queue_throttle_seconds"
 	KeyMikrotikDeleteUnregisteredSecrets = "mikrotik_delete_unregistered"
+	KeyBackupEncryptionPassword          = "backup_encryption_password"
+	KeyBackupDiscordChannelID            = "backup_discord_channel_id"
+	KeyBackupEncryptionEnabled          = "backup_encryption_enabled"
 )
 
 var defaults = map[string]string{
@@ -89,7 +92,7 @@ var defaults = map[string]string{
 	KeyMenunggakDays:                     "30",
 	KeyInactiveSuspendedDays:             "20",
 	KeyWAQueueThrottleSeconds:            "120",
-	KeyTrialGraceDays:                    "4",
+	KeyTrialGraceDays:                    "5",
 	KeyTrialPeriodDays:                   "3",
 	KeyTrialAutoGenerate:                 "1",
 	KeyTrialEnabled:                      "1",
@@ -110,7 +113,10 @@ var defaults = map[string]string{
 	KeyWorkerLockTTLSeconds:              "180",
 	KeyBackupAutoEnabled:                 "1",
 	KeyBackupAutoTime:                    "02:00",
-	KeyBackupRetentionCount:              "7",
+	KeyBackupRetentionCount:              "3",
+	KeyBackupEncryptionPassword:          "",
+	KeyBackupDiscordChannelID:            "",
+	KeyBackupEncryptionEnabled:           "1",
 	KeyDiscordWebhookURL:                 "",
 	KeyDiscordNotifyPayment:              "1",
 	KeyDiscordNotifyGenerate:             "1",

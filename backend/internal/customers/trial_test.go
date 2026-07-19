@@ -300,3 +300,53 @@ func TestServiceCreateRespectsTrialSettings(t *testing.T) {
 		t.Errorf("expected DB column trial_started_at to be NULL, got %s", *trialStartedAt)
 	}
 }
+
+func TestServiceCreateRespectsSkipTrialActivationContext(t *testing.T) {
+	db := customerTestDB(t)
+	defer db.Close()
+
+	service := Service{
+		Repository: Repository{DB: db},
+		Settings: settings.Service{
+			Repository: settings.Repository{DB: db},
+		},
+	}
+
+	// 1. Enable trials globally in settings
+	err := service.Settings.Set(context.Background(), "trial_enabled", "1")
+	if err != nil {
+		t.Fatalf("set trial_enabled setting to 1: %v", err)
+	}
+
+	// Create a package
+	_, err = db.Exec(`INSERT INTO paket (id, nama, kecepatan_mbps, harga, deskripsi) VALUES (1, 'Test Package', 10, 100000, '')`)
+	if err != nil {
+		t.Fatalf("failed to insert test package: %v", err)
+	}
+
+	// 2. Create customer with skip_trial_activation set to true in context
+	ctx := context.WithValue(context.Background(), "skip_trial_activation", true)
+	cust, err := service.Create(ctx, Customer{
+		Name:      "Imported Non-Trial Customer",
+		PackageID: 1,
+		DueDay:    15,
+		Status:    "active",
+	})
+	if err != nil {
+		t.Fatalf("failed to create customer: %v", err)
+	}
+
+	// 3. Verify customer is NOT in trial mode
+	if cust.IsTrial {
+		t.Error("expected customer to NOT be in trial mode since skip_trial_activation context key was true")
+	}
+	if cust.Status != "active" {
+		t.Errorf("expected status to remain 'active', got %s", cust.Status)
+	}
+	if cust.TrialDays != 0 {
+		t.Errorf("expected trial days to be 0, got %d", cust.TrialDays)
+	}
+	if cust.TrialStartedAt != nil {
+		t.Errorf("expected trial started at to be nil, got %s", *cust.TrialStartedAt)
+	}
+}

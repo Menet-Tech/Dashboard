@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { type GatewayAccount, type ChatbotSession, type ContactForm, type AutoReplyRule, type ChatbotSettings } from "../../../lib/gatewayApi";
 import { inputClassName } from "../../../components/ui";
-import { Bot, Sliders, PlusCircle, CheckCircle2, XCircle, Trash2, Key, ToggleLeft, ToggleRight, Phone, Clock, FileText, User } from "lucide-react";
+import { Bot, Sliders, PlusCircle, CheckCircle2, XCircle, Trash2, Key, ToggleLeft, ToggleRight, Phone, Clock, FileText, User, Pencil, X } from "lucide-react";
 
 type ChatbotTabProps = {
   gatewayUrl: string;
@@ -11,6 +11,14 @@ type ChatbotTabProps = {
   onSaveChatbotSettings: (settings: ChatbotSettings) => Promise<void>;
   autoReplyRules: AutoReplyRule[];
   onAddAutoReplyRule: (rule: {
+    accountId: string;
+    keyword: string;
+    reply: string;
+    matchType: AutoReplyRule["match_type"];
+    priority: number;
+    image?: File;
+  }) => Promise<void>;
+  onUpdateAutoReplyRule: (id: string, rule: {
     accountId: string;
     keyword: string;
     reply: string;
@@ -35,6 +43,7 @@ export function ChatbotTab({
   onSaveChatbotSettings,
   autoReplyRules,
   onAddAutoReplyRule,
+  onUpdateAutoReplyRule,
   onToggleAutoReplyRule,
   onDeleteAutoReplyRule,
   chatbotSessions,
@@ -63,6 +72,34 @@ export function ChatbotTab({
   });
   const [selectedImage, setSelectedImage] = useState<File | undefined>(undefined);
 
+  // Edit state
+  const [editingRule, setEditingRule] = useState<AutoReplyRule | null>(null);
+  const [editForm, setEditForm] = useState({
+    accountId: "*",
+    keyword: "",
+    reply: "",
+    matchType: "contains" as AutoReplyRule["match_type"],
+    priority: 100,
+  });
+  const [editImage, setEditImage] = useState<File | undefined>(undefined);
+
+  const startEditing = (rule: AutoReplyRule) => {
+    setEditingRule(rule);
+    setEditForm({
+      accountId: rule.account_id || "*",
+      keyword: rule.keyword,
+      reply: rule.reply,
+      matchType: rule.match_type,
+      priority: rule.priority,
+    });
+    setEditImage(undefined);
+  };
+
+  const cancelEditing = () => {
+    setEditingRule(null);
+    setEditImage(undefined);
+  };
+
   const handleSettingsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await onSaveChatbotSettings(localSettings);
@@ -78,6 +115,13 @@ export function ChatbotTab({
     setSelectedImage(undefined);
     const fileInput = document.getElementById("auto-reply-image-input") as HTMLInputElement;
     if (fileInput) fileInput.value = "";
+  };
+
+  const handleEditRuleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRule || !editForm.keyword.trim() || !editForm.reply.trim()) return;
+    await onUpdateAutoReplyRule(editingRule.id, { ...editForm, image: editImage });
+    cancelEditing();
   };
 
   return (
@@ -241,6 +285,77 @@ export function ChatbotTab({
           <span className="w-2 h-2 rounded-full bg-emerald-600" />
           Rule Auto-Response ({autoReplyRules.length})
         </h3>
+
+        {/* Inline Edit Panel */}
+        {editingRule && (
+          <form
+            onSubmit={handleEditRuleSubmit}
+            className="bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-700/50 rounded-2xl p-5 space-y-4 shadow-md"
+          >
+            <div className="flex items-center justify-between border-b border-amber-200 dark:border-amber-800/40 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-lg">
+                  <Pencil size={15} />
+                </div>
+                <span className="text-sm font-bold text-amber-800 dark:text-amber-300">Edit Rule: <span className="font-mono">{editingRule.keyword}</span></span>
+              </div>
+              <button type="button" onClick={cancelEditing} className="p-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400 transition-colors cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Akun</span>
+                <select value={editForm.accountId} onChange={(e) => setEditForm((c) => ({ ...c, accountId: e.target.value }))} className={inputClassName()}>
+                  <option value="*">Semua akun (*)</option>
+                  {accounts.map((acc) => (<option key={acc.accountId} value={acc.accountId}>{acc.accountId}</option>))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Tipe Cocok</span>
+                <select value={editForm.matchType} onChange={(e) => setEditForm((c) => ({ ...c, matchType: e.target.value as AutoReplyRule["match_type"] }))} className={inputClassName()}>
+                  <option value="contains">Mengandung Kata</option>
+                  <option value="exact">Sama Persis</option>
+                  <option value="startsWith">Diawali Kata</option>
+                  <option value="endsWith">Diakhiri Kata</option>
+                  <option value="regex">Regex</option>
+                </select>
+              </label>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-4">
+              <label className="block sm:col-span-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Keyword</span>
+                <input className={inputClassName()} value={editForm.keyword} onChange={(e) => setEditForm((c) => ({ ...c, keyword: e.target.value }))} required />
+              </label>
+              <label className="block">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Prioritas</span>
+                <input type="number" className={inputClassName()} value={editForm.priority} onChange={(e) => setEditForm((c) => ({ ...c, priority: Number(e.target.value) || 100 }))} />
+              </label>
+            </div>
+            <label className="block">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Balasan</span>
+              <textarea className={inputClassName()} rows={3} value={editForm.reply} onChange={(e) => setEditForm((c) => ({ ...c, reply: e.target.value }))} required />
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Gambar Lampiran Baru (Opsional — kosongkan untuk mempertahankan gambar lama)</span>
+              <input id="edit-reply-image-input" type="file" accept="image/*" className={inputClassName()} onChange={(e) => setEditImage(e.target.files?.[0])} />
+            </label>
+            {editingRule.image_path && !editImage && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-100/60 dark:bg-amber-900/20 px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-800/40">
+                <span>Gambar saat ini akan dipertahankan (pilih file baru untuk menggantinya).</span>
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all text-xs cursor-pointer text-center">
+                Simpan Perubahan
+              </button>
+              <button type="button" onClick={cancelEditing} className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer">
+                Batal
+              </button>
+            </div>
+          </form>
+        )}
+
         {autoReplyRules.length === 0 ? (
           <div className="text-center py-6 bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500">
             Belum ada rule auto-response custom.
@@ -283,6 +398,14 @@ export function ChatbotTab({
                   </div>
                   {canDecrypt ? (
                     <div className="flex gap-1.5">
+                      <button 
+                        onClick={() => startEditing(rule)} 
+                        type="button" 
+                        title="Edit Rule"
+                        className="text-xs font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 p-1.5 rounded-lg dark:bg-amber-950/45 dark:text-amber-400 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+                      >
+                        <Pencil size={15} />
+                      </button>
                       <button 
                         onClick={() => onToggleAutoReplyRule(rule)} 
                         type="button" 

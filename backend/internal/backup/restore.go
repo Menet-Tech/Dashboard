@@ -36,8 +36,7 @@ func (s *Service) getLiveDbPath() string {
 
 // SimulateRestore copies a backup to staging.db, runs integrity checks, and counts records
 func (s *Service) SimulateRestore(ctx context.Context, filename string) (RestoreSimulationResult, error) {
-	backupPath, err := s.GetBackupPath(filename)
-	if err != nil {
+	if _, err := s.GetBackupPath(filename); err != nil {
 		return RestoreSimulationResult{}, err
 	}
 
@@ -46,10 +45,11 @@ func (s *Service) SimulateRestore(ctx context.Context, filename string) (Restore
 	// Clean any existing staging file before copying
 	_ = os.Remove(stagingPath)
 
-	// Copy backup to staging
-	if err := copyFile(backupPath, stagingPath); err != nil {
+	// Decrypt and extract backup to staging.db
+	password := s.getBackupPassword(ctx)
+	if err := s.ExtractBackupDatabase(filename, stagingPath, password); err != nil {
 		_ = os.Remove(stagingPath) // clean up on failure
-		return RestoreSimulationResult{}, fmt.Errorf("copy backup to staging: %w", err)
+		return RestoreSimulationResult{}, err
 	}
 
 	// Open staging DB to verify

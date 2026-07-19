@@ -62,29 +62,37 @@ const findReplyRule = (messageBody, accountId = null) => {
     for (const rule of listAutoReplyRules(accountId)) {
         if (!rule.enabled) continue;
         const keyword = String(rule.keyword || '').trim();
-        const lowerKeyword = keyword.toLowerCase();
         let matched = false;
 
-        switch (rule.match_type) {
-            case 'exact':
-                matched = lowerBody === lowerKeyword;
-                break;
-            case 'startsWith':
-                matched = lowerBody.startsWith(lowerKeyword);
-                break;
-            case 'endsWith':
-                matched = lowerBody.endsWith(lowerKeyword);
-                break;
-            case 'regex':
-                try {
-                    matched = new RegExp(keyword, 'i').test(body);
-                } catch (_) {
-                    matched = false;
+        if (rule.match_type === 'regex') {
+            try {
+                matched = new RegExp(keyword, 'i').test(body);
+            } catch (_) {
+                matched = false;
+            }
+        } else {
+            // Split by comma for multiple keyword support (e.g. "halo, hai, pagi")
+            const parts = keyword.split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
+            if (parts.length === 0) continue;
+
+            for (const part of parts) {
+                switch (rule.match_type) {
+                    case 'exact':
+                        if (lowerBody === part) matched = true;
+                        break;
+                    case 'startsWith':
+                        if (lowerBody.startsWith(part)) matched = true;
+                        break;
+                    case 'endsWith':
+                        if (lowerBody.endsWith(part)) matched = true;
+                        break;
+                    case 'contains':
+                    default:
+                        if (lowerBody.includes(part)) matched = true;
+                        break;
                 }
-                break;
-            case 'contains':
-            default:
-                matched = lowerBody.includes(lowerKeyword);
+                if (matched) break; // Exit inner loop if matched
+            }
         }
 
         if (matched) return toLegacyRule(rule);
