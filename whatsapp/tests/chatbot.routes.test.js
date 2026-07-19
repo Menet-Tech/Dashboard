@@ -31,8 +31,11 @@ let tempDir;
 let database;
 const API_KEY = process.env.API_KEY;
 
+let originalDbPath;
+
 describe('🤖 Chatbot API Routes — Integration Tests', () => {
     beforeAll(() => {
+        originalDbPath = process.env.WA_DB_PATH;
         // Buat temporary directory untuk testing database
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-db-routes-test-'));
         process.env.WA_DB_PATH = path.join(tempDir, 'gateway.sqlite');
@@ -48,7 +51,11 @@ describe('🤖 Chatbot API Routes — Integration Tests', () => {
             database.getDb().close();
         } catch (_) {}
         fs.rmSync(tempDir, { recursive: true, force: true });
-        delete process.env.WA_DB_PATH;
+        if (originalDbPath) {
+            process.env.WA_DB_PATH = originalDbPath;
+        } else {
+            delete process.env.WA_DB_PATH;
+        }
     });
 
     describe('GET & DELETE /api/v1/chatbot/sessions', () => {

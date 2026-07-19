@@ -584,6 +584,13 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 	}, true, nil
 }
 
+func nullUserID(userID int64) any {
+	if userID <= 0 {
+		return nil
+	}
+	return userID
+}
+
 func (r Repository) MarkPaid(ctx context.Context, billID int64, method string, userID int64) error {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -601,7 +608,7 @@ func (r Repository) MarkPaid(ctx context.Context, billID int64, method string, u
 		UPDATE tagihan
 		SET status = 'lunas', paid_at = ?, payment_method = ?, paid_by_user_id = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, now, method, userID, billID)
+	`, now, method, nullUserID(userID), billID)
 	if err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("update bill status paid: %w", err)
@@ -621,7 +628,7 @@ func (r Repository) MarkPaid(ctx context.Context, billID int64, method string, u
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO payment_history (tagihan_id, method, amount, paid_at, created_by_user_id)
 		VALUES (?, ?, ?, ?, ?)
-	`, bill.ID, method, bill.Amount, now, userID); err != nil {
+	`, bill.ID, method, bill.Amount, now, nullUserID(userID)); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("insert payment history: %w", err)
 	}
@@ -1026,7 +1033,7 @@ func (r Repository) PrepareMarkPaid(ctx context.Context, billID int64, method st
 		UPDATE tagihan
 		SET status = 'pending_paid', payment_method = ?, paid_by_user_id = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND status = 'belum_bayar'
-	`, method, userID, billID)
+	`, method, nullUserID(userID), billID)
 	if err != nil {
 		return fmt.Errorf("prepare mark paid: %w", err)
 	}

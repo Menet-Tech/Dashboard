@@ -120,6 +120,25 @@ func (s Service) FindByID(ctx context.Context, billID int64) (BillDetail, error)
 	return s.Repository.FindByID(ctx, billID, menunggakDays, time.Now())
 }
 
+func (s Service) FindByCustomerAndPeriod(ctx context.Context, customerID int64, period string) (Bill, error) {
+	menunggakDays, err := s.getMenunggakDays(ctx)
+	if err != nil {
+		return Bill{}, err
+	}
+	return s.Repository.FindByCustomerAndPeriod(ctx, customerID, period, menunggakDays, time.Now())
+}
+
+func (s Service) EnsureBillForCustomer(ctx context.Context, customerID int64, period string) (Bill, bool, error) {
+	if period == "" {
+		return Bill{}, false, errors.New("period is required")
+	}
+	menunggakDays, err := s.getMenunggakDays(ctx)
+	if err != nil {
+		return Bill{}, false, err
+	}
+	return s.Repository.EnsureBillForCustomer(ctx, customerID, period, menunggakDays, time.Now())
+}
+
 func (s Service) Generate(ctx context.Context, period string) (GenerateResult, error) {
 	period = strings.TrimSpace(period)
 	if period == "" {

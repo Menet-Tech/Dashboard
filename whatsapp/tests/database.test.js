@@ -6,7 +6,10 @@ describe('Gateway SQLite database utilities', () => {
     let database;
     let tempDir;
 
+    let originalDbPath;
+
     beforeAll(() => {
+        originalDbPath = process.env.WA_DB_PATH;
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-db-test-'));
         process.env.WA_DB_PATH = path.join(tempDir, 'gateway.sqlite');
         jest.resetModules();
@@ -18,7 +21,11 @@ describe('Gateway SQLite database utilities', () => {
             database.getDb().close();
         } catch (_) {}
         fs.rmSync(tempDir, { recursive: true, force: true });
-        delete process.env.WA_DB_PATH;
+        if (originalDbPath) {
+            process.env.WA_DB_PATH = originalDbPath;
+        } else {
+            delete process.env.WA_DB_PATH;
+        }
     });
 
     it('resolveDatabasePath memakai WA_DB_PATH absolut', () => {
