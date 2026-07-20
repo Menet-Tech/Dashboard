@@ -83,20 +83,26 @@ const initWhatsAppClient = (accountId = 'default') => {
     if (clients.has(accountId)) return clients.get(accountId);
 
     logger.info(`Initializing client for account: ${accountId}`);
+    const defaultArgs = [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-zygote'
+    ];
+    const customArgs = process.env.PUPPETEER_ARGS ? process.env.PUPPETEER_ARGS.split(',').map(a => a.trim()).filter(Boolean) : [];
+    const mergedArgs = Array.from(new Set([...defaultArgs, ...customArgs]));
+
     const client = new Client({
         authStrategy: new LocalAuth({
             dataPath: resolveSessionPath(accountId)
         }),
+        userAgent: process.env.USER_AGENT || 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
+        authTimeoutMs: 300000,
         puppeteer: {
             executablePath: resolveExecutablePath(),
-            args: process.env.PUPPETEER_ARGS ? process.env.PUPPETEER_ARGS.split(',') : [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--no-first-run',
-                '--no-zygote'
-            ]
+            args: mergedArgs
         }
     });
 
