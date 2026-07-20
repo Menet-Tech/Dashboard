@@ -786,13 +786,15 @@ func (r Repository) UpdateCustomerStatus(ctx context.Context, customerID int64, 
 }
 
 func (r Repository) findCandidates(ctx context.Context, period string) ([]billCandidate, error) {
+	_, _ = r.DB.ExecContext(ctx, `UPDATE pelanggan SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE status = 'trial' AND COALESCE(is_trial, 0) = 0`)
+
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo,
 		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.voucher_discount, c.status,
 		       c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
-		WHERE c.status IN ('active', 'limit', 'pending')
+		WHERE c.status IN ('active', 'limit', 'pending', 'trial')
 		  AND COALESCE(c.is_trial, 0) = 0
 		  AND NOT EXISTS (
 			SELECT 1
@@ -837,6 +839,8 @@ func (r Repository) findCandidates(ctx context.Context, period string) ([]billCa
 
 
 func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int64, period string) (billCandidate, bool, error) {
+	_, _ = r.DB.ExecContext(ctx, `UPDATE pelanggan SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'trial' AND COALESCE(is_trial, 0) = 0`, customerID)
+
 	row := r.DB.QueryRowContext(ctx, `
 		SELECT c.id, c.nama, COALESCE(c.nomor_wa, ''), p.id, p.nama, p.kecepatan_mbps, p.harga, c.tgl_jatuh_tempo,
 		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.voucher_discount, c.status,
@@ -844,7 +848,7 @@ func (r Repository) findCandidateForCustomer(ctx context.Context, customerID int
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		WHERE c.id = ?
-		  AND c.status IN ('active', 'limit', 'pending')
+		  AND c.status IN ('active', 'limit', 'pending', 'trial')
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM tagihan t

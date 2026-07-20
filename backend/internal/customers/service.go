@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strconv"
 	"strings"
 	"time"
-	"log/slog"
 
 	"menettech/dashboard/backend/internal/mikrotik"
 	"menettech/dashboard/backend/internal/settings"
@@ -686,6 +687,8 @@ func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Cu
 	isTrialVal := 0
 	if customer.IsTrial {
 		isTrialVal = 1
+	} else if customer.Status == "trial" {
+		customer.Status = "active"
 	}
 
 	result, err := r.DB.ExecContext(ctx, `
@@ -947,13 +950,45 @@ func (r Repository) ListTrialExpired(ctx context.Context, now time.Time) ([]Cust
 	return items, rows.Err()
 }
 
-// EndTrial marks the customer trial as finished
+// EndTrial marks the customer trial as finished and transitions trial status to active
 func (r Repository) EndTrial(ctx context.Context, id int64) error {
+	var trialStartedAt sql.NullString
+	var trialDays int
+	var dueDay int
+	_ = r.DB.QueryRowContext(ctx, "SELECT trial_started_at, COALESCE(trial_days, 0), COALESCE(tgl_jatuh_tempo, 1) FROM pelanggan WHERE id = ?", id).Scan(&trialStartedAt, &trialDays, &dueDay)
+
+	if trialStartedAt.Valid && trialStartedAt.String != "" && trialDays > 0 {
+		start, err := time.Parse(time.RFC3339, trialStartedAt.String)
+		if err != nil {
+			start, err = time.Parse("2006-01-02 15:04:05", trialStartedAt.String)
+		}
+		if err == nil {
+			graceDays := 7
+			var graceStr string
+			_ = r.DB.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = 'trial_overdue_grace_days'").Scan(&graceStr)
+			if graceStr != "" {
+				if val, convErr := strconv.Atoi(graceStr); convErr == nil {
+					graceDays = val
+				}
+			}
+			newDueDate := start.AddDate(0, 0, trialDays+graceDays)
+			dueDay = newDueDate.Day()
+			if dueDay < 1 {
+				dueDay = 1
+			} else if dueDay > 31 {
+				dueDay = 31
+			}
+		}
+	}
+
 	result, err := r.DB.ExecContext(ctx, `
 		UPDATE pelanggan
-		SET is_trial = 0, updated_at = CURRENT_TIMESTAMP
+		SET is_trial = 0,
+		    status = CASE WHEN status = 'trial' THEN 'active' ELSE status END,
+		    tgl_jatuh_tempo = ?,
+		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, id)
+	`, dueDay, id)
 	if err != nil {
 		return fmt.Errorf("end trial: %w", err)
 	}

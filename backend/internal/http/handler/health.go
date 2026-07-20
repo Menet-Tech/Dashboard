@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"menettech/dashboard/backend/internal/acs"
@@ -41,7 +42,7 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 	backupStatus := "idle"
 	alerts := make([]string, 0, 8)
 
-	ctx, cancel := contextWithTimeout(r, 2*time.Second)
+	ctx, cancel := contextWithTimeout(r, 6*time.Second)
 	defer cancel()
 
 	if err := h.DB.PingContext(ctx); err != nil {
@@ -158,35 +159,51 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 		alerts = append(alerts, "backup hari ini belum berjalan")
 	}
 
-	// Real-time online checks
+	// Real-time online checks run concurrently to prevent timeout under load
 	waOnline := false
-	if waConfigured {
-		waOnline = checkWhatsAppOnline(ctx, waGatewayURL, waAPIKey)
-	}
-
 	discordOnline := false
-	if discordConfigured {
-		discordOnline = checkDiscordOnline(ctx, discordWebhookURL)
-	}
-
 	mikrotikOnline := false
-	if mikrotikConfigured {
-		if len(activeRouters) > 0 {
-			// Online if at least one active router is reachable in real-time
-			for _, r := range activeRouters {
-				if checkMikrotikOnline(r.Host) {
-					mikrotikOnline = true
-				}
-			}
-		} else {
-			mikrotikOnline = checkMikrotikOnline(mikrotikHost)
-		}
-	}
-
 	genieACSOnline := false
-	if genieACSConfigured {
-		genieACSOnline = checkGenieACSOnline(ctx, effectiveACSURL, acsUsername, acsPassword)
+
+	var wg sync.WaitGroup
+	if waConfigured {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			waOnline = checkWhatsAppOnline(ctx, waGatewayURL, waAPIKey)
+		}()
 	}
+	if discordConfigured {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			discordOnline = checkDiscordOnline(ctx, discordWebhookURL)
+		}()
+	}
+	if mikrotikConfigured {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if len(activeRouters) > 0 {
+				for _, r := range activeRouters {
+					if checkMikrotikOnline(r.Host) {
+						mikrotikOnline = true
+						break
+					}
+				}
+			} else {
+				mikrotikOnline = checkMikrotikOnline(mikrotikHost)
+			}
+		}()
+	}
+	if genieACSConfigured {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			genieACSOnline = checkGenieACSOnline(ctx, effectiveACSURL, acsUsername, acsPassword)
+		}()
+	}
+	wg.Wait()
 
 	if !waConfigured {
 		alerts = append(alerts, "konfigurasi WhatsApp belum lengkap")
@@ -280,7 +297,7 @@ func (h HealthHandler) Show(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h HealthHandler) quickCheckDatabase(ctx context.Context) (string, error) {
-	row := h.DB.QueryRowContext(ctx, `PRAGMA quick_check;`)
+	row := h.DB.QueryRowContext(ctx, `PRAGMA quick_check(1);`)
 	var result string
 	if err := row.Scan(&result); err != nil {
 		return "error", fmt.Errorf("quick check scan: %w", err)

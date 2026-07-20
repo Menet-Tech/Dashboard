@@ -1064,7 +1064,10 @@ func resolveDueDate(period time.Time, dueDay int) time.Time {
 	firstOfMonth := time.Date(year, month, 1, 0, 0, 0, 0, location)
 	lastOfMonth := firstOfMonth.AddDate(0, 1, -1)
 	day := dueDay
-	if dueDay > lastOfMonth.Day() {
+	if day < 1 {
+		day = 1
+	}
+	if day > lastOfMonth.Day() {
 		day = lastOfMonth.Day()
 	}
 

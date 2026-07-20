@@ -274,11 +274,18 @@ foreach ($c in $checks) {
 # ─── Step 9: Compress to Releases.zip ───────────────────────────────────────
 Write-Step 9 $TOTAL_STEPS "Mengompres folder Releases ke Releases.zip..."
 
-# Hapus cache sesi WhatsApp lokal di folder Releases agar tidak terjadi locked files
-$waSessionDir = Join-Path $releasesDir "integration\whatsapp\src\whatsapp\sessions"
-if (Test-Path $waSessionDir) {
-    Write-Host "  -> Menghapus cache sesi WhatsApp lokal di folder Releases..."
-    Remove-Item -Recurse -Force $waSessionDir -ErrorAction SilentlyContinue
+# Hapus cache & sesi WhatsApp lokal di folder Releases agar tidak ikut terkemas ke server
+$waSessionDirs = @(
+    (Join-Path $releasesDir "integration\whatsapp\src\whatsapp\sessions"),
+    (Join-Path $releasesDir "integration\whatsapp\sessions"),
+    (Join-Path $releasesDir "integration\whatsapp\.wwebjs_auth"),
+    (Join-Path $releasesDir "integration\whatsapp\.wwebjs_cache"),
+    (Join-Path $releasesDir "integration\whatsapp\storage")
+)
+foreach ($dir in $waSessionDirs) {
+    if (Test-Path $dir) {
+        Remove-Item -Recurse -Force $dir -ErrorAction SilentlyContinue
+    }
 }
 
 $zipPath = Join-Path $repoRoot "Releases.zip"

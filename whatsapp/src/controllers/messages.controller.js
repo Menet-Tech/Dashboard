@@ -16,21 +16,55 @@ setInterval(() => {
 
 const sendMessage = async (req, res, next) => {
     try {
-        const idempotencyKey = req.headers['x-idempotency-key'];
+        let idempotencyKey = req.headers['x-idempotency-key'];
+        if (idempotencyKey) {
+            idempotencyKey = idempotencyKey.replace(/-attempt-\d+$/, '');
+        }
 
-        // Return cached response immediately if this is a retry for the same send attempt.
+        // Return cached response immediately if this is a retry for the same send attempt in RAM.
         if (idempotencyKey && idempotencyCache.has(idempotencyKey)) {
             const cached = idempotencyCache.get(idempotencyKey);
-            logger.info(`[Messages] Idempotency hit for key ${idempotencyKey} — returning cached response`);
+            logger.info(`[Messages] Idempotency hit in RAM for key ${idempotencyKey} — returning cached response`);
             return res.json(cached.response);
         }
 
         const { to, text, quotedMessageId, is_manual } = req.body;
 
+        // Check SQLite DB if this idempotencyKey was already sent previously (survives service restart)
+        if (idempotencyKey) {
+            const db = getDb();
+            if (db) {
+                const existing = db.prepare(`SELECT id, wa_message_id FROM messages WHERE idempotency_key = ? LIMIT 1`).get(idempotencyKey);
+                if (existing) {
+                    logger.info(`[Messages] Idempotency hit in SQLite DB for key ${idempotencyKey} (id=${existing.id}) — returning cached response`);
+                    const responseBody = { status: 'success', message: 'Message sent (cached)', id: existing.wa_message_id || existing.id };
+                    idempotencyCache.set(idempotencyKey, { response: responseBody, ts: Date.now() });
+                    return res.json(responseBody);
+                }
+            }
+        }
+
+        // Check if an exact identical automated outbound message was sent within the last 3 minutes
+        if (!is_manual && !idempotencyKey) {
+            const db = getDb();
+            if (db) {
+                const threeMinAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+                const recentDuplicate = db.prepare(`
+                    SELECT id, wa_message_id FROM messages
+                    WHERE to_number = ? AND direction = 'outbound' AND body = ? AND created_at >= ?
+                    LIMIT 1
+                `).get(to, text, threeMinAgo);
+                if (recentDuplicate) {
+                    logger.warn(`[Messages] Recent duplicate automated message detected within 3 mins for to=${to}. Preventing double send.`);
+                    return res.json({ status: 'success', message: 'Message sent (deduplicated)', id: recentDuplicate.wa_message_id || recentDuplicate.id });
+                }
+            }
+        }
+
         // Record time just before sending so we can verify in DB afterward
         const sendAttemptTime = new Date().toISOString();
 
-        const result = await sendTextMessage(req.accountId, to, text, quotedMessageId, is_manual);
+        const result = await sendTextMessage(req.accountId, to, text, quotedMessageId, is_manual, idempotencyKey);
 
         // whatsapp-web.js sometimes returns null/undefined even after successfully
         // delivering the message (confirmed: message appears in wa_gateway.db messages table).
@@ -67,6 +101,12 @@ const sendMessage = async (req, res, next) => {
         // Cache successful send so retries don't cause duplicate delivery.
         if (idempotencyKey) {
             idempotencyCache.set(idempotencyKey, { response: responseBody, ts: Date.now() });
+            try {
+                const db = getDb();
+                if (db && messageId) {
+                    db.prepare(`UPDATE messages SET idempotency_key = ? WHERE (wa_message_id = ? OR id = ?) AND idempotency_key IS NULL`).run(idempotencyKey, messageId, messageId);
+                }
+            } catch (e) {}
         }
 
         res.json(responseBody);

@@ -26,7 +26,7 @@ const recordOutboundMessage = (accountId, to, body, type, result) => {
     }
 };
 
-const sendTextMessage = async (accountId, to, text, quotedMessageId = null, is_manual = false) => {
+const sendTextMessage = async (accountId, to, text, quotedMessageId = null, is_manual = false, idempotencyKey = null) => {
     const client = getClient(accountId);
     const chatId = formatPhoneNumber(to);
     const options = quotedMessageId ? { quotedMessageId } : {};
@@ -54,11 +54,11 @@ const sendTextMessage = async (accountId, to, text, quotedMessageId = null, is_m
             global.automatedMessageIds.add(result.id._serialized);
         }
         // Simpan ke database
-        try { 
-            const newId = saveMessage(to, text, 'text', result?.id?._serialized, 'outbound', null, accountId); 
+        try {
+            const newId = saveMessage(to, text, 'text', result?.id?._serialized, 'outbound', null, accountId, idempotencyKey);
             if (global.io) {
                 global.io.emit('chat_message', {
-                    id: newId, account_id: accountId, direction: 'outbound', 
+                    id: newId, account_id: accountId, direction: 'outbound',
                     from_number: null, to_number: to, body: text, type: 'text',
                     wa_message_id: result?.id?._serialized, created_at: new Date().toISOString()
                 });

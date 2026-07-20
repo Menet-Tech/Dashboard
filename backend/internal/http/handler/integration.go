@@ -574,11 +574,17 @@ func (h IntegrationHandler) TestWhatsApp(w http.ResponseWriter, r *http.Request)
 		WriteError(w, http.StatusBadRequest, "payload tidak valid")
 		return
 	}
+	if strings.TrimSpace(payload.GatewayURL) == "" {
+		payload.GatewayURL, _ = h.Settings.GetString(r.Context(), settings.KeyWAGatewayURL)
+	}
+	if strings.TrimSpace(payload.APIKey) == "" {
+		payload.APIKey, _ = h.Settings.GetString(r.Context(), settings.KeyWAAPIKey)
+	}
 	if strings.TrimSpace(payload.GatewayURL) == "" || strings.TrimSpace(payload.APIKey) == "" {
 		WriteError(w, http.StatusBadRequest, "Gateway URL dan API Key wajib diisi")
 		return
 	}
-	gatewayURL := strings.TrimRight(payload.GatewayURL, "/")
+	gatewayURL := strings.TrimRight(settings.ResolveWAGatewayURL(payload.GatewayURL), "/")
 	statusURL := fmt.Sprintf("%s/api/v1/status", gatewayURL)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, statusURL, nil)
 	if err != nil {

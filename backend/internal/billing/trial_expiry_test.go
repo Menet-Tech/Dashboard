@@ -436,6 +436,44 @@ func TestProcessTrialExpiryUsesReminderTriggerInsideReminderWindow(t *testing.T)
 
 }
 
+func TestGenerateIncludesGraduatedTrialStatusCustomer(t *testing.T) {
+	db := trialTestDB(t)
+	repo := Repository{DB: db}
+
+	_, err := db.Exec(`INSERT INTO paket (id, nama, kecepatan_mbps, harga) VALUES (1, 'Test Paket', 20, 100000)`)
+	if err != nil {
+		t.Fatalf("insert package: %v", err)
+	}
+
+	// Insert customer with legacy/stopped trial where status='trial' and is_trial=0
+	_, err = db.Exec(`
+		INSERT INTO pelanggan (id, nama, paket_id, tgl_jatuh_tempo, status, is_trial)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, 1, "Graduated Trial Client", 1, 10, "trial", 0)
+	if err != nil {
+		t.Fatalf("insert customer: %v", err)
+	}
+
+	// Generate bills for period 2026-07
+	generated, err := repo.Generate(context.Background(), "2026-07")
+	if err != nil {
+		t.Fatalf("Generate bills: %v", err)
+	}
+
+	if generated != 1 {
+		t.Errorf("expected 1 bill generated for graduated trial customer, got %d", generated)
+	}
+
+	// Verify status normalized to active by self-healing check
+	var status string
+	if err := db.QueryRow(`SELECT status FROM pelanggan WHERE id = 1`).Scan(&status); err != nil {
+		t.Fatalf("query status: %v", err)
+	}
+	if status != "active" {
+		t.Errorf("expected status to be healed to 'active', got %q", status)
+	}
+}
+
 func trialTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 

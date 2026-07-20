@@ -175,10 +175,10 @@ func IsDefaultWAGatewayURL(value string) bool {
 }
 
 func ResolveWAGatewayURL(value string) string {
-	if envValue := strings.TrimSpace(os.Getenv("WA_GATEWAY_URL")); envValue != "" && IsDefaultWAGatewayURL(value) {
+	if envValue := strings.TrimSpace(os.Getenv("WA_GATEWAY_URL")); envValue != "" && (IsDefaultWAGatewayURL(value) || strings.TrimSpace(value) == "") {
 		return envValue
 	}
-	if IsDefaultWAGatewayURL(value) {
+	if IsDefaultWAGatewayURL(value) || strings.TrimSpace(value) == "" {
 		return DefaultWAGatewayURL
 	}
 	return strings.TrimSpace(value)
@@ -207,20 +207,61 @@ type Service struct {
 	Repository Repository
 }
 
+func (s Service) resolveWAAPIKeyFallback(ctx context.Context) string {
+	for _, envKey := range []string{"DASHBOARD_INTERNAL_API_KEY", "WA_API_KEY", "API_KEY"} {
+		if envVal := strings.TrimSpace(os.Getenv(envKey)); envVal != "" {
+			_ = s.Repository.Set(ctx, KeyWAAPIKey, envVal)
+			return envVal
+		}
+	}
+	paths := []string{
+		"/opt/menettech-go/whatsapp/.env",
+		"/opt/menettech-go/integration/whatsapp/.env",
+		"/opt/menettech-go/backend/.env",
+		"../whatsapp/.env",
+		"../../whatsapp/.env",
+		"../integration/whatsapp/.env",
+		"../../integration/whatsapp/.env",
+		"../../../integration/whatsapp/.env",
+		"whatsapp/.env",
+	}
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "#") || !strings.Contains(line, "=") {
+				continue
+			}
+			parts := strings.SplitN(line, "=", 2)
+			key := strings.TrimSpace(parts[0])
+			val := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
+			if (key == "API_KEY" || key == "DASHBOARD_INTERNAL_API_KEY") && val != "" {
+				_ = s.Repository.Set(ctx, KeyWAAPIKey, val)
+				return val
+			}
+		}
+	}
+	return ""
+}
+
 func (s Service) GetString(ctx context.Context, key string) (string, error) {
 	value, err := s.Repository.GetString(ctx, key)
 	if err == nil {
 		if key == KeyWAAPIKey && strings.TrimSpace(value) == "" {
-			if envVal := os.Getenv("DASHBOARD_INTERNAL_API_KEY"); envVal != "" {
-				return envVal, nil
+			if fb := s.resolveWAAPIKeyFallback(ctx); fb != "" {
+				return fb, nil
 			}
 		}
 		return value, nil
 	}
 	if err == sql.ErrNoRows {
 		if key == KeyWAAPIKey {
-			if envVal := os.Getenv("DASHBOARD_INTERNAL_API_KEY"); envVal != "" {
-				return envVal, nil
+			if fb := s.resolveWAAPIKeyFallback(ctx); fb != "" {
+				return fb, nil
 			}
 		}
 		return defaults[key], nil
@@ -258,8 +299,8 @@ func (s Service) GetAll(ctx context.Context) (map[string]string, error) {
 		result[k] = v
 	}
 	if strings.TrimSpace(result[KeyWAAPIKey]) == "" {
-		if envVal := os.Getenv("DASHBOARD_INTERNAL_API_KEY"); envVal != "" {
-			result[KeyWAAPIKey] = envVal
+		if fb := s.resolveWAAPIKeyFallback(ctx); fb != "" {
+			result[KeyWAAPIKey] = fb
 		}
 	}
 	return result, nil

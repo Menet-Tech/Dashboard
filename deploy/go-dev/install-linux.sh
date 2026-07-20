@@ -235,14 +235,29 @@ deploy_whatsapp() {
     if [[ -d "./whatsapp" ]]; then
         log_info "Menyalin WhatsApp Gateway source code..."
         
-        # Backup WhatsApp storage (session tokens) agar tidak ter-logout saat update
+        # Backup WhatsApp storage & sessions agar tidak ter-logout saat update
         if [[ -d "${INSTALL_DIR}/whatsapp/storage" ]]; then
-            log_info "Mencadangkan sesi WhatsApp..."
+            log_info "Mencadangkan storage WhatsApp..."
+            rm -rf "/tmp/whatsapp_storage_backup"
             cp -r "${INSTALL_DIR}/whatsapp/storage" "/tmp/whatsapp_storage_backup"
         fi
-
-        # Perhatikan agar .env tidak terhapus jika ada di dalam folder whatsapp, 
-        # walau best practice-nya .env ada di backend.
+        if [[ -d "${INSTALL_DIR}/whatsapp/src/whatsapp/sessions" ]]; then
+            log_info "Mencadangkan sesi login WhatsApp (src/whatsapp/sessions)..."
+            rm -rf "/tmp/whatsapp_sessions_backup"
+            cp -r "${INSTALL_DIR}/whatsapp/src/whatsapp/sessions" "/tmp/whatsapp_sessions_backup"
+        fi
+        if [[ -d "${INSTALL_DIR}/whatsapp/.wwebjs_auth" ]]; then
+            rm -rf "/tmp/whatsapp_wwebjs_auth_backup"
+            cp -r "${INSTALL_DIR}/whatsapp/.wwebjs_auth" "/tmp/whatsapp_wwebjs_auth_backup"
+        fi
+        if [[ -d "${INSTALL_DIR}/whatsapp/.wwebjs_cache" ]]; then
+            rm -rf "/tmp/whatsapp_wwebjs_cache_backup"
+            cp -r "${INSTALL_DIR}/whatsapp/.wwebjs_cache" "/tmp/whatsapp_wwebjs_cache_backup"
+        fi
+        if [[ -d "${INSTALL_DIR}/whatsapp/sessions" ]]; then
+            rm -rf "/tmp/whatsapp_root_sessions_backup"
+            cp -r "${INSTALL_DIR}/whatsapp/sessions" "/tmp/whatsapp_root_sessions_backup"
+        fi
         if [[ -f "${INSTALL_DIR}/whatsapp/.env" ]]; then
             cp "${INSTALL_DIR}/whatsapp/.env" "/tmp/whatsapp_env_backup"
         fi
@@ -250,13 +265,31 @@ deploy_whatsapp() {
         rm -rf "${INSTALL_DIR}/whatsapp/"*
         cp -r ./whatsapp/* "${INSTALL_DIR}/whatsapp/"
         
-        # Restore WhatsApp storage
+        # Restore WhatsApp storage & sessions
         if [[ -d "/tmp/whatsapp_storage_backup" ]]; then
-            log_info "Mengembalikan sesi WhatsApp..."
+            log_info "Mengembalikan data storage WhatsApp..."
+            mkdir -p "${INSTALL_DIR}/whatsapp"
             cp -r "/tmp/whatsapp_storage_backup" "${INSTALL_DIR}/whatsapp/storage"
             rm -rf "/tmp/whatsapp_storage_backup"
         fi
-        
+        if [[ -d "/tmp/whatsapp_sessions_backup" ]]; then
+            log_info "Mengembalikan sesi login WhatsApp (src/whatsapp/sessions)..."
+            mkdir -p "${INSTALL_DIR}/whatsapp/src/whatsapp"
+            cp -r "/tmp/whatsapp_sessions_backup" "${INSTALL_DIR}/whatsapp/src/whatsapp/sessions"
+            rm -rf "/tmp/whatsapp_sessions_backup"
+        fi
+        if [[ -d "/tmp/whatsapp_wwebjs_auth_backup" ]]; then
+            cp -r "/tmp/whatsapp_wwebjs_auth_backup" "${INSTALL_DIR}/whatsapp/.wwebjs_auth"
+            rm -rf "/tmp/whatsapp_wwebjs_auth_backup"
+        fi
+        if [[ -d "/tmp/whatsapp_wwebjs_cache_backup" ]]; then
+            cp -r "/tmp/whatsapp_wwebjs_cache_backup" "${INSTALL_DIR}/whatsapp/.wwebjs_cache"
+            rm -rf "/tmp/whatsapp_wwebjs_cache_backup"
+        fi
+        if [[ -d "/tmp/whatsapp_root_sessions_backup" ]]; then
+            cp -r "/tmp/whatsapp_root_sessions_backup" "${INSTALL_DIR}/whatsapp/sessions"
+            rm -rf "/tmp/whatsapp_root_sessions_backup"
+        fi
         if [[ -f "/tmp/whatsapp_env_backup" ]]; then
             cp "/tmp/whatsapp_env_backup" "${INSTALL_DIR}/whatsapp/.env"
             rm -f "/tmp/whatsapp_env_backup"

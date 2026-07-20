@@ -849,11 +849,11 @@ func (s WhatsAppService) sendDirect(ctx context.Context, msg QueuedMessage) erro
 	if strings.TrimSpace(msg.AccountID) != "" {
 		request.Header.Set("X-Account-Id", msg.AccountID)
 	}
-	// Idempotency key: queue row ID + attempt number.
-	// If the gateway receives the same key twice, it knows it's a retry and can
-	// skip re-sending while still returning 200 OK.
+	// Idempotency key: queue row ID.
+	// If the gateway receives the same key across retries, it knows it's the exact same queue item and can
+	// skip re-sending while returning 200 OK or cached response.
 	if msg.ID > 0 {
-		request.Header.Set("X-Idempotency-Key", fmt.Sprintf("queue-%d-attempt-%d", msg.ID, msg.Attempts))
+		request.Header.Set("X-Idempotency-Key", fmt.Sprintf("queue-%d", msg.ID))
 	}
 
 	response, err := client.Do(request)

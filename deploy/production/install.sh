@@ -168,21 +168,20 @@ if [[ "${UPDATE_MODE}" == "false" ]]; then
     else
         log_info "Node.js sudah terpasang: $(node -v)"
     fi
-
-    # ─── Puppeteer / Chromium system libraries ────────────────────────────────────
-    log_info "Menginstal library sistem untuk Chromium (Puppeteer)..."
-    # Package names compatible across Ubuntu 20.04 / 22.04 / 24.04
-    apt-get install -y -q \
-        libxss1 libatk1.0-0 libatk-bridge2.0-0 \
-        libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev libnss3 \
-        libdrm2 libxcomposite1 libxdamage1 libxrandr2 \
-        libxfixes3 libxkbcommon0 libpango-1.0-0 libcairo2 \
-        fonts-liberation libappindicator3-1 libasound2t64 2>/dev/null \
-        || apt-get install -y -q libasound2 2>/dev/null || true
-    log_success "Library sistem untuk Chromium terinstal"
 else
-    log_info "Mode update aktif: Melewati penginstalan dependensi sistem..."
+    log_info "Mode update aktif: Melewati penginstalan dependensi sistem dasar..."
 fi
+
+# ─── Puppeteer / Chromium system libraries (selalu dicek agar Chromium tidak crash saat initialize) ───
+log_info "Memeriksa library sistem untuk Chromium (Puppeteer)..."
+apt-get install -y -q \
+    libxss1 libatk1.0-0 libatk-bridge2.0-0 \
+    libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev libnss3 \
+    libdrm2 libxcomposite1 libxdamage1 libxrandr2 \
+    libxfixes3 libxkbcommon0 libpango-1.0-0 libcairo2 \
+    fonts-liberation libappindicator3-1 libasound2t64 2>/dev/null \
+    || apt-get install -y -q libasound2 2>/dev/null || true
+log_success "Library sistem untuk Chromium terverifikasi"
 
 # ══════════════════════════════════════════════════════════════════════════════
 log_step "2/8 - Setup User Sistem"
@@ -286,8 +285,61 @@ fi
 
 # ─── WhatsApp Gateway source ─────────────────────────────────────────────────
 if [[ -d "${SCRIPT_DIR}/integration/whatsapp" ]] && [[ -n "$(ls -A "${SCRIPT_DIR}/integration/whatsapp" 2>/dev/null)" ]]; then
+    # Backup sesi & auth WhatsApp jika update agar tidak ter-logout
+    if [[ -d "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions" ]]; then
+        log_info "Mencadangkan sesi login WhatsApp (src/whatsapp/sessions)..."
+        rm -rf /tmp/wa_prod_sessions_backup
+        cp -r "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions" "/tmp/wa_prod_sessions_backup"
+    fi
+    if [[ -d "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth" ]]; then
+        rm -rf /tmp/wa_prod_auth_backup
+        cp -r "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth" "/tmp/wa_prod_auth_backup"
+    fi
+    if [[ -d "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache" ]]; then
+        rm -rf /tmp/wa_prod_cache_backup
+        cp -r "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache" "/tmp/wa_prod_cache_backup"
+    fi
+    if [[ -d "${INSTALL_DIR}/integration/whatsapp/sessions" ]]; then
+        rm -rf /tmp/wa_prod_root_sessions_backup
+        cp -r "${INSTALL_DIR}/integration/whatsapp/sessions" "/tmp/wa_prod_root_sessions_backup"
+    fi
+    if [[ -d "${INSTALL_DIR}/integration/whatsapp/storage" ]]; then
+        rm -rf /tmp/wa_prod_storage_backup
+        cp -r "${INSTALL_DIR}/integration/whatsapp/storage" "/tmp/wa_prod_storage_backup"
+    fi
+
     cp -r "${SCRIPT_DIR}/integration/whatsapp/." "${INSTALL_DIR}/integration/whatsapp/"
-    log_success "Source WhatsApp Gateway disalin"
+
+    # Restore sesi & auth WhatsApp
+    if [[ -d "/tmp/wa_prod_sessions_backup" ]]; then
+        log_info "Mengembalikan sesi login WhatsApp..."
+        mkdir -p "${INSTALL_DIR}/integration/whatsapp/src/whatsapp"
+        rm -rf "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions"
+        cp -r "/tmp/wa_prod_sessions_backup" "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions"
+        rm -rf /tmp/wa_prod_sessions_backup
+    fi
+    if [[ -d "/tmp/wa_prod_auth_backup" ]]; then
+        rm -rf "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth"
+        cp -r "/tmp/wa_prod_auth_backup" "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth"
+        rm -rf /tmp/wa_prod_auth_backup
+    fi
+    if [[ -d "/tmp/wa_prod_cache_backup" ]]; then
+        rm -rf "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache"
+        cp -r "/tmp/wa_prod_cache_backup" "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache"
+        rm -rf /tmp/wa_prod_cache_backup
+    fi
+    if [[ -d "/tmp/wa_prod_root_sessions_backup" ]]; then
+        rm -rf "${INSTALL_DIR}/integration/whatsapp/sessions"
+        cp -r "/tmp/wa_prod_root_sessions_backup" "${INSTALL_DIR}/integration/whatsapp/sessions"
+        rm -rf /tmp/wa_prod_root_sessions_backup
+    fi
+    if [[ -d "/tmp/wa_prod_storage_backup" ]]; then
+        rm -rf "${INSTALL_DIR}/integration/whatsapp/storage"
+        cp -r "/tmp/wa_prod_storage_backup" "${INSTALL_DIR}/integration/whatsapp/storage"
+        rm -rf /tmp/wa_prod_storage_backup
+    fi
+
+    log_success "Source WhatsApp Gateway disalin dan sesi WhatsApp berhasil dipertahankan"
 else
     log_warn "Folder integration/whatsapp tidak ditemukan atau kosong."
 fi

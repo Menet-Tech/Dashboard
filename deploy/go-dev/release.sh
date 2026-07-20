@@ -62,7 +62,8 @@ cp -r "${ROOT_DIR}/frontend/dist"/* "${TEMP_RELEASE_DIR}/frontend-dist/"
 # 5. Pack WhatsApp Gateway (tanpa node_modules/cache/db)
 echo "💬 [5/6] Packing WhatsApp Gateway source code..."
 mkdir -p "${TEMP_RELEASE_DIR}/whatsapp"
-rsync -a --exclude="node_modules" --exclude=".jest-cache" --exclude="coverage" --exclude="storage" --exclude="*.log" "${ROOT_DIR}/whatsapp/" "${TEMP_RELEASE_DIR}/whatsapp/"
+rsync -a --exclude="node_modules" --exclude=".jest-cache" --exclude="coverage" --exclude="storage" --exclude="sessions" --exclude=".wwebjs_auth" --exclude=".wwebjs_cache" --exclude="*.log" "${ROOT_DIR}/whatsapp/" "${TEMP_RELEASE_DIR}/whatsapp/"
+rm -rf "${TEMP_RELEASE_DIR}/whatsapp/src/whatsapp/sessions" 2>/dev/null || true
 
 # Salin install-linux.sh dan systemd templates
 mkdir -p "${TEMP_RELEASE_DIR}/deploy"

@@ -57,24 +57,36 @@ io.on('connection', (socket) => {
 });
 
 // Mulai server HTTP + WebSocket
+server.on('error', (err) => {
+    logger.error(`[HTTP Server Error]: ${err.message}`, { error: err });
+    if (err.code === 'EADDRINUSE') {
+        logger.error(`Port ${PORT} sudah digunakan oleh proses lain (mungkin systemd service menettech-whatsapp). Keluar.`);
+        process.exit(1);
+    }
+});
+
 server.listen(PORT, () => {
     logger.info(`WhatsApp Gateway berjalan di port ${PORT}`);
     logger.info(`Swagger docs: http://localhost:${PORT}/api-docs`);
 
-    // ── Restore semua akun yang tersimpan dari database ──────────────────
-    const saved = getSavedAccounts();
-    if (saved.length === 0) {
-        // Tidak ada akun tersimpan → init akun default dan simpan ke DB
-        logger.info('[Startup] Tidak ada akun tersimpan, inisialisasi akun "default"');
-        saveAccount('default', 'Default Account');
-        initWhatsAppClient('default');
-    } else {
-        logger.info(`[Startup] Memulihkan ${saved.length} akun dari database…`);
-        for (const acc of saved) {
-            logger.info(`[Startup] Init akun: ${acc.id} (${acc.label})`);
-            initWhatsAppClient(acc.id);
+    try {
+        // ── Restore semua akun yang tersimpan dari database ──────────────────
+        const saved = getSavedAccounts();
+        if (saved.length === 0) {
+            // Tidak ada akun tersimpan → init akun default dan simpan ke DB
+            logger.info('[Startup] Tidak ada akun tersimpan, inisialisasi akun "default"');
+            saveAccount('default', 'Default Account');
+            initWhatsAppClient('default');
+        } else {
+            logger.info(`[Startup] Memulihkan ${saved.length} akun dari database…`);
+            for (const acc of saved) {
+                logger.info(`[Startup] Init akun: ${acc.id} (${acc.label})`);
+                initWhatsAppClient(acc.id);
+            }
         }
-    }
 
-    restoreScheduledMessages();
+        restoreScheduledMessages();
+    } catch (startupErr) {
+        logger.error(`[Startup Error] Gagal memulihkan data saat startup: ${startupErr.message}`, { error: startupErr });
+    }
 });

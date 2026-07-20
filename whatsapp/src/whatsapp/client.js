@@ -1,5 +1,6 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const fs = require('fs/promises');
+const fsSync = require('fs');
 const path = require('path');
 const qrcode = require('qrcode-terminal');
 const logger = require('../utils/logger');
@@ -10,6 +11,7 @@ const { setupEvents } = require('./events');
 const clients = new Map();
 const qrs = new Map();
 const readyStatuses = new Map();
+const reconnectTimers = new Map();
 
 const sessionRoot = path.resolve(__dirname, 'sessions');
 
@@ -28,6 +30,50 @@ const resolveSessionPath = (accountId) => {
     return target;
 };
 
+const cleanupSessionLocks = (accountId) => {
+    try {
+        const sessionDir = resolveSessionPath(accountId);
+        const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+        for (const file of lockFiles) {
+            try { fsSync.rmSync(path.join(sessionDir, file), { force: true }); } catch (e) {}
+            try { fsSync.rmSync(path.join(sessionDir, 'session', file), { force: true }); } catch (e) {}
+        }
+    } catch (err) {
+        logger.warn(`[${accountId}] Failed to clean up session locks: ${err.message}`);
+    }
+};
+
+const resolveExecutablePath = () => {
+    if (process.env.PUPPETEER_EXECUTABLE_PATH && fsSync.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+        return process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+    const commonPaths = [
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/google-chrome',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+        '/usr/lib/chromium-browser/chromium-browser',
+        '/snap/bin/chromium'
+    ];
+    for (const p of commonPaths) {
+        if (fsSync.existsSync(p)) {
+            logger.info(`Using detected system Chromium: ${p}`);
+            return p;
+        }
+    }
+    try {
+        const puppeteer = require('puppeteer');
+        if (puppeteer && typeof puppeteer.executablePath === 'function') {
+            const pPath = puppeteer.executablePath();
+            if (pPath && fsSync.existsSync(pPath)) {
+                logger.info(`Using Puppeteer cached browser: ${pPath}`);
+                return pPath;
+            }
+        }
+    } catch (e) {}
+    return process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+};
+
 /**
  * Inisialisasi WhatsApp Client baru
  * @param {string} accountId 
@@ -42,8 +88,15 @@ const initWhatsAppClient = (accountId = 'default') => {
             dataPath: resolveSessionPath(accountId)
         }),
         puppeteer: {
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-            args: process.env.PUPPETEER_ARGS ? process.env.PUPPETEER_ARGS.split(',') : ['--no-sandbox', '--disable-setuid-sandbox']
+            executablePath: resolveExecutablePath(),
+            args: process.env.PUPPETEER_ARGS ? process.env.PUPPETEER_ARGS.split(',') : [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--no-first-run',
+                '--no-zygote'
+            ]
         }
     });
 
@@ -99,9 +152,12 @@ const initWhatsAppClient = (accountId = 'default') => {
     setupEvents(client, accountId);
 
     logger.info(`[${accountId}] Sedang mencoba menghubungi peladen WhatsApp (membuka browser). Mohon tunggu...`);
-    client.initialize().catch(err => {
-        logger.error(`[${accountId}] Failed to initialize client: ${err.message}`);
+    cleanupSessionLocks(accountId);
+    client.initialize().catch(async (err) => {
+        const errMsg = err ? (err.stack || err.message || (typeof err === 'string' ? err : JSON.stringify(err))) : 'Unknown initialize error';
+        logger.error(`[${accountId}] Failed to initialize client: ${errMsg}`, { error: err });
         readyStatuses.set(accountId, false);
+        try { await client.destroy(); } catch (e) {}
         scheduleReconnect(accountId);
     });
     clients.set(accountId, client);
@@ -130,6 +186,10 @@ const getAllAccounts = () => {
 
 const removeAccount = async (accountId) => {
     assertSafeAccountId(accountId);
+    if (reconnectTimers.has(accountId)) {
+        clearTimeout(reconnectTimers.get(accountId));
+        reconnectTimers.delete(accountId);
+    }
     if (!clients.has(accountId)) return false;
     const client = clients.get(accountId);
     
@@ -158,12 +218,28 @@ const removeAccount = async (accountId) => {
 };
 
 const scheduleReconnect = (accountId = 'default') => {
+    if (reconnectTimers.has(accountId)) {
+        logger.info(`[${accountId}] Reconnect already scheduled. Skipping duplicate scheduleReconnect.`);
+        return;
+    }
     logger.info(`Scheduling reconnect for ${accountId} in 10 seconds...`);
-    setTimeout(async () => {
+    const timer = setTimeout(async () => {
+        reconnectTimers.delete(accountId);
         logger.info(`Attempting to reconnect ${accountId}...`);
-        await removeAccount(accountId);
+        if (clients.has(accountId)) {
+            const client = clients.get(accountId);
+            clients.delete(accountId);
+            readyStatuses.delete(accountId);
+            qrs.delete(accountId);
+            try {
+                await client.destroy();
+            } catch (err) {
+                logger.warn(`[${accountId}] Error destroying client during reconnect: ${err.message}`);
+            }
+        }
         initWhatsAppClient(accountId);
     }, 10000);
+    reconnectTimers.set(accountId, timer);
 };
 
 // Server.js will handle initialization

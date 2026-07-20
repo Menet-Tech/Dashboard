@@ -8,7 +8,8 @@ User=menettech
 Group=menettech
 WorkingDirectory=/opt/menettech-go/whatsapp
 EnvironmentFile=/opt/menettech-go/backend/.env
-ExecStart=/usr/bin/node src/server.js
+EnvironmentFile=-/opt/menettech-go/whatsapp/.env
+ExecStart=/usr/bin/node --max-old-space-size=160 src/server.js
 Restart=always
 RestartSec=5
 NoNewPrivileges=true
@@ -16,6 +17,8 @@ PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
 ReadWritePaths=/opt/menettech-go/whatsapp
+MemoryHigh=200M
+MemoryMax=250M
 
 [Install]
 WantedBy=multi-user.target

@@ -6,9 +6,18 @@ let db;
 
 const resolveDatabasePath = () => {
     if (process.env.WA_DB_PATH && process.env.WA_DB_PATH.trim()) {
-        return path.resolve(process.env.WA_DB_PATH.trim());
+        const customPath = process.env.WA_DB_PATH.trim();
+        if (path.isAbsolute(customPath)) {
+            return path.resolve(customPath);
+        }
+        return path.resolve(__dirname, '../../', customPath);
     }
-    return path.resolve(__dirname, '../../storage/wa_gateway.db');
+    const storagePath = path.resolve(__dirname, '../../storage/wa_gateway.db');
+    const legacyPath = path.resolve(__dirname, '../../wa_gateway.db');
+    if (!fs.existsSync(storagePath) && fs.existsSync(legacyPath)) {
+        return legacyPath;
+    }
+    return storagePath;
 };
 
 const getDb = () => {
@@ -37,6 +46,7 @@ const getDb = () => {
         try { db.exec("ALTER TABLE messages ADD COLUMN direction TEXT DEFAULT 'outbound'"); } catch (e) {}
         try { db.exec("ALTER TABLE messages ADD COLUMN from_number TEXT"); } catch (e) {}
         try { db.exec("ALTER TABLE messages ADD COLUMN account_id TEXT DEFAULT 'default'"); } catch (e) {}
+        try { db.exec("ALTER TABLE messages ADD COLUMN idempotency_key TEXT"); } catch (e) {}
 
         // Migration: Tambah kolom image_path untuk auto_reply_rules
         try { db.exec("ALTER TABLE auto_reply_rules ADD COLUMN image_path TEXT"); } catch (e) {}
@@ -124,17 +134,17 @@ const getDb = () => {
 /**
  * Simpan pesan terkirim/masuk ke database
  */
-const saveMessage = (to, body, type = 'text', waMessageId = null, direction = 'outbound', fromNumber = null, accountId = 'default') => {
+const saveMessage = (to, body, type = 'text', waMessageId = null, direction = 'outbound', fromNumber = null, accountId = 'default', idempotencyKey = null) => {
     const db = getDb();
     const id = require('crypto').randomBytes(8).toString('hex');
     const now = new Date().toISOString();
 
     const stmt = db.prepare(`
-        INSERT INTO messages (id, to_number, body, type, status, wa_message_id, created_at, sent_at, direction, from_number, account_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO messages (id, to_number, body, type, status, wa_message_id, created_at, sent_at, direction, from_number, account_id, idempotency_key)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const status = direction === 'inbound' ? 'received' : 'sent';
-    stmt.run(id, to, body, type, status, waMessageId, now, now, direction, fromNumber, accountId);
+    stmt.run(id, to, body, type, status, waMessageId, now, now, direction, fromNumber, accountId, idempotencyKey || null);
     return id;
 };
 

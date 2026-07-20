@@ -6,11 +6,12 @@ type ModalShellProps = {
   children: ReactNode;
   actions?: ReactNode;
   onClose: () => void;
+  zIndexClass?: string;
 };
 
-export function Modal({ title, children, actions, onClose }: ModalShellProps) {
+export function Modal({ title, children, actions, onClose, zIndexClass = "z-[80]" }: ModalShellProps) {
   return createPortal(
-    <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="presentation" onClick={onClose}>
+    <div className={`fixed inset-0 bg-slate-950/40 backdrop-blur-sm ${zIndexClass} flex items-center justify-center p-4`} role="presentation" onClick={onClose}>
       <section
         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in"
         role="dialog"

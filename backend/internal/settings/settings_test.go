@@ -102,6 +102,22 @@ func TestSettingsService_GetString(t *testing.T) {
 		}
 	})
 
+	t.Run("Get WA API Key fallback to API_KEY env", func(t *testing.T) {
+		t.Setenv("DASHBOARD_INTERNAL_API_KEY", "")
+		t.Setenv("WA_API_KEY", "")
+		t.Setenv("API_KEY", "cb02f4d5b1bd0bf77610ed2218c609b5")
+
+		_, _ = db.Exec("DELETE FROM pengaturan WHERE key = ?", settings.KeyWAAPIKey)
+
+		val, err := svc.GetString(ctx, settings.KeyWAAPIKey)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if val != "cb02f4d5b1bd0bf77610ed2218c609b5" {
+			t.Errorf("expected API_KEY fallback, got %q", val)
+		}
+	})
+
 	t.Run("GetAll settings", func(t *testing.T) {
 		all, err := svc.GetAll(ctx)
 		if err != nil {

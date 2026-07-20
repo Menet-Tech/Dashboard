@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -147,17 +148,33 @@ func findRepoRoot() (string, error) {
 	return "", fmt.Errorf("could not find repository root containing both backend and whatsapp directories")
 }
 
+func findSystemdUnit(serviceName string) string {
+	if runtime.GOOS != "linux" {
+		return ""
+	}
+	candidates := []string{
+		serviceName,
+		"menettech-go-" + serviceName,
+		"menettech-" + strings.TrimPrefix(serviceName, "menettech-go-"),
+	}
+	for _, c := range candidates {
+		name := c
+		if !strings.HasSuffix(name, ".service") {
+			name = name + ".service"
+		}
+		if _, err := os.Stat(filepath.Join("/etc/systemd/system", name)); err == nil {
+			return name
+		}
+	}
+	return ""
+}
+
 func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 	if _, running := s.processes["whatsapp"]; running {
 		return nil // already running
 	}
 
 	s.logger.Info("Starting WhatsApp Gateway service...")
-
-	waDir, _, _ := s.getPaths()
-	if waDir == "" {
-		return fmt.Errorf("could not resolve whatsapp directory path")
-	}
 
 	// Get configuration
 	waGatewayURL, _ := s.settingsSvc.GetString(ctx, settings.KeyWAGatewayURL)
@@ -166,6 +183,31 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 	waAccountID, _ := s.settingsSvc.GetString(ctx, settings.KeyWAAccountID)
 	if waAccountID == "" {
 		waAccountID = "default"
+	}
+
+	// ── Systemd Integration on Linux Production ───────────────────────
+	if unit := findSystemdUnit("whatsapp"); unit != "" {
+		s.logger.Info("Starting WhatsApp Gateway via systemctl...", "unit", unit)
+		if err := exec.Command("systemctl", "restart", unit).Run(); err != nil {
+			s.logger.Warn("Failed to restart systemd unit, attempting start...", "unit", unit, "error", err)
+			if errStart := exec.Command("systemctl", "start", unit).Run(); errStart != nil {
+				return fmt.Errorf("systemctl start %s: %w", unit, errStart)
+			}
+		}
+		dummyCmd := exec.Command("sleep", "31536000") // placeholder command to mark state as running
+		if err := dummyCmd.Start(); err == nil {
+			s.processes["whatsapp"] = dummyCmd
+		}
+		s.runningWAAPIKey = waAPIKey
+		s.runningWAGatewayURL = waGatewayURL
+		s.runningWAAccountID = waAccountID
+		s.logger.Info("WhatsApp Gateway started successfully via systemctl", "unit", unit)
+		return nil
+	}
+
+	waDir, _, _ := s.getPaths()
+	if waDir == "" {
+		return fmt.Errorf("could not resolve whatsapp directory path")
 	}
 
 	apiURL, _ := s.settingsSvc.GetString(ctx, "dashboard_api_url")
@@ -181,8 +223,8 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 		}
 	}
 
-	// Start Node process directly
-	cmd := exec.Command("node", "src/server.js")
+	// Start Node process with memory limit to prevent OOM on small VPS
+	cmd := exec.Command("node", "--max-old-space-size=160", "src/server.js")
 	cmd.Dir = waDir
 
 	// Configure environment variables
@@ -246,6 +288,23 @@ func (s *ServiceManager) startDiscord(ctx context.Context) error {
 	}
 
 	s.logger.Info("Starting Discord Bot service...")
+
+	// ── Systemd Integration on Linux Production ───────────────────────
+	if unit := findSystemdUnit("discord"); unit != "" {
+		s.logger.Info("Starting Discord Bot via systemctl...", "unit", unit)
+		if err := exec.Command("systemctl", "restart", unit).Run(); err != nil {
+			s.logger.Warn("Failed to restart discord systemd unit, attempting start...", "unit", unit, "error", err)
+			if errStart := exec.Command("systemctl", "start", unit).Run(); errStart != nil {
+				return fmt.Errorf("systemctl start %s: %w", unit, errStart)
+			}
+		}
+		dummyCmd := exec.Command("sleep", "31536000") // placeholder command to mark state as running
+		if err := dummyCmd.Start(); err == nil {
+			s.processes["discord"] = dummyCmd
+		}
+		s.logger.Info("Discord Bot started successfully via systemctl", "unit", unit)
+		return nil
+	}
 
 	_, discordBotBin, isProd := s.getPaths()
 	if discordBotBin == "" {
@@ -342,14 +401,21 @@ func (s *ServiceManager) compileDiscordBot(backendDir string) error {
 }
 
 func (s *ServiceManager) stopService(name string) {
+	if unit := findSystemdUnit(name); unit != "" {
+		s.logger.Info(fmt.Sprintf("Stopping %s service via systemctl...", name), "unit", unit)
+		_ = exec.Command("systemctl", "stop", unit).Run()
+	}
+
 	cmd, running := s.processes[name]
 	if !running {
 		return
 	}
 
 	s.logger.Info(fmt.Sprintf("Stopping %s service...", name))
-	if err := cmd.Process.Kill(); err != nil {
-		s.logger.Error(fmt.Sprintf("Failed to kill %s process", name), "error", err)
+	if cmd != nil && cmd.Process != nil {
+		if err := cmd.Process.Kill(); err != nil {
+			s.logger.Error(fmt.Sprintf("Failed to kill %s process", name), "error", err)
+		}
 	}
 	delete(s.processes, name)
 	s.logger.Info(fmt.Sprintf("%s service stopped successfully", name))
