@@ -16,6 +16,7 @@ import (
 
 	"menettech/dashboard/backend/internal/acs"
 	"menettech/dashboard/backend/internal/audit"
+	"menettech/dashboard/backend/internal/billing"
 	"menettech/dashboard/backend/internal/customers"
 	"menettech/dashboard/backend/internal/mikrotik"
 	"menettech/dashboard/backend/internal/notifications"
@@ -27,6 +28,8 @@ type CustomerHandler struct {
 	Audit       audit.Service
 	StoragePath string
 	WhatsApp    notifications.WhatsAppService
+	Billing     billing.Service
+	Settings    settings.Service
 }
 
 type statusPayload struct {
@@ -1018,6 +1021,12 @@ func (h CustomerHandler) EndTrial(w http.ResponseWriter, r *http.Request) {
 	if err := h.Service.EndTrial(r.Context(), id); err != nil {
 		WriteError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	// Auto-generate bill upon trial completion
+	if h.Billing.Repository.DB != nil {
+		period := time.Now().Format("2006-01")
+		_, _, _ = h.Billing.EnsureBillForCustomer(r.Context(), id, period)
 	}
 
 	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &id, "customer.end_trial", fmt.Sprintf("Trial pelanggan %s berhasil diberhentikan secara manual", cust.Name), ip)

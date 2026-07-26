@@ -89,7 +89,8 @@ const initWhatsAppClient = (accountId = 'default') => {
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--no-first-run',
-        '--no-zygote'
+        '--no-zygote',
+        '--disable-blink-features=AutomationControlled'
     ];
     const customArgs = process.env.PUPPETEER_ARGS ? process.env.PUPPETEER_ARGS.split(',').map(a => a.trim()).filter(Boolean) : [];
     const mergedArgs = Array.from(new Set([...defaultArgs, ...customArgs]));

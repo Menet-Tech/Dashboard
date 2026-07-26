@@ -72,6 +72,19 @@ func (s Service) FindByID(ctx context.Context, id int64) (Customer, error) {
 	return s.Repository.FindByID(ctx, id)
 }
 
+func calculateTrialDueDay(trialDays int) int {
+	now := time.Now()
+	year, month, _ := now.Date()
+	firstOfNextMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, now.Location())
+	lastDayOfMonth := firstOfNextMonth.AddDate(0, 0, -1).Day()
+
+	rawTarget := now.Day() + trialDays + 5
+	if rawTarget > lastDayOfMonth {
+		return lastDayOfMonth
+	}
+	return rawTarget
+}
+
 func (s Service) Create(ctx context.Context, customer Customer) (Customer, error) {
 	if err := validateCustomer(customer); err != nil {
 		return Customer{}, err
@@ -97,7 +110,12 @@ func (s Service) Create(ctx context.Context, customer Customer) (Customer, error
 		trialEnabled = false
 	}
 
-	if customer.Status == "trial" || customer.IsTrial {
+	if customer.Status == "wifi_umum" {
+		customer.IsTrial = false
+		customer.TrialDays = 0
+		customer.TrialStartedAt = nil
+		customer.DueDay = 1
+	} else if customer.Status == "trial" || customer.IsTrial {
 		customer.IsTrial = true
 		customer.Status = "trial"
 		if customer.TrialDays <= 0 {
@@ -107,6 +125,8 @@ func (s Service) Create(ctx context.Context, customer Customer) (Customer, error
 			nowStr := time.Now().UTC().Format(time.RFC3339)
 			customer.TrialStartedAt = &nowStr
 		}
+		// Dynamic due day capped at last day of current month if (today + trial_days + 5) > lastDayOfMonth
+		customer.DueDay = calculateTrialDueDay(customer.TrialDays)
 	} else if trialEnabled {
 		customer.IsTrial = true
 		customer.Status = "trial"
@@ -115,6 +135,8 @@ func (s Service) Create(ctx context.Context, customer Customer) (Customer, error
 			nowStr := time.Now().UTC().Format(time.RFC3339)
 			customer.TrialStartedAt = &nowStr
 		}
+		// Dynamic due day capped at last day of current month if (today + trial_days + 5) > lastDayOfMonth
+		customer.DueDay = calculateTrialDueDay(customer.TrialDays)
 	} else {
 		customer.IsTrial = false
 		customer.TrialDays = 0

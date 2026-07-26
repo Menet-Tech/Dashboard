@@ -65,9 +65,10 @@ server.on('error', (err) => {
     }
 });
 
-server.listen(PORT, () => {
-    logger.info(`WhatsApp Gateway berjalan di port ${PORT}`);
-    logger.info(`Swagger docs: http://localhost:${PORT}/api-docs`);
+const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
+server.listen(PORT, BIND_HOST, async () => {
+    logger.info(`WhatsApp Gateway berjalan di http://${BIND_HOST}:${PORT}`);
+    logger.info(`Swagger docs: http://${BIND_HOST}:${PORT}/api-docs`);
 
     try {
         // ── Restore semua akun yang tersimpan dari database ──────────────────
@@ -79,9 +80,17 @@ server.listen(PORT, () => {
             initWhatsAppClient('default');
         } else {
             logger.info(`[Startup] Memulihkan ${saved.length} akun dari database…`);
-            for (const acc of saved) {
+            for (let i = 0; i < saved.length; i++) {
+                const acc = saved[i];
                 logger.info(`[Startup] Init akun: ${acc.id} (${acc.label})`);
                 initWhatsAppClient(acc.id);
+                
+                // OPSEC / OOM Protection: Kasih jeda 20 detik jika ada akun berikutnya 
+                // agar CPU & RAM Chromium tidak spike bersamaan (OOM kill) di VPS 512MB
+                if (i < saved.length - 1) {
+                    logger.info(`[Startup] Menunggu 20 detik sebelum memuat akun berikutnya untuk menghemat memori...`);
+                    await new Promise(resolve => setTimeout(resolve, 20000));
+                }
             }
         }
 

@@ -1,5 +1,5 @@
 import { FormEvent } from "react";
-import { inputClassName, renderInlineError } from "../../components/ui";
+import { inputClassName, renderInlineError, Button } from "../../components/ui";
 import type { FieldErrors } from "../../utils/validation";
 import { XCircle } from "lucide-react";
 
@@ -63,9 +63,14 @@ export function LoginPage({
             />
             {renderInlineError(loginErrors.password)}
           </label>
-          <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50 mt-2" disabled={submitting}>
-            {isBusy("login") ? "Masuk..." : "Masuk"}
-          </button>
+          <Button 
+            variant="primary" 
+            isLoading={isBusy("login") || submitting} 
+            className="w-full mt-2" 
+            type="submit"
+          >
+            Masuk
+          </Button>
         </form>
       </section>
     </main>

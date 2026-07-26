@@ -1,4 +1,5 @@
 import { type FormEvent } from "react";
+import { Sparkles, Calendar } from "lucide-react";
 import { inputClassName, renderInlineError } from "../../../components/ui";
 import { type CustomerItem, type PackageItem, type User, type OdpItem } from "../../../types";
 import { type FieldErrors } from "../../../utils/validation";
@@ -19,6 +20,16 @@ type CustomerFormCardProps = {
   odps: OdpItem[];
 };
 
+function calculateTrialDueDay(trialDays: number): number {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const date = now.getDate();
+  const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+  const rawTarget = date + trialDays + 5;
+  return rawTarget > lastDayOfMonth ? lastDayOfMonth : rawTarget;
+}
+
 export function CustomerFormCard({
   user,
   packages,
@@ -26,237 +37,323 @@ export function CustomerFormCard({
   customerForm,
   customerErrors,
   editingCustomerId,
+  submitting,
+  busyAction,
   onFormChange,
   onSubmit,
+  onCancelEdit,
   odps,
 }: CustomerFormCardProps) {
-  if (user?.role === "viewer") return null;
+  const isEditing = Boolean(editingCustomerId);
 
   return (
-    <form className="grid grid-cols-1 md:grid-cols-2 gap-6" id="customer-form" onSubmit={onSubmit}>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Nama Pelanggan</span>
-        <input
-          className={inputClassName(customerErrors.name)}
-          value={customerForm.name}
-          onChange={(e) => onFormChange((curr) => ({ ...curr, name: e.target.value }))}
-          placeholder="Nama Lengkap"
-        />
-        {renderInlineError(customerErrors.name)}
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Paket Internet</span>
-        <select
-          className={inputClassName(customerErrors.package_id)}
-          value={customerForm.package_id}
-          onChange={(e) =>
-            onFormChange((curr) => ({
-              ...curr,
-              package_id: Number(e.target.value),
-            }))
-          }
-        >
-          <option value={0}>Pilih paket</option>
-          {packages.map((pkg) => (
-            <option key={pkg.id} value={pkg.id}>
-              {pkg.name} - {pkg.speed_mbps === 0 ? "Bypass" : `${pkg.speed_mbps} Mbps`}
-            </option>
-          ))}
-        </select>
-        {renderInlineError(customerErrors.package_id)}
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">User PPPoE</span>
-        <input
-          className={inputClassName(customerErrors.user_pppoe)}
-          value={customerForm.user_pppoe}
-          onChange={(e) =>
-            onFormChange((curr) => ({
-              ...curr,
-              user_pppoe: e.target.value,
-            }))
-          }
-          placeholder="Username PPPoE"
-        />
-        {renderInlineError(customerErrors.user_pppoe)}
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Password PPPoE</span>
-        <input
-          className={inputClassName(customerErrors.password_pppoe)}
-          value={customerForm.password_pppoe}
-          onChange={(e) =>
-            onFormChange((curr) => ({
-              ...curr,
-              password_pppoe: e.target.value,
-            }))
-          }
-          placeholder="Password PPPoE"
-        />
-        {renderInlineError(customerErrors.password_pppoe)}
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Nomor WhatsApp</span>
-        <input
-          className={inputClassName()}
-          value={customerForm.whatsapp}
-          onChange={(e) => {
-            const formatted = formatWhatsAppNumber(e.target.value);
-            onFormChange((curr) => ({
-              ...curr,
-              whatsapp: formatted,
-            }));
-          }}
-          placeholder="contoh: 0812-3456-7890 atau +62 812-3456-7890"
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Email Pelanggan</span>
-        <input
-          type="email"
-          className={inputClassName()}
-          value={customerForm.email}
-          onChange={(e) =>
-            onFormChange((curr) => ({
-              ...curr,
-              email: e.target.value,
-            }))
-          }
-          placeholder="contoh: pelanggan@gmail.com"
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">SN ONT</span>
-        <input
-          className={inputClassName()}
-          value={customerForm.sn_ont}
-          onChange={(e) =>
-            onFormChange((curr) => ({ ...curr, sn_ont: e.target.value }))
-          }
-          placeholder="Serial Number ONT"
-        />
-      </label>
+    <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-6">
+      <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+        <div>
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+            {isEditing ? "Edit Pelanggan" : "Tambah Pelanggan Baru"}
+          </h3>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            {isEditing
+              ? "Perbarui informasi layanan pelanggan yang dipilih."
+              : "Isi data berikut untuk mendaftarkan pelanggan baru."}
+          </p>
+        </div>
+        {isEditing && (
+          <button
+            type="button"
+            onClick={onCancelEdit}
+            className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 font-medium underline"
+          >
+            Batal Edit
+          </button>
+        )}
+      </div>
 
-      <div className="flex items-center gap-3 pt-6">
-        <label className="relative flex items-center cursor-pointer select-none">
+      <form onSubmit={onSubmit} className="space-y-4">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+            Nama Pelanggan *
+          </span>
           <input
-            type="checkbox"
-            id="is_trial"
-            className="sr-only peer"
-            checked={customerForm.status === "trial" || customerForm.is_trial}
+            className={inputClassName(customerErrors.name)}
+            value={customerForm.name}
+            onChange={(e) =>
+              onFormChange((curr) => ({ ...curr, name: e.target.value }))
+            }
+            placeholder="Masukkan nama pelanggan"
+          />
+          {renderInlineError(customerErrors.name)}
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+            Paket Layanan *
+          </span>
+          <select
+            className={inputClassName(customerErrors.package_id)}
+            value={customerForm.package_id || ""}
+            onChange={(e) =>
+              onFormChange((curr) => ({
+                ...curr,
+                package_id: Number(e.target.value),
+              }))
+            }
+          >
+            <option value="" disabled>
+              -- Pilih Paket --
+            </option>
+            {packages.map((pkg) => (
+              <option key={pkg.id} value={pkg.id}>
+                {pkg.name} - {pkg.speed_mbps} Mbps (Rp{" "}
+                {pkg.price.toLocaleString("id-ID")})
+              </option>
+            ))}
+          </select>
+          {renderInlineError(customerErrors.package_id)}
+        </label>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+              Username PPPoE
+            </span>
+            <input
+              className={inputClassName()}
+              value={customerForm.user_pppoe}
+              onChange={(e) =>
+                onFormChange((curr) => ({ ...curr, user_pppoe: e.target.value }))
+              }
+              placeholder="Username login PPPoE"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+              Password PPPoE
+            </span>
+            <input
+              className={inputClassName()}
+              value={customerForm.password_pppoe}
+              onChange={(e) =>
+                onFormChange((curr) => ({
+                  ...curr,
+                  password_pppoe: e.target.value,
+                }))
+              }
+              placeholder="Password login PPPoE"
+            />
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+              Nomor WhatsApp
+            </span>
+            <input
+              className={inputClassName(customerErrors.whatsapp)}
+              value={customerForm.whatsapp}
+              onChange={(e) =>
+                onFormChange((curr) => ({ ...curr, whatsapp: e.target.value }))
+              }
+              placeholder="Contoh: 08123456789"
+            />
+            {renderInlineError(customerErrors.whatsapp)}
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+              Email
+            </span>
+            <input
+              className={inputClassName()}
+              type="email"
+              value={customerForm.email}
+              onChange={(e) =>
+                onFormChange((curr) => ({ ...curr, email: e.target.value }))
+              }
+              placeholder="Alamat email pelanggan"
+            />
+          </label>
+        </div>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+            Alamat Pelanggan
+          </span>
+          <textarea
+            rows={2}
+            className={inputClassName()}
+            value={customerForm.address}
+            onChange={(e) =>
+              onFormChange((curr) => ({ ...curr, address: e.target.value }))
+            }
+            placeholder="Alamat lengkap lokasi pemasangan"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+            Serial Number ONT
+          </span>
+          <input
+            className={inputClassName()}
+            value={customerForm.sn_ont}
+            onChange={(e) =>
+              onFormChange((curr) => ({ ...curr, sn_ont: e.target.value }))
+            }
+            placeholder="Serial Number ONT"
+          />
+        </label>
+
+        <div className="pt-2">
+          <label className="relative flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 hover:border-indigo-300 dark:hover:border-indigo-800 transition-all cursor-pointer select-none group shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl transition-colors ${customerForm.status === "trial" || customerForm.is_trial ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}>
+                <Sparkles size={16} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Aktifkan Masa Trial (Percobaan)
+                  </span>
+                  {(customerForm.status === "trial" || customerForm.is_trial) && (
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-955/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      Trial Aktif
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Uji coba gratis tanpa tagihan awal selama durasi trial.
+                </p>
+              </div>
+            </div>
+
+            <div className="relative inline-flex items-center shrink-0 ml-3">
+              <input
+                type="checkbox"
+                id="is_trial"
+                className="sr-only peer"
+                checked={customerForm.status === "trial" || customerForm.is_trial}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  onFormChange((curr) => {
+                    const nextStatus = checked ? "trial" : "active";
+                    let nextDueDay = curr.due_day;
+                    if (checked) {
+                      nextDueDay = calculateTrialDueDay(curr.trial_days || 3);
+                    }
+                    return {
+                      ...curr,
+                      is_trial: checked,
+                      status: nextStatus,
+                      due_day: nextDueDay,
+                    };
+                  });
+                }}
+              />
+              <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:shadow-xs peer-checked:bg-indigo-600"></div>
+            </div>
+          </label>
+        </div>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Status Layanan</span>
+          <select
+            className={inputClassName()}
+            value={customerForm.status}
             onChange={(e) => {
-              const checked = e.target.checked;
+              const nextStatus = e.target.value as CustomerItem["status"];
+              const isTrial = nextStatus === "trial";
               onFormChange((curr) => {
-                const nextStatus = checked ? "trial" : "active";
                 let nextDueDay = curr.due_day;
-                if (checked) {
-                  const today = new Date();
-                  today.setDate(today.getDate() + curr.trial_days + 5);
-                  nextDueDay = today.getDate();
+                if (isTrial) {
+                  nextDueDay = calculateTrialDueDay(curr.trial_days || 3);
+                } else if (nextStatus === "wifi_umum") {
+                  nextDueDay = 1;
                 }
                 return {
                   ...curr,
-                  is_trial: checked,
                   status: nextStatus,
+                  is_trial: isTrial,
                   due_day: nextDueDay,
                 };
               });
             }}
-          />
-          <div className="w-9 h-5 bg-slate-200 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-350 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-          <span className="ml-3 text-xs font-bold text-slate-700 dark:text-slate-300">
-            Aktifkan Masa Trial (Percobaan)
-          </span>
+          >
+            <option value="active">Active</option>
+            <option value="limit">Limit</option>
+            <option value="pending">Pending (Perpanjangan)</option>
+            <option value="suspended">Suspended</option>
+            <option value="inactive">Inactive</option>
+            <option value="trial">Trial</option>
+            <option value="wifi_umum">🛜 WiFi Umum (Fasilitas Umum)</option>
+          </select>
         </label>
-      </div>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Status Layanan</span>
-        <select
-          className={inputClassName()}
-          value={customerForm.status}
-          onChange={(e) => {
-            const nextStatus = e.target.value as CustomerItem["status"];
-            const isTrial = nextStatus === "trial";
-            onFormChange((curr) => {
-              let nextDueDay = curr.due_day;
-              if (isTrial) {
-                const today = new Date();
-                today.setDate(today.getDate() + curr.trial_days + 5);
-                nextDueDay = today.getDate();
-              }
-              return {
-                ...curr,
-                status: nextStatus,
-                is_trial: isTrial,
-                due_day: nextDueDay,
-              };
-            });
-          }}
-        >
-          <option value="active">Active</option>
-          <option value="limit">Limit</option>
-          <option value="pending">Pending (Perpanjangan)</option>
-          <option value="suspended">Suspended</option>
-          <option value="inactive">Inactive</option>
-          <option value="trial">Trial</option>
-          <option value="wifi_umum">🛜 WiFi Umum (Fasilitas Umum)</option>
-        </select>
-      </label>
+        {/* Trial days — only visible when status is "trial" or is_trial is true */}
+        {(customerForm.status === "trial" || customerForm.is_trial) && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+              Durasi Trial (Hari)
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={365}
+              className={inputClassName()}
+              value={customerForm.trial_days}
+              onChange={(e) => {
+                const val = Math.max(1, Number(e.target.value));
+                onFormChange((curr) => {
+                  return {
+                    ...curr,
+                    trial_days: val,
+                    is_trial: true,
+                    due_day: calculateTrialDueDay(val),
+                  };
+                });
+              }}
+              placeholder="Jumlah hari trial"
+            />
+            <span className="text-[11px] text-slate-400 dark:text-slate-500">
+              Pelanggan akan otomatis diset sebagai pelanggan trial.
+            </span>
+          </label>
+        )}
 
-      {/* Trial days — only visible when status is "trial" or is_trial is true */}
-      {(customerForm.status === "trial" || customerForm.is_trial) && (
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
-            Durasi Trial (Hari)
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={365}
-            className={inputClassName()}
-            value={customerForm.trial_days}
-            onChange={(e) => {
-              const val = Math.max(1, Number(e.target.value));
-              onFormChange((curr) => {
-                const today = new Date();
-                today.setDate(today.getDate() + val + 5);
-                return {
-                  ...curr,
-                  trial_days: val,
-                  is_trial: true,
-                  due_day: today.getDate(),
-                };
-              });
-            }}
-            placeholder="Jumlah hari trial"
-          />
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">
-            Pelanggan akan otomatis diset sebagai pelanggan trial.
-          </span>
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Tanggal Jatuh Tempo Bulanan</span>
+          <select
+            className={inputClassName(customerErrors.due_day)}
+            value={customerForm.due_day}
+            disabled={customerForm.status === "wifi_umum"}
+            onChange={(e) =>
+              onFormChange((curr) => ({
+                ...curr,
+                due_day: Number(e.target.value),
+              }))
+            }
+          >
+            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+              <option key={day} value={day}>
+                Tanggal {day}
+              </option>
+            ))}
+          </select>
+          {renderInlineError(customerErrors.due_day)}
+          {customerForm.status === "wifi_umum" ? (
+            <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
+              🛜 WiFi Umum gratis / fasilitas umum — tidak memerlukan tanggal jatuh tempo & tidak dibuatkan tagihan.
+            </span>
+          ) : (customerForm.status === "trial" || customerForm.is_trial) ? (
+            <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mt-0.5">
+              <Calendar size={12} className="shrink-0" />
+              Tanggal jatuh tempo dihitung otomatis: Hari ini + {customerForm.trial_days || 3} hari trial + 5 hari jeda = Tanggal {customerForm.due_day}
+            </span>
+          ) : null}
         </label>
-      )}
-
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Tanggal Jatuh Tempo Bulanan</span>
-        <select
-          className={inputClassName(customerErrors.due_day)}
-          value={customerForm.due_day}
-          onChange={(e) =>
-            onFormChange((curr) => ({
-              ...curr,
-              due_day: Number(e.target.value),
-            }))
-          }
-        >
-          {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-            <option key={day} value={day}>
-              Tanggal {day}
-            </option>
-          ))}
-        </select>
-        {renderInlineError(customerErrors.due_day)}
-      </label>
 
       {/* ODP Node selector */}
       <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -367,6 +464,7 @@ export function CustomerFormCard({
         />
       </label>
     </form>
+  </article>
   );
 }
 

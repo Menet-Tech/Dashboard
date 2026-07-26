@@ -1,3 +1,4 @@
+import { Button } from "../../components/ui";
 import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { inputClassName, renderInlineError } from "../../components/ui";
 import type { FieldErrors } from "../../utils/validation";
@@ -3572,14 +3573,8 @@ export function SettingsPage({
                   </label>
 
                   <div className="flex justify-end pt-3">
-                    <button
-                      type="submit"
-                      disabled={userSubmitting === "username"}
-                      className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      {userSubmitting === "username" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                      Update Username
-                    </button>
+                    <Button variant="primary" isLoading={userSubmitting === "username"} >
+                      Update Username</Button>
                   </div>
                 </form>
               </article>
@@ -3634,14 +3629,8 @@ export function SettingsPage({
                   </label>
 
                   <div className="flex justify-end pt-3">
-                    <button
-                      type="submit"
-                      disabled={userSubmitting === "password"}
-                      className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      {userSubmitting === "password" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                      Update Password
-                    </button>
+                    <Button variant="primary" isLoading={userSubmitting === "password"} >
+                      Update Password</Button>
                   </div>
                 </form>
               </article>

@@ -392,7 +392,7 @@ func (r Repository) EnsureBillForCustomer(ctx context.Context, customerID int64,
 			trialStart, parseErr = time.Parse("2006-01-02 15:04:05", candidate.TrialStartedAt)
 		}
 		if parseErr == nil {
-			trialGraceDays := 4 // default
+			trialGraceDays := 5 // default (3 days trial + 5 days grace)
 			var graceStr string
 			_ = tx.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = 'trial_overdue_grace_days'").Scan(&graceStr)
 			if graceStr != "" {
@@ -719,6 +719,7 @@ func (r Repository) AutomationCandidates(ctx context.Context) ([]automationCandi
 		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
 		INNER JOIN paket p ON p.id = t.paket_id
 		WHERE t.status = 'belum_bayar'
+		  AND c.status != 'wifi_umum'
 		ORDER BY t.id ASC
 	`)
 	if err != nil {

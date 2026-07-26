@@ -100,6 +100,16 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 		Notifications: notifications.NotificationLogRepository{DB: db},
 		Templates:     templateService,
 	}, cfg.AppName, cfg.StoragePath, auditService)
+	customerHandler.Billing = billing.Service{
+		Repository:    billing.Repository{DB: db},
+		Settings:      settingsService,
+		Customers:     customersService,
+		WhatsApp:      whatsAppService,
+		Discord:       discordService,
+		Notifications: notifications.NotificationLogRepository{DB: db},
+		Templates:     templateService,
+	}
+	customerHandler.Settings = settingsService
 	templateHandler := handler.NewTemplateHandler(templateService)
 	emailTemplateHandler := handler.NewEmailTemplateHandler(templateService)
 	settingsHandler := handler.NewSettingsHandler(settingsService, serviceMgr)

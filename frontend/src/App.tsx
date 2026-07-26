@@ -1,3 +1,4 @@
+import { Button } from "./components/ui";
 import { FormEvent, lazy, Suspense, startTransition, useEffect, useMemo, useState } from "react";
 import { StatusPill } from "./components/StatusPill";
 import {
@@ -888,17 +889,17 @@ export default function App() {
           onClose={feedback.dismissConfirmDialog}
           actions={
             <>
-              <button type="button" className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={feedback.dismissConfirmDialog}>
+              <Button type="button" variant="secondary" onClick={feedback.dismissConfirmDialog}>
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className={feedback.confirmDialog.tone === "danger" ? "text-red-600 hover:bg-red-50 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" : "bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50"}
+                variant={feedback.confirmDialog.tone === "danger" ? "danger" : "primary"}
                 onClick={() => void feedback.confirmAndRun()}
-                disabled={feedback.submitting}
+                isLoading={feedback.submitting}
               >
                 {feedback.confirmDialog.confirmLabel}
-              </button>
+              </Button>
             </>
           }
         >
