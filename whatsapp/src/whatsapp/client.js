@@ -35,8 +35,8 @@ const cleanupSessionLocks = (accountId) => {
         const sessionDir = resolveSessionPath(accountId);
         const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
         for (const file of lockFiles) {
-            try { fsSync.rmSync(path.join(sessionDir, file), { force: true }); } catch (e) {}
-            try { fsSync.rmSync(path.join(sessionDir, 'session', file), { force: true }); } catch (e) {}
+            try { fsSync.rmSync(path.join(sessionDir, file), { force: true }); } catch (e) { }
+            try { fsSync.rmSync(path.join(sessionDir, 'session', file), { force: true }); } catch (e) { }
         }
     } catch (err) {
         logger.warn(`[${accountId}] Failed to clean up session locks: ${err.message}`);
@@ -70,7 +70,7 @@ const resolveExecutablePath = () => {
                 return pPath;
             }
         }
-    } catch (e) {}
+    } catch (e) { }
     return process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
 };
 
@@ -115,7 +115,7 @@ const initWhatsAppClient = (accountId = 'default') => {
     client.on('qr', (qr) => {
         logger.info(`[${accountId}] QR Code received, scan with WhatsApp`);
         if (process.env.ENABLE_DASHBOARD !== 'true') {
-            qrcode.generate(qr, { small: true }); 
+            qrcode.generate(qr, { small: true });
         }
         qrs.set(accountId, qr);
         if (global.io) {
@@ -164,7 +164,7 @@ const initWhatsAppClient = (accountId = 'default') => {
         const errMsg = err ? (err.stack || err.message || (typeof err === 'string' ? err : JSON.stringify(err))) : 'Unknown initialize error';
         logger.error(`[${accountId}] Failed to initialize client: ${errMsg}`, { error: err });
         readyStatuses.set(accountId, false);
-        try { await client.destroy(); } catch (e) {}
+        try { await client.destroy(); } catch (e) { }
         scheduleReconnect(accountId);
     });
     clients.set(accountId, client);
@@ -199,7 +199,7 @@ const removeAccount = async (accountId) => {
     }
     if (!clients.has(accountId)) return false;
     const client = clients.get(accountId);
-    
+
     // Hapus duluan dari memory supaya disconnected-event tahu bahwa ini dihapus manual
     clients.delete(accountId);
     readyStatuses.delete(accountId);
@@ -216,7 +216,7 @@ const removeAccount = async (accountId) => {
     } catch (err) {
         logger.error(`Error removing session folder ${accountId}:`, err);
     }
-    
+
     if (global.io) {
         global.io.emit('account_removed', { accountId });
     }
@@ -251,13 +251,13 @@ const scheduleReconnect = (accountId = 'default') => {
 
 // Server.js will handle initialization
 
-module.exports = { 
-    initWhatsAppClient, 
-    getClient, 
-    isReady, 
-    getQr, 
-    getAllAccounts, 
-    removeAccount, 
+module.exports = {
+    initWhatsAppClient,
+    getClient,
+    isReady,
+    getQr,
+    getAllAccounts,
+    removeAccount,
     scheduleReconnect,
     resolveSessionPath,
 };
