@@ -244,7 +244,8 @@ const removeAccount = (id) => {
 
 const getSavedAccounts = () => {
     const db = getDb();
-    return db.prepare('SELECT * FROM wa_accounts ORDER BY created_at ASC').all();
+    const rows = db.prepare('SELECT * FROM wa_accounts ORDER BY created_at ASC').all();
+    return rows.map(r => ({ ...r, id: String(r.id) }));
 };
 
 const saveAutoReplyRule = (rule) => {

@@ -1,5 +1,6 @@
-import { Wifi, RefreshCw } from "lucide-react";
-import { inputClassName } from "../../../components/ui";
+import { Wifi, RefreshCw, Key } from "lucide-react";
+import { useState } from "react";
+import { inputClassName, Button } from "../../../components/ui";
 import { type GatewayAccount } from "../../../lib/gatewayApi";
 
 type QrTabProps = {
@@ -8,6 +9,7 @@ type QrTabProps = {
   qrSelectedAccountId: string;
   setQrSelectedAccountId: (id: string) => void;
   onTriggerQrFetch: (id: string) => Promise<void>;
+  onTriggerPairingCode?: (id: string, phone: string) => Promise<string | null>;
 };
 
 export function QrTab({
@@ -16,9 +18,27 @@ export function QrTab({
   qrSelectedAccountId,
   setQrSelectedAccountId,
   onTriggerQrFetch,
+  onTriggerPairingCode,
 }: QrTabProps) {
+  const [usePairingCode, setUsePairingCode] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [loadingPairing, setLoadingPairing] = useState(false);
+
   const target = accounts.find((a) => a.accountId === qrSelectedAccountId);
   const qr = qrs[qrSelectedAccountId];
+
+  const handleRequestPairingCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onTriggerPairingCode || !phoneNumber) return;
+    setLoadingPairing(true);
+    setPairingCode(null);
+    const code = await onTriggerPairingCode(qrSelectedAccountId, phoneNumber);
+    if (code) {
+      setPairingCode(code);
+    }
+    setLoadingPairing(false);
+  };
 
   return (
     <div className="max-w-md mx-auto py-4">
@@ -27,7 +47,10 @@ export function QrTab({
           <span className="text-xs font-semibold text-slate-600 block mb-1">Pilih Akun yang Ingin di-Scan</span>
           <select
             value={qrSelectedAccountId}
-            onChange={(e) => setQrSelectedAccountId(e.target.value)}
+            onChange={(e) => {
+              setQrSelectedAccountId(e.target.value);
+              setPairingCode(null);
+            }}
             className={inputClassName()}
           >
             {accounts.map((acc) => (
@@ -38,6 +61,28 @@ export function QrTab({
           </select>
         </label>
       </div>
+
+      {/* Toggles between QR and Pairing Code */}
+      {!target?.ready && (
+        <div className="flex bg-slate-100 rounded-lg p-1 mb-5">
+          <button
+            onClick={() => setUsePairingCode(false)}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+              !usePairingCode ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Scan QR
+          </button>
+          <button
+            onClick={() => setUsePairingCode(true)}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+              usePairingCode ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Tautkan dg Nomor
+          </button>
+        </div>
+      )}
 
       {/* QR Card Container */}
       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center shadow-inner relative min-h-[350px]">
@@ -50,6 +95,53 @@ export function QrTab({
             </div>
             <h4 className="font-bold text-slate-900 mb-1">WhatsApp Terkoneksi</h4>
             <p className="text-sm text-slate-500">Akun '{qrSelectedAccountId}' siap mengirim dan menerima pesan.</p>
+          </div>
+        ) : usePairingCode ? (
+          <div className="w-full flex flex-col items-center">
+             <div className="bg-indigo-50 text-indigo-600 p-4 rounded-full inline-block mb-4 border border-indigo-100">
+               <Key size={32} />
+             </div>
+             <h4 className="font-bold text-slate-900 mb-2">Tautkan dengan Nomor</h4>
+             {!pairingCode ? (
+               <form onSubmit={handleRequestPairingCode} className="w-full max-w-[280px] flex flex-col gap-3">
+                  <p className="text-xs text-slate-500 text-center mb-2">
+                    Masukkan nomor HP yang ada di WhatsApp (mulai dengan kode negara, ex: 62812...)
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 6281234567890"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className={inputClassName()}
+                    required
+                  />
+                  <Button
+                    type="submit"
+                    isLoading={loadingPairing}
+                    className="w-full justify-center"
+                  >
+                    {loadingPairing ? "Meminta..." : "Dapatkan Kode"}
+                  </Button>
+               </form>
+             ) : (
+               <div className="text-center w-full max-w-[280px]">
+                 <p className="text-xs text-slate-600 mb-3">Masukkan kode ini di aplikasi WhatsApp Anda:</p>
+                 <div className="bg-white border-2 border-indigo-200 py-3 px-4 rounded-xl shadow-sm mb-4">
+                    <span className="text-3xl font-mono font-bold tracking-[0.25em] text-slate-800">
+                      {pairingCode}
+                    </span>
+                 </div>
+                 <p className="text-xs text-slate-500">
+                   Buka WhatsApp → Tautkan Perangkat → Pilih "Tautkan dengan nomor telepon saja"
+                 </p>
+                 <button
+                    onClick={() => setPairingCode(null)}
+                    className="mt-4 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                 >
+                   Meminta Ulang / Ganti Nomor
+                 </button>
+               </div>
+             )}
           </div>
         ) : qr ? (
           <div className="text-center flex flex-col items-center">

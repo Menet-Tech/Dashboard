@@ -198,6 +198,21 @@ export function WhatsAppPage({
     }
   }
 
+  async function triggerPairingCode(id: string, phone: string): Promise<string | null> {
+    if (!gatewayUrl) return null;
+    try {
+      const { requestGatewayPairingCode } = await import("../../lib/gatewayApi");
+      const res = await requestGatewayPairingCode(gatewayUrl, apiKey, id, phone);
+      if (res.data?.code) {
+        return res.data.code;
+      }
+      return null;
+    } catch (err: any) {
+      pushError(err.message || "Gagal mendapatkan pairing code");
+      return null;
+    }
+  }
+
   
 
   // Encryption helper
@@ -342,6 +357,7 @@ export function WhatsAppPage({
             qrSelectedAccountId={qrSelectedAccountId}
             setQrSelectedAccountId={setQrSelectedAccountId}
             onTriggerQrFetch={triggerQrFetch}
+            onTriggerPairingCode={triggerPairingCode}
           />
         )}
 

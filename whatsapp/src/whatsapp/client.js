@@ -16,14 +16,16 @@ const reconnectTimers = new Map();
 const sessionRoot = path.resolve(__dirname, 'sessions');
 
 const assertSafeAccountId = (accountId) => {
-    if (!/^[a-zA-Z0-9_-]+$/.test(accountId)) {
-        throw new Error('Account ID hanya boleh berisi huruf, angka, underscore, dan dash');
+    const idStr = String(accountId || '');
+    if (!/^[a-zA-Z0-9._-]+$/.test(idStr)) {
+        throw new Error('Account ID hanya boleh berisi huruf, angka, dot, underscore, dan dash');
     }
 };
 
 const resolveSessionPath = (accountId) => {
-    assertSafeAccountId(accountId);
-    const target = path.resolve(sessionRoot, accountId);
+    const idStr = String(accountId || '');
+    assertSafeAccountId(idStr);
+    const target = path.resolve(sessionRoot, idStr);
     if (!target.startsWith(sessionRoot + path.sep) && target !== sessionRoot) {
         throw new Error('Invalid session path');
     }
@@ -83,6 +85,10 @@ const initWhatsAppClient = (accountId = 'default') => {
     if (clients.has(accountId)) return clients.get(accountId);
 
     logger.info(`Initializing client for account: ${accountId}`);
+    cleanupSessionLocks(accountId);
+    if (!process.env.DBUS_SESSION_BUS_ADDRESS) {
+        delete process.env.DBUS_SESSION_BUS_ADDRESS;
+    }
     const defaultArgs = [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -90,8 +96,37 @@ const initWhatsAppClient = (accountId = 'default') => {
         '--disable-gpu',
         '--no-first-run',
         '--no-zygote',
-        '--disable-blink-features=AutomationControlled'
+        '--disable-extensions',
+        '--disable-software-rasterizer',
+        '--mute-audio',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--disable-site-isolation-trials',
+        '--disable-web-security',
+        // Low-memory flags for VPS
+        '--disable-background-networking',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--disable-translate',
+        '--hide-scrollbars',
+        '--metrics-recording-only',
+        '--no-default-browser-check',
+        '--disable-hang-monitor',
+        '--disable-prompt-on-repost',
+        '--disable-background-timer-throttling',
+        '--disable-client-side-phishing-detection',
+        '--disable-popup-blocking',
+        '--disable-component-extensions-with-background-pages',
+        '--disable-ipc-flooding-protection',
+        '--js-flags=--max-old-space-size=128',
+        '--renderer-process-limit=1',
+        // Optimizations for faster loading
+        '--blink-settings=imagesEnabled=false', // Disable images (saves huge bandwidth/CPU)
+        '--disable-accelerated-2d-canvas',
+        '--disable-accelerated-video-decode',
+        '--disable-features=WebGL',
     ];
+
     const customArgs = process.env.PUPPETEER_ARGS ? process.env.PUPPETEER_ARGS.split(',').map(a => a.trim()).filter(Boolean) : [];
     const mergedArgs = Array.from(new Set([...defaultArgs, ...customArgs]));
 
@@ -99,11 +134,13 @@ const initWhatsAppClient = (accountId = 'default') => {
         authStrategy: new LocalAuth({
             dataPath: resolveSessionPath(accountId)
         }),
-        userAgent: process.env.USER_AGENT || 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
         authTimeoutMs: 300000,
         puppeteer: {
             executablePath: resolveExecutablePath(),
-            args: mergedArgs
+            args: mergedArgs,
+            timeout: 600000,
+            protocolTimeout: 0
         }
     });
 
@@ -115,7 +152,9 @@ const initWhatsAppClient = (accountId = 'default') => {
     client.on('qr', (qr) => {
         logger.info(`[${accountId}] QR Code received, scan with WhatsApp`);
         if (process.env.ENABLE_DASHBOARD !== 'true') {
-            qrcode.generate(qr, { small: true });
+            try {
+                qrcode.generate(qr, { small: true });
+            } catch (e) {}
         }
         qrs.set(accountId, qr);
         if (global.io) {
@@ -144,14 +183,22 @@ const initWhatsAppClient = (accountId = 'default') => {
         sendDiscordNotification(`🚀 **[${accountId}]** WhatsApp Client is Ready & Online!`);
     });
 
-    client.on('disconnected', (reason) => {
+    client.on('disconnected', async (reason) => {
         if (!clients.has(accountId)) return; // Account was removed manually
         logger.warn(`[${accountId}] Client disconnected: ${reason}`);
         readyStatuses.set(accountId, false);
+        qrs.delete(accountId);
         if (global.io) {
             global.io.emit('account_status', { accountId, ready: false, hasQr: false });
         }
         sendDiscordNotification(`⚠️ **[${accountId}]** WhatsApp Client Disconnected! Reason: ${reason}`);
+        // Destroy client dulu sebelum reconnect agar Chrome lama tidak OOM-kill Chrome baru
+        try {
+            await client.destroy();
+            logger.info(`[${accountId}] Browser destroyed after disconnect.`);
+        } catch (e) {
+            logger.warn(`[${accountId}] Error destroying client after disconnect: ${e.message}`);
+        }
         scheduleReconnect(accountId);
     });
 
@@ -167,6 +214,46 @@ const initWhatsAppClient = (accountId = 'default') => {
         try { await client.destroy(); } catch (e) { }
         scheduleReconnect(accountId);
     });
+
+    // Fallback DOM Scanner: ekstraksi QR langsung dari canvas Chromium jika event terhalang
+    let domScanCount = 0;
+    const domScanInterval = setInterval(async () => {
+        domScanCount++;
+        if (readyStatuses.get(accountId) || domScanCount > 30) {
+            clearInterval(domScanInterval);
+            return;
+        }
+        if (client && client.pupPage) {
+            try {
+                const qrRes = await client.pupPage.evaluate(() => {
+                    const divRef = document.querySelector('div[data-ref]');
+                    if (divRef) return divRef.getAttribute('data-ref');
+                    const canvas = document.querySelector('canvas');
+                    if (canvas && canvas.parentElement) {
+                        return canvas.parentElement.getAttribute('data-ref');
+                    }
+                    return null;
+                });
+                
+                if (qrRes && qrs.get(accountId) !== qrRes) {
+                    logger.info(`[${accountId}] QR Code diperbarui via DOM Fallback Scanner!`);
+                    qrs.set(accountId, qrRes);
+                    if (global.io) {
+                        global.io.emit('qr_code', { accountId, qr: qrRes });
+                        global.io.emit('account_status', { accountId, ready: false, hasQr: true });
+                    }
+                    if (process.env.ENABLE_DASHBOARD !== 'true') {
+                        try {
+                            qrcode.generate(qrRes, { small: true });
+                        } catch (e) {}
+                    }
+                }
+            } catch (e) {
+                // ignore transient errors during page load
+            }
+        }
+    }, 2000);
+
     clients.set(accountId, client);
     return client;
 };
@@ -207,12 +294,13 @@ const removeAccount = async (accountId) => {
 
     try {
         await client.destroy();
+        await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (err) {
         logger.error(`Error destroying client ${accountId}:`, err);
     }
 
     try {
-        await fs.rm(resolveSessionPath(accountId), { recursive: true, force: true });
+        await fs.rm(resolveSessionPath(accountId), { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
     } catch (err) {
         logger.error(`Error removing session folder ${accountId}:`, err);
     }

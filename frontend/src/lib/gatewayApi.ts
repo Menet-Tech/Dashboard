@@ -126,6 +126,18 @@ export function getGatewayAccountQr(url: string, apiKey: string, accountId: stri
   );
 }
 
+export function requestGatewayPairingCode(url: string, apiKey: string, accountId: string, phoneNumber: string) {
+  return gatewayRequest<{ data: { code: string } }>(
+    url,
+    apiKey,
+    `/api/v1/accounts/${accountId}/pairing-code`,
+    {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber }),
+    }
+  );
+}
+
 export function getGatewayHistory(
   url: string,
   apiKey: string,

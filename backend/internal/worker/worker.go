@@ -168,7 +168,7 @@ func (s Service) startEmailQueueProcessor(ctx context.Context) {
 func (s Service) getQueueThrottleDuration(ctx context.Context) time.Duration {
 	throttleSecs, _ := s.Settings.GetInt(ctx, "wa_queue_throttle_seconds")
 	if throttleSecs <= 0 {
-		throttleSecs = 5 // default 5 seconds
+		throttleSecs = 2 // default 2 seconds (reduced from 5s)
 	}
 	return time.Duration(throttleSecs) * time.Second
 }
@@ -194,9 +194,9 @@ func (s Service) startQueueProcessor(ctx context.Context) {
 				// If processed is true, it means it was a send failure (gateway error).
 				// We act as a circuit breaker and pause for 60 seconds.
 				if processed {
-					s.Logger.Error("whatsapp gateway error detected, pausing queue for 60 seconds (circuit breaker)", "error", err)
+					s.Logger.Error("whatsapp gateway error detected, pausing queue for 15 seconds (circuit breaker)", "error", err)
 					idleSleep = 500 * time.Millisecond
-					time.Sleep(60 * time.Second)
+					time.Sleep(15 * time.Second)
 				} else {
 					s.Logger.Error("queue processing encountered error", "error", err)
 					idleSleep = 500 * time.Millisecond

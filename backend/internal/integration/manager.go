@@ -223,8 +223,8 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 		}
 	}
 
-	// Start Node process with memory limit to prevent OOM on small VPS
-	cmd := exec.Command("node", "--max-old-space-size=160", "src/server.js")
+	// Start Node process with adequate memory limit for Puppeteer
+	cmd := exec.Command("node", "--max-old-space-size=384", "src/server.js")
 	cmd.Dir = waDir
 
 	// Configure environment variables

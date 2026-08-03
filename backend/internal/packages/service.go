@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 
 	"menettech/dashboard/backend/internal/mikrotik"
@@ -20,6 +21,7 @@ type Package struct {
 	ID            int64  `json:"id"`
 	Name          string `json:"name"`
 	SpeedMbps     int    `json:"speed_mbps"`
+	RateLimit     string `json:"rate_limit"` // full MikroTik rate-limit string, e.g. "10M/10M 50M/50M 10M/10M 10/10"
 	Price         int    `json:"price"`
 	Description   string `json:"description"`
 	CustomerCount int    `json:"customer_count"`
@@ -113,6 +115,9 @@ func (s Service) Update(ctx context.Context, id int64, pkg Package) (Package, er
 						secrets = append(secrets, sec)
 					}
 				}
+			}
+			if err := rows.Err(); err != nil {
+				slog.Error("error iterating customer secrets", "error", err)
 			}
 			rows.Close()
 		}
@@ -267,8 +272,10 @@ func (s Service) syncPackageToMikrotik(ctx context.Context, pkg Package) (Packag
 	}
 
 	// 3. Sync PPP Profile across all active routers
-	rateLimit := ""
-	if pkg.SpeedMbps > 0 {
+	// Use the explicit RateLimit string if set (supports burst format);
+	// otherwise fall back to generating a simple symmetric limit from SpeedMbps.
+	rateLimit := strings.TrimSpace(pkg.RateLimit)
+	if rateLimit == "" && pkg.SpeedMbps > 0 {
 		rateLimit = fmt.Sprintf("%dM/%dM", pkg.SpeedMbps, pkg.SpeedMbps)
 	}
 	for _, r := range routers {
@@ -320,11 +327,11 @@ func deriveLocalAddress(poolRange string) string {
 
 func (r Repository) List(ctx context.Context) ([]Package, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT p.id, p.nama, p.kecepatan_mbps, p.harga, COALESCE(p.deskripsi, ''), 
+		SELECT p.id, p.nama, p.kecepatan_mbps, COALESCE(p.rate_limit, ''), p.harga, COALESCE(p.deskripsi, ''),
 		       COALESCE(p.ip_pool, ''), COALESCE(p.local_address, ''), COUNT(c.id)
 		FROM paket p
 		LEFT JOIN pelanggan c ON c.paket_id = p.id
-		GROUP BY p.id, p.nama, p.kecepatan_mbps, p.harga, p.deskripsi, p.ip_pool, p.local_address
+		GROUP BY p.id, p.nama, p.kecepatan_mbps, p.rate_limit, p.harga, p.deskripsi, p.ip_pool, p.local_address
 		ORDER BY p.id DESC
 	`)
 	if err != nil {
@@ -335,8 +342,12 @@ func (r Repository) List(ctx context.Context) ([]Package, error) {
 	items := []Package{}
 	for rows.Next() {
 		var item Package
-		if err := rows.Scan(&item.ID, &item.Name, &item.SpeedMbps, &item.Price, &item.Description, &item.IPPool, &item.LocalAddress, &item.CustomerCount); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.SpeedMbps, &item.RateLimit, &item.Price, &item.Description, &item.IPPool, &item.LocalAddress, &item.CustomerCount); err != nil {
 			return nil, fmt.Errorf("scan package: %w", err)
+		}
+		// Backfill SpeedMbps from RateLimit when speed is 0 but rate_limit is set
+		if item.SpeedMbps == 0 && item.RateLimit != "" {
+			item.SpeedMbps = ParseSpeedFromRateLimit(item.RateLimit)
 		}
 		items = append(items, item)
 	}
@@ -345,10 +356,14 @@ func (r Repository) List(ctx context.Context) ([]Package, error) {
 }
 
 func (r Repository) Create(ctx context.Context, pkg Package) (Package, error) {
+	// Derive SpeedMbps from RateLimit if caller hasn't set it
+	if pkg.SpeedMbps == 0 && pkg.RateLimit != "" {
+		pkg.SpeedMbps = ParseSpeedFromRateLimit(pkg.RateLimit)
+	}
 	result, err := r.DB.ExecContext(ctx, `
-		INSERT INTO paket (nama, kecepatan_mbps, harga, deskripsi, ip_pool, local_address, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-	`, pkg.Name, pkg.SpeedMbps, pkg.Price, strings.TrimSpace(pkg.Description), pkg.IPPool, pkg.LocalAddress)
+		INSERT INTO paket (nama, kecepatan_mbps, rate_limit, harga, deskripsi, ip_pool, local_address, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`, pkg.Name, pkg.SpeedMbps, strings.TrimSpace(pkg.RateLimit), pkg.Price, strings.TrimSpace(pkg.Description), pkg.IPPool, pkg.LocalAddress)
 	if err != nil {
 		return Package{}, fmt.Errorf("create package: %w", err)
 	}
@@ -363,11 +378,15 @@ func (r Repository) Create(ctx context.Context, pkg Package) (Package, error) {
 }
 
 func (r Repository) Update(ctx context.Context, id int64, pkg Package) (Package, error) {
+	// Derive SpeedMbps from RateLimit if caller hasn't set it
+	if pkg.SpeedMbps == 0 && pkg.RateLimit != "" {
+		pkg.SpeedMbps = ParseSpeedFromRateLimit(pkg.RateLimit)
+	}
 	result, err := r.DB.ExecContext(ctx, `
 		UPDATE paket
-		SET nama = ?, kecepatan_mbps = ?, harga = ?, deskripsi = ?, ip_pool = ?, local_address = ?, updated_at = CURRENT_TIMESTAMP
+		SET nama = ?, kecepatan_mbps = ?, rate_limit = ?, harga = ?, deskripsi = ?, ip_pool = ?, local_address = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, pkg.Name, pkg.SpeedMbps, pkg.Price, strings.TrimSpace(pkg.Description), pkg.IPPool, pkg.LocalAddress, id)
+	`, pkg.Name, pkg.SpeedMbps, strings.TrimSpace(pkg.RateLimit), pkg.Price, strings.TrimSpace(pkg.Description), pkg.IPPool, pkg.LocalAddress, id)
 	if err != nil {
 		return Package{}, fmt.Errorf("update package: %w", err)
 	}
@@ -410,4 +429,39 @@ func (r Repository) Delete(ctx context.Context, id int64) error {
 	}
 
 	return nil
+}
+
+// ParseSpeedFromRateLimit extracts the download speed in Mbps from a MikroTik
+// rate-limit string. The format is:
+//
+//	"rx-rate[/tx-rate] [rx-burst-rate[/tx-burst-rate] ...]"
+//
+// Only the first token (normal rx rate) is used for display purposes.
+// Examples:
+//
+//	"10M/10M"             → 10
+//	"10M/10M 50M/50M ..." → 10
+//	"512K/1M"             → 0  (sub-Mbps, shown as-is)
+func ParseSpeedFromRateLimit(rateLimit string) int {
+	if rateLimit == "" {
+		return 0
+	}
+	// First token = normal rate, take rx (before "/")
+	firstToken := strings.Fields(rateLimit)[0]
+	rxPart := strings.SplitN(firstToken, "/", 2)[0]
+	rxPart = strings.TrimSpace(strings.ToUpper(rxPart))
+
+	if strings.HasSuffix(rxPart, "M") {
+		numStr := strings.TrimSuffix(rxPart, "M")
+		if v, err := strconv.ParseFloat(numStr, 64); err == nil {
+			return int(v)
+		}
+	} else if strings.HasSuffix(rxPart, "G") {
+		numStr := strings.TrimSuffix(rxPart, "G")
+		if v, err := strconv.ParseFloat(numStr, 64); err == nil {
+			return int(v * 1000)
+		}
+	}
+	// K or bare number: too small to be meaningful as Mbps display
+	return 0
 }

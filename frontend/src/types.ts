@@ -20,6 +20,7 @@ export type PackageItem = {
   id: number;
   name: string;
   speed_mbps: number;
+  rate_limit?: string; // full MikroTik rate-limit string, e.g. "10M/10M 50M/50M 10M/10M 10/10"
   price: number;
   description: string;
   customer_count: number;

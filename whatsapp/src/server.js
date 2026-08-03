@@ -82,8 +82,12 @@ server.listen(PORT, BIND_HOST, async () => {
             logger.info(`[Startup] Memulihkan ${saved.length} akun dari database…`);
             for (let i = 0; i < saved.length; i++) {
                 const acc = saved[i];
-                logger.info(`[Startup] Init akun: ${acc.id} (${acc.label})`);
-                initWhatsAppClient(acc.id);
+                try {
+                    logger.info(`[Startup] Init akun: ${acc.id} (${acc.label})`);
+                    initWhatsAppClient(acc.id);
+                } catch (accErr) {
+                    logger.error(`[Startup Error] Gagal memuat akun ${acc.id}: ${accErr.message}`);
+                }
                 
                 // OPSEC / OOM Protection: Kasih jeda 20 detik jika ada akun berikutnya 
                 // agar CPU & RAM Chromium tidak spike bersamaan (OOM kill) di VPS 512MB

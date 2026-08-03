@@ -935,6 +935,7 @@ func (h IntegrationHandler) SyncPackagesImport(w http.ResponseWriter, r *http.Re
 		newPkg := packages.Package{
 			Name:         profile.Name,
 			SpeedMbps:    speed,
+			RateLimit:    profile.RateLimit, // preserve original MikroTik rate-limit string (may include burst)
 			Price:        price,
 			Description:  "Sinkronisasi dari profil MikroTik " + profile.Name,
 			IPPool:       profile.RemoteAddress,

@@ -10,6 +10,7 @@ import { useDialog } from "../../context/DialogContext";
 
 export type PackageFormState = {
   name: string;
+  rate_limit: string;
   speed_mbps: number;
   price: number;
   description: string;
@@ -19,7 +20,8 @@ export type PackageFormState = {
 
 export const defaultPackageForm = (): PackageFormState => ({
   name: "",
-  speed_mbps: 10,
+  rate_limit: "",
+  speed_mbps: 0,
   price: 150000,
   description: "",
   ip_pool: "",
@@ -304,7 +306,11 @@ export function PackagesPage({
                   <tr key={pkg.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">{pkg.name}</td>
                     <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">
-                      {pkg.speed_mbps === 0 ? "Bypass / Tanpa Limit" : `${pkg.speed_mbps} Mbps`}
+                      {pkg.rate_limit
+                        ? <span className="font-mono text-xs">{pkg.rate_limit}</span>
+                        : pkg.speed_mbps === 0
+                          ? "Bypass / Tanpa Limit"
+                          : `${pkg.speed_mbps} Mbps`}
                     </td>
                     <td className="px-6 py-4 text-slate-950 dark:text-slate-150 font-bold">{formatCurrency(pkg.price)}</td>
                     <td className="px-6 py-4 text-slate-800 dark:text-slate-200 font-bold text-center">
@@ -385,21 +391,24 @@ export function PackagesPage({
               {renderInlineError(packageErrors.name)}
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Kecepatan Bandwidth (Mbps)</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Rate Limit Bandwidth (Format MikroTik)</span>
               <input
-                className={inputClassName(packageErrors.speed_mbps)}
-                type="number"
-                min={0}
-                value={packageForm.speed_mbps}
+                className={inputClassName(packageErrors.rate_limit ?? packageErrors.speed_mbps)}
+                type="text"
+                value={packageForm.rate_limit}
                 onChange={(e) =>
-                  onFormChange((curr) => ({ ...curr, speed_mbps: Number(e.target.value) }))
+                  onFormChange((curr) => ({ ...curr, rate_limit: e.target.value }))
                 }
-                required
+                placeholder="contoh: 10M/10M atau 10M/10M 50M/50M 10M/10M 10/10"
               />
-              <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                Masukkan 0 untuk bypass limit (Unlimited / Tanpa Batasan rate limit).
-              </span>
-              {renderInlineError(packageErrors.speed_mbps)}
+              {/* Format reference card */}
+              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-[10px] text-slate-500 dark:text-slate-400 space-y-1 font-mono leading-relaxed">
+                <p className="font-sans font-bold text-slate-700 dark:text-slate-300 text-[11px] mb-1.5">📡 Format Rate-Limit MikroTik:</p>
+                <p><span className="text-indigo-600 dark:text-indigo-400">rx/tx</span> — basic: <span className="text-slate-800 dark:text-slate-200">10M/10M</span></p>
+                <p><span className="text-indigo-600 dark:text-indigo-400">rate burst-rate threshold time</span> — burst: <span className="text-slate-800 dark:text-slate-200">10M/10M 50M/50M 10M/10M 10/10</span></p>
+                <p className="text-[9px] text-slate-400 font-sans mt-1">Kosongkan untuk bypass (unlimited). Satuan: K=Kbps, M=Mbps, G=Gbps</p>
+              </div>
+              {renderInlineError(packageErrors.rate_limit ?? packageErrors.speed_mbps)}
             </label>
 
             {/* Rupiah Price Input */}

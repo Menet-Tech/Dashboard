@@ -477,6 +477,7 @@ export default function App() {
                 packagesHook.handlers.setEditingPackageId(pkg.id);
                 packagesHook.handlers.setPackageForm({
                   name: pkg.name,
+                  rate_limit: pkg.rate_limit || "",
                   speed_mbps: pkg.speed_mbps,
                   price: pkg.price,
                   description: pkg.description,

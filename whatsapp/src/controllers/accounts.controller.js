@@ -1,13 +1,13 @@
-const { initWhatsAppClient, getAllAccounts, removeAccount: destroyClient, getQr, isReady } = require('../whatsapp/client');
+const { initWhatsAppClient, getAllAccounts, removeAccount: destroyClient, getQr, isReady, getClient } = require('../whatsapp/client');
 const { saveAccount, removeAccount: removeAccountDb, getSavedAccounts } = require('../utils/database');
 
 const postCreateAccount = (req, res, next) => {
     try {
-        const { accountId, label } = req.body;
-        if (!accountId) return res.status(400).json({ status: 'error', message: 'accountId wajib diisi' });
+        const accountId = String(req.body.accountId || req.body.name || req.body.id || 'default');
+        const label = String(req.body.label || req.body.name || accountId);
 
         // Simpan ke DB supaya persisten antar restart
-        saveAccount(accountId, label || accountId);
+        saveAccount(accountId, label);
         initWhatsAppClient(accountId);
 
         res.json({ status: 'success', message: `Inisialisasi akun '${accountId}' dimulai` });
@@ -69,4 +69,53 @@ const getStatus = (req, res, next) => {
     }
 };
 
-module.exports = { postCreateAccount, getAccounts, deleteAccount, getAccountQr, getStatus };
+const getPairingCode = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { phoneNumber } = req.body;
+        
+        if (!phoneNumber) {
+            return res.status(400).json({ status: 'error', message: 'Nomor telepon diperlukan (phoneNumber)' });
+        }
+        
+        const client = getClient(id);
+        if (isReady(id)) {
+            return res.status(400).json({ status: 'error', message: 'Akun WhatsApp sudah siap (ready)' });
+        }
+        
+        // Remove +, spaces, dashes, etc
+        const cleanPhone = String(phoneNumber).replace(/\D/g, '');
+        // Pastikan onCodeReceivedEvent diexpose ke puppeteer page (karena jika tidak diset di options saat init, fungsi ini tidak ada)
+        try {
+            await client.pupPage.exposeFunction('onCodeReceivedEvent', (code) => {
+                return code;
+            });
+        } catch (e) {
+            // Abaikan jika sudah terekspos
+        }
+
+        // Wait until AuthStore and PairingCodeLinkUtils are injected by WhatsApp Web
+        try {
+            await client.pupPage.waitForFunction(() => {
+                return window.AuthStore && window.AuthStore.PairingCodeLinkUtils;
+            }, { timeout: 15000 });
+        } catch (e) {
+            // Debugging: what does AuthStore contain?
+            try {
+                const keys = await client.pupPage.evaluate(() => {
+                    return window.AuthStore ? Object.keys(window.AuthStore) : ['AuthStore is null/undefined'];
+                });
+                console.error("[DEBUG] AuthStore keys:", keys);
+            } catch (err) {}
+
+            return res.status(400).json({ status: 'error', message: 'Halaman WhatsApp belum siap untuk Tautkan Nomor. Coba beberapa saat lagi atau muat ulang QR code.' });
+        }
+
+        const code = await client.requestPairingCode(cleanPhone);
+        res.json({ status: 'success', data: { code } });
+    } catch (err) {
+        next(err);
+    }
+};
+
+module.exports = { postCreateAccount, getAccounts, deleteAccount, getAccountQr, getStatus, getPairingCode };

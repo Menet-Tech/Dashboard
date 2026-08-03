@@ -15,12 +15,14 @@ export function validateLogin(form: { username: string; password: string }): Fie
 
 export function validatePackage(form: {
   name: string;
+  rate_limit?: string;
   speed_mbps: number;
   price: number;
 }): FieldErrors {
   const errors: FieldErrors = {};
   if (!form.name.trim()) errors.name = "Nama paket wajib diisi.";
-  if (form.speed_mbps < 0) errors.speed_mbps = "Kecepatan tidak boleh bernilai negatif.";
+  const hasRateLimit = (form.rate_limit || "").trim().length > 0;
+  if (!hasRateLimit && form.speed_mbps < 0) errors.speed_mbps = "Kecepatan tidak boleh bernilai negatif.";
   if (form.price <= 0) errors.price = "Harga harus lebih dari 0.";
   return errors;
 }

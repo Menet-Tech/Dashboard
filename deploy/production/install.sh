@@ -48,9 +48,20 @@ fi
 
 # ─── Parse Flags ───────────────────────────────────────────────────────────────
 UPDATE_MODE=false
+CLEAR_WA_SESSIONS=false
+FORCE_WA_CHOICE=false
+
 for arg in "$@"; do
     if [[ "$arg" == "--update" ]] || [[ "$arg" == "-u" ]]; then
         UPDATE_MODE=true
+    fi
+    if [[ "$arg" == "--clear-wa-session" ]] || [[ "$arg" == "--reset-wa" ]]; then
+        CLEAR_WA_SESSIONS=true
+        FORCE_WA_CHOICE=true
+    fi
+    if [[ "$arg" == "--keep-wa-session" ]]; then
+        CLEAR_WA_SESSIONS=false
+        FORCE_WA_CHOICE=true
     fi
 done
 
@@ -140,6 +151,33 @@ if [[ "${UPDATE_MODE}" == "false" ]]; then
         fi
     else
         log_info "HTTPS memerlukan domain name, bukan IP. Melewati setup HTTPS."
+    fi
+    echo ""
+fi
+
+# ─── Tanya Konfirmasi Penanganan Sesi WhatsApp ──────────────────────────────
+HAS_EXISTING_WA_SESSION=false
+if [[ -d "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth" ]] || \
+   [[ -d "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions" ]] || \
+   [[ -d "${INSTALL_DIR}/integration/whatsapp/sessions" ]]; then
+    HAS_EXISTING_WA_SESSION=true
+fi
+
+if [[ "${HAS_EXISTING_WA_SESSION}" == "true" ]] && [[ "${FORCE_WA_CHOICE}" == "false" ]]; then
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}📱 TERDETEKSI SESI LOGIN WHATSAPP LAMA${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "Di sistem terdeteksi ada sesi login WhatsApp yang tersimpan."
+    echo -e " - Pilih ${BOLD}'y'${NC} (ya): Hapus sesi lama & terbitkan QR Code baru di Dashboard."
+    echo -e " - Pilih ${BOLD}'N'${NC} (tidak/default): Pertahankan sesi lama agar WhatsApp tetap terhubung."
+    echo ""
+    read -r -p "Hapus sesi WhatsApp lama dan minta QR Code baru? (y/N): " wa_choice
+    if [[ "${wa_choice}" =~ ^[Yy]$ ]]; then
+        CLEAR_WA_SESSIONS=true
+        log_warn "Sesi WhatsApp lama akan dibersihkan saat proses penyalinan rilis."
+    else
+        CLEAR_WA_SESSIONS=false
+        log_info "Sesi WhatsApp lama akan dipertahankan."
     fi
     echo ""
 fi
@@ -285,61 +323,74 @@ fi
 
 # ─── WhatsApp Gateway source ─────────────────────────────────────────────────
 if [[ -d "${SCRIPT_DIR}/integration/whatsapp" ]] && [[ -n "$(ls -A "${SCRIPT_DIR}/integration/whatsapp" 2>/dev/null)" ]]; then
-    # Backup sesi & auth WhatsApp jika update agar tidak ter-logout
-    if [[ -d "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions" ]]; then
-        log_info "Mencadangkan sesi login WhatsApp (src/whatsapp/sessions)..."
-        rm -rf /tmp/wa_prod_sessions_backup
-        cp -r "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions" "/tmp/wa_prod_sessions_backup"
-    fi
-    if [[ -d "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth" ]]; then
-        rm -rf /tmp/wa_prod_auth_backup
-        cp -r "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth" "/tmp/wa_prod_auth_backup"
-    fi
-    if [[ -d "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache" ]]; then
-        rm -rf /tmp/wa_prod_cache_backup
-        cp -r "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache" "/tmp/wa_prod_cache_backup"
-    fi
-    if [[ -d "${INSTALL_DIR}/integration/whatsapp/sessions" ]]; then
-        rm -rf /tmp/wa_prod_root_sessions_backup
-        cp -r "${INSTALL_DIR}/integration/whatsapp/sessions" "/tmp/wa_prod_root_sessions_backup"
-    fi
-    if [[ -d "${INSTALL_DIR}/integration/whatsapp/storage" ]]; then
-        rm -rf /tmp/wa_prod_storage_backup
-        cp -r "${INSTALL_DIR}/integration/whatsapp/storage" "/tmp/wa_prod_storage_backup"
+    if [[ "${CLEAR_WA_SESSIONS}" == "true" ]]; then
+        log_info "Membersihkan sesi & autentikasi WhatsApp lama sesuai pilihan..."
+        rm -rf "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions"
+        rm -rf "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth"
+        rm -rf "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache"
+        rm -rf "${INSTALL_DIR}/integration/whatsapp/sessions"
+        rm -rf "${INSTALL_DIR}/integration/whatsapp/storage"
+        rm -rf /tmp/wa_prod_*_backup 2>/dev/null || true
+    else
+        # Backup sesi & auth WhatsApp jika update agar tidak ter-logout
+        if [[ -d "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions" ]]; then
+            log_info "Mencadangkan sesi login WhatsApp (src/whatsapp/sessions)..."
+            rm -rf /tmp/wa_prod_sessions_backup
+            cp -r "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions" "/tmp/wa_prod_sessions_backup"
+        fi
+        if [[ -d "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth" ]]; then
+            rm -rf /tmp/wa_prod_auth_backup
+            cp -r "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth" "/tmp/wa_prod_auth_backup"
+        fi
+        if [[ -d "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache" ]]; then
+            rm -rf /tmp/wa_prod_cache_backup
+            cp -r "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache" "/tmp/wa_prod_cache_backup"
+        fi
+        if [[ -d "${INSTALL_DIR}/integration/whatsapp/sessions" ]]; then
+            rm -rf /tmp/wa_prod_root_sessions_backup
+            cp -r "${INSTALL_DIR}/integration/whatsapp/sessions" "/tmp/wa_prod_root_sessions_backup"
+        fi
+        if [[ -d "${INSTALL_DIR}/integration/whatsapp/storage" ]]; then
+            rm -rf /tmp/wa_prod_storage_backup
+            cp -r "${INSTALL_DIR}/integration/whatsapp/storage" "/tmp/wa_prod_storage_backup"
+        fi
     fi
 
     cp -r "${SCRIPT_DIR}/integration/whatsapp/." "${INSTALL_DIR}/integration/whatsapp/"
 
-    # Restore sesi & auth WhatsApp
-    if [[ -d "/tmp/wa_prod_sessions_backup" ]]; then
-        log_info "Mengembalikan sesi login WhatsApp..."
-        mkdir -p "${INSTALL_DIR}/integration/whatsapp/src/whatsapp"
-        rm -rf "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions"
-        cp -r "/tmp/wa_prod_sessions_backup" "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions"
-        rm -rf /tmp/wa_prod_sessions_backup
+    if [[ "${CLEAR_WA_SESSIONS}" == "false" ]]; then
+        # Restore sesi & auth WhatsApp jika dipertahankan
+        if [[ -d "/tmp/wa_prod_sessions_backup" ]]; then
+            log_info "Mengembalikan sesi login WhatsApp..."
+            mkdir -p "${INSTALL_DIR}/integration/whatsapp/src/whatsapp"
+            rm -rf "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions"
+            cp -r "/tmp/wa_prod_sessions_backup" "${INSTALL_DIR}/integration/whatsapp/src/whatsapp/sessions"
+            rm -rf /tmp/wa_prod_sessions_backup
+        fi
+        if [[ -d "/tmp/wa_prod_auth_backup" ]]; then
+            rm -rf "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth"
+            cp -r "/tmp/wa_prod_auth_backup" "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth"
+            rm -rf /tmp/wa_prod_auth_backup
+        fi
+        if [[ -d "/tmp/wa_prod_cache_backup" ]]; then
+            rm -rf "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache"
+            cp -r "/tmp/wa_prod_cache_backup" "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache"
+            rm -rf /tmp/wa_prod_cache_backup
+        fi
+        if [[ -d "/tmp/wa_prod_root_sessions_backup" ]]; then
+            rm -rf "${INSTALL_DIR}/integration/whatsapp/sessions"
+            cp -r "/tmp/wa_prod_root_sessions_backup" "${INSTALL_DIR}/integration/whatsapp/sessions"
+            rm -rf /tmp/wa_prod_root_sessions_backup
+        fi
+        if [[ -d "/tmp/wa_prod_storage_backup" ]]; then
+            rm -rf "${INSTALL_DIR}/integration/whatsapp/storage"
+            cp -r "/tmp/wa_prod_storage_backup" "${INSTALL_DIR}/integration/whatsapp/storage"
+            rm -rf /tmp/wa_prod_storage_backup
+        fi
+        log_success "Source WhatsApp Gateway disalin dan sesi WhatsApp dipertahankan"
+    else
+        log_success "Source WhatsApp Gateway disalin dan sesi WhatsApp dibersihkan (siap penerbitan QR Code baru)"
     fi
-    if [[ -d "/tmp/wa_prod_auth_backup" ]]; then
-        rm -rf "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth"
-        cp -r "/tmp/wa_prod_auth_backup" "${INSTALL_DIR}/integration/whatsapp/.wwebjs_auth"
-        rm -rf /tmp/wa_prod_auth_backup
-    fi
-    if [[ -d "/tmp/wa_prod_cache_backup" ]]; then
-        rm -rf "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache"
-        cp -r "/tmp/wa_prod_cache_backup" "${INSTALL_DIR}/integration/whatsapp/.wwebjs_cache"
-        rm -rf /tmp/wa_prod_cache_backup
-    fi
-    if [[ -d "/tmp/wa_prod_root_sessions_backup" ]]; then
-        rm -rf "${INSTALL_DIR}/integration/whatsapp/sessions"
-        cp -r "/tmp/wa_prod_root_sessions_backup" "${INSTALL_DIR}/integration/whatsapp/sessions"
-        rm -rf /tmp/wa_prod_root_sessions_backup
-    fi
-    if [[ -d "/tmp/wa_prod_storage_backup" ]]; then
-        rm -rf "${INSTALL_DIR}/integration/whatsapp/storage"
-        cp -r "/tmp/wa_prod_storage_backup" "${INSTALL_DIR}/integration/whatsapp/storage"
-        rm -rf /tmp/wa_prod_storage_backup
-    fi
-
-    log_success "Source WhatsApp Gateway disalin dan sesi WhatsApp berhasil dipertahankan"
 else
     log_warn "Folder integration/whatsapp tidak ditemukan atau kosong."
 fi

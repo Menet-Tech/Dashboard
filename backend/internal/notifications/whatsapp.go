@@ -821,12 +821,20 @@ func (s WhatsAppService) sendDirect(ctx context.Context, msg QueuedMessage) erro
 
 	timeoutSecs, _ := s.Settings.GetInt(ctx, "wa_client_timeout_seconds")
 	if timeoutSecs <= 0 {
-		timeoutSecs = 60
+		timeoutSecs = 15 // 15s default — gateway is on 127.0.0.1, 60s was too long
 	}
 
 	client := s.HTTPClient
 	if client == nil {
-		client = &http.Client{Timeout: time.Duration(timeoutSecs) * time.Second}
+		client = &http.Client{
+			Timeout: time.Duration(timeoutSecs) * time.Second,
+			Transport: &http.Transport{
+				MaxIdleConns:        10,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     90 * time.Second,
+				DisableKeepAlives:   false,
+			},
+		}
 	} else if client.Timeout == 0 {
 		client.Timeout = time.Duration(timeoutSecs) * time.Second
 	}

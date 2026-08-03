@@ -33,3 +33,6 @@ storage
 cover*
 Releases.zip
 *.jpeg
+Releases/
+scratch/
+Backup-Prod/

@@ -152,16 +152,16 @@ func (s *RouterService) ReconcileProfiles(ctx context.Context, client *Client) e
 	// Fetch IP pools once (used for pool name resolution)
 	pools, _ := client.ListIPPools(ctx)
 
-	rows, err := s.DB.QueryContext(ctx, "SELECT nama, kecepatan_mbps, COALESCE(ip_pool, ''), COALESCE(local_address, '') FROM paket")
+	rows, err := s.DB.QueryContext(ctx, "SELECT nama, kecepatan_mbps, COALESCE(ip_pool, ''), COALESCE(local_address, ''), COALESCE(rate_limit, '') FROM paket")
 	if err != nil {
 		return fmt.Errorf("failed to query packages: %w", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var name, ipPool, localAddress string
+		var name, ipPool, localAddress, dbRateLimit string
 		var speedMbps int
-		if err := rows.Scan(&name, &speedMbps, &ipPool, &localAddress); err != nil {
+		if err := rows.Scan(&name, &speedMbps, &ipPool, &localAddress, &dbRateLimit); err != nil {
 			return fmt.Errorf("scan package: %w", err)
 		}
 
@@ -170,8 +170,10 @@ func (s *RouterService) ReconcileProfiles(ctx context.Context, client *Client) e
 			continue
 		}
 
-		var rateLimit string
-		if speedMbps > 0 {
+		// Prefer the explicit rate_limit column (supports burst format like "10M/10M 50M/50M 10M/10M 10/10");
+		// fall back to generating a simple symmetric limit from speedMbps.
+		rateLimit := strings.TrimSpace(dbRateLimit)
+		if rateLimit == "" && speedMbps > 0 {
 			rateLimit = fmt.Sprintf("%dM/%dM", speedMbps, speedMbps)
 		}
 
