@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { apiRequest, checkWAN, checkGponEpon, type GacsDevice, type GacsDeviceDetail, type GacsFault } from "../../lib/api";
 import { formatDateTime } from "../../utils/format";
 import { Modal } from "../../components/ui/Modal";
+import { Button } from "../../components/ui/Button";
 import { useDialog } from "../../context/DialogContext";
 import {
   Cpu,
@@ -338,29 +339,35 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
       onClose={onClose}
       actions={
         <div className="flex gap-2">
-          <button
+          <Button
             type="button"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+            variant="primary"
+            className="bg-indigo-600 hover:bg-indigo-700"
             onClick={() => void handleSummon()}
             disabled={summoning || loading}
+            isLoading={summoning}
+            loadingText="Menyummon..."
           >
-            {summoning ? "Menyummon..." : "⟳ Refresh Data"}
-          </button>
-          <button
+            ⟳ Refresh Data
+          </Button>
+          <Button
             type="button"
-            className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+            variant="primary"
+            className="bg-amber-500 hover:bg-amber-600"
             onClick={() => void handleReboot()}
             disabled={rebooting || loading}
+            isLoading={rebooting}
+            loadingText="Rebooting..."
           >
-            {rebooting ? "Rebooting..." : "↺ Reboot"}
-          </button>
-          <button
+            ↺ Reboot
+          </Button>
+          <Button
             type="button"
-            className="text-gray-600 hover:bg-gray-100 text-sm font-semibold py-2 px-4 rounded-lg transition-colors"
+            variant="ghost"
             onClick={onClose}
           >
             Tutup
-          </button>
+          </Button>
         </div>
       }
     >
@@ -951,13 +958,14 @@ function FaultsPanel({ pushError }: { pushError: (msg: string) => void }) {
                 <td className="px-5 py-3 text-slate-500 text-xs">{formatDateTime(f.timestamp)}</td>
                 <td className="px-5 py-3 text-slate-700">{f.retries ?? 0}x</td>
                 <td className="px-5 py-3">
-                  <button
+                  <Button
                     type="button"
-                    className="text-red-600 hover:bg-red-50 text-xs font-bold py-1 px-2.5 rounded-lg transition-colors border border-red-200"
+                    variant="danger"
+                    size="sm"
                     onClick={() => void handleDeleteFault(f._id)}
                   >
                     Hapus
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))
@@ -1179,15 +1187,16 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
               </button>
             ))}
           </div>
-          <button
+          <Button
             type="button"
-            className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-50 pb-3 flex items-center gap-1.5 cursor-pointer transition-colors"
+            variant="link"
+            className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-50 pb-3 flex items-center gap-1.5 cursor-pointer transition-colors px-0 hover:no-underline"
             onClick={() => void loadDevices()}
             disabled={loading}
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
             {loading ? "Refreshing..." : "Refresh Perangkat"}
-          </button>
+          </Button>
         </div>
 
         <div className="p-6">
@@ -1292,13 +1301,15 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                                 </div>
                               </td>
                               <td className="px-5 py-3.5">
-                                <button
+                                <Button
                                   type="button"
-                                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-xl transition-colors shadow-sm cursor-pointer"
+                                  variant="primary"
+                                  size="sm"
+                                  className="bg-indigo-600 hover:bg-indigo-700"
                                   onClick={() => setDetailId(d._id)}
                                 >
                                   Detail
-                                </button>
+                                </Button>
                               </td>
                             </tr>
                           );

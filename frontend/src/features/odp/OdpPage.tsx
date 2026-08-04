@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Loader2, Plus, Edit3, Trash2, ShieldAlert, Send, MapPin, Map, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { StatusPill, EmptyTableRow } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
+import { Button } from "../../components/ui/Button";
 import type { OdpItem, User, CustomerItem } from "../../types";
 import { CustomerDetailModal } from "../customers/components/CustomerDetailModal";
 import { request } from "../../lib/api";
@@ -270,14 +271,15 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
           </p>
         </div>
         {!isViewer && (
-          <button
+          <Button
             type="button"
+            variant="primary"
+            className="bg-indigo-600 hover:bg-indigo-700 font-semibold py-2.5 px-4 rounded-xl text-xs"
             onClick={handleOpenCreate}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
           >
             <Plus size={14} />
             Tambah ODP Baru
-          </button>
+          </Button>
         )}
       </div>
 
@@ -338,43 +340,50 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
                     </td>
                     <td className="px-6 py-4 text-gray-700">
                       <div className="flex gap-2 justify-center">
-                        <button
+                        <Button
                           type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
                           onClick={() => setSelectedOdpForDetail(item)}
-                          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1"
                         >
                           Detail Port
-                        </button>
+                        </Button>
                         {!isViewer && item.customer_count > 0 && (
-                          <button
+                          <Button
                             type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200"
                             onClick={() => handleOpenBroadcast(item)}
-                            className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1"
                           >
                             <ShieldAlert size={12} />
                             Broadcast WA
-                          </button>
+                          </Button>
                         )}
                         {!isViewer && (
                           <>
-                            <button
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleOpenEdit(item)}
-                              className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1"
                             >
                               <Edit3 size={12} />
                               Edit
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               type="button"
+                              variant="danger"
+                              size="sm"
+                              className="bg-red-50 hover:bg-red-100 text-red-700"
                               onClick={() => setDeletingOdp(item)}
                               disabled={item.customer_count > 0}
                               title={item.customer_count > 0 ? "Tidak bisa menghapus ODP yang masih memiliki pelanggan" : ""}
-                              className="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
                             >
                               <Trash2 size={12} />
                               Hapus
-                            </button>
+                            </Button>
                           </>
                         )}
                       </div>
@@ -394,21 +403,24 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
           onClose={() => setIsFormModalOpen(false)}
           actions={
             <>
-              <button
+              <Button
                 type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                variant="ghost"
                 onClick={() => setIsFormModalOpen(false)}
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 form="odp-form"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors flex items-center gap-1"
+                variant="primary"
+                className="bg-indigo-600 hover:bg-indigo-700"
                 disabled={submitting}
+                isLoading={submitting}
+                loadingText="Menyimpan..."
               >
-                {submitting ? "Menyimpan..." : "Simpan ODP"}
-              </button>
+                Simpan ODP
+              </Button>
             </>
           }
         >
@@ -525,22 +537,24 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
           onClose={() => setDeletingOdp(null)}
           actions={
             <>
-              <button
+              <Button
                 type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                variant="ghost"
                 onClick={() => setDeletingOdp(null)}
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+                variant="danger"
                 onClick={() => void handleConfirmDelete()}
                 disabled={submitting}
+                isLoading={submitting}
+                loadingText="Menghapus..."
               >
                 <Trash2 size={14} />
-                {submitting ? "Menghapus..." : "Ya, Hapus ODP"}
-              </button>
+                Ya, Hapus ODP
+              </Button>
             </>
           }
         >
@@ -562,26 +576,25 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
           onClose={() => setIsBroadcastModalOpen(false)}
           actions={
             <>
-              <button
+              <Button
                 type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                variant="ghost"
                 onClick={() => setIsBroadcastModalOpen(false)}
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 form="broadcast-form"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+                variant="primary"
+                className="bg-indigo-600 hover:bg-indigo-700"
                 disabled={submitting}
+                isLoading={submitting}
+                loadingText="Mengirim..."
               >
-                {submitting ? "Mengirim..." : (
-                  <>
-                    <Send size={14} />
-                    Kirim Broadcast WA ({broadcastingOdp.customer_count})
-                  </>
-                )}
-              </button>
+                <Send size={14} />
+                Kirim Broadcast WA ({broadcastingOdp.customer_count})
+              </Button>
             </>
           }
         >
@@ -609,13 +622,13 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
           title={`Detail Port ODP: ${selectedOdpForDetail.nama}`}
           onClose={() => setSelectedOdpForDetail(null)}
           actions={
-            <button
+            <Button
               type="button"
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+              variant="primary"
               onClick={() => setSelectedOdpForDetail(null)}
             >
               Tutup
-            </button>
+            </Button>
           }
         >
           <div className="flex flex-col gap-4">
@@ -667,13 +680,14 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
                               </span>
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <button
+                              <Button
                                 type="button"
+                                variant="link"
+                                className="text-indigo-600 hover:text-indigo-850 font-bold hover:underline px-0"
                                 onClick={() => setDetailedCustomer(matchedCustomer)}
-                                className="text-indigo-600 hover:text-indigo-850 font-bold hover:underline"
                               >
                                 Lihat Profil
-                              </button>
+                              </Button>
                             </td>
                           </>
                         ) : (
