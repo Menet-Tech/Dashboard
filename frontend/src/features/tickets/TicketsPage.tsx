@@ -9,6 +9,7 @@ import {
   factoryResetONT,
   request,
 } from "../../lib/api";
+import { Button } from "../../components/ui/Button";
 import type { TicketItem, TicketDetailItem, CustomerItem, User } from "../../types";
 import { StatusPill } from "../../components/ui/StatusPill";
 import { toErrorMessage } from "../../utils/format";
@@ -353,14 +354,15 @@ export function TicketsPage({
               <option value="closed">Selesai / Ditutup</option>
             </select>
             {!isViewer && (
-              <button
+              <Button
                 type="button"
+                variant="primary"
                 onClick={handleOpenCreateModal}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg p-1.5 shadow-sm transition-colors text-xs flex items-center justify-center cursor-pointer"
+                className="!p-1.5"
                 title="Tambah Tiket Baru"
               >
                 <Plus size={16} />
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -480,12 +482,13 @@ export function TicketsPage({
                   </div>
                 </div>
                 {detail.status === "open" && !isViewer && (
-                  <button
+                  <Button
+                    variant="outline"
                     onClick={handleClose}
-                    className="bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors border border-emerald-100 dark:border-emerald-900/30 cursor-pointer"
+                    className="bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 !py-1.5"
                   >
                     Tandai Selesai
-                  </button>
+                  </Button>
                 )}
               </div>
 
@@ -560,13 +563,14 @@ export function TicketsPage({
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
                     />
-                    <button
+                    <Button
                       type="submit"
+                      variant="primary"
                       disabled={!replyText.trim()}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                      className="!py-2"
                     >
                       Kirim WA
-                    </button>
+                    </Button>
                     {replyText.trim() && (
                       <div className="inline-flex items-center">
                         {/* Buka WA */}
@@ -583,8 +587,9 @@ export function TicketsPage({
                           Buka WA
                         </a>
                         {/* Salin Link */}
-                        <button
+                        <Button
                           type="button"
+                          variant="secondary"
                           onClick={async () => {
                             const phone = detail.no_hp.replace("@c.us", "").replace("@lid", "").replace(/[+\-\s]/g, "").replace(/^0/, "62");
                             const url = `https://wa.me/${phone}?text=${encodeURIComponent(replyText)}`;
@@ -595,7 +600,7 @@ export function TicketsPage({
                               pushError(err.message || "Gagal menyalin link");
                             }
                           }}
-                          className="bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-l-0 border-slate-200 dark:border-slate-700 font-semibold py-2 px-3 rounded-r-xl text-xs shadow-sm transition-colors flex items-center justify-center cursor-pointer gap-1"
+                          className="!py-2 !px-3 !rounded-l-none !rounded-r-xl border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
                           title="Salin link wa.me ke clipboard"
                         >
                           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -603,7 +608,7 @@ export function TicketsPage({
                             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                           </svg>
                           Salin
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </form>
@@ -680,15 +685,17 @@ export function TicketsPage({
                         <Cpu size={11} className="text-slate-400" />
                         GenieACS TR-069
                       </h4>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={handleCheckOntStatus}
                         disabled={loadingOnt || rebootingOnt || resettingOnt}
-                        className="text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-400 px-2 py-1 rounded transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                        isLoading={loadingOnt}
+                        icon={<RefreshCw size={10} />}
+                        className="bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-400 !px-2 !py-1 !text-[9px]"
                       >
-                        {loadingOnt ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
                         Cek
-                      </button>
+                      </Button>
                     </div>
 
                     {/* Stats & Details */}
@@ -742,24 +749,27 @@ export function TicketsPage({
                           {/* Commands for Non-Viewer */}
                           {user?.role !== "viewer" && (
                             <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-50 dark:border-slate-800">
-                              <button
+                              <Button
                                 type="button"
+                                variant="danger"
                                 onClick={handleRebootOnt}
                                 disabled={rebootingOnt || loadingOnt}
-                                className="w-full bg-rose-650 hover:bg-rose-700 text-white font-bold py-1 px-1 rounded-lg text-[9px] transition-colors flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
+                                isLoading={rebootingOnt}
+                                icon={<RotateCw size={9} />}
+                                className="w-full !px-1 !py-1 !text-[9px]"
                               >
-                                {rebootingOnt ? <Loader2 size={9} className="animate-spin" /> : <RotateCw size={9} />}
                                 Reboot
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 type="button"
+                                variant="secondary"
                                 onClick={handleFactoryResetOnt}
                                 disabled={resettingOnt || loadingOnt}
-                                className="w-full bg-slate-750 hover:bg-slate-800 text-white font-bold py-1 px-1 rounded-lg text-[9px] transition-colors flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
+                                isLoading={resettingOnt}
+                                className="w-full bg-slate-750 hover:bg-slate-800 text-white hover:text-white dark:bg-slate-700 !px-1 !py-1 !text-[9px]"
                               >
-                                {resettingOnt ? <Loader2 size={9} className="animate-spin" /> : null}
                                 Factory
-                              </button>
+                              </Button>
                             </div>
                           )}
                         </div>
@@ -787,13 +797,14 @@ export function TicketsPage({
                 <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-sans">Tambah Tiket Baru</h3>
                 <p className="text-[10px] text-slate-450 mt-0.5">Laporkan kendala support baru secara manual.</p>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-350 transition-colors cursor-pointer"
+                className="!p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-350"
               >
                 <X size={16} />
-              </button>
+              </Button>
             </div>
 
             {/* Content Form */}
@@ -873,21 +884,22 @@ export function TicketsPage({
               </label>
 
               <div className="flex justify-end gap-2.5 mt-3 border-t border-slate-100 dark:border-slate-800 pt-4">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="bg-white border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 font-semibold py-2 px-4 rounded-xl text-xs transition-colors cursor-pointer"
                 >
                   Batal
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
+                  variant="primary"
                   disabled={creatingTicket}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-5 rounded-xl text-xs transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  isLoading={creatingTicket}
+                  loadingText="Membuat..."
                 >
-                  {creatingTicket ? <Loader2 size={12} className="animate-spin" /> : null}
-                  {creatingTicket ? "Membuat..." : "Buat Tiket"}
-                </button>
+                  Buat Tiket
+                </Button>
               </div>
             </form>
           </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { Button } from "../../components/ui/Button";
 import {
   MapContainer,
   TileLayer,
@@ -2204,19 +2205,19 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
             </div>
 
             <div className="flex justify-end gap-2 border-t pt-4 mt-5">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setIsNodeModalOpen(false)}
-                className="text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold py-2 px-4 rounded-xl transition"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded-xl transition shadow"
+                variant="primary"
               >
                 Simpan
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -2233,13 +2234,14 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               <h3 className="text-base font-bold text-slate-900">
                 {editingEdge ? `Edit Kabel: ${editingEdge.edge_id}` : "Tambah Sambungan Kabel"}
               </h3>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setIsEdgeModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="!p-1 text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
 
             <div className="grid gap-3.5">
@@ -2345,8 +2347,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                       onChange={(e) => setEdgeDistanceInput(e.target.value)}
                       placeholder="Contoh: 150"
                     />
-                    <button
+                    <Button
                       type="button"
+                      variant="link"
                       onClick={() => {
                         if (edgeSourceInput && edgeTargetInput) {
                           const srcNode = nodes.find(n => n.node_id === edgeSourceInput);
@@ -2366,10 +2369,10 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                           pushError("Pilih node asal dan tujuan terlebih dahulu.");
                         }
                       }}
-                      className="text-left mt-1 text-[10px] text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold underline cursor-pointer"
+                      className="text-left mt-1 !text-[10px] !justify-start"
                     >
                       Hitung Otomatis dari Peta
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -2429,19 +2432,19 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
             </div>
 
             <div className="flex justify-end gap-2 border-t pt-4 mt-5">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setIsEdgeModalOpen(false)}
-                className="text-slate-600 hover:bg-slate-100 text-sm font-semibold py-2 px-4 rounded-xl transition"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded-xl transition shadow"
+                variant="primary"
               >
                 Simpan
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -2459,13 +2462,14 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 <Settings className="w-5 h-5 text-indigo-600" />
                 Pengaturan Peta Jaringan
               </h3>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setIsSettingsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="!p-1 text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
 
             <div className="grid gap-3.5">
@@ -2527,28 +2531,29 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
             </div>
 
             <div className="flex justify-between border-t pt-4 mt-5">
-              <button
+              <Button
                 type="button"
+                variant="danger"
                 onClick={() => void handleResetSettings()}
-                className="text-red-600 hover:bg-red-50 text-sm font-semibold py-2 px-3 rounded-xl transition"
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 Reset ke Default
-              </button>
+              </Button>
 
               <div className="flex gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setIsSettingsModalOpen(false)}
-                  className="text-slate-600 hover:bg-slate-100 text-sm font-semibold py-2 px-4 rounded-xl transition"
                 >
                   Batal
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded-xl transition shadow"
+                  variant="primary"
                 >
                   Simpan
-                </button>
+                </Button>
               </div>
             </div>
           </form>
@@ -2567,13 +2572,14 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 <Trash2 className="w-5 h-5" />
                 Hapus Semua Data Peta
               </h3>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setIsResetModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="!p-1 text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
 
             <div className="grid gap-3.5">
@@ -2598,20 +2604,22 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
             </div>
 
             <div className="flex justify-end gap-2 border-t pt-4 mt-5">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setIsResetModalOpen(false)}
-                className="text-slate-600 hover:bg-slate-100 text-sm font-semibold py-2 px-4 rounded-xl transition"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
+                variant="danger"
                 disabled={saving}
-                className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-sm font-bold py-2 px-4 rounded-xl transition shadow"
+                isLoading={saving}
+                loadingText="Mereset..."
               >
-                {saving ? "Mereset..." : "Ya, Hapus Semua"}
-              </button>
+                Ya, Hapus Semua
+              </Button>
             </div>
           </form>
         </div>
@@ -2626,32 +2634,33 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
                 {confirmModal.title}
               </h3>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setConfirmModal(null)}
-                className="text-slate-400 hover:text-slate-600"
+                className="!p-1 text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
               {confirmModal.message}
             </p>
             <div className="flex justify-end gap-3">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setConfirmModal(null)}
-                className="text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold py-2 px-4 rounded-xl transition"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="danger"
                 onClick={() => void confirmModal.onConfirm()}
-                className="bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-xl transition shadow"
               >
                 Konfirmasi
-              </button>
+              </Button>
             </div>
           </div>
         </div>
