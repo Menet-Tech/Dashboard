@@ -127,6 +127,7 @@ export function BillsPage({
         className="px-6 py-4 font-medium select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-gray-500"
         onClick={() => requestSort(field)}
         aria-sort={sortAria}
+        scope="col"
       >
         <div className="inline-flex items-center gap-1.5">
           <span>{label}</span>

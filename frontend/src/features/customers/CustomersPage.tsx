@@ -213,6 +213,7 @@ export function CustomersPage({
         className={`px-4 py-4 font-semibold select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${align === "center" ? "text-center" : "text-left"}`}
         onClick={() => requestSort(field)}
         aria-sort={sortAria}
+        scope="col"
       >
         <div className={`inline-flex items-center gap-1.5 ${align === "center" ? "justify-center w-full" : ""}`}>
           <span>{label}</span>
