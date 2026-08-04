@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "../../../components/ui/Button";
 import { Plus, Trash2, RefreshCw } from "lucide-react";
 import { inputClassName } from "../../../components/ui";
 import { getGatewayAccounts, type GatewayAccount } from "../../../lib/gatewayApi";
@@ -71,8 +72,10 @@ export function AccountsTab({
                 <p className="font-semibold text-slate-700 mb-1">Belum ada akun gateway terdaftar</p>
                 <p className="text-xs text-slate-500 mb-4">Tambahkan akun baru di panel sebelah kanan, atau tunggu sebentar jika gateway baru saja dimulai.</p>
                 {canDecrypt && apiKey && (
-                  <button
+                  <Button
                     type="button"
+                    variant="primary"
+                    size="sm"
                     onClick={async () => {
                       try {
                         const res = await getGatewayAccounts(gatewayUrl, apiKey!);
@@ -83,10 +86,9 @@ export function AccountsTab({
                         pushError(err?.message || "Gagal memuat akun");
                       }
                     }}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700"
                   >
-                    <RefreshCw size={13} /> Refresh Sekarang
-                  </button>
+                    Refresh Daftar Akun
+                  </Button>
                 )}
               </>
             )}
@@ -123,21 +125,26 @@ export function AccountsTab({
 
                 <div className="flex gap-2 mt-2 pt-2 border-t border-slate-50 justify-end">
                   {canDecrypt && !acc.ready && (
-                    <button
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
                       onClick={() => onScanQrClick(acc.accountId)}
-                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
+                      className="!bg-indigo-50 hover:!bg-indigo-100 !text-indigo-600 hover:!text-indigo-700 border-transparent"
                     >
                       Scan QR
-                    </button>
+                    </Button>
                   )}
                   {canDecrypt && (
-                    <button
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
                       onClick={() => onDeleteAccount(acc.accountId)}
-                      className="text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-1.5 rounded-md transition-colors"
                       title="Hapus Akun"
                     >
                       <Trash2 size={15} />
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -184,14 +191,15 @@ export function AccountsTab({
               />
             </label>
 
-            <button
+            <Button
               type="submit"
+              variant="primary"
               disabled={!apiKey}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
+              className="w-full flex justify-center gap-2"
             >
               <Plus size={16} />
               Daftarkan & Inisialisasi
-            </button>
+            </Button>
           </form>
         </div>
       ) : (

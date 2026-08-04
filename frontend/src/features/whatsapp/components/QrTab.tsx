@@ -65,22 +65,28 @@ export function QrTab({
       {/* Toggles between QR and Pairing Code */}
       {!target?.ready && (
         <div className="flex bg-slate-100 rounded-lg p-1 mb-5">
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={() => setUsePairingCode(false)}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              !usePairingCode ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:text-slate-700"
-            }`}
+            className={
+              !usePairingCode ? "flex-1 !bg-white shadow-sm text-indigo-700" : "flex-1 text-slate-500 hover:text-slate-700 border-transparent"
+            }
           >
             Scan QR
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={() => setUsePairingCode(true)}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              usePairingCode ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:text-slate-700"
-            }`}
+            className={
+              usePairingCode ? "flex-1 !bg-white shadow-sm text-indigo-700" : "flex-1 text-slate-500 hover:text-slate-700 border-transparent"
+            }
           >
             Tautkan dg Nomor
-          </button>
+          </Button>
         </div>
       )}
 
@@ -134,12 +140,14 @@ export function QrTab({
                  <p className="text-xs text-slate-500">
                    Buka WhatsApp → Tautkan Perangkat → Pilih "Tautkan dengan nomor telepon saja"
                  </p>
-                 <button
+                 <Button
+                    type="button"
+                    variant="link"
                     onClick={() => setPairingCode(null)}
                     className="mt-4 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                  >
                    Meminta Ulang / Ganti Nomor
-                 </button>
+                 </Button>
                </div>
              )}
           </div>
@@ -164,13 +172,15 @@ export function QrTab({
         ) : (
           <div className="text-center flex flex-col items-center">
             <p className="text-sm text-slate-500 mb-4">Meminta status/QR code dari server...</p>
-            <button
+            <Button
+              type="button"
+              variant="primary"
               onClick={() => onTriggerQrFetch(qrSelectedAccountId)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+              className="flex items-center gap-1.5"
             >
               <RefreshCw size={14} />
               Muat Ulang QR Code
-            </button>
+            </Button>
           </div>
         )}
       </div>

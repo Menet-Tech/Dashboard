@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Button } from "../../components/ui/Button";
 import { useWhatsAppGateway } from "../../hooks/useWhatsAppGateway";
 import {
   getGatewayAccounts,
@@ -263,13 +264,14 @@ export function WhatsAppPage({
           </div>
 
           <div className="flex gap-2">
-            <button
+            <Button
+              type="button"
+              variant="outline"
               onClick={handleRefreshAccounts}
-              className="flex items-center gap-2 border border-slate-200 hover:bg-slate-50 font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors text-slate-700"
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
               Refresh Status
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -279,14 +281,14 @@ export function WhatsAppPage({
               <p className="font-bold">Gateway WhatsApp bermasalah</p>
               <p className="text-sm mt-1">{gatewayError}</p>
             </div>
-            <button
+            <Button
               type="button"
+              variant="danger"
               onClick={handleRefreshAccounts}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
             >
               <RefreshCw size={15} />
               Coba Lagi
-            </button>
+            </Button>
           </div>
         ) : null}
 

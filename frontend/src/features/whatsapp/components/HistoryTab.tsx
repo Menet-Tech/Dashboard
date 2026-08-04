@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Button } from "../../../components/ui/Button";
 import { Lock, Unlock } from "lucide-react";
 import { inputClassName } from "../../../components/ui";
 import { type GatewayAccount, type GatewayMessage } from "../../../lib/gatewayApi";
@@ -73,17 +74,19 @@ export function HistoryTab({
 
         <div className="flex items-center gap-2">
           {canDecrypt ? (
-            <button
-              onClick={() => setDecryptAll(!decryptAll)}
-              className={`flex items-center gap-1.5 font-bold text-xs py-2 px-3 rounded-lg shadow-sm border transition-colors ${
-                decryptAll
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                  : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
-              }`}
-            >
-              {decryptAll ? <Unlock size={14} /> : <Lock size={14} />}
-              {decryptAll ? "Dekripsi Aktif (Role-based)" : "Dekripsi Sembunyi"}
-            </button>
+              <Button
+                type="button"
+                variant={decryptAll ? "outline" : "secondary"}
+                onClick={() => setDecryptAll(!decryptAll)}
+                className={
+                  decryptAll
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                    : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+                }
+              >
+                {decryptAll ? <Unlock size={14} /> : <Lock size={14} />}
+                {decryptAll ? "Dekripsi Aktif (Role-based)" : "Dekripsi Sembunyi"}
+              </Button>
           ) : (
             <div className="flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-100 px-3 py-2 rounded-lg">
               <Lock size={12} />
