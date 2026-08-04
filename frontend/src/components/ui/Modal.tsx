@@ -1,3 +1,4 @@
+import { Button } from "./Button";
 import type { ReactNode } from "react";
 import { useRef, useEffect, useId } from "react";
 import { createPortal } from "react-dom";

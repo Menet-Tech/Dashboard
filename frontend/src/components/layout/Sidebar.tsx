@@ -261,14 +261,18 @@ export function Sidebar({
             </span>
           </div>
         </div>
-        <button
-          className="w-full bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-350 border border-slate-200 dark:border-slate-800 dark:hover:border-slate-700 font-bold py-2 px-4 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center gap-2 text-xs cursor-pointer"
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
           onClick={onLogout}
           disabled={submitting}
+          isLoading={isBusy("logout")}
+          loadingText="Keluar..."
+          icon={<LogOut size={13} />}
         >
-          <LogOut size={13} />
-          {isBusy("logout") ? "Keluar..." : "Logout"}
-        </button>
+          Logout
+        </Button>
       </div>
     </aside>
   );

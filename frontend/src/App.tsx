@@ -70,6 +70,7 @@ import { FeedbackProvider, useAppFeedback } from "./context/FeedbackContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
+
 import type { ConfirmDialogState } from "./hooks/types";
 import { useCustomers } from "./hooks/useCustomers";
 import { useBills } from "./hooks/useBills";
@@ -877,9 +878,9 @@ function AppRouter() {
           onClose={() => usersHook.handlers.setPasswordResetState(null)}
           actions={
             <>
-              <button type="button" className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={() => usersHook.handlers.setPasswordResetState(null)}>
+              <Button type="button" variant="outline" onClick={() => usersHook.handlers.setPasswordResetState(null)}>
                 Batal
-              </button>
+              </Button>
               <Button type="submit" form="password-reset-form" variant="primary" disabled={feedback.submitting}>
                 Simpan Password Baru
               </Button>
