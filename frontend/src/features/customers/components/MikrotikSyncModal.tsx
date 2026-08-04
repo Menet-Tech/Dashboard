@@ -3,6 +3,7 @@ import { Modal } from "../../../components/ui/Modal";
 import { apiRequest } from "../../../lib/api";
 import { Loader2, Search, AlertCircle, RefreshCw, UserPlus } from "lucide-react";
 import type { PackageItem } from "../../../types";
+import { Button } from "../../../components/ui/Button";
 
 type MikrotikSyncSecret = {
   name: string;
@@ -85,13 +86,9 @@ export function MikrotikSyncModal({
       title="Sync dari MikroTik (PPPoE Secret)"
       onClose={onClose}
       actions={
-        <button
-          type="button"
-          onClick={onClose}
-          className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
-        >
+        <Button type="button" variant="outline" onClick={onClose}>
           Tutup
-        </button>
+        </Button>
       }
     >
       <div className="space-y-4 min-h-[300px] max-h-[500px] flex flex-col">
@@ -112,15 +109,16 @@ export function MikrotikSyncModal({
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => void loadSecrets()}
             disabled={loading}
-            className="p-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
             title="Refresh List"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          </button>
+          </Button>
         </div>
 
         {loading ? (
@@ -135,13 +133,9 @@ export function MikrotikSyncModal({
               <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Gagal Membaca MikroTik</p>
               <p className="text-[11px] text-slate-400 max-w-sm leading-relaxed">{error}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => void loadSecrets()}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-4 rounded-xl shadow-sm transition-all cursor-pointer"
-            >
+            <Button type="button" variant="primary" onClick={() => void loadSecrets()}>
               Coba Lagi
-            </button>
+            </Button>
           </div>
         ) : filteredSecrets.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center py-10 text-slate-400 text-xs">
@@ -176,14 +170,16 @@ export function MikrotikSyncModal({
                     </div>
                   </div>
 
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
+                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-100"
                     onClick={() => onSelectSecret(secret.name, secret.password || "", guessedId)}
-                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold py-1.5 px-3 rounded-xl border border-indigo-100 transition-all flex items-center gap-1 cursor-pointer"
+                    icon={<UserPlus size={12} />}
                   >
-                    <UserPlus size={12} />
                     Pilih & Lengkapi
-                  </button>
+                  </Button>
                 </div>
               );
             })}

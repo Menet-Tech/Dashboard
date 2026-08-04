@@ -279,9 +279,9 @@ export function DashboardPage({
               <Button type="button" variant="primary" onClick={() => onSwitchView("bills")}>
                 Buka Tagihan
               </Button>
-              <button type="button" className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-755 text-slate-700 dark:text-slate-300 text-xs font-bold py-2 px-4 rounded-lg transition-colors cursor-pointer" onClick={() => onSwitchView("monitoring")}>
+              <Button type="button" variant="outline" onClick={() => onSwitchView("monitoring")}>
                 Buka Monitoring
-              </button>
+              </Button>
             </div>
           </div>
         </article>

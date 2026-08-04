@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { sendBroadcast } from "../../../lib/api";
+import { Button } from "../../../components/ui/Button";
 
 type BroadcastModalProps = {
   isOpen: boolean;
@@ -65,9 +66,9 @@ export function BroadcastModal({
       <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xl max-w-lg w-full flex flex-col gap-4 animate-in fade-in zoom-in duration-200">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <h3 className="text-lg font-bold text-slate-900">Broadcast WhatsApp</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <Button variant="ghost" size="icon" onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"></path></svg>
-          </button>
+          </Button>
         </div>
 
         {broadcastError && (
@@ -115,20 +116,17 @@ export function BroadcastModal({
           </p>
 
           <div className="flex justify-end gap-3 border-t border-slate-100 pt-3 mt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-xl text-xs transition-colors"
-            >
-              Batal
-            </button>
-            <button
+            <Button type="button" variant="outline" onClick={onClose}>
+            Batal
+          </Button>
+            <Button
               type="submit"
               disabled={broadcastSubmitting || !message.trim()}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors disabled:opacity-50"
+              isLoading={broadcastSubmitting}
+              loadingText="Mengirim..."
             >
-              {broadcastSubmitting ? "Mengirim..." : "Kirim Broadcast"}
-            </button>
+              Kirim Broadcast
+            </Button>
           </div>
         </form>
       </div>
