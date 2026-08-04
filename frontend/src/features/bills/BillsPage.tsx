@@ -274,13 +274,14 @@ export function BillsPage({
                       <td className="px-6 py-4 text-gray-700 font-semibold">{bill.invoice_number}</td>
                       <td className="px-6 py-4 text-gray-700">
                         <div className="flex items-center gap-1.5">
-                          <button
+                          <Button
+                            variant="link"
                             type="button"
-                            className="text-indigo-600 hover:text-indigo-700 hover:underline font-semibold text-left transition-colors"
+                            className="px-0 py-0 h-auto text-indigo-600 hover:text-indigo-700 font-semibold text-left transition-colors"
                             onClick={() => onShowCustomerDetails?.(bill.customer_id)}
                           >
                             {bill.customer_name}
-                          </button>
+                          </Button>
                           {bill.customer_phone && (
                             <a
                               href={`https://wa.me/+${bill.customer_phone.replace(/[+\-\s]/g, "").replace(/^0/, "62")}`}
@@ -316,21 +317,25 @@ export function BillsPage({
                         <div className="flex flex-wrap gap-2 items-center">
                           {/* Dokumen & Log - Grup 1 */}
                           <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5">
-                            <button
+                            <Button
                               type="button"
-                              className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-md shadow-sm transition-colors"
+                              variant="outline"
+                              size="sm"
+                              className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200"
                               onClick={() => window.open(`/api/v1/bills/${bill.id}/invoice`, "_blank")}
                               title="Buka PDF Invoice"
                             >
                               PDF
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               type="button"
-                              className="hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-md transition-colors"
+                              variant="ghost"
+                              size="sm"
+                              className="hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
                               onClick={() => onToggleNotifications(bill.id)}
                             >
                               Log WA
-                            </button>
+                            </Button>
                           </div>
                           
                           {/* WA Notify Native Select */}
@@ -370,10 +375,12 @@ export function BillsPage({
                             </Button>
                           ) : null}
                           {user?.role !== "viewer" && bill.status === "belum_bayar" && bill.display_status !== "perpanjangan" && onGrantExtension ? (
-                            <button
+                            <Button
                               type="button"
+                              variant="primary"
+                              size="sm"
+                              className="bg-amber-500 hover:bg-amber-600 text-white"
                               title="Perpanjangan: tagihan ini digabung ke bulan depan (nominal dikali 2)"
-                              className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
                               onClick={async () => {
                                 if (await showConfirm(`Perpanjang tagihan ${bill.invoice_number}? Pelanggan akan dialihkan ke status 'pending' (perpanjangan) dan tagihan bulan depan digabung (nominal dikali 2).`)) {
                                   onGrantExtension(bill.id);
@@ -381,17 +388,21 @@ export function BillsPage({
                               }}
                             >
                               Perpanjang
-                            </button>
+                            </Button>
                           ) : null}
                           {user?.role !== "viewer" && (bill.status === "pending_paid" || bill.status === "pending_extension") && onCancelPendingAction ? (
-                            <button
+                            <Button
                               type="button"
-                              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50 animate-pulse"
+                              variant="danger"
+                              size="sm"
+                              className="bg-rose-600 hover:bg-rose-700 animate-pulse"
                               onClick={() => onCancelPendingAction(bill.id)}
                               disabled={isBusy(`cancel-pending-${bill.id}`)}
+                              isLoading={isBusy(`cancel-pending-${bill.id}`)}
+                              loadingText="Batal..."
                             >
-                              {isBusy(`cancel-pending-${bill.id}`) ? "Batal..." : "Batal"}
-                            </button>
+                              Batal
+                            </Button>
                           ) : null}
 
                           {/* Proof Upload */}
@@ -410,14 +421,18 @@ export function BillsPage({
                               >
                                 {proofFiles[bill.id] ? proofFiles[bill.id]?.name : "Pilih File"}
                               </label>
-                              <button
+                              <Button
                                 type="button"
-                                className="bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500 text-white text-[10px] font-bold py-1 px-2 rounded shadow-sm transition-colors disabled:opacity-50"
+                                variant="primary"
+                                size="sm"
+                                className="bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500"
                                 onClick={() => onUploadProof(bill.id)}
                                 disabled={isBusy("upload-proof")}
+                                isLoading={isBusy("upload-proof")}
+                                loadingText="↑"
                               >
-                                {isBusy("upload-proof") ? "↑" : "Upload"}
-                              </button>
+                                Upload
+                              </Button>
                             </div>
                           )}
                         </div>
@@ -477,8 +492,12 @@ export function BillsPage({
                                         <td className="px-4 py-2.5 text-center">
                                           <div className="inline-flex items-center shadow-sm rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800">
                                             {/* Tombol Buka WA */}
-                                            <button
+                                            <Button
                                               type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              className="bg-green-50 hover:bg-green-100/80 dark:bg-green-950/20 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 border-r border-slate-200 dark:border-slate-800"
+                                              title="Buka WhatsApp langsung"
                                               onClick={() => {
                                                 const cleanPhone = log.sent_to.replace(/[^0-9]/g, "");
                                                 let phone = cleanPhone;
@@ -490,17 +509,21 @@ export function BillsPage({
                                                 const url = `https://wa.me/${phone}?text=${encodeURIComponent(log.message || "")}`;
                                                 window.open(url, "_blank");
                                               }}
-                                              className="inline-flex items-center gap-1 bg-green-50 hover:bg-green-100/80 dark:bg-green-950/20 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold py-1.5 px-3 border-r border-slate-200 dark:border-slate-800 transition-colors"
-                                              title="Buka WhatsApp langsung"
+                                              icon={
+                                                <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                                                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.402 0 9.798-4.394 9.802-9.793.002-2.614-1.01-5.074-2.853-6.918C16.38 2.05 13.924.966 11.312.966c-5.402 0-9.802 4.394-9.802 9.794.002 1.902.51 3.5 1.461 5.09l-.989 3.605 3.682-.966zM17.07 14.5c-.274-.138-1.62-.8-1.874-.892-.252-.093-.437-.138-.62.138-.184.276-.713.892-.873 1.077-.16.184-.32.207-.593.07-.273-.138-1.156-.426-2.202-1.36-.812-.724-1.36-1.617-1.52-1.893-.16-.276-.017-.425.12-.562.122-.122.274-.32.41-.482.138-.16.184-.276.276-.46.09-.184.045-.344-.023-.482-.068-.138-.62-1.493-.849-2.046-.224-.543-.472-.47-.62-.47-.138-.008-.32-.008-.503-.008-.184 0-.482.07-.733.344-.25.276-.957.942-.957 2.3 0 1.357.987 2.668 1.123 2.852.138.184 1.94 2.962 4.7 4.15 1.543.665 2.505.772 3.414.636.58-.087 1.62-.662 1.848-1.27.228-.607.228-1.127.16-1.27-.068-.14-.25-.224-.523-.362z"/>
+                                                </svg>
+                                              }
                                             >
-                                              <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
-                                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.402 0 9.798-4.394 9.802-9.793.002-2.614-1.01-5.074-2.853-6.918C16.38 2.05 13.924.966 11.312.966c-5.402 0-9.802 4.394-9.802 9.794.002 1.902.51 3.5 1.461 5.09l-.989 3.605 3.682-.966zM17.07 14.5c-.274-.138-1.62-.8-1.874-.892-.252-.093-.437-.138-.62.138-.184.276-.713.892-.873 1.077-.16.184-.32.207-.593.07-.273-.138-1.156-.426-2.202-1.36-.812-.724-1.36-1.617-1.52-1.893-.16-.276-.017-.425.12-.562.122-.122.274-.32.41-.482.138-.16.184-.276.276-.46.09-.184.045-.344-.023-.482-.068-.138-.62-1.493-.849-2.046-.224-.543-.472-.47-.62-.47-.138-.008-.32-.008-.503-.008-.184 0-.482.07-.733.344-.25.276-.957.942-.957 2.3 0 1.357.987 2.668 1.123 2.852.138.184 1.94 2.962 4.7 4.15 1.543.665 2.505.772 3.414.636.58-.087 1.62-.662 1.848-1.27.228-.607.228-1.127.16-1.27-.068-.14-.25-.224-.523-.362z"/>
-                                              </svg>
                                               Buka WA
-                                            </button>
+                                            </Button>
                                             {/* Tombol Salin Link */}
-                                            <button
+                                            <Button
                                               type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              className="bg-slate-50 hover:bg-slate-100 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 text-slate-650 dark:text-slate-400"
+                                              title="Salin link wa.me ke clipboard"
                                               onClick={async () => {
                                                 const cleanPhone = log.sent_to.replace(/[^0-9]/g, "");
                                                 let phone = cleanPhone;
@@ -517,15 +540,15 @@ export function BillsPage({
                                                   pushError(err.message || "Gagal menyalin link");
                                                 }
                                               }}
-                                              className="inline-flex items-center gap-1 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 text-slate-650 dark:text-slate-400 text-[10px] font-bold py-1.5 px-3 transition-colors"
-                                              title="Salin link wa.me ke clipboard"
+                                              icon={
+                                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                                </svg>
+                                              }
                                             >
-                                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                                              </svg>
                                               Salin
-                                            </button>
+                                            </Button>
                                           </div>
                                         </td>
                                       </tr>
@@ -553,25 +576,29 @@ export function BillsPage({
               Menampilkan {Math.min((page - 1) * limit + 1, total)} - {Math.min(page * limit, total)} dari {total} item
             </span>
             <div className="flex gap-2">
-              <button
+              <Button
                 type="button"
-                className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-2 px-4 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                variant="outline"
+                size="sm"
+                className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700"
                 disabled={page <= 1}
                 onClick={() => onPageChange(page - 1)}
               >
                 Sebelumnya
-              </button>
+              </Button>
               <span className="flex items-center px-2 text-slate-700">
                 Halaman {page} dari {Math.ceil(total / limit)}
               </span>
-              <button
+              <Button
                 type="button"
-                className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-2 px-4 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                variant="outline"
+                size="sm"
+                className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700"
                 disabled={page >= Math.ceil(total / limit)}
                 onClick={() => onPageChange(page + 1)}
               >
                 Berikutnya
-              </button>
+              </Button>
             </div>
           </div>
         )}

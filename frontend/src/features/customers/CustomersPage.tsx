@@ -362,41 +362,44 @@ export function CustomersPage({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {user?.role !== "viewer" && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                className="bg-white hover:bg-slate-50 dark:hover:bg-slate-800"
                 onClick={() => setIsSyncModalOpen(true)}
-                className="bg-white border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                icon={<RefreshCw size={14} />}
               >
-                <RefreshCw size={14} />
                 Sync dari MikroTik
-              </button>
+              </Button>
             )}
             {user?.role !== "viewer" && (
-              <button
+              <Button
                 type="button"
+                variant="primary"
                 onClick={() => {
                   onCancelEdit();
                   onSetFormOpen(true);
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                icon={<Plus size={14} />}
               >
-                <Plus size={14} />
                 Tambah Pelanggan
-              </button>
+              </Button>
             )}
             {user?.role !== "viewer" && (
-              <button
+              <Button
                 type="button"
+                variant="primary"
                 onClick={() => setIsBroadcastOpen(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
+                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                 Broadcast WA {selectedCount > 0 ? `(${selectedCount})` : ""}
-              </button>
+              </Button>
             )}
             {user?.role !== "viewer" && selectedCount > 0 && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
                 onClick={() => {
                   setBulkActionType("status");
                   setBulkSearchQuery("");
@@ -406,10 +409,9 @@ export function CustomersPage({
                   setSelectedReferredById(null);
                   setIsBulkEditOpen(true);
                 }}
-                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 Aksi Massal ({selectedCount})
-              </button>
+              </Button>
             )}
             <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl px-3 py-1.5 shadow-sm font-sans w-full sm:w-64">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 shrink-0"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -521,13 +523,14 @@ export function CustomersPage({
                       )}
                       <td className="px-4 py-4 font-semibold text-slate-900 dark:text-slate-100">
                         <div className="flex items-center gap-1.5">
-                          <button
+                          <Button
+                            variant="link"
                             type="button"
                             onClick={() => handleOpenDetails(customer)}
-                            className="text-indigo-600 hover:text-indigo-700 hover:underline font-semibold text-left transition-colors"
+                            className="px-0 py-0 h-auto text-indigo-600 hover:text-indigo-700 font-semibold text-left transition-colors"
                           >
                             {customer.name}
-                          </button>
+                          </Button>
                           {isMultiAccount && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
                               Multi-Akun
@@ -587,23 +590,27 @@ export function CustomersPage({
                     <td className="px-4 py-4 text-center">
                       {user?.role !== "viewer" && (
                         <div className="flex items-center justify-center gap-2">
-                          <button
+                          <Button
                             type="button"
-                            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                            variant="outline"
+                            size="sm"
+                            className="bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
                             onClick={() => {
                               onEdit(customer);
                               onSetFormOpen(true);
                             }}
                           >
                             Edit
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
-                            className="bg-red-50 border border-red-200 hover:bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                            variant="danger"
+                            size="sm"
+                            className="bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
                             onClick={() => onDelete(customer.id)}
                           >
                             Hapus
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </td>
@@ -632,13 +639,14 @@ export function CustomersPage({
           onClose={handleCloseForm}
           actions={
             <>
-              <button
+              <Button
                 type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                variant="outline"
+                className="bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
                 onClick={handleCloseForm}
               >
                 Batal
-              </button>
+              </Button>
               <Button
                 type="submit"
                 form="customer-form"
@@ -698,13 +706,14 @@ export function CustomersPage({
           onClose={() => setIsBulkEditOpen(false)}
           actions={
             <>
-              <button
+              <Button
                 type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer"
+                variant="outline"
+                className="bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
                 onClick={() => setIsBulkEditOpen(false)}
               >
                 Batal
-              </button>
+              </Button>
               <Button
                 type="button"
                 variant="primary"
