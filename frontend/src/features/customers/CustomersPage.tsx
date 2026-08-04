@@ -748,7 +748,7 @@ export function CustomersPage({
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Pilih Status Baru</span>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {(["active", "limit", "pending", "suspended", "inactive", "wifi_umum"] as const).map((st) => (
-                    <button
+                    <Button variant="outline"
                       key={st}
                       type="button"
                       onClick={() => setSelectedStatus(st)}
@@ -769,7 +769,7 @@ export function CustomersPage({
                               : st === "wifi_umum"
                                 ? "🛜 WiFi Umum"
                                 : "Inactive (Nonaktif)"}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -789,7 +789,7 @@ export function CustomersPage({
                   {packages
                     .filter((pkg) => pkg.name.toLowerCase().includes(bulkSearchQuery.toLowerCase()))
                     .map((pkg) => (
-                      <button
+                      <Button variant="outline"
                         key={pkg.id}
                         type="button"
                         onClick={() => setSelectedPackageId(pkg.id)}
@@ -803,7 +803,7 @@ export function CustomersPage({
                         <span className="text-[10px] text-slate-400 dark:text-slate-500">
                           {pkg.speed_mbps === 0 ? "Bypass" : `${pkg.speed_mbps} Mbps`}
                         </span>
-                      </button>
+                      </Button>
                     ))}
                 </div>
               </div>
@@ -820,8 +820,7 @@ export function CustomersPage({
                   onChange={(e) => setBulkSearchQuery(e.target.value)}
                 />
                 <div className="border border-slate-150 dark:border-slate-800 rounded-xl max-h-48 overflow-y-auto p-1.5 space-y-1 bg-slate-50/50 dark:bg-slate-950/30">
-                  <button
-                    type="button"
+                  <Button variant="outline" type="button"
                     onClick={() => setSelectedOdpId(-1)}
                     className={`w-full text-left py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       selectedOdpId === -1
@@ -830,11 +829,11 @@ export function CustomersPage({
                     }`}
                   >
                     -- Hapus / Kosongkan ODP --
-                  </button>
+                  </Button>
                   {odps
                     .filter((o) => o.nama.toLowerCase().includes(bulkSearchQuery.toLowerCase()) || o.lokasi.toLowerCase().includes(bulkSearchQuery.toLowerCase()))
                     .map((odp) => (
-                      <button
+                      <Button variant="outline"
                         key={odp.id}
                         type="button"
                         onClick={() => setSelectedOdpId(odp.id)}
@@ -846,7 +845,7 @@ export function CustomersPage({
                       >
                         <span>{odp.nama}</span>
                         <span className="text-[10px] text-slate-400 dark:text-slate-500">{odp.lokasi}</span>
-                      </button>
+                      </Button>
                     ))}
                 </div>
               </div>
@@ -863,8 +862,7 @@ export function CustomersPage({
                   onChange={(e) => setBulkSearchQuery(e.target.value)}
                 />
                 <div className="border border-slate-150 dark:border-slate-800 rounded-xl max-h-48 overflow-y-auto p-1.5 space-y-1 bg-slate-50/50 dark:bg-slate-950/30">
-                  <button
-                    type="button"
+                  <Button variant="outline" type="button"
                     onClick={() => setSelectedReferredById(-1)}
                     className={`w-full text-left py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       selectedReferredById === -1
@@ -873,11 +871,11 @@ export function CustomersPage({
                     }`}
                   >
                     -- Hapus / Kosongkan Referral --
-                  </button>
+                  </Button>
                   {customers
                     .filter((c) => c.name.toLowerCase().includes(bulkSearchQuery.toLowerCase()))
                     .map((c) => (
-                      <button
+                      <Button variant="outline"
                         key={c.id}
                         type="button"
                         onClick={() => setSelectedReferredById(c.id)}
@@ -889,7 +887,7 @@ export function CustomersPage({
                       >
                         <span>{c.name}</span>
                         <span className="text-[10px] text-slate-400 dark:text-slate-500">{c.whatsapp || "Tanpa WA"}</span>
-                      </button>
+                      </Button>
                     ))}
                 </div>
               </div>

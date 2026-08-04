@@ -1145,8 +1145,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
           {/* Tools Menu */}
           <div className="grid gap-2.5 mb-6">
-            <button
-              type="button"
+            <Button variant="outline" type="button"
               onClick={() => {
                 setActiveTool("select");
                 setFirstNodeForEdge(null);
@@ -1159,10 +1158,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
             >
               <Move className="w-4 h-4 text-indigo-500" />
               Navigasi & Pindah Node
-            </button>
+            </Button>
 
-            <button
-              type="button"
+            <Button variant="outline" type="button"
               onClick={() => {
                 setActiveTool("add-node");
                 setFirstNodeForEdge(null);
@@ -1176,10 +1174,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
             >
               <Plus className="w-4 h-4 text-emerald-500" />
               Tambah Node Baru
-            </button>
+            </Button>
 
-            <button
-              type="button"
+            <Button variant="outline" type="button"
               onClick={() => {
                 setActiveTool("add-edge");
                 setFirstNodeForEdge(null);
@@ -1193,7 +1190,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
             >
               <Link className="w-4 h-4 text-amber-500" />
               Tambah Hubungan Kabel
-            </button>
+            </Button>
           </div>
 
           {/* Waypoints Editor (Rendered when an edge is selected) */}
@@ -1207,32 +1204,29 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     <Link className="w-3.5 h-3.5 text-indigo-500" />
                     Edit Belokan: {edge.edge_id}
                   </span>
-                  <button
-                    type="button"
+                  <Button variant="outline" type="button"
                     onClick={() => setSelectedEdgeForWaypoints(null)}
                     className="text-slate-400 hover:text-slate-600"
                   >
                     <X className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
                 <p className="text-[10px] text-slate-500 leading-snug">
                   Tambahkan titik belokan pada kabel ini. Anda bisa menyeret titik kuning di peta untuk mengatur posisi belokannya.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
+                  <Button variant="outline" type="button"
                     onClick={() => handleAddWaypoint(edge.edge_id)}
                     className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-indigo-600 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm flex items-center justify-center gap-1 transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" /> Tambah Belokan
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button variant="outline" type="button"
                     onClick={() => handleResetWaypoints(edge.edge_id)}
                     className="bg-white hover:bg-red-50 border border-slate-200 text-red-600 text-xs font-semibold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
                   >
                     Reset
-                  </button>
+                  </Button>
                 </div>
 
                 {edge.waypoints && edge.waypoints.length > 0 && (
@@ -1240,13 +1234,12 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     {edge.waypoints.map((wp, idx) => (
                       <div key={idx} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-1.5 text-[10px] font-mono">
                         <span className="text-slate-600">Pt #{idx + 1}: {wp[0].toFixed(5)}, {wp[1].toFixed(5)}</span>
-                        <button
-                          type="button"
+                        <Button variant="outline" type="button"
                           onClick={() => handleRemoveWaypoint(edge.edge_id, idx)}
                           className="text-red-500 hover:text-red-700"
                         >
                           <Trash2 className="w-3 h-3" />
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -1278,44 +1271,40 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
           )}
 
           <div className="flex gap-2">
-            <button
-              type="button"
+            <Button variant="outline" type="button"
               onClick={() => void handleSync()}
               disabled={saving || !isDirty}
               className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-sm py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow"
             >
               <Save className="w-4 h-4" />
               {saving ? "Menyimpan..." : "Simpan Peta"}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button variant="outline" type="button"
               title="Reset Semua ke DB"
               onClick={() => void loadData()}
               disabled={saving}
               className="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 py-2.5 px-3 rounded-xl transition"
             >
               <RefreshCw className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
 
           <div className="flex justify-between mt-1">
-            <button
-              type="button"
+            <Button variant="outline" type="button"
               onClick={() => setIsSettingsModalOpen(true)}
               className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1"
             >
               <Settings className="w-3.5 h-3.5" />
               Pengaturan Peta
-            </button>
+            </Button>
 
-            <button
-              type="button"
+            <Button variant="outline" type="button"
               onClick={() => void handleResetAll()}
               className="text-xs text-red-600 hover:text-red-800 font-semibold flex items-center gap-1"
             >
               <Trash2 className="w-3.5 h-3.5" />
               Hapus Semua
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -1330,8 +1319,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               (!firstNodeForEdge
                 ? "Pilih node asal dengan mengklik penanda di peta."
                 : `Menghubungkan dari: "${firstNodeForEdge.name}". Klik node tujuan.`)}
-            <button
-              type="button"
+            <Button variant="outline" type="button"
               onClick={() => {
                 setActiveTool("select");
                 setFirstNodeForEdge(null);
@@ -1339,7 +1327,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               className="bg-indigo-700 hover:bg-indigo-800 p-0.5 rounded-full"
             >
               <X className="w-3 h-3" />
-            </button>
+            </Button>
           </div>
         )}
 
@@ -1443,8 +1431,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     )}
 
                     <div className="flex gap-2">
-                      <button
-                        type="button"
+                      <Button variant="outline" type="button"
                         onClick={() => {
                           setEditingEdge(edge);
                           setEdgeIdInput(edge.edge_id);
@@ -1459,14 +1446,13 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                         className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition"
                       >
                         <Edit className="w-3 h-3" /> Edit
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button variant="outline" type="button"
                         onClick={() => handleDeleteEdge(edge.edge_id)}
                         className="flex-1 bg-red-500 hover:bg-red-600 text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition shadow"
                       >
                         <Trash2 className="w-3 h-3" /> Hapus
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </Popup>
@@ -1656,8 +1642,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                           </div>
 
                           {/* Copy Info Button */}
-                          <button
-                            type="button"
+                          <Button variant="outline" type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               const info = `ODP Name: ${node.name}\nCoordinates: ${node.latitude}, ${node.longitude}\nUsage: ${connectedOnts.length}/${capacity} Ports`;
@@ -1667,7 +1652,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                             className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-750 dark:text-slate-300 text-[10px] font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
                           >
                             Copy Info
-                          </button>
+                          </Button>
                         </div>
                       );
                     })()}
@@ -1679,8 +1664,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     )}
 
                     <div className="flex gap-2 flex-wrap">
-                      <button
-                        type="button"
+                      <Button variant="outline" type="button"
                         onClick={() => handleToggleLock(node.node_id)}
                         className={`flex-1 py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition ${
                           isLocked
@@ -1691,9 +1675,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                       >
                         {isLocked ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
                         {isLocked ? "Buka Kunci" : "Kunci"}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button variant="outline" type="button"
                         onClick={() => {
                           setEditingNode(node);
                           setNodeIdInput(node.node_id);
@@ -1736,16 +1719,15 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                         className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition"
                       >
                         <Edit className="w-3 h-3" /> Edit
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button variant="outline" type="button"
                         onClick={() => handleDeleteNode(node.node_id)}
                         disabled={isLocked}
                         title={isLocked ? "Buka kunci terlebih dahulu sebelum menghapus" : "Hapus node dari peta"}
                         className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-red-200 disabled:cursor-not-allowed text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition shadow"
                       >
                         <Trash2 className="w-3 h-3" /> Hapus
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </Popup>
@@ -1756,8 +1738,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
         {/* Map Layer Toggle Button */}
         <div className="absolute bottom-4 right-4 z-[999]">
-          <button
-            type="button"
+          <Button variant="outline" type="button"
             onClick={() => {
               setMapLayer(prev => 
                 prev === "street" ? "satellite" : prev === "satellite" ? "satellite-plain" : "street"
@@ -1794,7 +1775,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">Street</span>
               </>
             )}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1809,13 +1790,12 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               <h3 className="text-base font-bold text-slate-900">
                 {editingNode ? `Edit Node: ${editingNode.node_id}` : "Tambah Node Infrastruktur"}
               </h3>
-              <button
-                type="button"
+              <Button variant="outline" type="button"
                 onClick={() => setIsNodeModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
 
             <div className="grid gap-3.5 max-h-[450px] overflow-y-auto pr-1">
@@ -1920,8 +1900,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">TIPE IDENTIFIER</label>
                     <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5">
-                      <button
-                        type="button"
+                      <Button variant="outline" type="button"
                         onClick={() => {
                           setIdentifierType("pppoe");
                           setSearchQuery("");
@@ -1931,9 +1910,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                         }`}
                       >
                         PPPoE Username
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button variant="outline" type="button"
                         onClick={() => {
                           setIdentifierType("serialnumber");
                           setSearchQuery("");
@@ -1943,7 +1921,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                         }`}
                       >
                         Serial Number
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -1978,7 +1956,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                             const val = identifierType === "pppoe" ? pppoe : sn;
                             const sub = identifierType === "pppoe" ? `SN: ${sn}` : `PPPoE: ${pppoe}`;
                             return (
-                              <button
+                              <Button variant="outline"
                                 key={dev._id}
                                 type="button"
                                 onClick={() => handleSelectDevice(dev)}
@@ -1986,7 +1964,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                               >
                                 <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
                                 <span className="text-[10px] text-slate-400">{sub}</span>
-                              </button>
+                              </Button>
                             );
                           })
                         )}
@@ -2179,8 +2157,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     <p className="text-[10px] text-slate-400 leading-snug">{nodeLocked ? "Node tidak bisa digeser di peta." : "Node bisa digeser bebas di peta."}</p>
                   </div>
                 </div>
-                <button
-                  type="button"
+                <Button variant="outline" type="button"
                   onClick={() => setNodeLocked(v => !v)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                     nodeLocked ? "bg-amber-500" : "bg-slate-200 dark:bg-slate-700"
@@ -2189,7 +2166,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
                     nodeLocked ? "translate-x-6" : "translate-x-1"
                   }`} />
-                </button>
+                </Button>
               </div>
 
               <div>

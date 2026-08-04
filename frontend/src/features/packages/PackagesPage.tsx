@@ -7,6 +7,7 @@ import type { PackageItem } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
 import { fetchMikrotikIPPools, type MikrotikIPPoolItem, apiRequest } from "../../lib/api";
 import { useDialog } from "../../context/DialogContext";
+import { Button } from "../../components/ui/Button";
 
 export type PackageFormState = {
   name: string;
@@ -256,17 +257,15 @@ export function PackagesPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <Button variant="outline" type="button"
             onClick={loadSyncProfiles}
             className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
             onClickCapture={() => setIsSyncOpen(true)}
           >
             <RefreshCw size={14} />
             Sinkronisasi MikroTik
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button variant="outline" type="button"
             onClick={() => {
               onCancelEdit();
               setIsCreatingNewPool(false);
@@ -276,7 +275,7 @@ export function PackagesPage({
           >
             <Plus size={14} />
             Tambah Paket
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -320,8 +319,7 @@ export function PackagesPage({
                     </td>
                     <td className="px-6 py-4 text-gray-700">
                       <div className="flex gap-2 justify-center">
-                        <button
-                          type="button"
+                        <Button variant="outline" type="button"
                           className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
                           onClick={() => {
                             setIsCreatingNewPool(false);
@@ -330,9 +328,8 @@ export function PackagesPage({
                           }}
                         >
                           Edit
-                        </button>
-                        <button
-                          type="button"
+                        </Button>
+                        <Button variant="outline" type="button"
                           className="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors"
                           onClick={() => {
                             setDeletingPkg(pkg);
@@ -342,7 +339,7 @@ export function PackagesPage({
                           title={pkg.customer_count > 0 ? "Tidak bisa menghapus paket yang memiliki pelanggan aktif" : ""}
                         >
                           Hapus
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -360,21 +357,19 @@ export function PackagesPage({
           onClose={handleCloseForm}
           actions={
             <>
-              <button
-                type="button"
+              <Button variant="outline" type="button"
                 className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 onClick={handleCloseForm}
               >
                 Batal
-              </button>
-              <button
-                type="submit"
+              </Button>
+              <Button variant="outline" type="submit"
                 form="package-form"
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 disabled={submitting}
               >
                 {isBusy("save-package") ? "Menyimpan..." : editingPackageId ? "Update Paket" : "Simpan Paket"}
-              </button>
+              </Button>
             </>
           }
         >
@@ -454,8 +449,7 @@ export function PackagesPage({
               <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Buat IP Pool Baru di MikroTik</span>
-                  <button
-                    type="button"
+                  <Button variant="outline" type="button"
                     className="text-xs font-bold text-indigo-650 hover:text-indigo-700"
                     onClick={() => {
                       setIsCreatingNewPool(false);
@@ -463,7 +457,7 @@ export function PackagesPage({
                     }}
                   >
                     Batal
-                  </button>
+                  </Button>
                 </div>
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Nama IP Pool Baru</span>
@@ -512,21 +506,19 @@ export function PackagesPage({
           onClose={() => setIsSyncOpen(false)}
           actions={
             <>
-              <button
-                type="button"
+              <Button variant="outline" type="button"
                 className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-55 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 onClick={() => setIsSyncOpen(false)}
               >
                 Tutup
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button variant="outline" type="button"
                 onClick={handleImportSync}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 disabled={syncLoading || !anySyncSelected}
               >
                 {syncLoading ? "Mengimpor..." : "Impor Profil Terpilih"}
-              </button>
+              </Button>
             </>
           }
         >
@@ -616,15 +608,13 @@ export function PackagesPage({
           onClose={() => setDeletingPkg(null)}
           actions={
             <>
-              <button
-                type="button"
+              <Button variant="outline" type="button"
                 className="bg-white border border-gray-300 text-slate-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 onClick={() => setDeletingPkg(null)}
               >
                 Batal
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button variant="outline" type="button"
                 className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 onClick={() => {
                   const id = deletingPkg.id;
@@ -634,7 +624,7 @@ export function PackagesPage({
                 }}
               >
                 Ya, Hapus Paket
-              </button>
+              </Button>
             </>
           }
         >

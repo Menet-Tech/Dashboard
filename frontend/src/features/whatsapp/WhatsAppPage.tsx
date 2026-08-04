@@ -294,7 +294,7 @@ export function WhatsAppPage({
 
         {/* Navigation Tabs */}
         <div className="flex border-b border-slate-200 mb-6 overflow-x-auto gap-2">
-          <button
+          <Button type="button" variant="outline"
             onClick={() => setActiveTab("accounts")}
             className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "accounts"
@@ -304,8 +304,8 @@ export function WhatsAppPage({
           >
             <MessageSquare size={16} />
             Akun Gateway ({accounts.length})
-          </button>
-          <button
+          </Button>
+          <Button type="button" variant="outline"
             onClick={() => setActiveTab("qr")}
             className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "qr"
@@ -315,8 +315,8 @@ export function WhatsAppPage({
           >
             <Wifi size={16} />
             Scan QR Code
-          </button>
-          <button
+          </Button>
+          <Button type="button" variant="outline"
             onClick={() => setActiveTab("history")}
             className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "history"
@@ -326,7 +326,7 @@ export function WhatsAppPage({
           >
             <ShieldAlert size={16} />
             Log Percakapan
-          </button>
+          </Button>
         </div>
 
         {/* Tab content 1: Accounts list & Create account */}

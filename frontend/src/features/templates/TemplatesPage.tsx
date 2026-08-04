@@ -380,7 +380,7 @@ export function TemplatesPage({
 
       {/* Tab Navigation */}
       <nav className="flex border-b border-slate-200 dark:border-slate-800 mb-6 overflow-x-auto gap-2">
-        <button
+        <Button variant="outline"
           onClick={() => setActiveTab("templates")}
           type="button"
           className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
@@ -391,8 +391,8 @@ export function TemplatesPage({
         >
           <FileText size={16} />
           Template Pesan
-        </button>
-        <button
+        </Button>
+        <Button variant="outline"
           onClick={() => setActiveTab("autoreply")}
           type="button"
           className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
@@ -403,8 +403,8 @@ export function TemplatesPage({
         >
           <MessageSquare size={16} />
           Auto-Response Custom
-        </button>
-        <button
+        </Button>
+        <Button variant="outline"
           onClick={() => setActiveTab("sessions")}
           type="button"
           className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
@@ -415,7 +415,7 @@ export function TemplatesPage({
         >
           <Bot size={16} />
           Sesi & Pendaftaran Chatbot ({contactForms.length})
-        </button>
+        </Button>
       </nav>
 
       {gatewayError && (activeTab === "autoreply" || activeTab === "sessions") ? (
@@ -492,8 +492,7 @@ export function TemplatesPage({
                         </td>
                         <td className="px-6 py-4 text-gray-700">
                           <div className="flex gap-2 justify-center">
-                            <button
-                              type="button"
+                            <Button variant="outline" type="button"
                               className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
                               onClick={() => {
                                 onEdit(item);
@@ -501,14 +500,13 @@ export function TemplatesPage({
                               }}
                             >
                               Edit
-                            </button>
-                            <button
-                              type="button"
+                            </Button>
+                            <Button variant="outline" type="button"
                               className="bg-red-50 hover:bg-red-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 text-red-700 dark:text-rose-350 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors cursor-pointer"
                               onClick={() => onDelete(item.id)}
                             >
                               Hapus
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -579,8 +577,7 @@ export function TemplatesPage({
                         </td>
                         <td className="px-6 py-4 text-gray-700">
                           <div className="flex gap-2 justify-center">
-                            <button
-                              type="button"
+                            <Button variant="outline" type="button"
                               className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
                               onClick={() => {
                                 onEdit(item);
@@ -588,14 +585,13 @@ export function TemplatesPage({
                               }}
                             >
                               Edit
-                            </button>
-                            <button
-                              type="button"
+                            </Button>
+                            <Button variant="outline" type="button"
                               className="bg-red-50 hover:bg-red-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 text-red-700 dark:text-rose-350 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors cursor-pointer"
                               onClick={() => onDelete(item.id)}
                             >
                               Hapus
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>

@@ -387,7 +387,7 @@ export function TicketsPage({
                 minute: "2-digit",
               });
               return (
-                <button
+                <Button type="button" variant="outline"
                   key={t.id}
                   onClick={() => setSelectedTicketId(t.id)}
                   className={`w-full text-left py-4 px-3 rounded-xl transition-all flex flex-col gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 ${
@@ -408,7 +408,7 @@ export function TicketsPage({
                       tone={t.status === "open" ? "gold" : "green"}
                     />
                   </div>
-                </button>
+                </Button>
               );
             })
           )}

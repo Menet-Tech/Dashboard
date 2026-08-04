@@ -191,18 +191,18 @@ export default function InventoryPage() {
         </header>
 
         <div className="flex gap-4 border-b border-slate-200 dark:border-slate-800">
-          <button
+          <Button type="button" variant="outline"
             onClick={() => setActiveTab("items")}
             className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === "items" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}
           >
             Stok Barang
-          </button>
-          <button
+          </Button>
+          <Button type="button" variant="outline"
             onClick={() => setActiveTab("logs")}
             className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === "logs" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}
           >
             Riwayat Transaksi
-          </button>
+          </Button>
         </div>
 
         {activeTab === "items" && (

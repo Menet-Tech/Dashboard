@@ -19,6 +19,7 @@ import {
 import { formatCurrency } from "../../utils/format";
 import { Info, ArrowUpRight, ArrowDownLeft, Gift, Percent, Search, Trash2, Edit3, Plus, X, Ticket, Settings, Clock, CheckCircle, XCircle, FileText, Camera, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { useDialog } from "../../context/DialogContext";
+import { Button } from "../../components/ui/Button";
 
 type DiscountsPageProps = {
   user: User | null;
@@ -575,7 +576,7 @@ export function DiscountsPage({
 
         {/* Tab Selector */}
         <div className="bg-slate-100 dark:bg-slate-900 p-1.5 rounded-2xl flex border border-slate-200 dark:border-slate-800 shrink-0">
-          <button
+          <Button type="button" variant="outline"
             onClick={() => {
               setActiveTab("discounts");
               setSearchQuery("");
@@ -588,8 +589,8 @@ export function DiscountsPage({
           >
             <Percent size={14} />
             Diskon Khusus ({sortedDiscountCustomers.length})
-          </button>
-          <button
+          </Button>
+          <Button type="button" variant="outline"
             onClick={() => {
               setActiveTab("referrals");
               setSearchQuery("");
@@ -602,8 +603,8 @@ export function DiscountsPage({
           >
             <Gift size={14} />
             Referral MGM ({sortedReferralCustomers.length})
-          </button>
-          <button
+          </Button>
+          <Button type="button" variant="outline"
             onClick={() => {
               setActiveTab("vouchers");
               setSearchQuery("");
@@ -616,8 +617,8 @@ export function DiscountsPage({
           >
             <Ticket size={14} />
             Voucher & Promosi
-          </button>
-          <button
+          </Button>
+          <Button type="button" variant="outline"
             onClick={() => {
               setActiveTab("withdrawals");
               setSearchQuery("");
@@ -630,7 +631,7 @@ export function DiscountsPage({
           >
             <Clock size={14} />
             Penarikan Referral ({withdrawalsList.filter(w => w.status === "pending").length})
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -683,15 +684,15 @@ export function DiscountsPage({
         {!isViewer && (
           <div className="flex gap-2">
             {activeTab === "discounts" ? (
-              <button
+              <Button type="button" variant="outline"
                 onClick={() => setIsCreateDiscountOpen(true)}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-2xl transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
               >
                 <Plus size={14} />
                 Beri Diskon Baru
-              </button>
+              </Button>
             ) : activeTab === "referrals" ? (
-              <button
+              <Button type="button" variant="outline"
                 onClick={async () => {
                   // Find first customer with no code to edit referral
                   const firstWithoutRef = customers.find(c => !c.referral_code);
@@ -707,23 +708,23 @@ export function DiscountsPage({
               >
                 <Plus size={14} />
                 Atur Referral Baru
-              </button>
+              </Button>
             ) : activeTab === "vouchers" ? (
               <>
-                <button
+                <Button type="button" variant="outline"
                   onClick={() => setIsCreateVoucherOpen(true)}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-2xl transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
                 >
                   <Plus size={14} />
                   Buat Voucher Baru
-                </button>
-                <button
+                </Button>
+                <Button type="button" variant="outline"
                   onClick={() => setIsAssignVoucherOpen(true)}
                   className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-750 dark:hover:bg-slate-700 text-white font-semibold text-xs px-4 py-2.5 rounded-2xl transition-all shadow-md flex items-center gap-1.5 shrink-0"
                 >
                   <Gift size={14} />
                   Beri Voucher ke Pelanggan
-                </button>
+                </Button>
               </>
             ) : null}
           </div>
@@ -782,22 +783,22 @@ export function DiscountsPage({
                         {!isViewer && (
                           <td className="px-6 py-4">
                             <div className="flex items-center justify-center gap-4">
-                              <button
+                              <Button type="button" variant="outline"
                                 onClick={() => handleOpenEditDiscount(customer)}
                                 className="text-xs text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1.5"
                                 title="Ubah Nominal Diskon"
                               >
                                 <Edit3 size={13} />
                                 Edit
-                              </button>
-                              <button
+                              </Button>
+                              <Button type="button" variant="outline"
                                 onClick={() => handleDeleteDiscount(customer)}
                                 className="text-xs text-red-600 hover:text-red-700 font-bold flex items-center gap-1.5"
                                 title="Hapus Diskon"
                               >
                                 <Trash2 size={13} />
                                 Hapus
-                              </button>
+                              </Button>
                             </div>
                           </td>
                         )}
@@ -867,7 +868,7 @@ export function DiscountsPage({
                             <div className="flex flex-col xl:flex-row items-center justify-center gap-2">
                               {/* Claim actions */}
                               <div className="flex gap-1.5">
-                                <button
+                                <Button type="button" variant="outline"
                                   onClick={() => handleWithdraw(customer)}
                                   disabled={customer.referral_balance <= 0}
                                   className={`text-[10px] px-2.5 py-1 rounded-lg border font-bold flex items-center gap-0.5 transition-all ${
@@ -879,8 +880,8 @@ export function DiscountsPage({
                                 >
                                   <ArrowUpRight size={10} />
                                   Tarik
-                                </button>
-                                <button
+                                </Button>
+                                <Button type="button" variant="outline"
                                   onClick={() => handleConvertToVoucher(customer)}
                                   disabled={customer.referral_balance <= 0}
                                   className={`text-[10px] px-2.5 py-1 rounded-lg border font-bold flex items-center gap-0.5 transition-all ${
@@ -892,27 +893,27 @@ export function DiscountsPage({
                                 >
                                   <ArrowDownLeft size={10} />
                                   Voucher
-                                </button>
+                                </Button>
                               </div>
 
                               {/* CRUD actions */}
                               <div className="flex gap-1.5 xl:border-l xl:pl-2 xl:ml-2 border-slate-200 dark:border-slate-800">
-                                <button
+                                <Button type="button" variant="outline"
                                   onClick={() => handleOpenEditReferral(customer)}
                                   className="text-xs text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1"
                                   title="Edit Data Referral"
                                 >
                                   <Edit3 size={11} />
                                   Edit
-                                </button>
-                                <button
+                                </Button>
+                                <Button type="button" variant="outline"
                                   onClick={() => handleDeleteReferral(customer)}
                                   className="text-xs text-red-600 hover:text-red-700 font-bold flex items-center gap-1"
                                   title="Reset Referral"
                                 >
                                   <Trash2 size={11} />
                                   Reset
-                                </button>
+                                </Button>
                               </div>
                             </div>
                           </td>
@@ -969,13 +970,13 @@ export function DiscountsPage({
                                 {voucher.code}
                               </span>
                               {!isViewer && (
-                                <button
+                                <Button type="button" variant="outline"
                                   onClick={() => handleDeleteVoucher(voucher.id, voucher.code)}
                                   className="text-red-600 hover:text-red-750 dark:text-red-400 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
                                   title="Hapus template"
                                 >
                                   <Trash2 size={12} />
-                                </button>
+                                </Button>
                               )}
                             </div>
                             <div className="text-lg font-extrabold text-slate-850 dark:text-slate-200 mt-2">
@@ -1042,7 +1043,7 @@ export function DiscountsPage({
                             </td>
                             <td className="px-5 py-3">
                               {!isViewer && cv.status === "active" ? (
-                                <button
+                                <Button type="button" variant="outline"
                                   onClick={() => cust && handleToggleAutoApply(cust, cust.voucher_auto_apply ?? 1)}
                                   className={`px-3 py-1 rounded-xl text-[10px] font-bold transition-all shadow-sm ${
                                     isAuto
@@ -1052,7 +1053,7 @@ export function DiscountsPage({
                                   title="Klik untuk mengubah preferensi penggunaan"
                                 >
                                   {isAuto ? "ON" : "OFF"}
-                                </button>
+                                </Button>
                               ) : (
                                 <span className="text-slate-400">{isAuto ? "ON" : "OFF"}</span>
                               )}
@@ -1220,7 +1221,7 @@ export function DiscountsPage({
                               <div className="flex items-center justify-center gap-2">
                                 {w.status === "pending" ? (
                                   <>
-                                    <button
+                                    <Button type="button" variant="outline"
                                       onClick={() => {
                                         setSelectedWithdrawForComplete(w);
                                         setCompleteNotes("");
@@ -1231,8 +1232,8 @@ export function DiscountsPage({
                                     >
                                       <CheckCircle size={12} />
                                       Selesai
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button type="button" variant="outline"
                                       onClick={() => {
                                         setSelectedWithdrawForReject(w);
                                         setRejectNotes("");
@@ -1242,7 +1243,7 @@ export function DiscountsPage({
                                     >
                                       <XCircle size={12} />
                                       Tolak
-                                    </button>
+                                    </Button>
                                   </>
                                 ) : (
                                   <span className="text-slate-400 italic text-xs">No Action</span>
@@ -1264,7 +1265,7 @@ export function DiscountsPage({
       {isCreateDiscountOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
-            <button
+            <Button type="button" variant="outline"
               onClick={() => {
                 setIsCreateDiscountOpen(false);
                 setSelectedCustomerForNewDiscount(0);
@@ -1273,7 +1274,7 @@ export function DiscountsPage({
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
-            </button>
+            </Button>
 
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-1.5">
               <Percent size={18} className="text-indigo-600" />
@@ -1383,8 +1384,7 @@ export function DiscountsPage({
               )}
 
               <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
+                <Button variant="outline" type="button"
                   onClick={() => {
                     setIsCreateDiscountOpen(false);
                     setSelectedCustomerForNewDiscount(0);
@@ -1394,14 +1394,13 @@ export function DiscountsPage({
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
-                </button>
-                <button
-                  type="submit"
+                </Button>
+                <Button variant="outline" type="submit"
                   disabled={submitting || selectedCustomerForNewDiscount === 0}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50"
                 >
                   {submitting ? "Menyimpan..." : "Tambahkan Diskon"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -1412,12 +1411,12 @@ export function DiscountsPage({
       {editingDiscountCustomer && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
-            <button
+            <Button type="button" variant="outline"
               onClick={() => setEditingDiscountCustomer(null)}
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
-            </button>
+            </Button>
 
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">
               Ubah Diskon Khusus
@@ -1497,21 +1496,19 @@ export function DiscountsPage({
               )}
 
               <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
+                <Button variant="outline" type="button"
                   onClick={() => setEditingDiscountCustomer(null)}
                   disabled={submitting}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
-                </button>
-                <button
-                  type="submit"
+                </Button>
+                <Button variant="outline" type="submit"
                   disabled={submitting}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20"
                 >
                   {submitting ? "Menyimpan..." : "Simpan Diskon"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -1522,7 +1519,7 @@ export function DiscountsPage({
       {isCreateVoucherOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
-            <button
+            <Button type="button" variant="outline"
               onClick={() => {
                 setIsCreateVoucherOpen(false);
                 setNewVoucherCode("");
@@ -1534,7 +1531,7 @@ export function DiscountsPage({
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
-            </button>
+            </Button>
 
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-1.5">
               <Ticket size={18} className="text-indigo-600" />
@@ -1629,8 +1626,7 @@ export function DiscountsPage({
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
+                <Button variant="outline" type="button"
                   onClick={() => {
                     setIsCreateVoucherOpen(false);
                     setNewVoucherCode("");
@@ -1643,14 +1639,13 @@ export function DiscountsPage({
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
-                </button>
-                <button
-                  type="submit"
+                </Button>
+                <Button variant="outline" type="submit"
                   disabled={submitting || !newVoucherCode}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20"
                 >
                   {submitting ? "Menyimpan..." : "Buat Voucher"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -1661,7 +1656,7 @@ export function DiscountsPage({
       {isAssignVoucherOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
-            <button
+            <Button type="button" variant="outline"
               onClick={() => {
                 setIsAssignVoucherOpen(false);
                 setSelectedCustomerForVoucher(0);
@@ -1670,7 +1665,7 @@ export function DiscountsPage({
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
-            </button>
+            </Button>
 
             <h3 className="text-lg font-bold text-slate-850 dark:text-slate-100 mb-2 flex items-center gap-1.5">
               <Gift size={18} className="text-indigo-600" />
@@ -1720,8 +1715,7 @@ export function DiscountsPage({
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
+                <Button variant="outline" type="button"
                   onClick={() => {
                     setIsAssignVoucherOpen(false);
                     setSelectedCustomerForVoucher(0);
@@ -1731,14 +1725,13 @@ export function DiscountsPage({
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
-                </button>
-                <button
-                  type="submit"
+                </Button>
+                <Button variant="outline" type="submit"
                   disabled={submitting || selectedCustomerForVoucher === 0 || selectedVoucherTemplate === 0}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50"
                 >
                   {submitting ? "Mengaitkan..." : "Kaitkan Voucher"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -1747,12 +1740,12 @@ export function DiscountsPage({
       {editingReferralCustomer && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
-            <button
+            <Button type="button" variant="outline"
               onClick={() => setEditingReferralCustomer(null)}
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
-            </button>
+            </Button>
 
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-1.5">
               <Gift size={18} className="text-indigo-600" />
@@ -1839,21 +1832,19 @@ export function DiscountsPage({
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
+                <Button variant="outline" type="button"
                   onClick={() => setEditingReferralCustomer(null)}
                   disabled={submitting}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
-                </button>
-                <button
-                  type="submit"
+                </Button>
+                <Button variant="outline" type="submit"
                   disabled={submitting}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20"
                 >
                   {submitting ? "Menyimpan..." : "Simpan Data"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -1864,7 +1855,7 @@ export function DiscountsPage({
       {isCompleteWithdrawOpen && selectedWithdrawForComplete && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
-            <button
+            <Button type="button" variant="outline"
               onClick={() => {
                 setIsCompleteWithdrawOpen(false);
                 setSelectedWithdrawForComplete(null);
@@ -1874,7 +1865,7 @@ export function DiscountsPage({
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
-            </button>
+            </Button>
 
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-1.5">
               <CheckCircle size={18} className="text-green-600" />
@@ -1939,8 +1930,7 @@ export function DiscountsPage({
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
+                <Button variant="outline" type="button"
                   onClick={() => {
                     setIsCompleteWithdrawOpen(false);
                     setSelectedWithdrawForComplete(null);
@@ -1951,14 +1941,13 @@ export function DiscountsPage({
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-355 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
-                </button>
-                <button
-                  type="submit"
+                </Button>
+                <Button variant="outline" type="submit"
                   disabled={submitting}
                   className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-green-600/25"
                 >
                   {submitting ? "Memproses..." : "Selesaikan Penarikan"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -1969,7 +1958,7 @@ export function DiscountsPage({
       {isRejectWithdrawOpen && selectedWithdrawForReject && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
-            <button
+            <Button type="button" variant="outline"
               onClick={() => {
                 setIsRejectWithdrawOpen(false);
                 setSelectedWithdrawForReject(null);
@@ -1978,7 +1967,7 @@ export function DiscountsPage({
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
-            </button>
+            </Button>
 
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-1.5">
               <XCircle size={18} className="text-red-600" />
@@ -2026,8 +2015,7 @@ export function DiscountsPage({
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
+                <Button variant="outline" type="button"
                   onClick={() => {
                     setIsRejectWithdrawOpen(false);
                     setSelectedWithdrawForReject(null);
@@ -2037,14 +2025,13 @@ export function DiscountsPage({
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-355 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
-                </button>
-                <button
-                  type="submit"
+                </Button>
+                <Button variant="outline" type="submit"
                   disabled={submitting}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-red-600/25"
                 >
                   {submitting ? "Menolak..." : "Tolak Penarikan"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

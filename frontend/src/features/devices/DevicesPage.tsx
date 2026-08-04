@@ -394,7 +394,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
             {/* Tab switcher */}
             <div className="flex gap-1 mb-5 border-b border-slate-150">
               {(["info", "wan", "wifi", "mikrotik", "params"] as const).map((tab) => (
-                <button
+                <Button variant="outline"
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
@@ -409,7 +409,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                     : tab === "wifi" ? "WiFi & Klien"
                     : tab === "mikrotik" ? "Pelanggan & MikroTik" 
                     : "Semua Parameter"}
-                </button>
+                </Button>
               ))}
             </div>
 
@@ -1173,7 +1173,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
         <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-slate-150 bg-slate-50/50">
           <div className="flex gap-1">
             {(["registered", "all", "faults"] as const).map((tab) => (
-              <button
+              <Button variant="outline"
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
@@ -1184,7 +1184,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                 }`}
               >
                 {tab === "registered" ? "Perangkat Terdaftar" : tab === "all" ? "Seluruh Perangkat" : "Fault Log"}
-              </button>
+              </Button>
             ))}
           </div>
           <Button

@@ -847,7 +847,7 @@ export function SettingsPage({
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <button
+              <Button variant="outline"
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id as any)}
@@ -861,7 +861,7 @@ export function SettingsPage({
                   <span className="block text-xs leading-none">{tab.label}</span>
                   <span className="block text-[9px] font-normal text-slate-400 dark:text-slate-500 mt-1">{tab.desc}</span>
                 </div>
-              </button>
+              </Button>
             );
           })}
         </nav>
@@ -885,7 +885,7 @@ export function SettingsPage({
                   const SubIcon = sub.icon;
                   const isSubActive = appSubTab === sub.id;
                   return (
-                    <button
+                    <Button variant="outline"
                       key={sub.id}
                       type="button"
                       onClick={() => setAppSubTab(sub.id as any)}
@@ -896,7 +896,7 @@ export function SettingsPage({
                     >
                       <SubIcon size={16} />
                       {sub.label}
-                    </button>
+                    </Button>
                   );
                 })}
               </aside>
@@ -1650,14 +1650,13 @@ export function SettingsPage({
                               <p className="text-[10px] text-slate-400 dark:text-slate-500">Kelola dan hubungkan beberapa router MikroTik secara sinkron.</p>
                             </div>
                           </div>
-                          <button
-                            type="button"
+                          <Button variant="outline" type="button"
                             onClick={() => void loadRouters()}
                             className="p-1.5 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
                             title="Refresh List"
                           >
                             <RefreshCw size={14} className={loadingRouters ? "animate-spin" : ""} />
-                          </button>
+                          </Button>
                         </div>
 
                         {loadingRouters ? (
@@ -1903,8 +1902,7 @@ export function SettingsPage({
                                     <option key={iface} value={iface}>{iface}</option>
                                   ))}
                                 </select>
-                                <button
-                                  type="button"
+                                <Button variant="outline" type="button"
                                   onClick={() => void loadRouterInterfaces({
                                     id: editingRouterId || undefined,
                                     host: newRouterHost,
@@ -1916,7 +1914,7 @@ export function SettingsPage({
                                   title="Ambil Port dari Router"
                                 >
                                   <RefreshCw size={14} className={fetchingInterfaces ? "animate-spin" : ""} />
-                                </button>
+                                </Button>
                               </div>
                               <span className="text-[9px] text-slate-400 block mt-1">Interface yang digunakan untuk sumber PPPoE (dinonaktifkan otomatis saat Main online).</span>
                             </label>
@@ -1937,8 +1935,7 @@ export function SettingsPage({
 
                         <div className="flex gap-2 pt-2">
                           {editingRouterId && (
-                            <button
-                              type="button"
+                            <Button variant="outline" type="button"
                               onClick={() => {
                                 setEditingRouterId(null);
                                 setNewRouterName("");
@@ -1953,10 +1950,9 @@ export function SettingsPage({
                               className="flex-1 bg-white border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-355 font-bold py-2 px-4 rounded-xl text-xs shadow-sm hover:bg-slate-50 transition-all cursor-pointer"
                             >
                               Batal
-                            </button>
+                            </Button>
                           )}
-                          <button
-                            type="button"
+                          <Button variant="outline" type="button"
                             onClick={async () => {
                               if (!newRouterName.trim() || !newRouterHost.trim() || !newRouterUser.trim()) {
                                 pushError("Harap lengkapi semua field wajib.");
@@ -2002,7 +1998,7 @@ export function SettingsPage({
                             className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-md transition-all cursor-pointer text-center"
                           >
                             {editingRouterId ? "Simpan Perubahan" : "Daftarkan Router"}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -2075,15 +2071,14 @@ export function SettingsPage({
                         </label>
                       </div>
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <button
-                          type="button"
+                        <Button variant="outline" type="button"
                           onClick={() => saveSection("MikroTik Global", ["mikrotik_isolir_profile", "mikrotik_inactive_profile", "mikrotik_auto_sync_hours", "mikrotik_delete_unregistered"])}
                           disabled={savingSection === "MikroTik Global"}
                           className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           {savingSection === "MikroTik Global" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save MikroTik Settings
-                        </button>
+                        </Button>
                       </div>
                     </article>
                                       {/* Auto setup panel (shows up if profile Check detects missing profiles on MikroTik) */}
@@ -2322,16 +2317,14 @@ export function SettingsPage({
                         </div>
                         <div className="flex justify-end pt-3 border-t border-amber-100 dark:border-amber-900/30 gap-3">
                           {showSetupForm && (
-                            <button
-                              type="button"
+                            <Button variant="outline" type="button"
                               onClick={() => setShowSetupForm(false)}
                               className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center cursor-pointer border border-transparent"
                             >
                               Batal
-                            </button>
+                            </Button>
                           )}
-                          <button
-                            type="button"
+                          <Button variant="outline" type="button"
                             onClick={() => {
                               if (!showSetupForm) {
                                 setSetupIsolirName(settingsForm.mikrotik_isolir_profile || "isolir");
@@ -2346,7 +2339,7 @@ export function SettingsPage({
                           >
                             {settingUpProfiles ? <Loader2 size={12} className="animate-spin" /> : <Settings size={12} />}
                             {showSetupForm ? "Mulai Setup" : "Setup Profile Otomatis"}
-                          </button>
+                          </Button>
                         </div>
                       </article>
                     )}
@@ -2363,15 +2356,14 @@ export function SettingsPage({
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Salin otomatis IP Pool, PPP Profile, dan PPP Secret dari router Utama ke semua router Slave.</p>
                           </div>
                         </div>
-                        <button
-                          type="button"
+                        <Button variant="outline" type="button"
                           onClick={handleRouterSync}
                           disabled={syncingRouters}
                           className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm cursor-pointer"
                         >
                           {syncingRouters ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                           {syncingRouters ? "Menyinkronkan..." : "Sync Main -> Slave Sekarang"}
-                        </button>
+                        </Button>
                       </div>
 
                       {routerSyncError && (
@@ -2408,15 +2400,14 @@ export function SettingsPage({
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Tarik daftar PPPoE secret dari router dan import yang belum terdaftar di dashboard.</p>
                           </div>
                         </div>
-                        <button
-                          type="button"
+                        <Button variant="outline" type="button"
                           onClick={handleSyncPreview}
                           disabled={syncLoading}
                           className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm cursor-pointer"
                         >
                           {syncLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                           {syncLoading ? "Memuat..." : "Preview Secrets"}
-                        </button>
+                        </Button>
                       </div>
 
                       {syncError && (
@@ -2433,9 +2424,9 @@ export function SettingsPage({
                               <span className="font-bold text-slate-700 dark:text-slate-300">{syncSecrets.length}</span> secret ditemukan &bull;{" "}
                               <span className="font-bold text-emerald-600 dark:text-emerald-455">{syncSecrets.filter((s) => !s.exists).length}</span> belum di dashboard
                             </p>
-                            <button type="button" onClick={toggleAll} className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer">
+                            <Button variant="outline" type="button" onClick={toggleAll} className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer">
                               {selected.size === syncSecrets.filter((s) => !s.exists).length ? "Batalkan Semua" : "Pilih Semua Baru"}
-                            </button>
+                            </Button>
                           </div>
 
                           <div className="max-h-64 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800/85">
@@ -2488,15 +2479,14 @@ export function SettingsPage({
                                   Aktifkan Trial
                                 </label>
                               </div>
-                              <button
-                                type="button"
+                              <Button variant="outline" type="button"
                                 onClick={handleImport}
                                 disabled={importLoading}
                                 className="w-full sm:w-auto sm:ml-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-60 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer"
                               >
                                 {importLoading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                                 {importLoading ? "Mengimport..." : `Import ${selected.size} Secret`}
-                              </button>
+                              </Button>
                             </div>
                           )}
 
@@ -2610,15 +2600,14 @@ export function SettingsPage({
                               {discordResult.success ? "Sukses" : "Gagal"}
                             </span>
                           )}
-                          <button
-                            type="button"
+                          <Button variant="outline" type="button"
                             onClick={handleTestDiscord}
                             disabled={testingDiscord}
                             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                           >
                             {testingDiscord ? <Loader2 size={12} className="animate-spin" /> : null}
                             {testingDiscord ? "Menguji..." : "Test Webhook"}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </article>
@@ -2694,8 +2683,7 @@ export function SettingsPage({
                       </div>
 
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <button
-                          type="button"
+                        <Button variant="outline" type="button"
                           onClick={() => saveSection("Discord & Bot", [
                             "discord_webhook_url", "discord_notify_payment", "discord_notify_generate",
                             "discord_notify_worker", "discord_bot_token", "discord_bot_application_id",
@@ -2706,7 +2694,7 @@ export function SettingsPage({
                         >
                           {savingSection === "Discord & Bot" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save Discord Settings
-                        </button>
+                        </Button>
                       </div>
                     </article>
                   </div>
@@ -2824,15 +2812,14 @@ export function SettingsPage({
                               placeholder="tujuan@gmail.com"
                             />
                           </label>
-                          <button
-                            type="button"
+                          <Button variant="outline" type="button"
                             onClick={handleTestSMTP}
                             disabled={testingSMTP}
                             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer h-[42px]"
                           >
                             {testingSMTP ? <Loader2 size={14} className="animate-spin" /> : null}
                             {testingSMTP ? "Menguji..." : "Kirim Email Test"}
-                          </button>
+                          </Button>
                         </div>
                         {smtpResult && (
                           <div className={`flex items-start gap-2 border text-xs rounded-xl px-4 py-3 ${smtpResult.success
@@ -2846,8 +2833,7 @@ export function SettingsPage({
                       </div>
 
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <button
-                          type="button"
+                        <Button variant="outline" type="button"
                           onClick={() => saveSection("SMTP Email", [
                             "smtp_enabled", "smtp_host", "smtp_port", "smtp_username", "smtp_password",
                             "smtp_from_email", "smtp_encryption"
@@ -2857,7 +2843,7 @@ export function SettingsPage({
                         >
                           {savingSection === "SMTP Email" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save SMTP Settings
-                        </button>
+                        </Button>
                       </div>
                     </article>
                   </div>
@@ -2879,7 +2865,7 @@ export function SettingsPage({
                   const SubIcon = sub.icon;
                   const isSubActive = acsSubTab === sub.id;
                   return (
-                    <button
+                    <Button variant="outline"
                       key={sub.id}
                       type="button"
                       onClick={() => setAcsSubTab(sub.id as any)}
@@ -2890,7 +2876,7 @@ export function SettingsPage({
                     >
                       <SubIcon size={16} />
                       {sub.label}
-                    </button>
+                    </Button>
                   );
                 })}
               </aside>
@@ -2963,24 +2949,22 @@ export function SettingsPage({
                               {acsResult.success ? "Sukses" : "Gagal"}
                             </span>
                           )}
-                          <button
-                            type="button"
+                          <Button variant="outline" type="button"
                             onClick={handleTestGenieACS}
                             disabled={testingAcs}
                             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                           >
                             {testingAcs ? <Loader2 size={12} className="animate-spin" /> : null}
                             {testingAcs ? "Menguji..." : "Test URL"}
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button variant="outline" type="button"
                             onClick={() => saveSection("GenieACS URL", ["acs_url", "acs_username", "acs_password"])}
                             disabled={savingSection === "GenieACS URL"}
                             className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-1.5 px-3.5 rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 font-sans"
                           >
                             {savingSection === "GenieACS URL" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                             Save URL
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </article>
@@ -3101,8 +3085,7 @@ export function SettingsPage({
                       </div>
 
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <button
-                          type="button"
+                        <Button variant="outline" type="button"
                           onClick={() => saveSection("Virtual Parameters", [
                             "vpPppoeUsername", "vpWanBridge", "vpRxPower", "vpTemperature",
                             "vpActiveDevices", "vpSuperAdmin", "vpSuperPassword", "vpUserAdmin", "vpUserPassword"
@@ -3112,7 +3095,7 @@ export function SettingsPage({
                         >
                           {savingSection === "Virtual Parameters" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save Virtual Parameters
-                        </button>
+                        </Button>
                       </div>
                     </article>
 
@@ -3171,15 +3154,14 @@ export function SettingsPage({
                       </div>
 
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <button
-                          type="button"
+                        <Button variant="outline" type="button"
                           onClick={() => saveSection("RX Power Settings", ["gacs_rx_power_excellent", "gacs_rx_power_fair", "rxPowerThresholds"])}
                           disabled={savingSection === "RX Power Settings"}
                           className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           {savingSection === "RX Power Settings" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save RX Power Settings
-                        </button>
+                        </Button>
                       </div>
                     </article>
 
@@ -3260,15 +3242,14 @@ export function SettingsPage({
                       </div>
 
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <button
-                          type="button"
+                        <Button variant="outline" type="button"
                           onClick={() => saveSection("Auto Refresh Intervals", ["autoRefreshIntervals"])}
                           disabled={savingSection === "Auto Refresh Intervals"}
                           className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           {savingSection === "Auto Refresh Intervals" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save RX Power Settings
-                        </button>
+                        </Button>
                       </div>
                     </article>
                   </div>
@@ -3280,8 +3261,7 @@ export function SettingsPage({
 
                     {/* Sub-tab Navigation */}
                     <div className="flex gap-4 border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <button
-                        type="button"
+                      <Button variant="outline" type="button"
                         onClick={() => setVendorSubTab("vendors")}
                         className={`text-xs font-bold pb-2 transition-all cursor-pointer border-b-2 px-1 ${vendorSubTab === "vendors"
                           ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
@@ -3289,9 +3269,8 @@ export function SettingsPage({
                           }`}
                       >
                         📦 Vendors
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button variant="outline" type="button"
                         onClick={() => setVendorSubTab("wifi")}
                         className={`text-xs font-bold pb-2 transition-all cursor-pointer border-b-2 px-1 ${vendorSubTab === "wifi"
                           ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
@@ -3299,7 +3278,7 @@ export function SettingsPage({
                           }`}
                       >
                         📡 WiFi Security Config
-                      </button>
+                      </Button>
                     </div>
 
                     {/* Vendors Sub-tab Content */}
@@ -3311,14 +3290,13 @@ export function SettingsPage({
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Manage parameter path mapping configurations per ONT manufacturer.</p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
+                            <Button variant="outline" type="button"
                               onClick={() => exportData(vendors, "vendors_export.json")}
                               className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
                             >
                               <Download size={14} />
                               Export
-                            </button>
+                            </Button>
                             <label className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
                               <Upload size={14} />
                               Import
@@ -3329,14 +3307,13 @@ export function SettingsPage({
                                 className="hidden"
                               />
                             </label>
-                            <button
-                              type="button"
+                            <Button variant="outline" type="button"
                               onClick={() => setEditingVendor({})}
                               className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 cursor-pointer"
                             >
                               <Plus size={14} />
                               Add Vendor
-                            </button>
+                            </Button>
                           </div>
                         </div>
 
@@ -3398,22 +3375,20 @@ export function SettingsPage({
                                     </td>
                                     <td className="py-3 px-4 text-right shrink-0">
                                       <div className="flex items-center justify-end gap-1.5">
-                                        <button
-                                          type="button"
+                                        <Button variant="outline" type="button"
                                           onClick={() => setEditingVendor(vendor)}
                                           className="p-1 hover:text-indigo-600 text-slate-500 transition-colors cursor-pointer"
                                           title="Edit Vendor"
                                         >
                                           <Edit size={14} />
-                                        </button>
-                                        <button
-                                          type="button"
+                                        </Button>
+                                        <Button variant="outline" type="button"
                                           onClick={() => setDeletingVendorItem(vendor)}
                                           className="p-1 hover:text-rose-600 text-slate-500 transition-colors cursor-pointer"
                                           title="Delete Vendor"
                                         >
                                           <Trash2 size={14} />
-                                        </button>
+                                        </Button>
                                       </div>
                                     </td>
                                   </tr>
@@ -3434,14 +3409,13 @@ export function SettingsPage({
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Configure WiFi password paths per product class.</p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
+                            <Button variant="outline" type="button"
                               onClick={() => exportData(wifiConfigs, "wifi_configs_export.json")}
                               className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
                             >
                               <Download size={14} />
                               Export
-                            </button>
+                            </Button>
                             <label className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
                               <Upload size={14} />
                               Import
@@ -3452,14 +3426,13 @@ export function SettingsPage({
                                 className="hidden"
                               />
                             </label>
-                            <button
-                              type="button"
+                            <Button variant="outline" type="button"
                               onClick={() => setEditingWifiConfig({})}
                               className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 cursor-pointer"
                             >
                               <Plus size={14} />
                               Add WiFi Config
-                            </button>
+                            </Button>
                           </div>
                         </div>
 
@@ -3502,22 +3475,20 @@ export function SettingsPage({
                                     </td>
                                     <td className="py-3 px-4 text-right">
                                       <div className="flex items-center justify-end gap-1.5">
-                                        <button
-                                          type="button"
+                                        <Button variant="outline" type="button"
                                           onClick={() => setEditingWifiConfig(item)}
                                           className="p-1 hover:text-indigo-600 text-slate-500 transition-colors cursor-pointer"
                                           title="Edit Wifi Config"
                                         >
                                           <Edit size={14} />
-                                        </button>
-                                        <button
-                                          type="button"
+                                        </Button>
+                                        <Button variant="outline" type="button"
                                           onClick={() => setDeletingWifiItem(item)}
                                           className="p-1 hover:text-rose-600 text-slate-500 transition-colors cursor-pointer"
                                           title="Delete Wifi Config"
                                         >
                                           <Trash2 size={14} />
-                                        </button>
+                                        </Button>
                                       </div>
                                     </td>
                                   </tr>
@@ -3648,14 +3619,13 @@ export function SettingsPage({
           <p className="text-xs text-slate-500 dark:text-slate-400 text-center sm:text-left">
             Operasional backup manual dan histori file sekarang dipindahkan ke tab <strong>Monitoring</strong> agar tim bisa cek status sistem tanpa membuka form konfigurasi.
           </p>
-          <button
-            type="submit"
+          <Button variant="outline" type="submit"
             disabled={submitting}
             className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2.5 px-6 rounded-xl shadow-md hover:shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isBusy("save-settings") ? <Loader2 size={14} className="animate-spin" /> : null}
             {isBusy("save-settings") ? "Menyimpan..." : "Simpan Semua Pengaturan"}
-          </button>
+          </Button>
         </div>
       </form>
 
@@ -3666,15 +3636,13 @@ export function SettingsPage({
           onClose={() => setEditingVendor(null)}
           actions={
             <>
-              <button
-                type="button"
+              <Button variant="outline" type="button"
                 onClick={() => setEditingVendor(null)}
                 className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Cancel
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button variant="outline" type="button"
                 onClick={async () => {
                   if (!editingVendor.name || !editingVendor.parameter_prefix) {
                     pushError("Vendor Name and Parameter Prefix are required.");
@@ -3715,7 +3683,7 @@ export function SettingsPage({
                 className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-md hover:shadow-indigo-500/20 transition-all cursor-pointer"
               >
                 Save
-              </button>
+              </Button>
             </>
           }
         >
@@ -3881,15 +3849,13 @@ export function SettingsPage({
           onClose={() => setDeletingVendorItem(null)}
           actions={
             <>
-              <button
-                type="button"
+              <Button variant="outline" type="button"
                 onClick={() => setDeletingVendorItem(null)}
                 className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Batal
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button variant="outline" type="button"
                 onClick={async () => {
                   try {
                     await deleteVendor(deletingVendorItem.id);
@@ -3903,7 +3869,7 @@ export function SettingsPage({
                 className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-md hover:shadow-rose-500/20 transition-all cursor-pointer"
               >
                 Hapus Vendor
-              </button>
+              </Button>
             </>
           }
         >
@@ -3930,15 +3896,13 @@ export function SettingsPage({
           onClose={() => setEditingWifiConfig(null)}
           actions={
             <>
-              <button
-                type="button"
+              <Button variant="outline" type="button"
                 onClick={() => setEditingWifiConfig(null)}
                 className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Cancel
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button variant="outline" type="button"
                 onClick={async () => {
                   if (!editingWifiConfig.product_class || !editingWifiConfig.password_param_path) {
                     pushError("Product Class and Password Parameter Path are required.");
@@ -3968,7 +3932,7 @@ export function SettingsPage({
                 className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-md hover:shadow-indigo-500/20 transition-all cursor-pointer"
               >
                 Save
-              </button>
+              </Button>
             </>
           }
         >
@@ -4025,15 +3989,13 @@ export function SettingsPage({
           onClose={() => setDeletingWifiItem(null)}
           actions={
             <>
-              <button
-                type="button"
+              <Button variant="outline" type="button"
                 onClick={() => setDeletingWifiItem(null)}
                 className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Batal
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button variant="outline" type="button"
                 onClick={async () => {
                   try {
                     await deleteWifiSecurity(deletingWifiItem.id);
@@ -4047,7 +4009,7 @@ export function SettingsPage({
                 className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-md hover:shadow-rose-500/20 transition-all cursor-pointer"
               >
                 Hapus WiFi Config
-              </button>
+              </Button>
             </>
           }
         >
@@ -4074,15 +4036,13 @@ export function SettingsPage({
           onClose={() => setDeletingRouter(null)}
           actions={
             <>
-              <button
-                type="button"
+              <Button variant="outline" type="button"
                 onClick={() => setDeletingRouter(null)}
                 className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Batal
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button variant="outline" type="button"
                 onClick={async () => {
                   try {
                     await deleteMikrotikRouter(deletingRouter.id);
@@ -4096,7 +4056,7 @@ export function SettingsPage({
                 className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-md hover:shadow-rose-500/20 transition-all cursor-pointer"
               >
                 Hapus Router
-              </button>
+              </Button>
             </>
           }
         >
