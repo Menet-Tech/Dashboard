@@ -4,6 +4,7 @@ import { inputClassName, renderInlineError } from "../../../components/ui";
 import { type CustomerItem, type PackageItem, type User, type OdpItem } from "../../../types";
 import { type FieldErrors } from "../../../utils/validation";
 import { type CustomerFormState } from "../CustomersPage";
+import { Button } from "../../../components/ui/Button";
 
 type CustomerFormCardProps = {
   user: User | null;
@@ -60,13 +61,15 @@ export function CustomerFormCard({
           </p>
         </div>
         {isEditing && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={onCancelEdit}
-            className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 font-medium underline"
+            className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 underline"
           >
             Batal Edit
-          </button>
+          </Button>
         )}
       </div>
 

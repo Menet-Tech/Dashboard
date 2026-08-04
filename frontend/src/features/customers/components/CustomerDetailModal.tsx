@@ -12,6 +12,7 @@ import {
   updateONTWifi,
 } from "../../../lib/api";
 import { useDialog } from "../../../context/DialogContext";
+import { Button } from "../../../components/ui/Button";
 
 type CustomerDetailModalProps = {
   customer: CustomerItem;
@@ -239,16 +240,18 @@ export function CustomerDetailModal({
               Informasi profil operasional & riwayat billing pelanggan.
             </p>
           </div>
-          <button
+          <Button
             type="button"
-            className="text-slate-400 hover:text-slate-650 p-1.5 hover:bg-slate-205 rounded-lg transition-colors"
+            variant="ghost"
+            size="icon"
+            className="text-slate-400 hover:text-slate-650"
             onClick={onClose}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
-          </button>
+          </Button>
         </div>
 
         {/* Modal Body */}
@@ -272,13 +275,14 @@ export function CustomerDetailModal({
                 </p>
               </div>
               {user?.role !== "viewer" && onEndTrial && (
-                <button
+                <Button
                   type="button"
+                  variant="primary"
+                  className="bg-amber-600 hover:bg-amber-700 sm:w-auto w-full"
                   onClick={() => onEndTrial(customer.id)}
-                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors cursor-pointer w-full sm:w-auto text-center whitespace-nowrap"
                 >
                   Hentikan Trial & Jadikan Reguler
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -379,15 +383,17 @@ export function CustomerDetailModal({
                 </span>
                 <div className="flex flex-wrap gap-2 mt-1">
                   {linkedAccounts.map((acc) => (
-                    <button
+                    <Button
                       key={acc.id}
                       type="button"
+                      variant="outline"
+                      size="sm"
+                      className="bg-white hover:bg-indigo-55 hover:text-indigo-800 text-indigo-700 border-indigo-200"
                       onClick={() => onSelectCustomer?.(acc)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-indigo-55 hover:text-indigo-800 text-indigo-700 border border-indigo-200 transition-colors shadow-sm cursor-pointer"
+                      icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-indigo-500"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>}
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-indigo-500"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
                       {acc.name} ({acc.address || "Tanpa Alamat"})
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -402,48 +408,59 @@ export function CustomerDetailModal({
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
                       type="button"
+                      variant="primary"
+                      size="sm"
                       onClick={handleCheckOntStatus}
                       disabled={loadingOnt || rebootingOnt}
-                      className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                      isLoading={loadingOnt}
+                      loadingText="Checking..."
                     >
-                      {loadingOnt ? <Loader2 size={12} className="animate-spin" /> : null}
-                      {loadingOnt ? "Checking..." : "Cek Koneksi ONT"}
-                    </button>
+                      Cek Koneksi ONT
+                    </Button>
                     {ontStatus && (
                       <>
                         {user?.role !== "viewer" && (
                           <>
-                            <button
+                            <Button
                               type="button"
+                              variant="primary"
+                              size="sm"
+                              className="bg-amber-600 hover:bg-amber-700"
                               onClick={handleWifiUpdate}
                               disabled={loadingOnt || rebootingOnt || updatingWifi || resettingOnt}
-                              className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                              isLoading={updatingWifi}
+                              loadingText="Updating..."
                             >
-                              {updatingWifi ? <Loader2 size={12} className="animate-spin" /> : null}
-                              {updatingWifi ? "Updating..." : "Ubah WiFi"}
-                            </button>
-                            <button
+                              Ubah WiFi
+                            </Button>
+                            <Button
                               type="button"
+                              variant="primary"
+                              size="sm"
+                              className="bg-slate-700 hover:bg-slate-800"
                               onClick={handleFactoryResetOnt}
                               disabled={loadingOnt || rebootingOnt || updatingWifi || resettingOnt}
-                              className="text-xs font-semibold bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                              isLoading={resettingOnt}
+                              loadingText="Resetting..."
                             >
-                              {resettingOnt ? <Loader2 size={12} className="animate-spin" /> : null}
-                              {resettingOnt ? "Resetting..." : "Reset Pabrik"}
-                            </button>
+                              Reset Pabrik
+                            </Button>
                           </>
                         )}
-                        <button
+                        <Button
                           type="button"
+                          variant="danger"
+                          size="sm"
                           onClick={handleRebootOnt}
                           disabled={loadingOnt || rebootingOnt || updatingWifi || resettingOnt}
-                          className="text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                          isLoading={rebootingOnt}
+                          loadingText="Rebooting..."
+                          icon={!rebootingOnt ? <RotateCw size={12} /> : undefined}
                         >
-                          {rebootingOnt ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
-                          {rebootingOnt ? "Rebooting..." : "Reboot ONT"}
-                        </button>
+                          Reboot ONT
+                        </Button>
                       </>
                     )}
                   </div>
@@ -661,15 +678,18 @@ export function CustomerDetailModal({
                 </div>
                 {customer.user_pppoe && user?.role !== "viewer" && (
                   <div className="pt-2 border-t border-slate-100 flex justify-end">
-                    <button
+                    <Button
                       type="button"
+                      variant="danger"
+                      size="sm"
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200"
                       onClick={handleKickMikrotik}
                       disabled={kickingMikrotik}
-                      className="text-[10px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-60"
+                      isLoading={kickingMikrotik}
+                      loadingText="Putus Sesi (Kick)"
                     >
-                      {kickingMikrotik ? <Loader2 size={10} className="animate-spin" /> : null}
                       Putus Sesi (Kick)
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -742,20 +762,23 @@ export function CustomerDetailModal({
             </div>
             {user?.role !== "viewer" && customer.referral_balance > 0 && (
               <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-slate-100">
-                <button
+                <Button
                   type="button"
-                  className="bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
+                  variant="outline"
+                  size="sm"
+                  className="bg-white border-indigo-200 hover:bg-indigo-50 text-indigo-700"
                   onClick={handleConvertVoucher}
                 >
                   Tukar Jadi Voucher
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
+                  variant="primary"
+                  size="sm"
                   onClick={handleWithdrawReferral}
                 >
                   Tarik Tunai
-                </button>
+                </Button>
               </div>
             )}
           </div>

@@ -12,6 +12,7 @@ import { formatCurrency } from "../../utils/format";
 import { Check, X, Eye, FileText, AlertCircle } from "lucide-react";
 import { useDialog } from "../../context/DialogContext";
 import { Modal } from "../../components/ui/Modal";
+import { Button } from "../../components/ui/Button";
 
 type PaymentConfirmationsPageProps = {
   pushSuccess: (msg: string) => void;
@@ -179,19 +180,18 @@ export function PaymentConfirmationsPage({
             </p>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-semibold py-2.5 px-4 rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              Tambah Konfirmasi Manual
-            </button>
-            <button
+            <Button onClick={() => setShowAddModal(true)} variant="primary">
+                Tambah Konfirmasi Manual
+              </Button>
+            <Button
+              variant="secondary"
               onClick={loadConfirmations}
               disabled={loading}
-              className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold py-2.5 px-4 rounded-xl shadow-sm transition-all cursor-pointer"
+              isLoading={loading}
+              loadingText="Menyegarkan..."
             >
-              {loading ? "Menyegarkan..." : "Segarkan"}
-            </button>
+              Segarkan
+            </Button>
           </div>
         </div>
 
@@ -312,20 +312,22 @@ export function PaymentConfirmationsPage({
                     </div>
 
                     <div className="flex gap-3 mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
-                      <button
-                        onClick={() => handleReject(item.id)}
-                        disabled={busyId !== null}
-                        className="flex-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 text-rose-600 dark:text-rose-450 text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-colors disabled:opacity-55"
-                      >
-                        <X className="w-4 h-4" /> Tolak
-                      </button>
-                      <button
-                        onClick={() => handleApprove(item.id)}
-                        disabled={busyId !== null}
-                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all disabled:opacity-55"
-                      >
-                        <Check className="w-4 h-4" /> Setujui
-                      </button>
+                      <Button
+                          onClick={() => handleReject(item.id)}
+                          disabled={busyId !== null}
+                          variant="danger"
+                          className="bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 text-rose-600 flex-1"
+                        >
+                          <X className="w-4 h-4" /> Tolak
+                        </Button>
+                      <Button
+                          onClick={() => handleApprove(item.id)}
+                          disabled={busyId !== null}
+                          variant="primary"
+                          className="flex-1"
+                        >
+                          <Check className="w-4 h-4" /> Setujui
+                        </Button>
                     </div>
                   </div>
                 </div>
@@ -424,20 +426,18 @@ export function PaymentConfirmationsPage({
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold py-2 px-4 rounded-xl text-xs hover:bg-slate-50 dark:hover:bg-slate-750 cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
+              <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
+                  Batal
+                </Button>
+              <Button
                 type="submit"
+                variant="primary"
                 disabled={submitting}
-                className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                isLoading={submitting}
+                loadingText="Menyimpan..."
               >
-                {submitting ? "Menyimpan..." : "Simpan Konfirmasi"}
-              </button>
+                Simpan Konfirmasi
+              </Button>
             </div>
           </form>
         </Modal>
