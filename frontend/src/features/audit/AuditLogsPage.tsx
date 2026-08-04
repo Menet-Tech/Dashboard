@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Button } from "../../components/ui/Button";
 import { StatusPill, inputClassName } from "../../components/ui";
 import { formatDateTime } from "../../utils/format";
 import { ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
@@ -131,19 +132,21 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
             </label>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="bg-white border border-slate-200 hover:bg-slate-50 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50 h-8 flex items-center justify-center"
-              disabled={submitting}
-              onClick={() => {
-                setActionFilter("");
-                setDateFilter("");
-                setSearchTerm("");
-                onRefresh();
-              }}
-            >
-              Reset & Refresh
-            </button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="!text-indigo-700 !h-8 !px-3"
+                disabled={submitting}
+                onClick={() => {
+                  setActionFilter("");
+                  setDateFilter("");
+                  setSearchTerm("");
+                  onRefresh();
+                }}
+              >
+                Refresh Data
+              </Button>
             <StatusPill label={`${filteredLogs.length} event`} tone="slate" />
           </div>
         </div>

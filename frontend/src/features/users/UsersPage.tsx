@@ -1,4 +1,5 @@
 import type { FormEvent } from "react";
+import { Button } from "../../components/ui/Button";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
 import type { ManagedUserItem } from "../../types";
 import type { FieldErrors } from "../../utils/validation";
@@ -80,9 +81,9 @@ export function UsersPage({
             </select>
           </label>
           <div className="flex gap-3 mt-4">
-            <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
+            <Button type="submit" variant="primary" disabled={submitting}>
               {isBusy("save-user") ? "Menyimpan..." : "Simpan User"}
-            </button>
+            </Button>
           </div>
         </form>
         <div className="border-t border-slate-100 pt-6 mt-6">
@@ -147,13 +148,14 @@ export function UsersPage({
                       )}
                     </td>
                     <td className="px-6 py-4 text-gray-700">
-                      <button
+                      <Button
                         type="button"
-                        className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                        variant="outline"
+                        size="sm"
                         onClick={() => onResetPassword(item)}
                       >
                         Reset Password
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))

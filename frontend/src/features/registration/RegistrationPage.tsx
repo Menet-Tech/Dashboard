@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type FormEvent } from "react";
+import { Button } from "../../components/ui/Button";
 import { StatusPill, EmptyTableRow, inputClassName, renderInlineError } from "../../components/ui";
 import { Trash2, CheckCircle2, UserPlus, Plus, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
@@ -421,8 +422,9 @@ export function RegistrationPage({
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={() => {
               setManualForm({
                 nama: "",
@@ -441,11 +443,11 @@ export function RegistrationPage({
               setFormErrors({});
               setIsManualModalOpen(true);
             }}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer animate-in"
+            className="!py-2 !px-4 animate-in"
           >
             <Plus size={14} />
             Tambah Registrasi Manual
-          </button>
+          </Button>
           <div className="flex gap-2">
             <StatusPill label={`${pendingLeads} Leads Pending`} tone={pendingLeads > 0 ? "gold" : "slate"} />
             <StatusPill label={`${leads.length} Total`} tone="slate" />
@@ -457,14 +459,15 @@ export function RegistrationPage({
       <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans">List Pendaftaran Calon Pelanggan</h3>
-          <button
+          <Button
             type="button"
+            variant="link"
             onClick={() => void loadLeads()}
             disabled={loading}
-            className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold"
+            className="!text-xs !font-semibold"
           >
             {loading ? "Memperbarui..." : "Refresh Data"}
-          </button>
+          </Button>
         </div>
 
         <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm scrollbar-thin">
@@ -562,33 +565,39 @@ export function RegistrationPage({
                         <div className="flex gap-2 justify-center">
                           {lead.status === "pending" && (
                             <>
-                              <button
+                              <Button
                                 type="button"
+                                variant="primary"
+                                size="sm"
                                 title="Konversi ke Pelanggan"
                                 onClick={() => handleConvert(lead)}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-2 rounded-lg shadow-sm transition-colors flex items-center gap-1 text-xs cursor-pointer"
+                                className="!p-2 !gap-1"
                               >
                                 <UserPlus size={14} />
                                 Konversi
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 type="button"
+                                variant="secondary"
+                                size="sm"
                                 title="Tandai Selesai"
                                 onClick={() => void handleResolve(lead)}
-                                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold p-2 rounded-lg transition-colors cursor-pointer"
+                                className="!p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-transparent"
                               >
                                 <CheckCircle2 size={14} />
-                              </button>
+                              </Button>
                             </>
                           )}
-                          <button
+                          <Button
                             type="button"
+                            variant="danger"
+                            size="sm"
                             title="Hapus Lead"
                             onClick={() => handleDelete(lead.id)}
-                            className="bg-red-50 hover:bg-red-100 text-red-700 font-bold p-2 rounded-lg transition-colors cursor-pointer"
+                            className="!p-2"
                           >
                             <Trash2 size={14} />
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -607,22 +616,24 @@ export function RegistrationPage({
           onClose={() => setIsManualModalOpen(false)}
           actions={
             <>
-              <button
+              <Button
                 type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer text-xs"
+                variant="outline"
                 onClick={() => setIsManualModalOpen(false)}
                 disabled={manualSubmitting}
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
+                variant="primary"
                 form="manual-reg-form"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer text-xs"
                 disabled={manualSubmitting}
+                isLoading={manualSubmitting}
+                loadingText="Menyimpan..."
               >
-                {manualSubmitting ? "Menyimpan..." : "Simpan Pendaftaran"}
-              </button>
+                Simpan Pendaftaran
+              </Button>
             </>
           }
         >
@@ -846,21 +857,21 @@ export function RegistrationPage({
           onClose={() => setConvertPreview(null)}
           actions={
             <>
-              <button
+              <Button
                 type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer text-xs"
+                variant="outline"
                 onClick={() => setConvertPreview(null)}
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="primary"
                 onClick={() => void handleConfirmConvert()}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer text-xs flex items-center gap-1.5"
               >
                 <UserPlus size={13} />
                 Simpan & Konversi Pelanggan
-              </button>
+              </Button>
             </>
           }
         >

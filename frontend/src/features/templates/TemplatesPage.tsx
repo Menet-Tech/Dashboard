@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, type FormEvent } from "react";
+import { Button } from "../../components/ui/Button";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
 import { Plus, FileText, MessageSquare, Bot, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
@@ -423,13 +424,13 @@ export function TemplatesPage({
             <p className="font-bold">Gateway WhatsApp bermasalah</p>
             <p className="text-sm mt-1">{gatewayError}</p>
           </div>
-          <button
+          <Button
             type="button"
+            variant="danger"
             onClick={loadChatbotData}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 cursor-pointer"
           >
             Coba Lagi
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -444,18 +445,20 @@ export function TemplatesPage({
               </div>
               <div className="flex items-center gap-3">
                 <StatusPill label={`${billingTemplates.length} Item`} tone="slate" />
-                <button
+                <Button
                   type="button"
+                  variant="primary"
+                  size="sm"
                   onClick={() => {
                     onCancelEdit();
                     onFormChange((curr) => ({ ...curr, trigger_key: "" }));
                     setIsFormOpen(true);
                   }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3.5 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="!py-2 !px-3.5 !gap-1.5"
                 >
                   <Plus size={13} />
                   Tambah Billing
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -525,18 +528,20 @@ export function TemplatesPage({
               </div>
               <div className="flex items-center gap-3">
                 <StatusPill label={`${chatbotTemplates.length} Item`} tone="green" />
-                <button
+                <Button
                   type="button"
+                  variant="primary"
+                  size="sm"
                   onClick={() => {
                     onCancelEdit();
                     onFormChange((curr) => ({ ...curr, trigger_key: "chatbot_" }));
                     setIsFormOpen(true);
                   }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3.5 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="!py-2 !px-3.5 !gap-1.5"
                 >
                   <Plus size={13} />
                   Tambah Chatbot
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -677,21 +682,23 @@ export function TemplatesPage({
           onClose={handleCloseForm}
           actions={
             <>
-              <button
+              <Button
                 type="button"
-                className="bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer"
+                variant="outline"
                 onClick={handleCloseForm}
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
+                variant="primary"
                 form="template-form"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer"
                 disabled={submitting}
+                isLoading={isBusy("save-template")}
+                loadingText="Menyimpan..."
               >
-                {isBusy("save-template") ? "Menyimpan..." : editingTemplateId ? "Update Template" : "Simpan Template"}
-              </button>
+                {editingTemplateId ? "Update Template" : "Simpan Template"}
+              </Button>
             </>
           }
         >

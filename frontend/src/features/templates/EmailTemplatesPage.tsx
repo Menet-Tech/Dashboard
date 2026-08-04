@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, type FormEvent } from "react";
+import { Button } from "../../components/ui/Button";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
 import { Plus, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
@@ -197,18 +198,18 @@ export function EmailTemplatesPage({
             Konfigurasi draft template subject dan isi email otomatis untuk billing, reminder jatuh tempo, isolir, dan pembayaran lunas.
           </p>
         </div>
-        <button
+        <Button
           type="button"
+          variant="primary"
           onClick={() => {
             setEditingTemplateId(null);
             setTemplateForm(defaultEmailTemplateForm());
             setIsFormOpen(true);
           }}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
         >
           <Plus size={14} />
           Tambah Template
-        </button>
+        </Button>
       </div>
 
       {/* Templates Table Card (Full Width) */}
@@ -252,20 +253,22 @@ export function EmailTemplatesPage({
                     </td>
                     <td className="px-6 py-4 text-gray-700">
                       <div className="flex gap-2 justify-center">
-                        <button
+                        <Button
                           type="button"
-                          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleEdit(item)}
                         >
                           Edit
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors"
+                          variant="danger"
+                          size="sm"
                           onClick={() => void handleDelete(item.id)}
                         >
                           Hapus
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -283,21 +286,23 @@ export function EmailTemplatesPage({
           onClose={handleCloseForm}
           actions={
             <>
-              <button
+              <Button
                 type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                variant="outline"
                 onClick={handleCloseForm}
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
+                variant="primary"
                 form="email-template-form"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 disabled={submitting}
+                isLoading={submitting}
+                loadingText="Menyimpan..."
               >
-                {submitting ? "Menyimpan..." : editingTemplateId ? "Update Template" : "Simpan Template"}
-              </button>
+                {editingTemplateId ? "Update Template" : "Simpan Template"}
+              </Button>
             </>
           }
         >
