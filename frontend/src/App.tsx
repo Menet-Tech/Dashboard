@@ -1,6 +1,6 @@
 import { Button } from "./components/ui";
 import { FormEvent, lazy, Suspense, startTransition, useEffect, useMemo, useState } from "react";
-import { StatusPill } from "./components/StatusPill";
+import { StatusPill } from "./components/ui";
 import {
   ApiError,
   fetchCurrentUser,
@@ -66,7 +66,9 @@ import { DevicesPage } from "./features/devices/DevicesPage";
 import { NetworkMapPage } from "./features/network-map/NetworkMapPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
-import { useAppFeedback } from "./hooks/useAppFeedback";
+import { FeedbackProvider, useAppFeedback } from "./context/FeedbackContext";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 import type { ConfirmDialogState } from "./hooks/types";
 import { useCustomers } from "./hooks/useCustomers";
@@ -147,8 +149,8 @@ const navItems: NavItem[] = [
   { key: "settings", label: "Pengaturan", caption: "Konfigurasi sistem" },
 ];
 
-export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+function AppRouter() {
+  const { user } = useAuth();
   const [view, setView] = useState<ViewKey>(() => {
     const stored = localStorage.getItem("active_view");
     if (stored) return stored as ViewKey;
@@ -157,23 +159,7 @@ export default function App() {
   const [activeDetailCustomer, setActiveDetailCustomer] = useState<CustomerItem | null>(null);
   const [booting, setBooting] = useState(true);
 
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    const stored = localStorage.getItem("theme");
-    if (stored === "dark" || stored === "light") return stored;
-    return "light";
-  });
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-    localStorage.setItem("theme", theme);
-  }, [theme]);
-
-  const toggleTheme = () => setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  const { theme, toggleTheme } = useTheme();
 
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
   const [revenue, setRevenue] = useState<RevenueItem[]>([]);
@@ -199,11 +185,7 @@ export default function App() {
   const usersHook = useUsers({ withFeedback: feedback.withFeedback, onSuccess: feedback.pushSuccess });
   const settingsHook = useSettings({ withFeedback: feedback.withFeedback, onSuccess: feedback.pushSuccess, refreshHealth: monitoringHook.handlers.refreshHealth });
 
-  useEffect(() => {
-    registerOnUnauthorized(() => {
-      setUser(null);
-    });
-  }, []);
+  const { authLoading, handleLogin, handleLogout } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
@@ -211,12 +193,6 @@ export default function App() {
       try {
         const healthPayload = await fetchHealth();
         if (!cancelled) monitoringHook.handlers.setHealth(healthPayload);
-        try {
-          const current = await fetchCurrentUser();
-          if (!cancelled) setUser(current.user);
-        } catch (caughtError) {
-          if (!cancelled && !(caughtError instanceof ApiError && caughtError.status === 401)) throw caughtError;
-        }
       } catch (caughtError) {
         if (!cancelled) feedback.pushError(toErrorMessage(caughtError));
       } finally {
@@ -348,7 +324,7 @@ export default function App() {
     }
   };
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+  async function doLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateLogin(loginForm);
     setLoginErrors(nextErrors);
@@ -358,7 +334,7 @@ export default function App() {
     try {
       const response = await login(loginForm.username, loginForm.password);
       setLoginErrors({});
-      setUser(response.user);
+      handleLogin(response.user);
       feedback.pushSuccess("Login berhasil. Fondasi admin panel Go sekarang sudah aktif.");
     } catch (caughtError) {
       setLoginApiError(toErrorMessage(caughtError));
@@ -367,28 +343,32 @@ export default function App() {
     }
   }
 
-  async function handleLogout() {
-    await feedback.withFeedback(async () => {
-      await logout();
-      setUser(null);
-      setSummary(null);
-      packagesHook.handlers.setPackages([]);
-      customersHook.handlers.setCustomers([]);
-      billsHook.handlers.setBills([]);
-      templatesHook.handlers.setTemplates([]);
-      setAuditLogs([]);
-      setRevenue([]);
-      usersHook.handlers.setManagedUsers([]);
-      startTransition(() => setView("dashboard"));
-      localStorage.setItem("active_view", "dashboard");
-      feedback.pushSuccess("Sesi berhasil ditutup.");
-    }, "logout");
+  async function doLogout() {
+    await handleLogout();
+    setSummary(null);
+    packagesHook.handlers.setPackages([]);
+    customersHook.handlers.setCustomers([]);
+    billsHook.handlers.setBills([]);
+    templatesHook.handlers.setTemplates([]);
+    setAuditLogs([]);
+    setRevenue([]);
+    usersHook.handlers.setManagedUsers([]);
+    startTransition(() => setView("dashboard"));
+    localStorage.setItem("active_view", "dashboard");
   }
 
-  if (booting) {
+  if (booting || authLoading) {
     return (
-      <main className="page-shell centered-shell">
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm loading-state">Memuat sistem...</div>
+      <main className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center" aria-label="Memuat aplikasi">
+        <div className="flex flex-col items-center gap-4" role="status" aria-live="polite">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+            <svg className="w-6 h-6 text-white animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Memuat Menet-Tech Dashboard...</p>
+        </div>
       </main>
     );
   }
@@ -400,25 +380,32 @@ export default function App() {
         loginErrors={loginErrors}
         loginApiError={loginApiError}
         submitting={loginSubmitting}
+        onLogin={doLogin}
         isBusy={(key) => key === "login" && loginSubmitting}
         onFormChange={(field, value) => {
           setLoginForm((current) => ({ ...current, [field]: value }));
           setLoginApiError(null);
         }}
-        onLogin={handleLogin}
       />
     );
   }
 
   return (
     <main className="flex min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 max-w-[1600px] mx-auto transition-colors duration-300">
+      {/* Skip navigation link — WCAG 2.4.1 */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[200] focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white focus:rounded-lg focus:text-sm focus:font-semibold focus:shadow-lg"
+      >
+        Langsung ke konten utama
+      </a>
       <Sidebar
         navOpen={navOpen}
         navItems={visibleNavItems}
         view={view}
         switchView={switchView}
         user={user}
-        onLogout={() => void handleLogout()}
+        onLogout={() => void doLogout()}
         submitting={feedback.submitting}
         isBusy={feedback.isBusy}
       />
@@ -427,7 +414,7 @@ export default function App() {
         <button type="button" className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 lg:hidden" onClick={() => setNavOpen(false)} aria-label="Tutup navigasi" />
       ) : null}
 
-      <div className="flex-1 flex flex-col min-w-0 px-4 py-6 md:px-8 lg:px-12 max-w-full overflow-x-hidden">
+      <div id="main-content" className="flex-1 flex flex-col min-w-0 px-4 py-6 md:px-8 lg:px-12 max-w-full overflow-x-hidden">
         <Topbar
           navOpen={navOpen}
           onToggleNav={() => setNavOpen((current) => !current)}
@@ -882,31 +869,7 @@ export default function App() {
         />
       )}
 
-      <ToastStack toasts={feedback.toasts} />
-
-      {feedback.confirmDialog ? (
-        <Modal
-          title={feedback.confirmDialog.title}
-          onClose={feedback.dismissConfirmDialog}
-          actions={
-            <>
-              <Button type="button" variant="secondary" onClick={feedback.dismissConfirmDialog}>
-                Batal
-              </Button>
-              <Button
-                type="button"
-                variant={feedback.confirmDialog.tone === "danger" ? "danger" : "primary"}
-                onClick={() => void feedback.confirmAndRun()}
-                isLoading={feedback.submitting}
-              >
-                {feedback.confirmDialog.confirmLabel}
-              </Button>
-            </>
-          }
-        >
-          <p className="muted">{feedback.confirmDialog.body}</p>
-        </Modal>
-      ) : null}
+      
 
       {usersHook.state.passwordResetState ? (
         <Modal
@@ -917,9 +880,9 @@ export default function App() {
               <button type="button" className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={() => usersHook.handlers.setPasswordResetState(null)}>
                 Batal
               </button>
-              <button type="submit" form="password-reset-form" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={feedback.submitting}>
+              <Button type="submit" form="password-reset-form" variant="primary" disabled={feedback.submitting}>
                 Simpan Password Baru
-              </button>
+              </Button>
             </>
           }
         >
@@ -945,7 +908,19 @@ export default function App() {
         </Modal>
       ) : null}
 
-
     </main>
   );
 }
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <FeedbackProvider>
+        <AuthProvider>
+          <AppRouter />
+        </AuthProvider>
+      </FeedbackProvider>
+    </ThemeProvider>
+  );
+}
+

@@ -127,7 +127,7 @@ func (p *TrafficPoller) pollOnce(ctx context.Context) {
 			defer cancel()
 
 			// Connect if not already connected
-			if cl.conn == nil {
+			if !cl.IsConnected() {
 				if err := cl.Connect(pollCtx); err != nil {
 					return
 				}
@@ -177,8 +177,8 @@ func (p *TrafficPoller) pollOnce(ctx context.Context) {
 				if exists {
 					dt := now.Sub(prev.time).Seconds()
 					if dt > 0.1 {
-						rxRate := int64(float64(txByte-prev.txBytes) / dt * 8)
-						txRate := int64(float64(rxByte-prev.rxBytes) / dt * 8)
+						rxRate := int64(float64(rxByte-prev.rxBytes) / dt * 8)
+						txRate := int64(float64(txByte-prev.txBytes) / dt * 8)
 						if rxRate < 0 {
 							rxRate = 0
 						}
@@ -209,5 +209,5 @@ func extractPPPoEUser(ifaceName string) string {
 	if strings.HasPrefix(lower, "pppoe-") {
 		return ifaceName[6:]
 	}
-	return ifaceName
+	return ""
 }

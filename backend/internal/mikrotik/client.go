@@ -2,11 +2,14 @@ package mikrotik
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -29,7 +32,15 @@ type Client struct {
 	Password string
 	Timeout  time.Duration
 
+	mu   sync.Mutex
 	conn net.Conn
+}
+
+// IsConnected returns true if the client has an active connection.
+func (c *Client) IsConnected() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.conn != nil
 }
 
 func NewClient(host, username, password string) *Client {
@@ -49,15 +60,29 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 
 	dialer := net.Dialer{Timeout: c.Timeout}
-	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	var conn net.Conn
+	var err error
+
+	if strings.HasSuffix(addr, ":8729") {
+		tlsCfg := &tls.Config{InsecureSkipVerify: true}
+		conn, err = tls.DialWithDialer(&dialer, "tcp", addr, tlsCfg)
+	} else {
+		conn, err = dialer.DialContext(ctx, "tcp", addr)
+	}
+
 	if err != nil {
 		return fmt.Errorf("mikrotik connect %s: %w", addr, err)
 	}
+
+	c.mu.Lock()
 	c.conn = conn
+	c.mu.Unlock()
 
 	if err := c.login(ctx); err != nil {
+		c.mu.Lock()
 		_ = c.conn.Close()
 		c.conn = nil
+		c.mu.Unlock()
 		return fmt.Errorf("mikrotik login: %w", err)
 	}
 
@@ -66,6 +91,8 @@ func (c *Client) Connect(ctx context.Context) error {
 
 // Close closes the connection.
 func (c *Client) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.conn != nil {
 		_ = c.conn.Close()
 		c.conn = nil
@@ -147,17 +174,23 @@ func (c *Client) ExportBackup(ctx context.Context) ([]byte, error) {
 	}
 
 	ipPools, err := fetchAndParse("/ip/pool/print")
-	if err == nil {
+	if err != nil {
+		slog.Warn("backup: failed to fetch ip pools", "error", err)
+	} else {
 		backupData["ip_pools"] = ipPools
 	}
 
 	pppProfiles, err := fetchAndParse("/ppp/profile/print")
-	if err == nil {
+	if err != nil {
+		slog.Warn("backup: failed to fetch ppp profiles", "error", err)
+	} else {
 		backupData["ppp_profiles"] = pppProfiles
 	}
 
 	pppSecrets, err := fetchAndParse("/ppp/secret/print")
-	if err == nil {
+	if err != nil {
+		slog.Warn("backup: failed to fetch ppp secrets", "error", err)
+	} else {
 		backupData["ppp_secrets"] = pppSecrets
 	}
 
@@ -203,7 +236,7 @@ func (c *Client) login(ctx context.Context) error {
 			}
 		}
 	}
-	return nil
+	return fmt.Errorf("login: no !done received in response")
 }
 
 // run sends a RouterOS API command and collects the response sentences.
@@ -222,15 +255,24 @@ func (c *Client) run(ctx context.Context, words ...string) ([][]string, error) {
 			deadline = d
 		}
 	}
-	_ = c.conn.SetDeadline(deadline)
-	if _, err := c.conn.Write(buf); err != nil {
+	
+	c.mu.Lock()
+	conn := c.conn
+	c.mu.Unlock()
+	
+	if conn == nil {
+		return nil, fmt.Errorf("not connected to RouterOS")
+	}
+
+	_ = conn.SetDeadline(deadline)
+	if _, err := conn.Write(buf); err != nil {
 		return nil, fmt.Errorf("write api sentence: %w", err)
 	}
 
 	// Read sentences until !done or !trap
 	var results [][]string
 	for {
-		sentence, err := readSentence(c.conn)
+		sentence, err := readSentence(conn)
 		if err != nil {
 			return results, fmt.Errorf("read api sentence: %w", err)
 		}
@@ -252,6 +294,10 @@ func readSentence(conn net.Conn) ([]string, error) {
 		}
 		if length == 0 {
 			break
+		}
+		const maxWordLength = 1 * 1024 * 1024 // 1 MB
+		if length > maxWordLength {
+			return words, fmt.Errorf("routeros word too large: %d bytes", length)
 		}
 		word := make([]byte, length)
 		if _, err := io.ReadFull(conn, word); err != nil {

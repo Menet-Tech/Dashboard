@@ -1,3 +1,4 @@
+import { Button } from "../../components/ui/Button";
 import { Fragment, useState, useMemo, type FormEvent } from "react";
 import { ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { formatCurrency } from "../../utils/format";
@@ -120,21 +121,23 @@ export function BillsPage({
 
   const renderSortableHeader = (label: string, field: string) => {
     const isSorted = sortField === field;
+    const sortAria = isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "none";
     return (
       <th 
         className="px-6 py-4 font-medium select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-gray-500"
         onClick={() => requestSort(field)}
+        aria-sort={sortAria}
       >
         <div className="inline-flex items-center gap-1.5">
           <span>{label}</span>
           {isSorted ? (
             sortDirection === "asc" ? (
-              <ChevronUp size={12} className="text-indigo-650 dark:text-indigo-400 stroke-[3]" />
+              <ChevronUp size={12} className="text-indigo-650 dark:text-indigo-400 stroke-[3]" aria-hidden="true" />
             ) : (
-              <ChevronDown size={12} className="text-indigo-650 dark:text-indigo-400 stroke-[3]" />
+              <ChevronDown size={12} className="text-indigo-650 dark:text-indigo-400 stroke-[3]" aria-hidden="true" />
             )
           ) : (
-            <ArrowUpDown size={12} className="text-slate-350 dark:text-slate-600 opacity-50 transition-opacity" />
+            <ArrowUpDown size={12} className="text-slate-350 dark:text-slate-600 opacity-50 transition-opacity" aria-hidden="true" />
           )}
         </div>
       </th>
@@ -178,9 +181,9 @@ export function BillsPage({
               {renderInlineError(billErrors.period)}
             </label>
             <div className="button-row">
-              <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" disabled={submitting}>
+              <Button variant="primary" disabled={submitting}>
                 {isBusy("generate-bills") ? "Menghasilkan..." : "Generate Sekarang"}
-              </button>
+              </Button>
             </div>
           </form>
           <p className="muted top-gap">
@@ -310,52 +313,61 @@ export function BillsPage({
                         )}
                       </td>
                       <td className="px-6 py-4 text-gray-700">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
-                            onClick={() => window.open(`/api/v1/bills/${bill.id}/invoice`, "_blank")}
-                          >
-                            Invoice
-                          </button>
-                          
-                          <select
-                            className="bg-white border border-slate-200 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
-                            defaultValue=""
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                void handleSendManualWA(bill.id, e.target.value);
-                                e.target.value = "";
-                              }
-                            }}
-                            disabled={isBusy(`notify-${bill.id}`)}
-                          >
-                            <option value="" disabled>Kirim WA</option>
-                            <option value="tagihan-h7">Tagihan H-7</option>
-                            <option value="reminder-h3">Reminder H-3</option>
-                            <option value="reminder-h5">Reminder H-5</option>
-                            <option value="jatuh_tempo">Jatuh Tempo</option>
-                            <option value="limit_5hari">Limit 5 Hari</option>
-                            <option value="isolir_20hari">Isolir 20 Hari</option>
-                            <option value="lunas">Lunas</option>
-                          </select>
-
-                          <button
-                            type="button"
-                            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
-                            onClick={() => onToggleNotifications(bill.id)}
-                          >
-                            Log WA
-                          </button>
-                          {user?.role !== "viewer" && bill.status === "belum_bayar" && bill.display_status !== "perpanjangan" ? (
+                        <div className="flex flex-wrap gap-2 items-center">
+                          {/* Dokumen & Log - Grup 1 */}
+                          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5">
                             <button
                               type="button"
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                              className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-md shadow-sm transition-colors"
+                              onClick={() => window.open(`/api/v1/bills/${bill.id}/invoice`, "_blank")}
+                              title="Buka PDF Invoice"
+                            >
+                              PDF
+                            </button>
+                            <button
+                              type="button"
+                              className="hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-md transition-colors"
+                              onClick={() => onToggleNotifications(bill.id)}
+                            >
+                              Log WA
+                            </button>
+                          </div>
+                          
+                          {/* WA Notify Native Select */}
+                          <div className="relative">
+                            <select
+                              className="appearance-none bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold py-1.5 pl-3 pr-8 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                              defaultValue=""
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  void handleSendManualWA(bill.id, e.target.value);
+                                  e.target.value = "";
+                                }
+                              }}
+                              disabled={isBusy(`notify-${bill.id}`)}
+                              aria-label="Kirim Notifikasi WA"
+                            >
+                              <option value="" disabled>Kirim WA</option>
+                              <option value="tagihan-h7">H-7</option>
+                              <option value="reminder-h3">H-3</option>
+                              <option value="reminder-h5">H-5</option>
+                              <option value="jatuh_tempo">Jatuh Tempo</option>
+                              <option value="limit_5hari">Limit 5H</option>
+                              <option value="isolir_20hari">Isolir 20H</option>
+                              <option value="lunas">Lunas</option>
+                            </select>
+                          </div>
+
+                          {/* Action Buttons (Lunas / Perpanjang / Batal) */}
+                          {user?.role !== "viewer" && bill.status === "belum_bayar" && bill.display_status !== "perpanjangan" ? (
+                            <Button
+                              type="button"
+                              variant="primary"
                               onClick={() => onMarkBillPaid(bill.id)}
                               disabled={isBusy("mark-paid")}
                             >
-                              {isBusy("mark-paid") ? "Memproses..." : "Tandai Lunas"}
-                            </button>
+                              {isBusy("mark-paid") ? "Proses..." : "Lunas"}
+                            </Button>
                           ) : null}
                           {user?.role !== "viewer" && bill.status === "belum_bayar" && bill.display_status !== "perpanjangan" && onGrantExtension ? (
                             <button
@@ -367,7 +379,6 @@ export function BillsPage({
                                   onGrantExtension(bill.id);
                                 }
                               }}
-
                             >
                               Perpanjang
                             </button>
@@ -379,11 +390,13 @@ export function BillsPage({
                               onClick={() => onCancelPendingAction(bill.id)}
                               disabled={isBusy(`cancel-pending-${bill.id}`)}
                             >
-                              {isBusy(`cancel-pending-${bill.id}`) ? "Membatalkan..." : "Batal"}
+                              {isBusy(`cancel-pending-${bill.id}`) ? "Batal..." : "Batal"}
                             </button>
                           ) : null}
+
+                          {/* Proof Upload */}
                           {user?.role !== "viewer" && bill.status !== "lunas" && bill.display_status !== "perpanjangan" && (
-                            <>
+                            <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 ml-auto">
                               <input
                                 type="file"
                                 accept=".jpg,.jpeg,.png,.pdf,.webp"
@@ -393,18 +406,19 @@ export function BillsPage({
                               />
                               <label
                                 htmlFor={`proof-upload-${bill.id}`}
-                                className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
+                                className="bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium py-1 px-2 rounded cursor-pointer transition-colors max-w-[80px] truncate"
                               >
-                                {proofFiles[bill.id] ? proofFiles[bill.id]?.name : "Pilih Bukti"}
+                                {proofFiles[bill.id] ? proofFiles[bill.id]?.name : "Pilih File"}
                               </label>
                               <button
                                 type="button"
-                                className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                                className="bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500 text-white text-[10px] font-bold py-1 px-2 rounded shadow-sm transition-colors disabled:opacity-50"
                                 onClick={() => onUploadProof(bill.id)}
+                                disabled={isBusy("upload-proof")}
                               >
-                                {isBusy("upload-proof") ? "Mengunggah..." : "Upload"}
+                                {isBusy("upload-proof") ? "↑" : "Upload"}
                               </button>
-                            </>
+                            </div>
                           )}
                         </div>
                       </td>

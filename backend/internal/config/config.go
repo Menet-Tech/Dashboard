@@ -109,6 +109,10 @@ func ValidateForProduction(cfg Config) error {
 	if strings.TrimSpace(jwtSecret) == "" || jwtSecret == "fallback-secret-key-for-development-only" {
 		return fmt.Errorf("JWT_SECRET must be set to a secure random value in production")
 	}
+	internalAPIKey := os.Getenv("DASHBOARD_INTERNAL_API_KEY")
+	if strings.TrimSpace(internalAPIKey) == "change-me-secret" {
+		return fmt.Errorf("DASHBOARD_INTERNAL_API_KEY must be changed in production")
+	}
 	return nil
 }
 

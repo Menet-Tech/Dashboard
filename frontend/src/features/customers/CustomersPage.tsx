@@ -1,3 +1,4 @@
+import { Button } from "../../components/ui/Button";
 import { useState, useEffect, useMemo } from "react";
 import { Loader2, Plus, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw } from "lucide-react";
 import { StatusPill, EmptyTableRow } from "../../components/ui";
@@ -206,21 +207,23 @@ export function CustomersPage({
 
   const renderSortableHeader = (label: string, field: string, align: "left" | "center" = "left") => {
     const isSorted = sortField === field;
+    const sortAria = isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "none";
     return (
       <th 
         className={`px-4 py-4 font-semibold select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${align === "center" ? "text-center" : "text-left"}`}
         onClick={() => requestSort(field)}
+        aria-sort={sortAria}
       >
         <div className={`inline-flex items-center gap-1.5 ${align === "center" ? "justify-center w-full" : ""}`}>
           <span>{label}</span>
           {isSorted ? (
             sortDirection === "asc" ? (
-              <ChevronUp size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+              <ChevronUp size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" aria-hidden="true" />
             ) : (
-              <ChevronDown size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" />
+              <ChevronDown size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" aria-hidden="true" />
             )
           ) : (
-            <ArrowUpDown size={12} className="text-slate-300 dark:text-slate-600 opacity-50 transition-opacity" />
+            <ArrowUpDown size={12} className="text-slate-300 dark:text-slate-600 opacity-50 transition-opacity" aria-hidden="true" />
           )}
         </div>
       </th>
@@ -241,8 +244,8 @@ export function CustomersPage({
     fetch("/api/v1/odps", { credentials: "include" })
       .then((res) => res.json())
       .then((data) => setOdps(data.data || []))
-      .catch((err) => console.error("Failed to load ODPs", err));
-  }, []);
+      .catch(() => pushError("Gagal memuat data ODP. Silakan muat ulang halaman."));
+  }, [pushError]);
 
   // Close form modal on successful save/update
   useEffect(() => {
@@ -636,14 +639,14 @@ export function CustomersPage({
               >
                 Batal
               </button>
-              <button
+              <Button
                 type="submit"
                 form="customer-form"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                variant="primary"
                 disabled={submitting}
               >
                 {submitting ? "Menyimpan..." : editingCustomerId ? "Update Pelanggan" : "Simpan Pelanggan"}
-              </button>
+              </Button>
             </>
           }
         >
@@ -702,13 +705,13 @@ export function CustomersPage({
               >
                 Batal
               </button>
-              <button
+              <Button
                 type="button"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors cursor-pointer"
+                variant="primary"
                 onClick={handleApplyBulkChange}
               >
                 Terapkan Perubahan
-              </button>
+              </Button>
             </>
           }
         >

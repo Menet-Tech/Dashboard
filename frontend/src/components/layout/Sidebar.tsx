@@ -1,3 +1,4 @@
+import { Button } from "../ui/Button";
 import { useState } from "react";
 import type { User, ViewKey } from "../../types";
 import {
@@ -141,14 +142,14 @@ export function Sidebar({
         }`}
       aria-label="Navigasi utama"
     >
-      {/* Sidebar Header */}
+      {/* Sidebar Header — branding, not a page heading */}
       <div className="p-6 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between">
         <div>
-          <p className="text-[9px] font-extrabold tracking-widest text-indigo-600 dark:text-indigo-400 uppercase mb-0.5">v2.1.0-stable</p>
-          <h1 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-200 dark:via-purple-200 dark:to-pink-200 leading-tight">
+          <p className="text-[10px] font-extrabold tracking-widest text-indigo-600 dark:text-indigo-400 uppercase mb-0.5">v2.1.0-stable</p>
+          <p className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-200 dark:via-purple-200 dark:to-pink-200 leading-tight">
             Menet-Tech
             <span className="block text-indigo-600 dark:text-indigo-400 font-semibold text-[10px] mt-0.5 font-sans">Control Panel</span>
-          </h1>
+          </p>
         </div>
       </div>
 
@@ -174,6 +175,8 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={() => toggleGroup(group.id)}
+                aria-expanded={!isCollapsed}
+                aria-controls={`nav-group-${group.id}`}
                 className={`w-full flex items-center justify-between px-4 py-3 text-left transition-all duration-200 bg-gradient-to-br ${group.gradient}`}
               >
                 <div className="flex items-center gap-3">
@@ -183,13 +186,13 @@ export function Sidebar({
                         : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
                       }`}
                   >
-                    <GroupIcon size={14} />
+                    <GroupIcon size={14} aria-hidden="true" />
                   </div>
                   <div>
                     <span className="font-bold text-xs text-slate-800 dark:text-slate-200 font-sans tracking-wide">
                       {group.title}
                     </span>
-                    <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-medium">
+                    <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium">
                       {groupItems.length} Fitur
                     </span>
                   </div>
@@ -197,11 +200,13 @@ export function Sidebar({
                 <ChevronDown
                   size={14}
                   className={`text-slate-400 dark:text-slate-500 transition-transform duration-300 ${isCollapsed ? "-rotate-90" : ""}`}
+                  aria-hidden="true"
                 />
               </button>
 
               {/* Group Card Features */}
               <div
+                id={`nav-group-${group.id}`}
                 className={`transition-all duration-300 ${isCollapsed ? "max-h-0 opacity-0 pointer-events-none" : "max-h-[800px] opacity-100 p-2 space-y-1 bg-slate-50/30 dark:bg-slate-950/40 border-t border-slate-100 dark:border-slate-900/60"
                   }`}
               >
@@ -218,15 +223,17 @@ export function Sidebar({
                       onClick={() => switchView(item.key)}
                       type="button"
                       aria-label={`Buka menu ${item.label}`}
+                      aria-current={isActive ? "page" : undefined}
                     >
                       <IconComponent
                         className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 group-hover/item:scale-110 ${isActive ? "text-white" : "text-slate-400 dark:text-slate-500 group-hover/item:text-indigo-600 dark:group-hover/item:text-slate-200"
                           }`}
+                        aria-hidden="true"
                       />
                       <div className="flex flex-col min-w-0">
                         <span className="font-bold text-xs font-sans tracking-wide leading-none">{item.label}</span>
                         <span
-                          className={`text-[9px] mt-0.5 truncate transition-colors leading-normal ${isActive ? "text-indigo-100" : "text-slate-450 dark:text-slate-500 group-hover/item:text-indigo-500/80 dark:group-hover/item:text-slate-400"
+                          className={`text-xs mt-0.5 truncate transition-colors leading-normal ${isActive ? "text-indigo-100" : "text-slate-450 dark:text-slate-500 group-hover/item:text-indigo-500/80 dark:group-hover/item:text-slate-400"
                             }`}
                         >
                           {item.caption}

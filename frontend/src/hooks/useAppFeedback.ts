@@ -17,12 +17,21 @@ export function useAppFeedback() {
     }, 4200);
   }
 
+  /** Dismiss a specific toast by id (e.g. via close button). */
+  function dismissToast(id: number) {
+    setToasts((current) => current.filter((item) => item.id !== id));
+  }
+
   function pushSuccess(msg: string) {
     pushToast("success", msg);
   }
 
   function pushError(msg: string) {
     pushToast("error", msg);
+  }
+
+  function pushWarning(msg: string) {
+    pushToast("warning", msg);
   }
 
   function askForConfirmation(config: ConfirmDialogState) {
@@ -65,6 +74,8 @@ export function useAppFeedback() {
     pushToast,
     pushSuccess,
     pushError,
+    pushWarning,
+    dismissToast,
     confirmDialog,
     askForConfirmation,
     dismissConfirmDialog,

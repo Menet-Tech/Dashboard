@@ -2,6 +2,7 @@ package mikrotik
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -112,7 +113,7 @@ func (s *RouterService) SyncMainToSlaves(ctx context.Context) (*SyncResult, erro
 			}
 
 			// Disable PPPoE interface on slave router to avoid collision with main
-			if slave.Role == "slave" && slave.SlavePort != "" {
+			if slave.SlavePort != "" {
 				slog.Info("sync: disabling backup port on slave router", "router", slave.Name, "port", slave.SlavePort)
 				if err := slaveClient.SetInterfaceDisabled(ctx, slave.SlavePort, true); err != nil {
 					slog.Error("sync: failed to disable backup port on slave router", "router", slave.Name, "port", slave.SlavePort, "error", err)
@@ -150,7 +151,10 @@ func (s *RouterService) ReconcileProfiles(ctx context.Context, client *Client) e
 	}
 
 	// Fetch IP pools once (used for pool name resolution)
-	pools, _ := client.ListIPPools(ctx)
+	pools, err := client.ListIPPools(ctx)
+	if err != nil {
+		slog.Warn("reconcile profiles: failed to list ip pools, pool names may not match exactly", "error", err)
+	}
 
 	rows, err := s.DB.QueryContext(ctx, "SELECT nama, kecepatan_mbps, COALESCE(ip_pool, ''), COALESCE(local_address, ''), COALESCE(rate_limit, '') FROM paket")
 	if err != nil {
@@ -158,6 +162,7 @@ func (s *RouterService) ReconcileProfiles(ctx context.Context, client *Client) e
 	}
 	defer rows.Close()
 
+	var errs []error
 	for rows.Next() {
 		var name, ipPool, localAddress, dbRateLimit string
 		var speedMbps int
@@ -207,7 +212,16 @@ func (s *RouterService) ReconcileProfiles(ctx context.Context, client *Client) e
 
 		if err := client.SyncPPPProfile(ctx, name, localAddress, actualPoolName, rateLimit); err != nil {
 			slog.Error("reconcile profiles: failed to sync profile", "profile", name, "error", err)
+			errs = append(errs, fmt.Errorf("profile %q: %w", name, err))
 		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("rows error during profile reconcile: %w", err)
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 	return nil
 }
@@ -227,23 +241,32 @@ func (s *RouterService) ReconcileSecrets(ctx context.Context, r Router) error {
 	}
 
 	// 2. Fetch the isolir and inactive profiles from the pengaturan table
-	var isolirProfile string
-	_ = s.DB.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = ?", "mikrotik_isolir_profile").Scan(&isolirProfile)
-	isolirProfile = strings.TrimSpace(isolirProfile)
+	var isolirProfile, inactiveProfile, deleteUnregistered string
+	rowsPengaturan, _ := s.DB.QueryContext(ctx, "SELECT key, value FROM pengaturan WHERE key IN (?, ?, ?)", "mikrotik_isolir_profile", "mikrotik_inactive_profile", "mikrotik_delete_unregistered")
+	if rowsPengaturan != nil {
+		for rowsPengaturan.Next() {
+			var k, v string
+			if err := rowsPengaturan.Scan(&k, &v); err == nil {
+				v = strings.TrimSpace(v)
+				switch k {
+				case "mikrotik_isolir_profile":
+					isolirProfile = v
+				case "mikrotik_inactive_profile":
+					inactiveProfile = v
+				case "mikrotik_delete_unregistered":
+					deleteUnregistered = v
+				}
+			}
+		}
+		rowsPengaturan.Close()
+	}
+
 	if isolirProfile == "" {
 		isolirProfile = "isolir"
 	}
-
-	var inactiveProfile string
-	_ = s.DB.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = ?", "mikrotik_inactive_profile").Scan(&inactiveProfile)
-	inactiveProfile = strings.TrimSpace(inactiveProfile)
 	if inactiveProfile == "" {
 		inactiveProfile = "nonaktif"
 	}
-
-	var deleteUnregistered string
-	_ = s.DB.QueryRowContext(ctx, "SELECT value FROM pengaturan WHERE key = ?", "mikrotik_delete_unregistered").Scan(&deleteUnregistered)
-	deleteUnregistered = strings.TrimSpace(deleteUnregistered)
 
 	// 3. Fetch all active/inactive customers with PPPoE configured from the database
 	type dbSecret struct {

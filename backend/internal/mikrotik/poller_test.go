@@ -14,7 +14,7 @@ func TestExtractPPPoEUser(t *testing.T) {
 		{"<pppoe-budi>", "budi"},
 		{"pppoe-ani", "ani"},
 		{"<PPPoE-joko>", "joko"}, // check case-insensitive match on prefix/suffix
-		{"client1", "client1"},
+		{"client1", ""},
 		{"", ""},
 	}
 

@@ -1,3 +1,4 @@
+import { Button } from "../components/ui/Button";
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { Modal } from "../components/ui/Modal";
 
@@ -60,27 +61,27 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               <>
                 <button
                   type="button"
-                  className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors cursor-pointer text-sm"
+                  className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors cursor-pointer text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
                   onClick={() => dialog.resolve(false)}
                 >
                   Batal
                 </button>
                 <button
                   type="button"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors cursor-pointer text-sm"
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors cursor-pointer text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
                   onClick={() => dialog.resolve(true)}
                 >
                   Ya, Lanjutkan
                 </button>
               </>
             ) : (
-              <button
+              <Button
                 type="button"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors cursor-pointer text-sm"
+                variant="primary"
                 onClick={() => dialog.resolve(true)}
               >
                 OK
-              </button>
+              </Button>
             )
           }
         >

@@ -1027,6 +1027,80 @@ func (r Repository) EndTrial(ctx context.Context, id int64) error {
 	return nil
 }
 
+func (r Repository) FindByIDs(ctx context.Context, ids []int64) ([]Customer, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	query := `
+		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),
+		       COALESCE(c.password_pppoe, ''), COALESCE(c.nomor_wa, ''), COALESCE(c.sn_ont, ''),
+		       c.tgl_jatuh_tempo, c.status, COALESCE(c.alamat, ''), c.is_trial, COALESCE(c.trial_started_at, ''), c.trial_days,
+		       c.diskon, COALESCE(c.tipe_diskon, 'flat'), c.referred_by_id, c.referral_balance, COALESCE(c.referral_code, ''), COALESCE(ref.nama, ''),
+		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
+		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
+		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
+		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port, COALESCE(c.email, '')
+		FROM pelanggan c
+		INNER JOIN paket p ON p.id = c.paket_id
+		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
+		LEFT JOIN odp o ON o.id = c.odp_id
+		WHERE c.id IN (`
+
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		args[i] = id
+		query += "?"
+		if i < len(ids)-1 {
+			query += ","
+		}
+	}
+	query += ")"
+
+	rows, err := r.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []Customer
+	for rows.Next() {
+		var item Customer
+		var isTrial int
+		var trialStartedAt, email, odpName, pppoeUptime, pppoeIP, pppoeStatus, ontTxPower, ontRxPower, ontUptime, ontIP, ontStatus, referredByName, referralCode string
+		var odpID, odpPort, referredByID sql.NullInt64
+
+		if err := rows.Scan(
+			&item.ID, &item.Name, &item.PackageID, &item.PackageName, &item.PackagePrice,
+			&item.UserPPPoE, &item.PasswordPPPoE, &item.WhatsApp, &item.SNOnt, &item.DueDay,
+			&item.Status, &item.Address, &isTrial, &trialStartedAt, &item.TrialDays,
+			&item.Diskon, &item.TipeDiskon, &referredByID, &item.ReferralBalance,
+			&referralCode, &referredByName, &item.VoucherDiscount, &ontStatus, &ontIP,
+			&ontUptime, &ontRxPower, &ontTxPower, &pppoeStatus, &pppoeIP, &pppoeUptime,
+			&item.LastSyncAt, &odpID, &odpName, &item.VoucherAutoApply, &odpPort, &email,
+		); err != nil {
+			return nil, err
+		}
+
+		item.IsTrial = isTrial != 0
+		if trialStartedAt != "" { item.TrialStartedAt = &trialStartedAt }
+		if referredByID.Valid { v := referredByID.Int64; item.ReferredByID = &v }
+		item.ReferralCode = referralCode; item.ReferredByName = referredByName
+		item.OntStatus = ontStatus; item.OntIP = ontIP; item.OntUptime = ontUptime
+		item.OntRxPower = ontRxPower; item.OntTxPower = ontTxPower
+		item.PppoeStatus = pppoeStatus; item.PppoeIP = pppoeIP; item.PppoeUptime = pppoeUptime
+		item.Email = email; item.OdpName = odpName
+		if odpID.Valid { v := odpID.Int64; item.OdpID = &v }
+		if odpPort.Valid { v := int(odpPort.Int64); item.OdpPort = &v }
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (s Service) FindByIDs(ctx context.Context, ids []int64) ([]Customer, error) {
+	return s.Repository.FindByIDs(ctx, ids)
+}
+
 func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 	row := r.DB.QueryRowContext(ctx, `
 		SELECT c.id, c.nama, c.paket_id, p.nama, p.harga, COALESCE(c.user_pppoe, ''),

@@ -65,7 +65,9 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 
 	routerSvc := mikrotik.NewRouterService(db)
 	poller := mikrotik.NewTrafficPoller(routerSvc)
-	go poller.Start(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
+	_ = cancel // Wire to graceful shutdown if needed in the future
+	go poller.Start(ctx, 3*time.Second)
 	mikrotikHandler := handler.NewMikrotikHandler(routerSvc, poller)
 
 	auditHandler := handler.NewAuditHandler(auditService)
@@ -83,7 +85,7 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	odpHandler := handler.NewOdpHandler(odp.Service{
 		Repository: odp.Repository{DB: db},
 	})
-	gacsHandler := handler.NewGacsHandler(db, settingsService)
+	gacsHandler := handler.NewGacsHandler(db, settingsService, authService)
 	reportsHandler := handler.NewReportsHandler(reports.Service{DB: db})
 
 	customersService := customers.Service{
@@ -160,11 +162,13 @@ func New(cfg config.Config, logger *slog.Logger, db *sql.DB, authService auth.Se
 	r.Get("/livez", healthHandler.Live)
 	r.Get("/readyz", healthHandler.Ready)
 	uploadsFileServer := http.StripPrefix("/uploads/", http.FileServer(http.Dir(filepath.Join(cfg.StoragePath, "uploads"))))
-	r.Handle("/uploads/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		uploadsFileServer.ServeHTTP(w, r)
-	}))
+	r.Group(func(uploads chi.Router) {
+		uploads.Use(authMiddleware(authService))
+		uploads.Handle("/uploads/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+			uploadsFileServer.ServeHTTP(w, r)
+		}))
+	})
 
 	r.Route("/api", func(api chi.Router) {
 		// Public routes

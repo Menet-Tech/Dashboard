@@ -687,6 +687,15 @@ func TestIntegrationFlow_PackageCustomerBill(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
+	var loginRes struct {
+		CSRFToken string `json:"csrf_token"`
+	}
+	
+	if err := json.NewDecoder(resp.Body).Decode(&loginRes); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+	realCSRFToken := loginRes.CSRFToken
+	
 	var sessionCookie *http.Cookie
 	for _, c := range resp.Cookies() {
 		if c.Name == "session" {
@@ -694,16 +703,19 @@ func TestIntegrationFlow_PackageCustomerBill(t *testing.T) {
 			break
 		}
 	}
+	
 	if sessionCookie == nil {
 		t.Fatal("expected session cookie")
 	}
+	
+	csrfToken := realCSRFToken
 
 	// 2. Create Package via API
 	pkgPayload := map[string]interface{}{"name": "Int-Pkg", "speed_mbps": 20, "price": 150000}
 	pkgBody, _ := json.Marshal(pkgPayload)
 	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/v1/packages", server.URL), bytes.NewReader(pkgBody))
 	req.AddCookie(sessionCookie)
-	req.Header.Set("X-CSRF-Token", sessionCookie.Value)
+	req.Header.Set("X-CSRF-Token", realCSRFToken)
 	req.Header.Set("Content-Type", "application/json")
 	
 	resp, err = http.DefaultClient.Do(req)
@@ -736,7 +748,7 @@ func TestIntegrationFlow_PackageCustomerBill(t *testing.T) {
 	custBody, _ := json.Marshal(custPayload)
 	req, _ = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/v1/customers", server.URL), bytes.NewReader(custBody))
 	req.AddCookie(sessionCookie)
-	req.Header.Set("X-CSRF-Token", sessionCookie.Value)
+	req.Header.Set("X-CSRF-Token", csrfToken)
 	req.Header.Set("Content-Type", "application/json")
 	
 	resp, err = http.DefaultClient.Do(req)

@@ -3,6 +3,7 @@ package mikrotik
 import (
 	"context"
 	"database/sql"
+	"os"
 	"strings"
 	"testing"
 
@@ -148,7 +149,12 @@ func TestCheckRealSecrets(t *testing.T) {
 
 	svc := NewRouterService(db)
 
-	cMain := NewClient("99.99.99.185:8728", "admin", "")
+	host := os.Getenv("TEST_MIKROTIK_HOST")
+	if host == "" {
+		t.Skip("TEST_MIKROTIK_HOST not set")
+	}
+
+	cMain := NewClient(host, os.Getenv("TEST_MIKROTIK_USER"), os.Getenv("TEST_MIKROTIK_PASS"))
 	if err := cMain.Connect(ctx); err == nil {
 		defer cMain.Close()
 

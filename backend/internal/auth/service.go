@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -63,9 +64,12 @@ func (s Service) Bootstrap(ctx context.Context) error {
 		username = "admin"
 	}
 	if password == "" {
+		if os.Getenv("APP_ENV") == "production" {
+			return errors.New("BOOTSTRAP_ADMIN_PASSWORD must be set in production environment")
+		}
 		password = "password"
 	}
-	if username == "" || password == "" {
+	if username == "" {
 		return nil
 	}
 
@@ -317,6 +321,7 @@ func (r Repository) FindUserBySessionToken(ctx context.Context, token string) (U
 	}
 
 	if !user.IsActive {
+		_ = r.DeleteSession(ctx, token)
 		return User{}, "", time.Time{}, time.Time{}, ErrUnauthorized
 	}
 

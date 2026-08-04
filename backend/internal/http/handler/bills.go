@@ -68,8 +68,12 @@ func (h BillHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	limit := 50
 	if l := q.Get("limit"); l != "" {
-		if val, err := strconv.Atoi(l); err == nil && val >= 0 {
-			limit = val
+		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+			if val > 500 {
+				limit = 500
+			} else {
+				limit = val
+			}
 		}
 	}
 
@@ -385,7 +389,10 @@ func (h BillHandler) UploadConfirmationProofBase64(w http.ResponseWriter, r *htt
 		return
 	}
 
-	compressedData, _ := compressImageIfPossible(data, safeExt)
+	compressedData, err := compressImageIfPossible(data, safeExt)
+	if err != nil {
+		slog.Warn("payment-proof: failed to compress image", "error", err)
+	}
 	if err := os.WriteFile(targetPath, compressedData, 0o644); err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to write file")
 		return
@@ -551,7 +558,10 @@ func (h BillHandler) storeProofFile(source io.Reader, originalName string, maxSi
 		return "", fmt.Errorf("invalid path traversal attempt")
 	}
 
-	compressedData, _ := compressImageIfPossible(data, safeExt)
+	compressedData, err := compressImageIfPossible(data, safeExt)
+	if err != nil {
+		slog.Warn("payment-proof: failed to compress image", "error", err)
+	}
 	if err := os.WriteFile(targetPath, compressedData, 0o644); err != nil {
 		return "", err
 	}

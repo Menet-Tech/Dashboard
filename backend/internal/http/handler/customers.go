@@ -249,10 +249,7 @@ func (h CustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 
 	if err := h.Service.Delete(r.Context(), id); err != nil {
 		WriteError(w, http.StatusInternalServerError, err.Error())
@@ -300,17 +297,25 @@ func (h CustomerHandler) BulkUpdateStatus(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 
 	successCount := 0
 	var updateErrors []string
 
+	custs, err := h.Service.FindByIDs(r.Context(), payload.IDs)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to fetch customers")
+		return
+	}
+
+	custMap := make(map[int64]*customers.Customer)
+	for i := range custs {
+		custMap[custs[i].ID] = &custs[i]
+	}
+
 	for _, id := range payload.IDs {
-		cust, err := h.Service.FindByID(r.Context(), id)
-		if err != nil {
+		cust, ok := custMap[id]
+		if !ok {
 			updateErrors = append(updateErrors, fmt.Sprintf("id %d: not found", id))
 			continue
 		}
@@ -375,7 +380,7 @@ func (h CustomerHandler) BulkUpdateStatus(w http.ResponseWriter, r *http.Request
 			continue
 		}
 
-		_, err = h.Service.Update(r.Context(), id, cust)
+		_, err := h.Service.Update(r.Context(), id, *cust)
 		if err != nil {
 			updateErrors = append(updateErrors, fmt.Sprintf("id %d (%s): %v", id, cust.Name, err))
 			continue
@@ -425,17 +430,25 @@ func (h CustomerHandler) BulkDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 
 	successCount := 0
 	var deleteErrors []string
 
+	customersList, err := h.Service.FindByIDs(r.Context(), payload.IDs)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to fetch customers")
+		return
+	}
+
+	custMap := make(map[int64]*customers.Customer)
+	for i := range customersList {
+		custMap[customersList[i].ID] = &customersList[i]
+	}
+
 	for _, id := range payload.IDs {
-		cust, err := h.Service.FindByID(r.Context(), id)
-		if err != nil {
+		cust, ok := custMap[id]
+		if !ok {
 			deleteErrors = append(deleteErrors, fmt.Sprintf("id %d: not found", id))
 			continue
 		}
@@ -648,10 +661,7 @@ func (h CustomerHandler) ONTReboot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Record the action in audit logs
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &item.ID, "customer.reboot_ont", fmt.Sprintf("Reboot ONT pelanggan %s (SN: %s) berhasil", item.Name, item.SNOnt), ip)
 
 	WriteJSON(w, http.StatusOK, map[string]any{
@@ -725,10 +735,7 @@ func (h CustomerHandler) ONTWifiUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Record the action in audit logs
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &item.ID, "customer.wifi_update_ont", fmt.Sprintf("Ubah WiFi ONT pelanggan %s (SSID baru: %s) berhasil", item.Name, payload.SSID), ip)
 
 	WriteJSON(w, http.StatusOK, map[string]any{
@@ -779,10 +786,7 @@ func (h CustomerHandler) ONTFactoryReset(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Record the action in audit logs
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &item.ID, "customer.factory_reset_ont", fmt.Sprintf("Reset pabrik ONT pelanggan %s (SN: %s) berhasil", item.Name, item.SNOnt), ip)
 
 	WriteJSON(w, http.StatusOK, map[string]any{
@@ -868,10 +872,7 @@ func (h CustomerHandler) MikrotikKick(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Record the action in audit logs
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &item.ID, "customer.kick_pppoe", fmt.Sprintf("Putus sesi PPPoE pelanggan %s (User: %s) berhasil", item.Name, username), ip)
 
 	WriteJSON(w, http.StatusOK, map[string]any{
@@ -927,10 +928,7 @@ func (h CustomerHandler) WithdrawReferral(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &customer.ID, "customer.referral_withdraw", fmt.Sprintf("Tarik tunai referral (%s) saldo pelanggan %s sebesar Rp %d diajukan", payload.Method, customer.Name, payload.Amount), ip)
 
 	WriteJSON(w, http.StatusOK, map[string]any{
@@ -977,10 +975,7 @@ func (h CustomerHandler) ConvertReferralToVoucher(w http.ResponseWriter, r *http
 		return
 	}
 
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, &customer.ID, "customer.referral_convert_voucher", fmt.Sprintf("Ubah saldo referral pelanggan %s sebesar Rp %d menjadi voucher diskon berhasil", customer.Name, payload.Amount), ip)
 
 	WriteJSON(w, http.StatusOK, map[string]any{
@@ -1013,10 +1008,7 @@ func (h CustomerHandler) EndTrial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 
 	if err := h.Service.EndTrial(r.Context(), id); err != nil {
 		WriteError(w, http.StatusInternalServerError, err.Error())
@@ -1091,10 +1083,7 @@ func (h CustomerHandler) CompleteReferralWithdrawal(w http.ResponseWriter, r *ht
 		return
 	}
 
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, nil, "referral_withdraw.complete", fmt.Sprintf("Penarikan referral ID %d selesai diproses dengan bukti %s", id, proofPath), ip)
 
 	WriteJSON(w, http.StatusOK, map[string]any{
@@ -1129,10 +1118,7 @@ func (h CustomerHandler) RejectReferralWithdrawal(w http.ResponseWriter, r *http
 		return
 	}
 
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
+	ip := getClientIP(r)
 	_ = h.Audit.RecordWithIP(r.Context(), &user.ID, nil, "referral_withdraw.reject", fmt.Sprintf("Penarikan referral ID %d ditolak. Alasan: %s", id, payload.Notes), ip)
 
 	WriteJSON(w, http.StatusOK, map[string]any{

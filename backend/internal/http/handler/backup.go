@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -22,7 +23,8 @@ type BackupHandler struct {
 func (h *BackupHandler) List(w http.ResponseWriter, r *http.Request) {
 	backups, err := h.Service.ListBackups()
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("backup: failed to list backups", "error", err)
+		WriteError(w, http.StatusInternalServerError, "gagal memuat daftar backup")
 		return
 	}
 
@@ -71,7 +73,7 @@ func (h *BackupHandler) Create(w http.ResponseWriter, r *http.Request) {
 			_ = h.Discord.SendFile(ctx, "✅ **Backup Manual Sukses!**\nDatabase Dashboard dan Konfigurasi MikroTik berhasil dicadangkan (Terenkripsi di dalam ZIP).", zipFilename, zipBytes)
 		} else {
 			// Log error but don't fail the API response
-			fmt.Printf("Warning: failed to build Discord backup zip: %v\n", err)
+			slog.Warn("backup: failed to build discord backup zip", "error", err)
 		}
 	}
 
@@ -112,7 +114,7 @@ func (h *BackupHandler) Verify(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *BackupHandler) Download(w http.ResponseWriter, r *http.Request) {
-	filename := r.PathValue("filename")
+	filename := chi.URLParam(r, "filename")
 	if filename == "" {
 		WriteError(w, http.StatusBadRequest, "filename is required")
 		return
@@ -120,11 +122,11 @@ func (h *BackupHandler) Download(w http.ResponseWriter, r *http.Request) {
 
 	path, err := h.Service.GetBackupPath(filename)
 	if err != nil {
-		WriteError(w, http.StatusNotFound, err.Error())
+		WriteError(w, http.StatusNotFound, "backup tidak ditemukan")
 		return
 	}
 
-	w.Header().Set("Content-Disposition", "attachment; filename="+filename)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	w.Header().Set("Content-Type", "application/octet-stream")
 	http.ServeFile(w, r, path)
 }

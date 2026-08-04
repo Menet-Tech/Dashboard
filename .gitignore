@@ -22,6 +22,8 @@ Thumbs.db
 .idea/
 .vscode/
 .env
+*.db
+*.sqlite
 *.db-wal
 *.db-shm
 GACS-dashboard

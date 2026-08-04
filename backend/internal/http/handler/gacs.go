@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -26,23 +27,22 @@ import (
 )
 
 type GacsHandler struct {
-	DB       *sql.DB
-	Settings settings.Service
+	DB          *sql.DB
+	Settings    settings.Service
+	AuthService auth.Service
 }
 
-func NewGacsHandler(db *sql.DB, settingsService settings.Service) GacsHandler {
+func NewGacsHandler(db *sql.DB, settingsService settings.Service, authService auth.Service) GacsHandler {
 	return GacsHandler{
-		DB:       db,
-		Settings: settingsService,
+		DB:          db,
+		Settings:    settingsService,
+		AuthService: authService,
 	}
 }
 
 // getJWTSecret returns the secret key used for signing JWT tokens.
 func getJWTSecret() []byte {
 	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "fallback-secret-key-for-development-only"
-	}
 	return []byte(secret)
 }
 
@@ -2051,29 +2051,22 @@ func (h GacsHandler) AuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user struct {
-		ID           int64
-		Username     string
-		PasswordHash string
-		Role         string
-		CreatedAt    string
-		UpdatedAt    string
+	remoteAddr := strings.TrimSpace(r.RemoteAddr)
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		remoteAddr = host
 	}
-
-	err := h.DB.QueryRowContext(r.Context(), "SELECT id, username, password_hash, role, created_at, updated_at FROM users WHERE username = ?", req.Username).Scan(
-		&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt,
-	)
+	
+	user, _, err := h.AuthService.Login(r.Context(), req.Username, req.Password, req.Username, remoteAddr)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, auth.ErrTooManyAttempts) {
+			WriteJSON(w, http.StatusTooManyRequests, map[string]any{"message": "Too many failed attempts. Please try again later."})
+			return
+		}
+		if errors.Is(err, auth.ErrInvalidCredentials) {
 			WriteJSON(w, http.StatusUnauthorized, map[string]any{"message": "Invalid username or password"})
 			return
 		}
 		WriteError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) != nil {
-		WriteJSON(w, http.StatusUnauthorized, map[string]any{"message": "Invalid username or password"})
 		return
 	}
 
@@ -2102,8 +2095,6 @@ func (h GacsHandler) AuthLogin(w http.ResponseWriter, r *http.Request) {
 			"id":        user.ID,
 			"username":  user.Username,
 			"role":      user.Role,
-			"createdAt": user.CreatedAt,
-			"updatedAt": user.UpdatedAt,
 		},
 		"token":        accessTokenStr,
 		"refreshToken": refreshTokenStr,

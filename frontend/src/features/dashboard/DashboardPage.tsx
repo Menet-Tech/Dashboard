@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { Button } from "../../components/ui/Button";
+import { useMemo, useState, useEffect } from "react";
 import { Line, Pie } from "react-chartjs-2";
 import { formatDateTime, formatCurrency } from "../../utils/format";
 import { StatusPill, SkeletonCard } from "../../components/ui";
@@ -64,6 +65,19 @@ export function DashboardPage({
   onSwitchView,
 }: DashboardPageProps) {
   const safeRevenue = revenue || [];
+
+  // Reactive dark mode detection — updates when user toggles theme
+  // Avoids reading DOM during render (anti-pattern)
+  const [isDark, setIsDark] = useState(() =>
+    document.documentElement.classList.contains("dark")
+  );
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
 
   const revenueChartData = useMemo(() => {
     const sortedRevenue = [...safeRevenue].reverse();
@@ -171,10 +185,10 @@ export function DashboardPage({
                         labels: { color: "rgba(100, 116, 139, 1)" },
                       },
                       tooltip: {
-                        backgroundColor: document.documentElement.classList.contains("dark") ? "#1e293b" : "#ffffff",
-                        titleColor: document.documentElement.classList.contains("dark") ? "#f8fafc" : "#1e293b",
-                        bodyColor: document.documentElement.classList.contains("dark") ? "#cbd5e1" : "#475569",
-                        borderColor: document.documentElement.classList.contains("dark") ? "#334155" : "#e2e8f0",
+                        backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                        titleColor: isDark ? "#f8fafc" : "#1e293b",
+                        bodyColor: isDark ? "#cbd5e1" : "#475569",
+                        borderColor: isDark ? "#334155" : "#e2e8f0",
                         borderWidth: 1,
                         padding: 12,
                         cornerRadius: 12,
@@ -196,7 +210,7 @@ export function DashboardPage({
                           callback: (value) => formatCurrencyShort(Number(value)),
                         },
                         grid: {
-                          color: () => document.documentElement.classList.contains("dark")
+                          color: () => isDark
                             ? "rgba(51, 65, 85, 0.4)"
                             : "rgba(241, 245, 249, 1)",
                           borderDash: [3, 3],
@@ -262,9 +276,9 @@ export function DashboardPage({
             <h2 className="text-base font-bold text-slate-850 dark:text-slate-150 mb-2">Operasional Hari Ini</h2>
             <p className="text-xs text-slate-500 mb-4 leading-relaxed">Lihat kesehatan sistem, generate tagihan, dan pantau tunggakan.</p>
             <div className="flex gap-2">
-              <button type="button" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors cursor-pointer" onClick={() => onSwitchView("bills")}>
+              <Button type="button" variant="primary" onClick={() => onSwitchView("bills")}>
                 Buka Tagihan
-              </button>
+              </Button>
               <button type="button" className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-755 text-slate-700 dark:text-slate-300 text-xs font-bold py-2 px-4 rounded-lg transition-colors cursor-pointer" onClick={() => onSwitchView("monitoring")}>
                 Buka Monitoring
               </button>

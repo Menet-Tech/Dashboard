@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net"
@@ -110,11 +111,10 @@ func csrfMiddleware(sessionCookieName string) func(http.Handler) http.Handler {
 					handler.WriteUnauthorized(w)
 					return
 				}
-				csrfToken, ok := auth.CSRFTokenFromContext(r.Context())
+				csrfToken, _ := auth.CSRFTokenFromContext(r.Context())
 				requestCSRF := r.Header.Get("X-CSRF-Token")
-				// Validate X-CSRF-Token: either it matches the separate CSRF token from database/context
-				// or it matches the cookie value itself (backward-compatible fallback for integration tests).
-				if requestCSRF == "" || (requestCSRF != csrfToken && (!ok || csrfToken == "" || requestCSRF != cookie.Value)) {
+				// Validate X-CSRF-Token: must match the CSRF token from database/context
+				if requestCSRF == "" || requestCSRF != csrfToken {
 					handler.WriteUnauthorized(w)
 					return
 				}
@@ -159,16 +159,6 @@ func auditMiddleware(auditService audit.Service) func(http.Handler) http.Handler
 			if host, _, err := net.SplitHostPort(clientIP); err == nil {
 				clientIP = host
 			}
-			if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-				// Bug #5: split, trim whitespace, and validate before using
-				parts := strings.Split(fwd, ",")
-				if len(parts) > 0 {
-					ip := strings.TrimSpace(parts[0])
-					if ip != "" {
-						clientIP = ip
-					}
-				}
-			}
 
 			action := r.Method + " " + r.URL.Path
 			message := "status=" + http.StatusText(recorder.status)
@@ -199,6 +189,7 @@ func requireRole(roles ...string) func(http.Handler) http.Handler {
 			}
 
 			if !hasRole {
+				slog.Warn("access denied: insufficient role", "user_id", user.ID, "username", user.Username, "required", roles, "path", r.URL.Path)
 				writeJSONError(w, http.StatusForbidden, "akses ditolak: role tidak sesuai")
 				return
 			}
@@ -211,8 +202,12 @@ func requireRole(roles ...string) func(http.Handler) http.Handler {
 func writeJSONError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	w.Write([]byte(`{"success":false,"error":"` + message + `"}`))
+	_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "error": message})
 }
+
+type contextKey string
+const gacsPortalKey contextKey = "gacs_portal"
+const gacsUserKey contextKey = "gacs_user"
 
 func gacsAuthMiddleware(authService auth.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -245,15 +240,12 @@ func gacsAuthMiddleware(authService auth.Service) func(http.Handler) http.Handle
 
 				token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
 					secret := os.Getenv("JWT_SECRET")
-					if secret == "" {
-						secret = "fallback-secret-key-for-development-only"
-					}
 					return []byte(secret), nil
 				})
 
 				if err == nil && token.Valid {
 					if claims.Portal {
-						ctx := context.WithValue(r.Context(), "gacs_portal", true)
+						ctx := context.WithValue(r.Context(), gacsPortalKey, true)
 						sysUser := auth.User{
 							ID:       0,
 							Username: "portal_api",
@@ -271,7 +263,7 @@ func gacsAuthMiddleware(authService auth.Service) func(http.Handler) http.Handle
 						Role:     claims.Role,
 						IsActive: true,
 					}
-					ctx := context.WithValue(r.Context(), "gacs_user", struct {
+					ctx := context.WithValue(r.Context(), gacsUserKey, struct {
 						ID   int64
 						Role string
 					}{ID: claims.UserID, Role: claims.Role})
