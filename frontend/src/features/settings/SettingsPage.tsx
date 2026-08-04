@@ -829,14 +829,15 @@ export function SettingsPage({
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <button
+            <Button
               type="submit"
+              variant="primary"
               disabled={submitting}
-              className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2.5 px-6 rounded-xl shadow-md hover:shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              isLoading={isBusy("save-settings")}
+              className="w-full md:w-auto"
             >
-              {isBusy("save-settings") ? <Loader2 size={14} className="animate-spin" /> : null}
-              {isBusy("save-settings") ? "Menyimpan..." : "Simpan Semua Pengaturan"}
-            </button>
+              Simpan Semua Pengaturan
+            </Button>
           </div>
         </div>
 
@@ -944,15 +945,16 @@ export function SettingsPage({
                       </div>
 
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60">
-                        <button
+                        <Button
                           type="button"
+                          variant="primary"
                           onClick={() => saveSection("General", ["appName", "portalApiKey"])}
                           disabled={savingSection === "General"}
-                          className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          isLoading={savingSection === "General"}
+                          icon={<Save size={14} />}
                         >
-                          {savingSection === "General" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save General Settings
-                        </button>
+                        </Button>
                       </div>
                     </article>
                   </div>
@@ -1109,15 +1111,15 @@ export function SettingsPage({
                                   : "Sukses"}
                             </span>
                           )}
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
                             onClick={handleTestWhatsApp}
                             disabled={testingWa}
-                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                            isLoading={testingWa}
                           >
-                            {testingWa ? <Loader2 size={12} className="animate-spin" /> : null}
-                            {testingWa ? "Menguji..." : "Test Koneksi"}
-                          </button>
+                            Test Koneksi
+                          </Button>
                         </div>
                       </div>
                     </article>
@@ -1280,19 +1282,20 @@ export function SettingsPage({
                       </div>
 
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <button
+                        <Button
                           type="button"
+                          variant="primary"
                           onClick={() => saveSection("WhatsApp", [
                             "wa_gateway_url", "wa_api_key", "wa_gateway_enabled", "wa_chatbot_enabled", "wa_account_id",
                             "wa_billing_account_id", "wa_reminder_account_id", "wa_due_account_id",
                             "wa_limit_account_id", "wa_payment_account_id"
                           ])}
                           disabled={savingSection === "WhatsApp"}
-                          className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          isLoading={savingSection === "WhatsApp"}
+                          icon={<Save size={14} />}
                         >
-                          {savingSection === "WhatsApp" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save WhatsApp Settings
-                        </button>
+                        </Button>
                       </div>
                     </article>
                   </div>
@@ -1609,8 +1612,9 @@ export function SettingsPage({
                       </div>
 
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <button
+                        <Button
                           type="button"
+                          variant="primary"
                           onClick={() => saveSection("Billing", [
                             "billing_reminder_days", "billing_limit_days", "billing_menunggak_days", "billing_inactive_suspended_days",
                             "billing_auto_generate_enabled", "billing_generate_day", "billing_generate_time",
@@ -1620,11 +1624,11 @@ export function SettingsPage({
                             "trial_enabled", "trial_period_days", "trial_overdue_grace_days"
                           ])}
                           disabled={savingSection === "Billing"}
-                          className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          isLoading={savingSection === "Billing"}
+                          icon={<Save size={14} />}
                         >
-                          {savingSection === "Billing" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save Billing Settings
-                        </button>
+                        </Button>
                       </div>
                     </article>
                   </div>
@@ -1706,7 +1710,7 @@ export function SettingsPage({
 
                                 <div className="flex gap-2 mt-4 pt-3 border-t border-slate-50 dark:border-slate-800/65 justify-end">
                                   {/* Enable / Disable toggle */}
-                                  <button
+                                  <Button
                                     type="button"
                                     onClick={async () => {
                                       setTogglingRouterId(router.id);
@@ -1723,16 +1727,13 @@ export function SettingsPage({
                                       }
                                     }}
                                     disabled={togglingRouterId !== null || testingRouterId !== null}
-                                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50 ${
-                                      router.is_active
-                                        ? "text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-955/20 dark:hover:bg-rose-955/40"
-                                        : "text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-955/20 dark:hover:bg-emerald-955/40"
-                                    }`}
+                                    isLoading={togglingRouterId === router.id}
+                                    variant={router.is_active ? "danger" : "primary"}
+                                    className="!py-1 !px-2.5 text-[10px]"
                                   >
-                                    {togglingRouterId === router.id ? <Loader2 size={10} className="animate-spin" /> : null}
                                     {router.is_active ? "Nonaktifkan" : "Aktifkan"}
-                                  </button>
-                                  <button
+                                  </Button>
+                                  <Button
                                     type="button"
                                     onClick={async () => {
                                       setTestingRouterId(router.id);
@@ -1766,13 +1767,15 @@ export function SettingsPage({
                                       }
                                     }}
                                     disabled={testingRouterId !== null || togglingRouterId !== null}
-                                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                    isLoading={testingRouterId === router.id}
+                                    variant="secondary"
+                                    className="!py-1 !px-2.5 text-[10px]"
                                   >
-                                    {testingRouterId === router.id ? <Loader2 size={10} className="animate-spin" /> : null}
                                     Test Koneksi
-                                  </button>
-                                  <button
+                                  </Button>
+                                  <Button
                                     type="button"
+                                    variant="outline"
                                     onClick={() => {
                                       setEditingRouterId(router.id);
                                       setNewRouterName(router.name);
@@ -1784,17 +1787,18 @@ export function SettingsPage({
                                       setNewRouterIsActive(router.is_active);
                                       setChangePassword(false);
                                     }}
-                                    className="text-[10px] font-bold text-slate-700 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                                    className="!py-1 !px-2.5 text-[10px]"
                                   >
                                     Edit
-                                  </button>
-                                  <button
+                                  </Button>
+                                  <Button
                                     type="button"
+                                    variant="danger"
                                     onClick={() => setDeletingRouter(router)}
-                                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-955/20 dark:hover:bg-rose-955/40 p-1.5 rounded-lg transition-colors cursor-pointer"
+                                    className="!py-1 !px-2.5 text-[10px]"
                                   >
                                     Hapus
-                                  </button>
+                                  </Button>
                                 </div>
                               </div>
                             ))}

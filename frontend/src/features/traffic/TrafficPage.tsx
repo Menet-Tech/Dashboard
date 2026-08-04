@@ -3,6 +3,7 @@ import { Line } from "react-chartjs-2";
 import { Search, Activity, ArrowUp, ArrowDown, X, Info, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import type { CustomerItem, PackageItem } from "../../types";
 import { fetchTrafficStats, type TrafficStats } from "../../lib/api";
+import { Button } from "../../components/ui/Button";
 
 type TrafficPageProps = {
   customers: CustomerItem[];
@@ -491,13 +492,14 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                   PPPoE User: {selectedCust.user_pppoe} • Limit: {activeLimit === 0 ? "Bypass" : `${activeLimit} Mbps`}
                 </p>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={handleCloseDetails}
-                className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 flex items-center justify-center transition-colors border border-slate-200 dark:border-slate-700/60"
+                className="w-8 h-8 rounded-full p-0 flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
               >
                 <X size={16} />
-              </button>
+              </Button>
             </div>
 
             {/* Modal Body */}
@@ -571,13 +573,13 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
 
             {/* Modal Footer */}
             <div className="bg-slate-55 dark:bg-slate-950 px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={handleCloseDetails}
-                className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold py-2 px-4 rounded-xl transition-colors border border-slate-200 dark:border-slate-750"
               >
                 Tutup
-              </button>
+              </Button>
             </div>
           </div>
         </div>

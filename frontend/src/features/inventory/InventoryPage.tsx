@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Package, Search, Plus, Archive, ArchiveRestore, History, Trash2, Edit2, Loader2, ArrowRightLeft, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { fetchInventoryItems, createInventoryItem, updateInventoryItem, deleteInventoryItem, fetchInventoryLogs, createInventoryLog } from "../../lib/api";
 import type { InventoryItem, InventoryLog } from "../../types";
+import { Button } from "../../components/ui/Button";
 
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -161,27 +162,31 @@ export default function InventoryPage() {
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Kelola stok barang, backbone, dan peralatan client.</p>
           </div>
           <div className="flex gap-2">
-            <button
+            <Button
+              type="button"
+              variant="secondary"
               onClick={() => {
                 setLogForm({ itemId: items[0]?.id || 0, type: "out", quantity: 1, reference: "", notes: "" });
                 setIsLogFormOpen(true);
               }}
-              className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-xs flex items-center gap-2 transition-all"
+              className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs flex items-center gap-2"
             >
               <ArrowRightLeft size={16} />
               Catat Keluar/Masuk
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
               onClick={() => {
                 setEditingItem(null);
                 setForm({ name: "", description: "", category: "client", unit: "pcs", quantity: 0 });
                 setIsFormOpen(true);
               }}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-2 transition-all"
+              className="px-4 py-2 text-xs flex items-center gap-2"
             >
               <Plus size={16} />
               Item Baru
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -225,16 +230,28 @@ export default function InventoryPage() {
                           {item.category}
                         </span>
                         <div className="flex gap-1">
-                          <button onClick={() => {
-                            setEditingItem(item);
-                            setForm({ name: item.name, description: item.description, category: item.category, unit: item.unit, quantity: item.quantity });
-                            setIsFormOpen(true);
-                          }} className="p-1 text-slate-400 hover:text-indigo-600">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="p-1 px-1 h-auto text-slate-400 hover:text-indigo-600"
+                            onClick={() => {
+                              setEditingItem(item);
+                              setForm({ name: item.name, description: item.description, category: item.category, unit: item.unit, quantity: item.quantity });
+                              setIsFormOpen(true);
+                            }}
+                          >
                             <Edit2 size={14} />
-                          </button>
-                          <button onClick={() => handleDeleteItem(item.id)} className="p-1 text-slate-400 hover:text-rose-600">
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="p-1 px-1 h-auto text-slate-400 hover:text-rose-600"
+                            onClick={() => handleDeleteItem(item.id)}
+                          >
                             <Trash2 size={14} />
-                          </button>
+                          </Button>
                         </div>
                       </div>
                       <h3 className="font-bold text-slate-900 dark:text-white text-lg">{item.name}</h3>
@@ -247,12 +264,17 @@ export default function InventoryPage() {
                           {item.quantity} <span className="text-sm font-semibold text-slate-500">{item.unit}</span>
                         </span>
                       </div>
-                      <button onClick={() => {
-                        setLogForm({ itemId: item.id, type: "out", quantity: 1, reference: "", notes: "" });
-                        setIsLogFormOpen(true);
-                      }} className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center hover:bg-indigo-100 transition-colors">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          setLogForm({ itemId: item.id, type: "out", quantity: 1, reference: "", notes: "" });
+                          setIsLogFormOpen(true);
+                        }}
+                        className="w-8 h-8 rounded-full p-0 flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100"
+                      >
                         <Plus size={16} />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -340,8 +362,8 @@ export default function InventoryPage() {
               </label>
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs">Batal</button>
-              <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">Simpan Item</button>
+              <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs">Batal</Button>
+              <Button type="submit" variant="primary" className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">Simpan Item</Button>
             </div>
           </form>
         </div>
@@ -383,8 +405,8 @@ export default function InventoryPage() {
               </label>
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <button type="button" onClick={() => setIsLogFormOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs">Batal</button>
-              <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">Simpan Transaksi</button>
+              <Button type="button" variant="ghost" onClick={() => setIsLogFormOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs">Batal</Button>
+              <Button type="submit" variant="primary" className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">Simpan Transaksi</Button>
             </div>
           </form>
         </div>

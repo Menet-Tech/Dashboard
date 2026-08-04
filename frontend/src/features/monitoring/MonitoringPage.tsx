@@ -1,6 +1,7 @@
 import { StatusPill } from "../../components/ui";
 import { formatDateTime } from "../../utils/format";
 import { getBackupDownloadUrl, type HealthPayload, type RestoreSimulationResult } from "../../lib/api";
+import { Button } from "../../components/ui/Button";
 
 export type BackupItem = {
   filename: string;
@@ -69,14 +70,14 @@ export function MonitoringPage({
           <h2 className="text-lg font-bold text-slate-900">Monitoring Sistem</h2>
           <div className="table-actions">
             <StatusPill label={health?.status ?? "checking"} tone={appTone} />
-            <button
+            <Button
               type="button"
-              className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
+              variant="outline"
               disabled={submitting}
               onClick={onRefresh}
             >
               {submitting && !busyAction ? "Memproses..." : "Refresh Status"}
-            </button>
+            </Button>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -189,14 +190,15 @@ export function MonitoringPage({
                   <span className="text-sm font-semibold text-slate-400">Belum dikonfigurasi</span>
                 )}
               </div>
-              <button
+              <Button
                 type="button"
-                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg transition-colors disabled:opacity-50 text-center"
+                variant="secondary"
+                size="sm"
                 onClick={handleCheckIntegrations}
                 disabled={isBusy("check-integrations")}
               >
                 {isBusy("check-integrations") ? "Checking..." : "Check Integrasi"}
-              </button>
+              </Button>
             </div>
           </article>
         </div>
@@ -365,14 +367,14 @@ export function MonitoringPage({
           <StatusPill label={`${backups.length} backup tersedia`} tone="slate" />
         </div>
         <div className="flex gap-3 mb-6">
-          <button
+          <Button
             type="button"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+            variant="primary"
             disabled={submitting}
             onClick={onCreateBackup}
           >
             {isBusy("create-backup") ? "Membuat backup..." : "Backup Sekarang"}
-          </button>
+          </Button>
         </div>
         <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
           <table className="w-full text-left border-collapse text-sm">
@@ -399,20 +401,22 @@ export function MonitoringPage({
                     <td className="px-6 py-4 text-gray-700">{formatDateTime(b.mod_time)}</td>
                     <td className="px-6 py-4 text-gray-700">
                       <div className="flex gap-2">
-                        <button
+                        <Button
                           type="button"
-                          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                          variant="outline"
+                          size="sm"
                           onClick={() => onVerifyBackup(b.filename)}
                         >
                           Verify
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                          variant="outline"
+                          size="sm"
                           onClick={() => onSimulateRestore(b.filename)}
                         >
                           Restore
-                        </button>
+                        </Button>
                         <a
                           className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors disabled:opacity-50 inline-block"
                           href={getBackupDownloadUrl(b.filename)}
@@ -446,12 +450,12 @@ export function MonitoringPage({
               <li>Total Tagihan: {restoreSimulation.result.total_tagihan}</li>
             </ul>
             <div className="button-row top-gap">
-              <button type="button" className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-50" onClick={onApplyRestore}>
+              <Button type="button" variant="danger" onClick={onApplyRestore}>
                 Apply to Live (Restart)
-              </button>
-              <button type="button" className="text-gray-600 hover:bg-gray-100 font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50" onClick={onCancelRestore}>
+              </Button>
+              <Button type="button" variant="outline" onClick={onCancelRestore}>
                 Batal
-              </button>
+              </Button>
             </div>
           </div>
         )}
