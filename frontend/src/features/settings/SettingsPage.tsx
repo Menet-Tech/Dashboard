@@ -847,13 +847,13 @@ export function SettingsPage({
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <Button variant="primary"
+              <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-1 min-w-[150px] flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer ${isActive
+                className={`flex-1 min-w-[150px] flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${isActive
                   ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-slate-800 font-bold"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-900/50 font-semibold"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-900/50 font-semibold border border-transparent"
                   }`}
               >
                 <Icon size={18} className={isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"} />
@@ -861,7 +861,7 @@ export function SettingsPage({
                   <span className="block text-xs leading-none">{tab.label}</span>
                   <span className="block text-[9px] font-normal text-slate-400 dark:text-slate-500 mt-1">{tab.desc}</span>
                 </div>
-              </Button>
+              </button>
             );
           })}
         </nav>
@@ -885,18 +885,18 @@ export function SettingsPage({
                   const SubIcon = sub.icon;
                   const isSubActive = appSubTab === sub.id;
                   return (
-                    <Button variant="outline"
+                    <button
                       key={sub.id}
                       type="button"
                       onClick={() => setAppSubTab(sub.id as any)}
-                      className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-all ${isSubActive
-                        ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm"
-                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-900/50"
+                      className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${isSubActive
+                        ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm border border-transparent"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-900/50 border border-transparent"
                         }`}
                     >
                       <SubIcon size={16} />
                       {sub.label}
-                    </Button>
+                    </button>
                   );
                 })}
               </aside>
@@ -2865,18 +2865,18 @@ export function SettingsPage({
                   const SubIcon = sub.icon;
                   const isSubActive = acsSubTab === sub.id;
                   return (
-                    <Button variant="primary"
+                    <button
                       key={sub.id}
                       type="button"
                       onClick={() => setAcsSubTab(sub.id as any)}
-                      className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-all ${isSubActive
-                        ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm"
-                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-900/50"
+                      className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${isSubActive
+                        ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm border border-transparent"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-900/50 border border-transparent"
                         }`}
                     >
                       <SubIcon size={16} />
                       {sub.label}
-                    </Button>
+                    </button>
                   );
                 })}
               </aside>
