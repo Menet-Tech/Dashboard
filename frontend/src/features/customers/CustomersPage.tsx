@@ -1,5 +1,5 @@
 import { Button } from "../../components/ui/Button";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Loader2, Plus, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw } from "lucide-react";
 import { StatusPill, EmptyTableRow } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
@@ -261,16 +261,6 @@ export function CustomersPage({
     setDetailedCustomer(customer);
   }, []);
 
-  const handleToggleSelectAll = (checked: boolean) => {
-    const next: Record<number, boolean> = {};
-    if (checked) {
-      filteredCustomers.forEach((c) => {
-        next[c.id] = true;
-      });
-    }
-    setSelectedIds(next);
-  };
-
   const handleApplyBulkChange = async () => {
     const ids = Object.entries(selectedIds)
       .filter(([_, val]) => val)
@@ -340,6 +330,19 @@ export function CustomersPage({
       }
     }
   };
+
+  const handleToggleSelectOne = useCallback((id: number, checked: boolean) => {
+    setSelectedIds((prev) => ({ ...prev, [id]: checked }));
+  }, []);
+
+  const handleToggleSelectAll = useCallback((checked: boolean) => {
+    if (checked) {
+      const allIds = filteredCustomers.reduce((acc, c) => ({ ...acc, [c.id]: true }), {});
+      setSelectedIds(allIds);
+    } else {
+      setSelectedIds({});
+    }
+  }, [filteredCustomers]);
 
   const renderTableRows = useMemo(() => {
     if (sortedCustomers.length === 0) {
@@ -632,7 +635,7 @@ export function CustomersPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-            )}
+              {renderTableRows}
             </tbody>
           </table>
         </div>

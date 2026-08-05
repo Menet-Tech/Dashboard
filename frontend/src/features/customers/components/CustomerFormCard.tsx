@@ -73,7 +73,7 @@ export function CustomerFormCard({
         )}
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form id="customer-form" onSubmit={onSubmit} className="space-y-4">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
             Nama Pelanggan *

@@ -504,8 +504,8 @@ server {
     }
 
     # Upload storage
-    location /storage/ {
-        alias ${INSTALL_DIR}/backend/storage/;
+    location /uploads/ {
+        alias ${INSTALL_DIR}/backend/storage/uploads/;
         expires 7d;
         add_header Cache-Control "public";
     }

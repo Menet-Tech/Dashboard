@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { fetchBills, generateBills, markBillPaid, uploadBillProof, fetchBillNotifications, grantBillExtension, cancelPendingBillAction } from "../lib/api";
 import { validateBillPeriod, type FieldErrors } from "../utils/validation";
 import { currentPeriod } from "../utils/format";
@@ -109,10 +109,19 @@ export function useBills({ withFeedback, askForConfirmation, onSuccess, onError 
     }
   }
 
+  const searchTimeout = useRef<number | null>(null);
+
   const handleSearchChange = (val: string) => {
     setSearch(val);
     setPage(1);
-    void refreshBills({ search: val, page: 1 });
+    
+    if (searchTimeout.current) {
+      window.clearTimeout(searchTimeout.current);
+    }
+    
+    searchTimeout.current = window.setTimeout(() => {
+      void refreshBills({ search: val, page: 1 });
+    }, 500);
   };
 
   const handleStatusChange = (val: string) => {
