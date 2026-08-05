@@ -1,4 +1,5 @@
 import { inputClassName } from "./FormHelpers";
+import { useRef } from "react";
 
 type RupiahInputProps = {
   value: number;
@@ -19,12 +20,40 @@ export function RupiahInput({
   className = "",
   disabled = false,
 }: RupiahInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const formattedValue = value ? value.toLocaleString("id-ID") : "";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/[^0-9]/g, "");
+    const el = e.target;
+    const start = el.selectionStart || 0;
+    const newValue = el.value;
+    
+    const raw = newValue.replace(/[^0-9]/g, "");
     const num = parseInt(raw, 10) || 0;
+
+    // Track digits before cursor to restore position
+    const digitsBeforeCursor = newValue.slice(0, start).replace(/[^0-9]/g, "").length;
+
     onChange(num);
+
+    // Restore cursor position after render
+    window.requestAnimationFrame(() => {
+      if (!inputRef.current) return;
+      const currentVal = inputRef.current.value;
+      let digitCount = 0;
+      let newPos = 0;
+      for (let i = 0; i < currentVal.length; i++) {
+        if (digitCount === digitsBeforeCursor) {
+          newPos = i;
+          break;
+        }
+        if (/[0-9]/.test(currentVal[i])) {
+          digitCount++;
+        }
+      }
+      if (digitCount === digitsBeforeCursor) newPos = currentVal.length;
+      inputRef.current.setSelectionRange(newPos, newPos);
+    });
   };
 
   const errStr = Array.isArray(error) ? error[0] : error;
@@ -37,6 +66,7 @@ export function RupiahInput({
           Rp
         </span>
         <input
+          ref={inputRef}
           type="text"
           className={`${inputClassName(errStr)} pl-9 ${className}`}
           value={formattedValue}

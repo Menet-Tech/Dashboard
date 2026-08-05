@@ -102,6 +102,7 @@ export function MikrotikSyncModal({
           <div className="relative flex-1">
             <Search className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500" size={14} />
             <input
+              autoFocus={true}
               type="text"
               placeholder="Cari PPPoE Username / Profil..."
               className="block w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:text-slate-100 pl-9 pr-4 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"

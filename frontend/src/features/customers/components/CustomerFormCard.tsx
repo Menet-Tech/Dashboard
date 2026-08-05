@@ -79,6 +79,7 @@ export function CustomerFormCard({
             Nama Pelanggan *
           </span>
           <input
+            autoFocus={true}
             className={inputClassName(customerErrors.name)}
             value={customerForm.name}
             onChange={(e) =>

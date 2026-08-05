@@ -377,6 +377,7 @@ export function PackagesPage({
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Nama Paket (Wajib Sama dengan Profil MikroTik)</span>
               <input
+                autoFocus={true}
                 className={inputClassName(packageErrors.name)}
                 value={packageForm.name}
                 onChange={(e) => onFormChange((curr) => ({ ...curr, name: e.target.value }))}
