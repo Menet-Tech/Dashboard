@@ -169,11 +169,11 @@ export function ReportsPage({
       {/* Header Info */}
       <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Analisis Laporan Keuangan</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">Analisis Laporan Keuangan</h2>
           <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">Pantau tren omset bulanan, status tagihan aktif, serta piutang menunggak.</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
             Role: Admin
           </span>
         </div>
@@ -187,11 +187,11 @@ export function ReportsPage({
             <TrendingUp size={22} />
           </div>
           <div>
-            <span className="text-xs font-semibold text-slate-400 block uppercase tracking-wider">Proyeksi Omset (MRR)</span>
-            <strong className="text-xl font-extrabold text-slate-900 dark:text-slate-100 block mt-1 tracking-tight">
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 block uppercase tracking-wider">Proyeksi Omset (MRR)</span>
+            <strong className="text-xl font-extrabold text-slate-900 dark:text-slate-50 dark:text-slate-100 block mt-1 tracking-tight">
               {formatCurrency(projectedMRR)}
             </strong>
-            <span className="text-[10px] text-slate-500 block mt-1">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-1">
               Dari {activeCustomers.length} pelanggan status aktif
             </span>
           </div>
@@ -203,11 +203,11 @@ export function ReportsPage({
             <DollarSign size={22} />
           </div>
           <div>
-            <span className="text-xs font-semibold text-slate-400 block uppercase tracking-wider">Tagihan Tergenerate</span>
-            <strong className="text-xl font-extrabold text-slate-900 dark:text-slate-100 block mt-1 tracking-tight">
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 block uppercase tracking-wider">Tagihan Tergenerate</span>
+            <strong className="text-xl font-extrabold text-slate-900 dark:text-slate-50 dark:text-slate-100 block mt-1 tracking-tight">
               {formatCurrency(billedThisMonth)}
             </strong>
-            <span className="text-[10px] text-slate-500 block mt-1">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-1">
               Untuk tagihan periode berjalan
             </span>
           </div>
@@ -219,11 +219,11 @@ export function ReportsPage({
             <Users size={22} />
           </div>
           <div>
-            <span className="text-xs font-semibold text-slate-400 block uppercase tracking-wider">Realisasi Lunas</span>
-            <strong className="text-xl font-extrabold text-slate-900 dark:text-slate-100 block mt-1 tracking-tight">
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 block uppercase tracking-wider">Realisasi Lunas</span>
+            <strong className="text-xl font-extrabold text-slate-900 dark:text-slate-50 dark:text-slate-100 block mt-1 tracking-tight">
               {formatCurrency(paidThisMonth)}
             </strong>
-            <span className="text-[10px] text-slate-500 block mt-1">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-1">
               Total kas masuk bulan ini
             </span>
           </div>
@@ -235,11 +235,11 @@ export function ReportsPage({
             <Percent size={22} />
           </div>
           <div>
-            <span className="text-xs font-semibold text-slate-400 block uppercase tracking-wider">Collection Rate</span>
-            <strong className="text-xl font-extrabold text-slate-900 dark:text-slate-100 block mt-1 tracking-tight">
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 block uppercase tracking-wider">Collection Rate</span>
+            <strong className="text-xl font-extrabold text-slate-900 dark:text-slate-50 dark:text-slate-100 block mt-1 tracking-tight">
               {collectionRate.toFixed(1)}%
             </strong>
-            <span className="text-[10px] text-slate-500 block mt-1">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-1">
               Rasio lunas dari total tagihan
             </span>
           </div>
@@ -250,7 +250,7 @@ export function ReportsPage({
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Trend Keuangan */}
         <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm lg:col-span-2">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-6">Tren Keuangan Bulanan</h3>
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 mb-6">Tren Keuangan Bulanan</h3>
           {safeRevenue.length > 0 ? (
             <div className="h-72">
               <Line
@@ -313,7 +313,7 @@ export function ReportsPage({
 
         {/* Aging piutang */}
         <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 mb-4">Rasio Aging Piutang</h3>
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 mb-4">Rasio Aging Piutang</h3>
           {aging && (aging.current > 0 || aging.days_1_30 > 0 || aging.days_31_60 > 0 || aging.over_60 > 0) ? (
             <div className="h-72 flex flex-col justify-between">
               <div className="max-w-[200px] mx-auto flex-1 flex items-center justify-center">
@@ -376,7 +376,7 @@ export function ReportsPage({
             <a
               href="/api/v1/reports/customers/csv"
               download
-              className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors flex items-center gap-2 cursor-pointer"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors flex items-center gap-2 cursor-pointer"
             >
               <Download size={14} />
               Export Data Pelanggan
@@ -393,13 +393,13 @@ export function ReportsPage({
           </div>
           <div className="grid grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-800 pt-4 mt-2">
             <div>
-              <span className="text-[10px] text-slate-400 block font-semibold uppercase">Rata-rata Kas Bulanan</span>
-              <strong className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-1 block">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-semibold uppercase">Rata-rata Kas Bulanan</span>
+              <strong className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 mt-1 block">
                 {formatCurrency(averageMonthlyCollection)}
               </strong>
             </div>
             <div>
-              <span className="text-[10px] text-slate-400 block font-semibold uppercase">Target Rasio Lunas</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-semibold uppercase">Target Rasio Lunas</span>
               <strong className="text-sm font-bold text-emerald-600 dark:text-emerald-450 mt-1 block">
                 &gt; 90.0%
               </strong>

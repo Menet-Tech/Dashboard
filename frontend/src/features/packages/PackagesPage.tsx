@@ -107,7 +107,7 @@ export function PackagesPage({
     const isSorted = sortField === field;
     return (
       <th 
-        className={`px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-slate-500 ${align === "center" ? "text-center" : "text-left"}`}
+        className={`px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 ${align === "center" ? "text-center" : "text-left"}`}
         onClick={() => requestSort(field)}
       >
         <div className={`inline-flex items-center gap-1.5 ${align === "center" ? "justify-center w-full" : ""}`}>
@@ -251,15 +251,15 @@ export function PackagesPage({
       {/* Table Header and Toolbar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-sans">Paket Internet</h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 font-sans">Paket Internet</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Definisikan profil paket kecepatan dan harga bulanan yang akan diterapkan pada data pelanggan dan router MikroTik.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" type="button"
             onClick={loadSyncProfiles}
-            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300 font-semibold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
             onClickCapture={() => setIsSyncOpen(true)}
           >
             <RefreshCw size={14} />
@@ -280,21 +280,21 @@ export function PackagesPage({
       </div>
 
       {/* Packages Table Card (Full Width) */}
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans">Daftar Master Paket</h3>
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider font-sans">Daftar Master Paket</h3>
           <StatusPill label={`${packages.length} Item`} tone="slate" />
         </div>
 
-        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm scrollbar-thin">
+        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
           <table className="w-full text-left border-collapse text-sm min-w-[600px]">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-sans">
+            <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
               <tr>
                 {renderSortableHeader("Nama Paket / Profile MikroTik", "name")}
                 {renderSortableHeader("Kecepatan bandwidth", "speed_mbps")}
                 {renderSortableHeader("Harga Bulanan", "price")}
                 {renderSortableHeader("Pelanggan Aktif", "customer_count", "center")}
-                <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>
+                <th className="px-6 py-4 font-semibold text-center text-slate-500 dark:text-slate-400">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -303,7 +303,7 @@ export function PackagesPage({
               ) : (
                 sortedPackages.map((pkg) => (
                   <tr key={pkg.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">{pkg.name}</td>
+                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">{pkg.name}</td>
                     <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">
                       {pkg.rate_limit
                         ? <span className="font-mono text-xs">{pkg.rate_limit}</span>
@@ -312,15 +312,15 @@ export function PackagesPage({
                           : `${pkg.speed_mbps} Mbps`}
                     </td>
                     <td className="px-6 py-4 text-slate-950 dark:text-slate-150 font-bold">{formatCurrency(pkg.price)}</td>
-                    <td className="px-6 py-4 text-slate-800 dark:text-slate-200 font-bold text-center">
+                    <td className="px-6 py-4 text-slate-800 dark:text-slate-100 dark:text-slate-200 font-bold text-center">
                       <span className="bg-slate-100 px-2.5 py-1 rounded-full text-xs font-semibold">
                         {pkg.customer_count} Pelanggan
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-700">
+                    <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                       <div className="flex gap-2 justify-center">
                         <Button variant="outline" type="button"
-                          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
                           onClick={() => {
                             setIsCreatingNewPool(false);
                             onEdit(pkg);
@@ -358,7 +358,7 @@ export function PackagesPage({
           actions={
             <>
               <Button variant="outline" type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                className="bg-white dark:bg-slate-900 border border-gray-300 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800/40 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 onClick={handleCloseForm}
               >
                 Batal
@@ -375,7 +375,7 @@ export function PackagesPage({
         >
           <form id="package-form" className="flex flex-col gap-5" onSubmit={onSubmit}>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Nama Paket (Wajib Sama dengan Profil MikroTik)</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Nama Paket (Wajib Sama dengan Profil MikroTik)</span>
               <input
                 className={inputClassName(packageErrors.name)}
                 value={packageForm.name}
@@ -386,7 +386,7 @@ export function PackagesPage({
               {renderInlineError(packageErrors.name)}
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Rate Limit Bandwidth (Format MikroTik)</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Rate Limit Bandwidth (Format MikroTik)</span>
               <input
                 className={inputClassName(packageErrors.rate_limit ?? packageErrors.speed_mbps)}
                 type="text"
@@ -397,11 +397,11 @@ export function PackagesPage({
                 placeholder="contoh: 10M/10M atau 10M/10M 50M/50M 10M/10M 10/10"
               />
               {/* Format reference card */}
-              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-[10px] text-slate-500 dark:text-slate-400 space-y-1 font-mono leading-relaxed">
+              <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-[10px] text-slate-500 dark:text-slate-400 space-y-1 font-mono leading-relaxed">
                 <p className="font-sans font-bold text-slate-700 dark:text-slate-300 text-[11px] mb-1.5">📡 Format Rate-Limit MikroTik:</p>
-                <p><span className="text-indigo-600 dark:text-indigo-400">rx/tx</span> — basic: <span className="text-slate-800 dark:text-slate-200">10M/10M</span></p>
-                <p><span className="text-indigo-600 dark:text-indigo-400">rate burst-rate threshold time</span> — burst: <span className="text-slate-800 dark:text-slate-200">10M/10M 50M/50M 10M/10M 10/10</span></p>
-                <p className="text-[9px] text-slate-400 font-sans mt-1">Kosongkan untuk bypass (unlimited). Satuan: K=Kbps, M=Mbps, G=Gbps</p>
+                <p><span className="text-indigo-600 dark:text-indigo-400">rx/tx</span> — basic: <span className="text-slate-800 dark:text-slate-100 dark:text-slate-200">10M/10M</span></p>
+                <p><span className="text-indigo-600 dark:text-indigo-400">rate burst-rate threshold time</span> — burst: <span className="text-slate-800 dark:text-slate-100 dark:text-slate-200">10M/10M 50M/50M 10M/10M 10/10</span></p>
+                <p className="text-[9px] text-slate-400 dark:text-slate-500 font-sans mt-1">Kosongkan untuk bypass (unlimited). Satuan: K=Kbps, M=Mbps, G=Gbps</p>
               </div>
               {renderInlineError(packageErrors.rate_limit ?? packageErrors.speed_mbps)}
             </label>
@@ -417,9 +417,9 @@ export function PackagesPage({
             {/* IP Pool selection */}
             {!isCreatingNewPool ? (
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-350">IP Pool MikroTik</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">IP Pool MikroTik</span>
                 {loadingPools ? (
-                  <div className="text-xs text-slate-400 italic">Memuat IP Pool dari MikroTik...</div>
+                  <div className="text-xs text-slate-400 dark:text-slate-500 italic">Memuat IP Pool dari MikroTik...</div>
                 ) : (
                   <select
                     className={inputClassName(packageErrors.ip_pool)}
@@ -446,9 +446,9 @@ export function PackagesPage({
                 {renderInlineError(packageErrors.ip_pool)}
               </label>
             ) : (
-              <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Buat IP Pool Baru di MikroTik</span>
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200">Buat IP Pool Baru di MikroTik</span>
                   <Button variant="outline" type="button"
                     className="text-xs font-bold text-indigo-650 hover:text-indigo-700"
                     onClick={() => {
@@ -460,7 +460,7 @@ export function PackagesPage({
                   </Button>
                 </div>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Nama IP Pool Baru</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Nama IP Pool Baru</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -471,7 +471,7 @@ export function PackagesPage({
                   />
                 </label>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Range IP Address (Contoh: 10.10.10.1-10.10.10.253)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Range IP Address (Contoh: 10.10.10.1-10.10.10.253)</span>
                   <input
                     type="text"
                     className={inputClassName(packageErrors.ip_pool_range)}
@@ -486,7 +486,7 @@ export function PackagesPage({
             )}
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Deskripsi Paket</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Deskripsi Paket</span>
               <textarea
                 className={inputClassName()}
                 rows={3}
@@ -507,7 +507,7 @@ export function PackagesPage({
           actions={
             <>
               <Button variant="outline" type="button"
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-55 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                className="bg-white dark:bg-slate-900 border border-gray-300 text-gray-700 dark:text-slate-300 hover:bg-gray-55 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 onClick={() => setIsSyncOpen(false)}
               >
                 Tutup
@@ -523,7 +523,7 @@ export function PackagesPage({
           }
         >
           <div className="flex flex-col gap-4">
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Berikut adalah daftar profil PPPoE yang terbaca di router MikroTik Anda. Centang profil yang ingin Anda tambahkan sebagai master paket di Control Panel ini.
             </p>
 
@@ -539,9 +539,9 @@ export function PackagesPage({
                 <Loader2 className="animate-spin text-indigo-600" />
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-96 overflow-y-auto scrollbar-thin">
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-96 overflow-y-auto scrollbar-thin">
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-650 sticky top-0">
+                  <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-slate-650 sticky top-0">
                     <tr>
                       <th className="px-4 py-2.5 text-center w-8">
                         <input
@@ -557,7 +557,7 @@ export function PackagesPage({
                       <th className="px-4 py-2.5 font-semibold text-center">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
+                  <tbody className="divide-y divide-slate-200 bg-white dark:bg-slate-900">
                     {syncProfiles.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="text-center py-6 text-slate-450">
@@ -566,7 +566,7 @@ export function PackagesPage({
                       </tr>
                     ) : (
                       syncProfiles.map((p) => (
-                        <tr key={p.name} className="hover:bg-slate-50">
+                        <tr key={p.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                           <td className="px-4 py-2.5 text-center">
                             <input
                               type="checkbox"
@@ -576,9 +576,9 @@ export function PackagesPage({
                               aria-label={`Pilih profil ${p.name}`}
                             />
                           </td>
-                          <td className="px-4 py-2.5 font-semibold text-slate-800">{p.name}</td>
+                          <td className="px-4 py-2.5 font-semibold text-slate-800 dark:text-slate-100">{p.name}</td>
                           <td className="px-4 py-2.5 font-mono text-slate-600">{p.rate_limit || "Tidak dibatasi"}</td>
-                          <td className="px-4 py-2.5 text-slate-700">{p.parsed_speed} Mbps</td>
+                          <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">{p.parsed_speed} Mbps</td>
                           <td className="px-4 py-2.5 text-center">
                             {p.exists ? (
                               <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
@@ -586,7 +586,7 @@ export function PackagesPage({
                                 Terpasang
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-50 text-slate-600 border border-slate-200">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-50 dark:bg-slate-950 text-slate-600 border border-slate-200 dark:border-slate-800">
                                 Baru
                               </span>
                             )}
@@ -609,7 +609,7 @@ export function PackagesPage({
           actions={
             <>
               <Button variant="outline" type="button"
-                className="bg-white border border-gray-300 text-slate-700 hover:bg-gray-50 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                className="bg-white dark:bg-slate-900 border border-gray-300 text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800/40 font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 onClick={() => setDeletingPkg(null)}
               >
                 Batal
@@ -628,16 +628,16 @@ export function PackagesPage({
             </>
           }
         >
-          <div className="flex flex-col gap-4 font-sans text-slate-800">
+          <div className="flex flex-col gap-4 font-sans text-slate-800 dark:text-slate-100">
             <p className="text-xs">
-              Apakah Anda yakin ingin menghapus paket <strong className="text-slate-900">{deletingPkg.name}</strong>?
+              Apakah Anda yakin ingin menghapus paket <strong className="text-slate-900 dark:text-slate-50">{deletingPkg.name}</strong>?
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Paket akan dihapus dari daftar master. Pastikan tidak ada pelanggan aktif yang masih bergantung pada paket ini.
             </p>
             
             {deletingPkg.ip_pool && (
-              <label className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 p-3.5 rounded-xl cursor-pointer select-none">
+              <label className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={deletePoolChecked}
@@ -645,8 +645,8 @@ export function PackagesPage({
                   className="accent-indigo-600 w-4 h-4 rounded border-gray-350"
                 />
                 <div className="text-xs text-left">
-                  <span className="font-bold text-slate-900 block">Hapus IP Pool juga dari MikroTik</span>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Hapus IP Pool <code className="bg-slate-200 px-1 rounded font-mono font-bold text-indigo-700">{deletingPkg.ip_pool}</code> dari seluruh router MikroTik aktif.</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-50 block">Hapus IP Pool juga dari MikroTik</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 block">Hapus IP Pool <code className="bg-slate-200 px-1 rounded font-mono font-bold text-indigo-700">{deletingPkg.ip_pool}</code> dari seluruh router MikroTik aktif.</span>
                 </div>
               </label>
             )}

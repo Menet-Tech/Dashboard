@@ -106,7 +106,7 @@ export function RegistrationPage({
     const isSorted = sortField === field;
     return (
       <th 
-        className="px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-105 dark:hover:bg-slate-805 transition-colors text-slate-500"
+        className="px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-105 dark:hover:bg-slate-805 transition-colors text-slate-500 dark:text-slate-400"
         onClick={() => requestSort(field)}
       >
         <div className="inline-flex items-center gap-1.5">
@@ -416,8 +416,8 @@ export function RegistrationPage({
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-sans">Registrasi List</h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 font-sans">Registrasi List</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Review dan kelola formulir pendaftaran pelanggan baru baik secara mandiri via WhatsApp maupun manual oleh admin.
           </p>
         </div>
@@ -456,9 +456,9 @@ export function RegistrationPage({
       </div>
 
       {/* Leads Table */}
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans">List Pendaftaran Calon Pelanggan</h3>
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider font-sans">List Pendaftaran Calon Pelanggan</h3>
           <Button
             type="button"
             variant="link"
@@ -470,9 +470,9 @@ export function RegistrationPage({
           </Button>
         </div>
 
-        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm scrollbar-thin">
+        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
           <table className="w-full text-left border-collapse text-sm min-w-[1000px]">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-sans">
+            <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
               <tr>
                 {renderSortableHeader("Waktu Masuk", "created_at")}
                 {renderSortableHeader("Nama / WhatsApp", "name")}
@@ -481,7 +481,7 @@ export function RegistrationPage({
                 {renderSortableHeader("PPPoE & Perangkat", "user_pppoe")}
                 {renderSortableHeader("Paket / Ref", "paket")}
                 {renderSortableHeader("Status", "status")}
-                <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>
+                <th className="px-6 py-4 font-semibold text-center text-slate-500 dark:text-slate-400">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -497,12 +497,12 @@ export function RegistrationPage({
                   });
                   return (
                     <tr key={lead.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="px-6 py-4 text-xs font-medium text-slate-500 whitespace-nowrap">
+                      <td className="px-6 py-4 text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
                         {dateStr}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-slate-900 dark:text-slate-100">{d.nama || d.name || "-"}</span>
+                          <span className="font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">{d.nama || d.name || "-"}</span>
                           <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
                             isManual
                               ? "bg-blue-50 text-blue-700 border border-blue-100"
@@ -513,21 +513,21 @@ export function RegistrationPage({
                         </div>
                         <div className="text-xs text-indigo-600 dark:text-indigo-400 font-mono">+{lead.phone}</div>
                       </td>
-                      <td className="px-6 py-4 text-slate-700 dark:text-slate-350 max-w-[200px] break-words">
+                      <td className="px-6 py-4 text-slate-700 dark:text-slate-300 dark:text-slate-350 max-w-[200px] break-words">
                         {d.alamat || d.address || "-"}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 dark:text-slate-200">
                           SSID: <span className="font-mono bg-slate-100 dark:bg-slate-850 px-1 rounded">{d.ssid || d.wifi || "-"}</span>
                         </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                           Pass: <span className="font-mono bg-slate-100 dark:bg-slate-850 px-1 rounded">{d.password || d.wifi_password || "-"}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         {d.user_pppoe ? (
                           <>
-                            <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                            <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 dark:text-slate-200">
                               PPPoE: <span className="font-mono bg-indigo-50 text-indigo-700 px-1 rounded">{d.user_pppoe}</span>
                             </div>
                             {d.sn_ont && (
@@ -536,17 +536,17 @@ export function RegistrationPage({
                               </div>
                             )}
                             {d.odp_id && (
-                              <div className="text-[10px] text-slate-500 font-medium">
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                                 ODP: {getOdpName(d.odp_id)} (Port {d.odp_port || "-"})
                               </div>
                             )}
                           </>
                         ) : (
-                          <span className="text-xs text-slate-400 font-sans italic">Belum dikonfigurasi</span>
+                          <span className="text-xs text-slate-400 dark:text-slate-500 font-sans italic">Belum dikonfigurasi</span>
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        <div className="text-xs font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200">
                           {d.paket || d.package_choice || "-"}
                         </div>
                         {d.referral && (
@@ -639,11 +639,11 @@ export function RegistrationPage({
         >
           <form id="manual-reg-form" onSubmit={handleManualSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin">
             {/* Section 1: Informasi Pelanggan */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Informasi Utama</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Nama Lengkap *</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Nama Lengkap *</span>
                   <input
                     type="text"
                     className={inputClassName(formErrors.nama)}
@@ -655,7 +655,7 @@ export function RegistrationPage({
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Nomor WhatsApp *</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-355">Nomor WhatsApp *</span>
                   <input
                     type="text"
                     className={inputClassName(formErrors.phone)}
@@ -668,7 +668,7 @@ export function RegistrationPage({
               </div>
 
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Alamat Lengkap *</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-355">Alamat Lengkap *</span>
                 <textarea
                   className={inputClassName(formErrors.alamat)}
                   rows={2}
@@ -681,11 +681,11 @@ export function RegistrationPage({
             </div>
 
             {/* Section 2: Paket & PPPoE */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Paket & Akun PPPoE</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1 col-span-full">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Pilihan Paket Internet</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilihan Paket Internet</span>
                   <select
                     className={inputClassName()}
                     value={manualForm.paket}
@@ -701,7 +701,7 @@ export function RegistrationPage({
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">User PPPoE (Otomatis)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">User PPPoE (Otomatis)</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -712,7 +712,7 @@ export function RegistrationPage({
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Password PPPoE (Otomatis)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Password PPPoE (Otomatis)</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -725,11 +725,11 @@ export function RegistrationPage({
             </div>
 
             {/* Section 3: ONT & ODP */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Perangkat & ODP</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1 col-span-full">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-355">SN ONT (Serial Number)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-355">SN ONT (Serial Number)</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -740,7 +740,7 @@ export function RegistrationPage({
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Titik Distribusi ODP</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-355">Titik Distribusi ODP</span>
                   <select
                     className={inputClassName()}
                     value={manualForm.odp_id}
@@ -775,7 +775,7 @@ export function RegistrationPage({
 
                 {manualForm.odp_id && (
                   <label className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Port ODP</span>
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Port ODP</span>
                     <select
                       className={inputClassName()}
                       value={manualForm.odp_port}
@@ -801,11 +801,11 @@ export function RegistrationPage({
             </div>
 
             {/* Section 4: WiFi & Referral */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">SSID WiFi & Referral</h4>
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">SSID WiFi (Opsional)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">SSID WiFi (Opsional)</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -816,7 +816,7 @@ export function RegistrationPage({
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-350">WiFi Password (Opsional)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">WiFi Password (Opsional)</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -827,7 +827,7 @@ export function RegistrationPage({
                 </label>
 
                 <label className="flex flex-col gap-1 col-span-full">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Referral (Pemberi Saran - Opsional)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-355">Referral (Pemberi Saran - Opsional)</span>
                   <input
                     type="text"
                     list="referral-list"
@@ -886,11 +886,11 @@ export function RegistrationPage({
             </div>
 
             {/* Section: Identitas */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Identitas Pelanggan</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700">Nama Lengkap *</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Nama Lengkap *</span>
                   <input
                     type="text"
                     className={inputClassName(convertErrors.name)}
@@ -912,7 +912,7 @@ export function RegistrationPage({
                   {renderInlineError(convertErrors.name)}
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700">Nomor WhatsApp</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Nomor WhatsApp</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -923,7 +923,7 @@ export function RegistrationPage({
                 </label>
               </div>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-700">Alamat Pemasangan</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Alamat Pemasangan</span>
                 <textarea
                   rows={2}
                   className={inputClassName()}
@@ -935,11 +935,11 @@ export function RegistrationPage({
             </div>
 
             {/* Section: Paket & PPPoE */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Paket & Akun PPPoE</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1 col-span-full">
-                  <span className="text-xs font-bold text-slate-700">Pilihan Paket Internet</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pilihan Paket Internet</span>
                   <select
                     className={inputClassName()}
                     value={convertForm.paket}
@@ -954,7 +954,7 @@ export function RegistrationPage({
                   </select>
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700">User PPPoE *</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">User PPPoE *</span>
                   <input
                     type="text"
                     className={inputClassName(convertErrors.user_pppoe)}
@@ -965,7 +965,7 @@ export function RegistrationPage({
                   {renderInlineError(convertErrors.user_pppoe)}
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700">Password PPPoE *</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Password PPPoE *</span>
                   <input
                     type="text"
                     className={inputClassName(convertErrors.password_pppoe)}
@@ -976,7 +976,7 @@ export function RegistrationPage({
                   {renderInlineError(convertErrors.password_pppoe)}
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700">Tanggal Jatuh Tempo</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Tanggal Jatuh Tempo</span>
                   <input
                     type="number"
                     min={1} max={31}
@@ -989,11 +989,11 @@ export function RegistrationPage({
             </div>
 
             {/* Section: Perangkat & ODP */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Perangkat & ODP</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1 col-span-full">
-                  <span className="text-xs font-bold text-slate-700">SN ONT (Serial Number)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">SN ONT (Serial Number)</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -1003,7 +1003,7 @@ export function RegistrationPage({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700">Titik Distribusi ODP</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Titik Distribusi ODP</span>
                   <select
                     className={inputClassName()}
                     value={convertForm.odp_id}
@@ -1037,7 +1037,7 @@ export function RegistrationPage({
                 </label>
                 {convertForm.odp_id && (
                   <label className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-slate-700">Port ODP</span>
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Port ODP</span>
                     <select
                       className={inputClassName()}
                       value={convertForm.odp_port}
@@ -1061,11 +1061,11 @@ export function RegistrationPage({
             </div>
 
             {/* Section: WiFi & Referral */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">WiFi & Referral</h4>
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700">SSID WiFi (Opsional)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">SSID WiFi (Opsional)</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -1075,7 +1075,7 @@ export function RegistrationPage({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700">Password WiFi (Opsional)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Password WiFi (Opsional)</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -1085,7 +1085,7 @@ export function RegistrationPage({
                   />
                 </label>
                 <label className="flex flex-col gap-1 col-span-full">
-                  <span className="text-xs font-bold text-slate-700">Referral (Opsional)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Referral (Opsional)</span>
                   <input
                     type="text"
                     list="convert-referral-list"

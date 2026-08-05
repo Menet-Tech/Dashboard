@@ -174,7 +174,7 @@ export function PaymentConfirmationsPage({
       <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-55">Review Pembayaran</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-55">Review Pembayaran</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Verifikasi bukti transfer dan klaim pembayaran yang dikirimkan pelanggan melalui WhatsApp.
             </p>
@@ -224,9 +224,9 @@ export function PaymentConfirmationsPage({
               return (
                 <div
                   key={item.id}
-                  className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-all duration-350"
+                  className="bg-white dark:bg-slate-900 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-all duration-350"
                 >
-                  <div className="relative bg-slate-50 dark:bg-slate-900 h-64 border-b border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden group">
+                  <div className="relative bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 h-64 border-b border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden group">
                     {isImg ? (
                       <img
                         src={item.bukti_transfer}
@@ -234,14 +234,14 @@ export function PaymentConfirmationsPage({
                         className="object-contain w-full h-full max-h-full transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : hasProof ? (
-                      <div className="flex flex-col items-center gap-3 p-6 text-slate-400">
+                      <div className="flex flex-col items-center gap-3 p-6 text-slate-400 dark:text-slate-500">
                         <FileText className="w-16 h-16 text-indigo-400" />
-                        <span className="text-xs font-semibold text-slate-500">File Non-Gambar</span>
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">File Non-Gambar</span>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center gap-2 p-6 text-slate-450">
                         <AlertCircle className="w-12 h-12 text-amber-500" />
-                        <span className="text-xs font-semibold text-slate-500">Klaim Tanpa Bukti (Cash)</span>
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Klaim Tanpa Bukti (Cash)</span>
                       </div>
                     )}
 
@@ -251,7 +251,7 @@ export function PaymentConfirmationsPage({
                           href={item.bukti_transfer}
                           target="_blank"
                           rel="noreferrer"
-                          className="bg-white hover:bg-slate-100 text-slate-850 p-2.5 rounded-xl shadow-lg transition-transform hover:scale-110 flex items-center gap-1.5 text-xs font-bold"
+                          className="bg-white dark:bg-slate-900 hover:bg-slate-100 text-slate-850 p-2.5 rounded-xl shadow-lg transition-transform hover:scale-110 flex items-center gap-1.5 text-xs font-bold"
                         >
                           <Eye className="w-4 h-4" /> Lihat Asli
                         </a>
@@ -263,7 +263,7 @@ export function PaymentConfirmationsPage({
                     <div>
                       <div className="flex justify-between items-start gap-2 mb-3">
                         <div>
-                          <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-tight">
+                          <h4 className="font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 text-sm leading-tight">
                             {item.customer_name}
                           </h4>
                           <span className="text-[10px] text-indigo-650 dark:text-indigo-400 font-semibold tracking-wide uppercase mt-1 inline-block">
@@ -279,7 +279,7 @@ export function PaymentConfirmationsPage({
                               (Total {item.linked_bills.length + 1} Akun)
                             </span>
                           )}
-                          <span className="block text-[10px] text-slate-400 mt-0.5">{date}</span>
+                          <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{date}</span>
                         </div>
                       </div>
 
@@ -289,11 +289,11 @@ export function PaymentConfirmationsPage({
                             Akun Lain yang Ditautkan:
                           </span>
                           {item.linked_bills.map((lb) => (
-                            <div key={lb.tagihan_id} className="flex justify-between items-center text-[11px] bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                            <div key={lb.tagihan_id} className="flex justify-between items-center text-[11px] bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 px-2.5 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
                               <span className="text-slate-650 dark:text-slate-400 font-semibold">
                                 {lb.invoice_number}
                               </span>
-                              <span className="font-extrabold text-slate-800 dark:text-slate-300">
+                              <span className="font-extrabold text-slate-800 dark:text-slate-100 dark:text-slate-300">
                                 {formatCurrency(lb.amount)}
                               </span>
                             </div>
@@ -301,7 +301,7 @@ export function PaymentConfirmationsPage({
                         </div>
                       )}
 
-                      <div className="bg-slate-50 dark:bg-slate-900/60 rounded-xl p-3 text-xs text-slate-650 dark:text-slate-350 border border-slate-100 dark:border-slate-800">
+                      <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 rounded-xl p-3 text-xs text-slate-650 dark:text-slate-350 border border-slate-100 dark:border-slate-800">
                         <strong className="block text-[10px] text-slate-450 dark:text-slate-500 mb-1 tracking-wider uppercase">
                           Keterangan:
                         </strong>
@@ -341,11 +341,11 @@ export function PaymentConfirmationsPage({
         <Modal title="Tambah Konfirmasi Pembayaran Manual" onClose={() => setShowAddModal(false)}>
           <form onSubmit={handleSubmit} className="space-y-4 font-sans">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-355 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 dark:text-slate-355 mb-1">
                 Pilih Tagihan Pelanggan (Belum Bayar) *
               </label>
               {loadingBills ? (
-                <div className="text-xs text-slate-400 py-1">Memuat daftar tagihan...</div>
+                <div className="text-xs text-slate-400 dark:text-slate-500 py-1">Memuat daftar tagihan...</div>
               ) : (
                 <select
                   value={selectedBillId || ""}
@@ -353,7 +353,7 @@ export function PaymentConfirmationsPage({
                     setSelectedBillId(Number(e.target.value) || null);
                     setSelectedLinkedBillIds([]);
                   }}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs px-3 py-2 text-slate-800 dark:text-slate-200"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs px-3 py-2 text-slate-800 dark:text-slate-100 dark:text-slate-200"
                   required
                 >
                   <option value="">-- Pilih Tagihan --</option>
@@ -402,26 +402,26 @@ export function PaymentConfirmationsPage({
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-355 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 dark:text-slate-355 mb-1">
                 Bukti Transfer (Gambar / PDF - Opsional)
               </label>
               <input
                 type="file"
                 accept="image/*,application/pdf"
                 onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                className="w-full text-xs text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-355 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 dark:text-slate-355 mb-1">
                 Catatan Pembayaran
               </label>
               <textarea
                 value={catatanText}
                 onChange={(e) => setCatatanText(e.target.value)}
                 placeholder="Contoh: Transfer Bank Mandiri an Pengirim"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs px-3 py-2 h-20 text-slate-800 dark:text-slate-200"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs px-3 py-2 h-20 text-slate-800 dark:text-slate-100 dark:text-slate-200"
               />
             </div>
 

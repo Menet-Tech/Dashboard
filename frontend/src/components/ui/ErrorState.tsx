@@ -17,7 +17,7 @@ export function ErrorState({ title = "Terjadi Kesalahan", message, onRetry }: Er
         <button
           type="button"
           onClick={onRetry}
-          className="bg-white border border-red-200 text-red-700 hover:bg-red-50 font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors"
+          className="bg-white dark:bg-slate-900 border border-red-200 text-red-700 hover:bg-red-50 font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors"
         >
           Coba Lagi
         </button>

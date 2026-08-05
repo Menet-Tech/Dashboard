@@ -124,7 +124,7 @@ export function BillsPage({
     const sortAria = isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "none";
     return (
       <th 
-        className="px-6 py-4 font-medium select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-gray-500"
+        className="px-6 py-4 font-medium select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-gray-500 dark:text-slate-400"
         onClick={() => requestSort(field)}
         aria-sort={sortAria}
         scope="col"
@@ -163,9 +163,9 @@ export function BillsPage({
   return (
     <section className="grid grid-cols-1 gap-6">
       {user?.role !== "viewer" && (
-        <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-slate-900">Generate Tagihan</h2>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Generate Tagihan</h2>
           </div>
           <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onGenerateBills}>
             <label className="flex flex-col gap-1.5">
@@ -194,22 +194,22 @@ export function BillsPage({
         </article>
       )}
 
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Daftar Tagihan</h2>
-            <p className="text-xs text-slate-500 mt-1">Cari, saring, dan kelola tagihan bulanan pelanggan.</p>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Daftar Tagihan</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Cari, saring, dan kelola tagihan bulanan pelanggan.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <input
               type="text"
-              className="bg-white border border-slate-200 text-slate-750 text-xs rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors w-64"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 text-xs rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors w-64"
               placeholder="Cari Invoice atau Pelanggan..."
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
             />
             <select
-              className="bg-white border border-slate-200 text-slate-750 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer"
               value={status}
               onChange={(e) => onStatusChange(e.target.value)}
             >
@@ -222,7 +222,7 @@ export function BillsPage({
             <div className="relative flex items-center">
               <input
                 type="month"
-                className="bg-white border border-slate-200 text-slate-750 text-xs rounded-xl pl-3 pr-8 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer w-40"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 text-xs rounded-xl pl-3 pr-8 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer w-40"
                 value={filterPeriod}
                 onChange={(e) => onFilterPeriodChange(e.target.value)}
                 onClick={(e) => {
@@ -232,7 +232,7 @@ export function BillsPage({
               {filterPeriod && (
                 <Button variant="outline" type="button"
                   onClick={() => onFilterPeriodChange("")}
-                  className="absolute right-2.5 text-slate-400 hover:text-slate-650 p-1 flex items-center justify-center transition-colors cursor-pointer"
+                  className="absolute right-2.5 text-slate-400 dark:text-slate-500 hover:text-slate-650 p-1 flex items-center justify-center transition-colors cursor-pointer"
                   title="Bersihkan Filter Bulan"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -250,9 +250,9 @@ export function BillsPage({
           </div>
         </div>
 
-         <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+         <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
           <table className="w-full text-left border-collapse text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
+            <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400">
               <tr>
                 {renderSortableHeader("Invoice", "invoice_number")}
                 {renderSortableHeader("Pelanggan", "customer_name")}
@@ -271,8 +271,8 @@ export function BillsPage({
                 sortedBills.map((bill) => (
                   <Fragment key={bill.id}>
                     <tr>
-                      <td className="px-6 py-4 text-gray-700 font-semibold">{bill.invoice_number}</td>
-                      <td className="px-6 py-4 text-gray-700">
+                      <td className="px-6 py-4 text-gray-700 dark:text-slate-300 font-semibold">{bill.invoice_number}</td>
+                      <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                         <div className="flex items-center gap-1.5">
                           <Button
                             variant="link"
@@ -295,16 +295,16 @@ export function BillsPage({
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-700">{bill.period}</td>
-                      <td className="px-6 py-4 text-gray-700">{bill.due_date}</td>
-                      <td className="px-6 py-4 text-gray-700">{formatCurrency(bill.amount)}</td>
-                      <td className="px-6 py-4 text-gray-700">
+                      <td className="px-6 py-4 text-gray-700 dark:text-slate-300">{bill.period}</td>
+                      <td className="px-6 py-4 text-gray-700 dark:text-slate-300">{bill.due_date}</td>
+                      <td className="px-6 py-4 text-gray-700 dark:text-slate-300">{formatCurrency(bill.amount)}</td>
+                      <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                         <StatusPill
                           label={displayStatusLabel(bill.display_status)}
                           tone={displayStatusTone(bill.display_status)}
                         />
                       </td>
-                      <td className="px-6 py-4 text-gray-700">
+                      <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                         {bill.proof_path ? (
                           <a href={bill.proof_path} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
                             Lihat bukti
@@ -313,7 +313,7 @@ export function BillsPage({
                           <span className="muted">Belum ada</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-gray-700">
+                      <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                         <div className="flex flex-wrap gap-2 items-center">
                           {/* Dokumen & Log - Grup 1 */}
                           <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5">
@@ -321,7 +321,7 @@ export function BillsPage({
                               type="button"
                               variant="outline"
                               size="sm"
-                              className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200"
+                              className="bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-200"
                               onClick={() => window.open(`/api/v1/bills/${bill.id}/invoice`, "_blank")}
                               title="Buka PDF Invoice"
                             >
@@ -407,7 +407,7 @@ export function BillsPage({
 
                           {/* Proof Upload */}
                           {user?.role !== "viewer" && bill.status !== "lunas" && bill.display_status !== "perpanjangan" && (
-                            <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 ml-auto">
+                            <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-800 dark:border-slate-700 rounded-lg p-0.5 ml-auto">
                               <input
                                 type="file"
                                 accept=".jpg,.jpeg,.png,.pdf,.webp"
@@ -417,7 +417,7 @@ export function BillsPage({
                               />
                               <label
                                 htmlFor={`proof-upload-${bill.id}`}
-                                className="bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium py-1 px-2 rounded cursor-pointer transition-colors max-w-[80px] truncate"
+                                className="bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium py-1 px-2 rounded cursor-pointer transition-colors max-w-[80px] truncate"
                               >
                                 {proofFiles[bill.id] ? proofFiles[bill.id]?.name : "Pilih File"}
                               </label>
@@ -440,8 +440,8 @@ export function BillsPage({
                     </tr>
                     {expandedBillId === bill.id && (
                       <tr className="expanded-row">
-                        <td className="px-6 py-4 text-gray-700" colSpan={8}>
-                          <div className="expanded-content p-5 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-900/60 shadow-inner">
+                        <td className="px-6 py-4 text-gray-700 dark:text-slate-300" colSpan={8}>
+                          <div className="expanded-content p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-900/60 shadow-inner">
                             <div className="flex items-center justify-between mb-3">
                               <h4 className="font-bold text-xs text-slate-850 dark:text-slate-200 tracking-wide uppercase">Riwayat Notifikasi</h4>
                               {notificationLogs[bill.id]?.length ? (
@@ -463,7 +463,7 @@ export function BillsPage({
                                       <th className="px-4 py-3 text-center">Aksi</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-950/30">
+                                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900 dark:bg-slate-950/30">
                                     {notificationLogs[bill.id].map((log) => (
                                       <tr key={log.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-900/40 transition-colors">
                                         <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400 font-mono text-[10px]">
@@ -475,7 +475,7 @@ export function BillsPage({
                                             {log.trigger_key}
                                           </span>
                                         </td>
-                                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-350">
+                                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 dark:text-slate-350">
                                           <StatusPill
                                             label={log.status.toUpperCase()}
                                             tone={log.status === "sent" ? "green" : log.status === "queued" ? "slate" : "red"}
@@ -522,7 +522,7 @@ export function BillsPage({
                                               type="button"
                                               variant="outline"
                                               size="sm"
-                                              className="bg-slate-50 hover:bg-slate-100 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 text-slate-650 dark:text-slate-400"
+                                              className="bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 text-slate-650 dark:text-slate-400"
                                               title="Salin link wa.me ke clipboard"
                                               onClick={async () => {
                                                 const cleanPhone = log.sent_to.replace(/[^0-9]/g, "");
@@ -571,7 +571,7 @@ export function BillsPage({
         </div>
 
         {total > limit && (
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 text-slate-500 text-xs font-semibold">
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>
               Menampilkan {Math.min((page - 1) * limit + 1, total)} - {Math.min(page * limit, total)} dari {total} item
             </span>
@@ -580,20 +580,20 @@ export function BillsPage({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300"
                 disabled={page <= 1}
                 onClick={() => onPageChange(page - 1)}
               >
                 Sebelumnya
               </Button>
-              <span className="flex items-center px-2 text-slate-700">
+              <span className="flex items-center px-2 text-slate-700 dark:text-slate-300">
                 Halaman {page} dari {Math.ceil(total / limit)}
               </span>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300"
                 disabled={page >= Math.ceil(total / limit)}
                 onClick={() => onPageChange(page + 1)}
               >

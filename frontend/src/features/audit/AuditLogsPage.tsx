@@ -32,7 +32,7 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
     const isSorted = sortField === field;
     return (
       <th 
-        className="px-6 py-4 font-medium select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500"
+        className="px-6 py-4 font-medium select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
         onClick={() => requestSort(field)}
       >
         <div className="inline-flex items-center gap-1.5">
@@ -95,23 +95,23 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
 
   return (
     <section className="grid gap-6">
-      <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+      <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
             <label className="block">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Cari Log</span>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">Cari Log</span>
               <input
                 type="text"
                 placeholder="Cari user, IP, aksi, atau detail..."
-                className="bg-white border border-slate-250 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+                className="bg-white dark:bg-slate-900 border border-slate-250 text-slate-700 dark:text-slate-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </label>
             <label className="block">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Filter Aksi</span>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">Filter Aksi</span>
               <select
-                className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
               >
@@ -122,10 +122,10 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
               </select>
             </label>
             <label className="block">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Filter Tanggal</span>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">Filter Tanggal</span>
               <input
                 type="date"
-                className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
               />
@@ -152,33 +152,33 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
         </div>
       </article>
 
-      <article className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto border border-slate-100 rounded-xl">
+      <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto border border-slate-100 dark:border-slate-800 rounded-xl">
           <table className="w-full text-left border-collapse text-sm">
-            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
+            <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400">
               <tr>
                 {renderSortableHeader("Waktu", "created_at")}
                 {renderSortableHeader("User", "username")}
                 {renderSortableHeader("IP", "ip_address")}
                 {renderSortableHeader("Aksi", "action")}
-                <th className="px-6 py-4 font-medium text-slate-500">Detail</th>
+                <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">Detail</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {sortedLogs.length === 0 ? (
                 <tr>
-                  <td className="px-6 py-12 text-center text-slate-400" colSpan={5}>
+                  <td className="px-6 py-12 text-center text-slate-400 dark:text-slate-500" colSpan={5}>
                     {auditLogs.length === 0 ? "Belum ada audit log." : "Tidak ada log yang cocok dengan filter."}
                   </td>
                 </tr>
               ) : (
                 sortedLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 text-slate-700 whitespace-nowrap">{formatDateTime(log.created_at)}</td>
-                    <td className="px-6 py-4 text-slate-700 font-medium">{log.username ?? (log.user_id ? `#${log.user_id}` : "-")}</td>
-                    <td className="px-6 py-4 text-slate-400 text-xs font-mono">{log.ip_address || "-"}</td>
+                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatDateTime(log.created_at)}</td>
+                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">{log.username ?? (log.user_id ? `#${log.user_id}` : "-")}</td>
+                    <td className="px-6 py-4 text-slate-400 dark:text-slate-500 text-xs font-mono">{log.ip_address || "-"}</td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 dark:text-slate-100">
                         {log.action}
                       </span>
                     </td>

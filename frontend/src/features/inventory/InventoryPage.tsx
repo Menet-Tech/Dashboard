@@ -56,7 +56,7 @@ export default function InventoryPage() {
     const isSorted = sortField === field;
     return (
       <th 
-        className="px-6 py-4 font-bold select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500"
+        className="px-6 py-4 font-bold select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
         onClick={() => requestSort(field)}
       >
         <div className="inline-flex items-center gap-1.5">
@@ -155,7 +155,7 @@ export default function InventoryPage() {
       <div className="max-w-6xl mx-auto space-y-6">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+            <h1 className="text-2xl font-black text-slate-900 dark:text-slate-50 dark:text-white tracking-tight flex items-center gap-2">
               <Package className="text-indigo-600" />
               Inventaris Gudang
             </h1>
@@ -169,7 +169,7 @@ export default function InventoryPage() {
                 setLogForm({ itemId: items[0]?.id || 0, type: "out", quantity: 1, reference: "", notes: "" });
                 setIsLogFormOpen(true);
               }}
-              className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs flex items-center gap-2"
+              className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 dark:text-slate-200 text-xs flex items-center gap-2"
             >
               <ArrowRightLeft size={16} />
               Catat Keluar/Masuk
@@ -193,13 +193,13 @@ export default function InventoryPage() {
         <div className="flex gap-4 border-b border-slate-200 dark:border-slate-800">
           <Button type="button" variant="outline"
             onClick={() => setActiveTab("items")}
-            className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === "items" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}
+            className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === "items" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"}`}
           >
             Stok Barang
           </Button>
           <Button type="button" variant="outline"
             onClick={() => setActiveTab("logs")}
-            className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === "logs" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}
+            className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === "logs" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"}`}
           >
             Riwayat Transaksi
           </Button>
@@ -208,7 +208,7 @@ export default function InventoryPage() {
         {activeTab === "items" && (
           <div className="space-y-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
               <input
                 type="text"
                 placeholder="Cari item..."
@@ -234,7 +234,7 @@ export default function InventoryPage() {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="p-1 px-1 h-auto text-slate-400 hover:text-indigo-600"
+                            className="p-1 px-1 h-auto text-slate-400 dark:text-slate-500 hover:text-indigo-600"
                             onClick={() => {
                               setEditingItem(item);
                               setForm({ name: item.name, description: item.description, category: item.category, unit: item.unit, quantity: item.quantity });
@@ -247,21 +247,21 @@ export default function InventoryPage() {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="p-1 px-1 h-auto text-slate-400 hover:text-rose-600"
+                            className="p-1 px-1 h-auto text-slate-400 dark:text-slate-500 hover:text-rose-600"
                             onClick={() => handleDeleteItem(item.id)}
                           >
                             <Trash2 size={14} />
                           </Button>
                         </div>
                       </div>
-                      <h3 className="font-bold text-slate-900 dark:text-white text-lg">{item.name}</h3>
-                      <p className="text-xs text-slate-500 line-clamp-2 mt-1">{item.description || "Tidak ada deskripsi"}</p>
+                      <h3 className="font-bold text-slate-900 dark:text-slate-50 dark:text-white text-lg">{item.name}</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">{item.description || "Tidak ada deskripsi"}</p>
                     </div>
                     <div className="mt-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3">
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase">Stok Tersedia</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase">Stok Tersedia</span>
                         <span className={`text-xl font-black ${item.quantity <= 0 ? "text-rose-500" : "text-emerald-600"}`}>
-                          {item.quantity} <span className="text-sm font-semibold text-slate-500">{item.unit}</span>
+                          {item.quantity} <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{item.unit}</span>
                         </span>
                       </div>
                       <Button
@@ -289,7 +289,7 @@ export default function InventoryPage() {
               <div className="flex justify-center p-8"><Loader2 className="animate-spin text-indigo-600" /></div>
             ) : (
               <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50 dark:bg-slate-950/50 text-slate-500 dark:text-slate-400">
+                <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/50 text-slate-500 dark:text-slate-400">
                   <tr>
                     {renderSortableHeader("Waktu", "created_at")}
                     {renderSortableHeader("Item ID", "item_id")}
@@ -316,7 +316,7 @@ export default function InventoryPage() {
                   ))}
                   {sortedLogs.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-slate-500">Belum ada transaksi.</td>
+                      <td colSpan={6} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">Belum ada transaksi.</td>
                     </tr>
                   )}
                 </tbody>

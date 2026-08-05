@@ -51,7 +51,7 @@ export function CustomerFormCard({
     <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-6">
       <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
         <div>
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">
             {isEditing ? "Edit Pelanggan" : "Tambah Pelanggan Baru"}
           </h3>
           <p className="text-xs text-slate-400 dark:text-slate-500">
@@ -75,7 +75,7 @@ export function CustomerFormCard({
 
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
             Nama Pelanggan *
           </span>
           <input
@@ -90,7 +90,7 @@ export function CustomerFormCard({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
             Paket Layanan *
           </span>
           <select
@@ -118,7 +118,7 @@ export function CustomerFormCard({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
               Username PPPoE
             </span>
             <input
@@ -132,7 +132,7 @@ export function CustomerFormCard({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
               Password PPPoE
             </span>
             <input
@@ -151,7 +151,7 @@ export function CustomerFormCard({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
               Nomor WhatsApp
             </span>
             <input
@@ -166,7 +166,7 @@ export function CustomerFormCard({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
               Email
             </span>
             <input
@@ -182,7 +182,7 @@ export function CustomerFormCard({
         </div>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
             Alamat Pelanggan
           </span>
           <textarea
@@ -197,7 +197,7 @@ export function CustomerFormCard({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
             Serial Number ONT
           </span>
           <input
@@ -218,7 +218,7 @@ export function CustomerFormCard({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200">
                     Aktifkan Masa Trial (Percobaan)
                   </span>
                   {(customerForm.status === "trial" || customerForm.is_trial) && (
@@ -262,7 +262,7 @@ export function CustomerFormCard({
         </div>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Status Layanan</span>
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Status Layanan</span>
           <select
             className={inputClassName()}
             value={customerForm.status}
@@ -298,7 +298,7 @@ export function CustomerFormCard({
         {/* Trial days — only visible when status is "trial" or is_trial is true */}
         {(customerForm.status === "trial" || customerForm.is_trial) && (
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
               Durasi Trial (Hari)
             </span>
             <input
@@ -327,7 +327,7 @@ export function CustomerFormCard({
         )}
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-355">Tanggal Jatuh Tempo Bulanan</span>
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-355">Tanggal Jatuh Tempo Bulanan</span>
           <select
             className={inputClassName(customerErrors.due_day)}
             value={customerForm.due_day}
@@ -361,7 +361,7 @@ export function CustomerFormCard({
       {/* ODP Node selector */}
       <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Titik Distribusi ODP</span>
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Titik Distribusi ODP</span>
           <select
             className={inputClassName()}
             value={customerForm.odp_id || 0}
@@ -400,7 +400,7 @@ export function CustomerFormCard({
 
         {(customerForm.odp_id || 0) > 0 && (
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Port ODP</span>
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Port ODP</span>
             <select
               className={inputClassName()}
               value={customerForm.odp_port || 1}
@@ -433,7 +433,7 @@ export function CustomerFormCard({
       </div>
 
       <label className="col-span-full flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Direkomendasikan Oleh (Referral)</span>
+        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Direkomendasikan Oleh (Referral)</span>
         <select
           className={inputClassName()}
           value={customerForm.referred_by_id}
@@ -455,7 +455,7 @@ export function CustomerFormCard({
         </select>
       </label>
       <label className="col-span-full flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Alamat Pemasangan</span>
+        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Alamat Pemasangan</span>
         <textarea
           className={inputClassName()}
           rows={3}

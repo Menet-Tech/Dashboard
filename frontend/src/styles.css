@@ -115,74 +115,6 @@ html.dark body {
   color: #f1f5f9;
 }
 
-html.dark .bg-white {
-  background-color: #0f172a !important;
-}
-
-html.dark .bg-slate-50 {
-  background-color: #020617 !important;
-}
-
-html.dark .bg-gray-50 {
-  background-color: #1e293b !important;
-}
-
-html.dark .border-gray-200,
-html.dark .border-slate-200,
-html.dark .border-slate-100,
-html.dark .border-gray-100 {
-  border-color: #1e293b !important;
-}
-
-html.dark .text-slate-900,
-html.dark .text-gray-900 {
-  color: #f8fafc !important;
-}
-
-html.dark .text-slate-800,
-html.dark .text-gray-800 {
-  color: #f1f5f9 !important;
-}
-
-html.dark .text-slate-700,
-html.dark .text-gray-700 {
-  color: #cbd5e1 !important;
-}
-
-html.dark .text-slate-500,
-html.dark .text-gray-500 {
-  color: #94a3b8 !important;
-}
-
-html.dark .text-slate-400,
-html.dark .text-gray-400 {
-  color: #64748b !important;
-}
-
-html.dark .hover\:bg-gray-50:hover {
-  background-color: rgba(30, 41, 59, 0.4) !important;
-}
-
-html.dark .modal-content {
-  background-color: #0f172a !important;
-  border-color: #1e293b !important;
-  color: #f8fafc !important;
-}
-
-html.dark input,
-html.dark select,
-html.dark textarea {
-  background-color: #020617 !important;
-  border-color: #334155 !important;
-  color: #f8fafc !important;
-}
-
-html.dark input:focus,
-html.dark select:focus,
-html.dark textarea:focus {
-  border-color: #6366f1 !important;
-  --tw-ring-color: #6366f1 !important;
-}
 
 /* ==========================================
    CUSTOM SELECT STYLING
@@ -196,6 +128,3 @@ select {
   padding-right: 2.5rem !important;
 }
 
-html.dark select {
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23818cf8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
-}

@@ -91,26 +91,26 @@ export function QrTab({
       )}
 
       {/* QR Card Container */}
-      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center shadow-inner relative min-h-[350px]">
+      <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center shadow-inner relative min-h-[350px]">
         {!target ? (
-          <p className="text-slate-500 text-sm">Pilih atau buat akun gateway terlebih dahulu.</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Pilih atau buat akun gateway terlebih dahulu.</p>
         ) : target.ready ? (
           <div className="text-center p-4">
             <div className="bg-emerald-50 text-emerald-600 p-4 rounded-full inline-block mb-3 border border-emerald-100">
               <Wifi size={40} />
             </div>
-            <h4 className="font-bold text-slate-900 mb-1">WhatsApp Terkoneksi</h4>
-            <p className="text-sm text-slate-500">Akun '{qrSelectedAccountId}' siap mengirim dan menerima pesan.</p>
+            <h4 className="font-bold text-slate-900 dark:text-slate-50 mb-1">WhatsApp Terkoneksi</h4>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Akun '{qrSelectedAccountId}' siap mengirim dan menerima pesan.</p>
           </div>
         ) : usePairingCode ? (
           <div className="w-full flex flex-col items-center">
              <div className="bg-indigo-50 text-indigo-600 p-4 rounded-full inline-block mb-4 border border-indigo-100">
                <Key size={32} />
              </div>
-             <h4 className="font-bold text-slate-900 mb-2">Tautkan dengan Nomor</h4>
+             <h4 className="font-bold text-slate-900 dark:text-slate-50 mb-2">Tautkan dengan Nomor</h4>
              {!pairingCode ? (
                <form onSubmit={handleRequestPairingCode} className="w-full max-w-[280px] flex flex-col gap-3">
-                  <p className="text-xs text-slate-500 text-center mb-2">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-2">
                     Masukkan nomor HP yang ada di WhatsApp (mulai dengan kode negara, ex: 62812...)
                   </p>
                   <input
@@ -132,12 +132,12 @@ export function QrTab({
              ) : (
                <div className="text-center w-full max-w-[280px]">
                  <p className="text-xs text-slate-600 mb-3">Masukkan kode ini di aplikasi WhatsApp Anda:</p>
-                 <div className="bg-white border-2 border-indigo-200 py-3 px-4 rounded-xl shadow-sm mb-4">
-                    <span className="text-3xl font-mono font-bold tracking-[0.25em] text-slate-800">
+                 <div className="bg-white dark:bg-slate-900 border-2 border-indigo-200 py-3 px-4 rounded-xl shadow-sm mb-4">
+                    <span className="text-3xl font-mono font-bold tracking-[0.25em] text-slate-800 dark:text-slate-100">
                       {pairingCode}
                     </span>
                  </div>
-                 <p className="text-xs text-slate-500">
+                 <p className="text-xs text-slate-500 dark:text-slate-400">
                    Buka WhatsApp → Tautkan Perangkat → Pilih "Tautkan dengan nomor telepon saja"
                  </p>
                  <Button
@@ -156,7 +156,7 @@ export function QrTab({
             <p className="text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full mb-4 animate-pulse">
               Menunggu Scan dari Aplikasi WhatsApp HP Anda
             </p>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-md mb-4">
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-md mb-4">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
                   qr
@@ -165,13 +165,13 @@ export function QrTab({
                 className="w-[260px] h-[260px] block"
               />
             </div>
-            <p className="text-xs text-slate-500 max-w-[280px]">
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-[280px]">
               Buka WhatsApp di HP Anda → Menu → Perangkat Tertaut → Tautkan Perangkat.
             </p>
           </div>
         ) : (
           <div className="text-center flex flex-col items-center">
-            <p className="text-sm text-slate-500 mb-4">Meminta status/QR code dari server...</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Meminta status/QR code dari server...</p>
             <Button
               type="button"
               variant="primary"

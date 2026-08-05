@@ -355,18 +355,18 @@ export function CustomersPage({
   return (
     <section className="flex flex-col gap-6 w-full">
       {/* Customer List Card (Full Width) */}
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 font-sans">Daftar Pelanggan</h2>
-            <p className="text-xs text-slate-500 mt-1">Pantau status billing, paket, jatuh tempo, dan referral pelanggan dalam satu daftar terpadu.</p>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50 font-sans">Daftar Pelanggan</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Pantau status billing, paket, jatuh tempo, dan referral pelanggan dalam satu daftar terpadu.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {user?.role !== "viewer" && (
               <Button
                 type="button"
                 variant="outline"
-                className="bg-white hover:bg-slate-50 dark:hover:bg-slate-800"
+                className="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800"
                 onClick={() => setIsSyncModalOpen(true)}
                 icon={<RefreshCw size={14} />}
               >
@@ -415,7 +415,7 @@ export function CustomersPage({
               </Button>
             )}
             <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl px-3 py-1.5 shadow-sm font-sans w-full sm:w-64">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 shrink-0"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 dark:text-slate-500 shrink-0"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               <input
                 type="text"
                 placeholder="Cari nama, pppoe, alamat..."
@@ -461,9 +461,9 @@ export function CustomersPage({
           </div>
         </div>
 
-        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm scrollbar-thin">
+        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
           <table className="w-full text-left border-collapse text-sm min-w-[1000px]">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-sans">
+            <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
               <tr>
                 {user?.role !== "viewer" && (
                   <th className="px-4 py-4 font-medium w-8 text-center">
@@ -522,7 +522,7 @@ export function CustomersPage({
                           />
                         </td>
                       )}
-                      <td className="px-4 py-4 font-semibold text-slate-900 dark:text-slate-100">
+                      <td className="px-4 py-4 font-semibold text-slate-900 dark:text-slate-50 dark:text-slate-100">
                         <div className="flex items-center gap-1.5">
                           <Button
                             variant="link"
@@ -541,7 +541,7 @@ export function CustomersPage({
                       </td>
                     <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-medium">{customer.package_name ?? "-"}</td>
                     <td className="px-4 py-4 text-slate-600 dark:text-slate-400">Tgl {customer.due_day}</td>
-                    <td className="px-4 py-4 text-gray-700">
+                    <td className="px-4 py-4 text-gray-700 dark:text-slate-300">
                       <div className="flex flex-col items-start gap-1">
                         <StatusPill
                           label={customerLifecycleMap[customer.id]?.label ?? "Lunas"}
@@ -595,7 +595,7 @@ export function CustomersPage({
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                            className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300"
                             onClick={() => {
                               onEdit(customer);
                               onSetFormOpen(true);
@@ -643,7 +643,7 @@ export function CustomersPage({
               <Button
                 type="button"
                 variant="outline"
-                className="bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="bg-white dark:bg-slate-900 border-gray-300 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800/40"
                 onClick={handleCloseForm}
               >
                 Batal
@@ -710,7 +710,7 @@ export function CustomersPage({
               <Button
                 type="button"
                 variant="outline"
-                className="bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="bg-white dark:bg-slate-900 border-gray-300 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800/40"
                 onClick={() => setIsBulkEditOpen(false)}
               >
                 Batal
@@ -727,7 +727,7 @@ export function CustomersPage({
         >
           <div className="space-y-4">
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Pilih Aksi Perubahan</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilih Aksi Perubahan</span>
               <select
                 className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 value={bulkActionType}
@@ -746,7 +746,7 @@ export function CustomersPage({
 
             {bulkActionType === "status" && (
               <div className="flex flex-col gap-2.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Pilih Status Baru</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilih Status Baru</span>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {(["active", "limit", "pending", "suspended", "inactive", "wifi_umum"] as const).map((st) => (
                     <Button variant="outline"
@@ -756,7 +756,7 @@ export function CustomersPage({
                       className={`py-2 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer text-center ${
                         selectedStatus === st
                           ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
-                          : "bg-white border-gray-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
+                          : "bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-800 text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
                       }`}
                     >
                       {st === "active"
@@ -778,7 +778,7 @@ export function CustomersPage({
 
             {bulkActionType === "package" && (
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Pilih Paket Internet Baru</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilih Paket Internet Baru</span>
                 <input
                   type="text"
                   placeholder="Cari paket..."
@@ -812,7 +812,7 @@ export function CustomersPage({
 
             {bulkActionType === "odp" && (
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Pilih ODP Baru</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilih ODP Baru</span>
                 <input
                   type="text"
                   placeholder="Cari ODP..."
@@ -854,7 +854,7 @@ export function CustomersPage({
 
             {bulkActionType === "referral" && (
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Pilih Pemberi Referral Baru</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilih Pemberi Referral Baru</span>
                 <input
                   type="text"
                   placeholder="Cari pelanggan..."

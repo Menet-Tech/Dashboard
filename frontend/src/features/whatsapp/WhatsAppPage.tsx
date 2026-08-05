@@ -236,10 +236,10 @@ export function WhatsAppPage({
   return (
     <section className="grid gap-6">
       {/* Overview Card */}
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
               <span>WhatsApp Gateway</span>
               {socketConnected ? (
                 <span className="flex items-center gap-1 text-xs font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200">
@@ -247,19 +247,19 @@ export function WhatsAppPage({
                   Real-time Active
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full border border-slate-200">
+                <span className="flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
                   <span className="w-2 h-2 rounded-full bg-slate-400" />
                   Polling Only
                 </span>
               )}
             </h1>
-            <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
               <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded-full border border-emerald-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Gateway
               </span>
-              <code className="bg-slate-50 px-1 py-0.5 rounded text-xs">{gatewayUrl}</code>
-              <span className="text-xs text-slate-400">Account: {configuredAccountId}</span>
+              <code className="bg-slate-50 dark:bg-slate-950 px-1 py-0.5 rounded text-xs">{gatewayUrl}</code>
+              <span className="text-xs text-slate-400 dark:text-slate-500">Account: {configuredAccountId}</span>
             </p>
           </div>
 
@@ -293,7 +293,7 @@ export function WhatsAppPage({
         ) : null}
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 mb-6 overflow-x-auto gap-2">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 overflow-x-auto gap-2">
           <Button type="button" variant="outline"
             onClick={() => setActiveTab("accounts")}
             className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${

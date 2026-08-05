@@ -87,7 +87,7 @@ export function EmailTemplatesPage({
     const isSorted = sortField === field;
     return (
       <th 
-        className="px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-slate-500"
+        className="px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
         onClick={() => requestSort(field)}
       >
         <div className="inline-flex items-center gap-1.5">
@@ -193,8 +193,8 @@ export function EmailTemplatesPage({
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-sans">Template Email</h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 font-sans">Template Email</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Konfigurasi draft template subject dan isi email otomatis untuk billing, reminder jatuh tempo, isolir, dan pembayaran lunas.
           </p>
         </div>
@@ -213,22 +213,22 @@ export function EmailTemplatesPage({
       </div>
 
       {/* Templates Table Card (Full Width) */}
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans">Daftar Template Email</h3>
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider font-sans">Daftar Template Email</h3>
           <StatusPill label={`${templates.length} Item`} tone="slate" />
         </div>
 
-        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm scrollbar-thin">
+        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
           <table className="w-full text-left border-collapse text-sm min-w-[800px]">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-sans">
+            <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
               <tr>
                 {renderSortableHeader("Nama Template", "name")}
                 {renderSortableHeader("Trigger Key", "trigger_key")}
                 {renderSortableHeader("Status", "is_active")}
                 {renderSortableHeader("Subject Email", "subject")}
-                <th className="px-6 py-4 font-semibold text-slate-500">Isi Template</th>
-                <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>
+                <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Isi Template</th>
+                <th className="px-6 py-4 font-semibold text-center text-slate-500 dark:text-slate-400">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -237,7 +237,7 @@ export function EmailTemplatesPage({
               ) : (
                 sortedTemplates.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">{item.name}</td>
+                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">{item.name}</td>
                     <td className="px-6 py-4 text-indigo-600 dark:text-indigo-400 font-mono text-xs font-semibold">{item.trigger_key}</td>
                     <td className="px-6 py-4">
                       <StatusPill
@@ -245,13 +245,13 @@ export function EmailTemplatesPage({
                         tone={item.is_active ? "green" : "slate"}
                       />
                     </td>
-                    <td className="px-6 py-4 text-slate-800 dark:text-slate-200 text-xs font-semibold max-w-[200px] truncate">
+                    <td className="px-6 py-4 text-slate-800 dark:text-slate-100 dark:text-slate-200 text-xs font-semibold max-w-[200px] truncate">
                       {item.subject}
                     </td>
                     <td className="px-6 py-4 text-slate-700 dark:text-slate-300 max-w-[350px] break-words whitespace-normal text-xs leading-relaxed font-sans">
                       {item.content}
                     </td>
-                    <td className="px-6 py-4 text-gray-700">
+                    <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                       <div className="flex gap-2 justify-center">
                         <Button
                           type="button"
@@ -308,7 +308,7 @@ export function EmailTemplatesPage({
         >
           <form id="email-template-form" className="flex flex-col gap-4" onSubmit={handleSubmit}>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Nama Template</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Nama Template</span>
               <input
                 type="text"
                 className={inputClassName(templateErrors.name)}
@@ -320,7 +320,7 @@ export function EmailTemplatesPage({
               {renderInlineError(templateErrors.name)}
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Trigger Key (Unik untuk Sistem)</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Trigger Key (Unik untuk Sistem)</span>
               <input
                 type="text"
                 className={inputClassName(templateErrors.trigger_key)}
@@ -333,7 +333,7 @@ export function EmailTemplatesPage({
               {renderInlineError(templateErrors.trigger_key)}
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Subject Email</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Subject Email</span>
               <input
                 type="text"
                 className={inputClassName(templateErrors.subject)}
@@ -345,7 +345,7 @@ export function EmailTemplatesPage({
               {renderInlineError(templateErrors.subject)}
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Isi Email</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Isi Email</span>
               <textarea
                 className={`${inputClassName(templateErrors.content)} min-h-[200px] resize-y`}
                 rows={12}
@@ -357,7 +357,7 @@ export function EmailTemplatesPage({
               {renderInlineError(templateErrors.content)}
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Status</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Status</span>
               <select
                 className={inputClassName()}
                 value={templateForm.is_active ? "1" : "0"}
@@ -372,27 +372,27 @@ export function EmailTemplatesPage({
       )}
 
       {/* Placeholders Guide */}
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-        <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans mb-3">Panduan Placeholders</h4>
-        <p className="text-xs text-slate-500 mb-4">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider font-sans mb-3">Panduan Placeholders</h4>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
           Anda dapat menggunakan tag placeholder kurung kurawal di bawah ini agar data dinamis pelanggan terisi otomatis pada Subject maupun Isi email:
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-150">
-            <span className="text-[10px] text-slate-400 font-bold block uppercase mb-1">Informasi Pelanggan</span>
+          <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-150">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase mb-1">Informasi Pelanggan</span>
             <code>{"{nama}"}</code> - Nama pelanggan<br />
             <code>{"{alamat}"}</code> - Alamat pemasangan<br />
             <code>{"{no_hp}"}</code> - Nomor WhatsApp
           </div>
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-150">
-            <span className="text-[10px] text-slate-400 font-bold block uppercase mb-1">Informasi Billing</span>
+          <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-150">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase mb-1">Informasi Billing</span>
             <code>{"{invoice_number}"}</code> - No. Invoice<br />
             <code>{"{periode}"}</code> - Periode tagihan<br />
             <code>{"{nominal}"}</code> - Nominal tagihan<br />
             <code>{"{jatuh_tempo}"}</code> - Tgl Jatuh tempo
           </div>
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-150">
-            <span className="text-[10px] text-slate-400 font-bold block uppercase mb-1">Status Keterlambatan</span>
+          <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-150">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase mb-1">Status Keterlambatan</span>
             <code>{"{hari_limit}"}</code> - Hari isolir
           </div>
         </div>

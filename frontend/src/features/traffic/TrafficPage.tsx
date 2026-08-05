@@ -325,12 +325,12 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
         {/* Search Bar */}
         <div className="relative w-full md:w-80">
           <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-slate-400" />
+            <Search className="h-4 w-4 text-slate-400 dark:text-slate-500" />
           </span>
           <input
             type="text"
             placeholder="Cari nama, PPPoE, atau paket..."
-            className="w-full pl-10 pr-4 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-800 dark:text-slate-200"
+            className="w-full pl-10 pr-4 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 dark:border-slate-850 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-800 dark:text-slate-100 dark:text-slate-200"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -339,17 +339,17 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
 
       {/* Summary Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
           <div className="w-11 h-11 bg-indigo-50 dark:bg-indigo-950/40 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
             <Activity size={20} />
           </div>
           <div>
             <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Aktif PPPoE</span>
-            <strong className="text-lg font-extrabold text-slate-800 dark:text-slate-200">{totals.activeUsers} User</strong>
+            <strong className="text-lg font-extrabold text-slate-800 dark:text-slate-100 dark:text-slate-200">{totals.activeUsers} User</strong>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
           <div className="w-11 h-11 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
             <ArrowDown size={20} />
           </div>
@@ -359,7 +359,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
           <div className="w-11 h-11 bg-pink-50 dark:bg-pink-950/40 rounded-xl flex items-center justify-center text-pink-600 dark:text-pink-400 shrink-0">
             <ArrowUp size={20} />
           </div>
@@ -369,7 +369,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
           <div className="w-11 h-11 bg-amber-50 dark:bg-amber-950/40 rounded-xl flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
             <Info size={20} />
           </div>
@@ -379,7 +379,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
           <div className="w-11 h-11 bg-rose-50 dark:bg-rose-950/40 rounded-xl flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
             <Info size={20} />
           </div>
@@ -391,10 +391,10 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
       </div>
 
       {/* Main Customers Traffic Table */}
-      <div className="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-850 rounded-2xl shadow-sm overflow-hidden backdrop-blur-md">
+      <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 dark:border-slate-850 rounded-2xl shadow-sm overflow-hidden backdrop-blur-md">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
-            <thead className="bg-slate-55/60 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-850/80 text-slate-500 dark:text-slate-400 text-xs uppercase font-extrabold tracking-wider">
+            <thead className="bg-slate-55/60 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 dark:border-slate-850/80 text-slate-500 dark:text-slate-400 text-xs uppercase font-extrabold tracking-wider">
               <tr>
                 {renderSortableHeader("Nama Pelanggan", "name")}
                 {renderSortableHeader("PPPoE Username", "user_pppoe")}
@@ -403,7 +403,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                 {renderSortableHeader("Download (Rx)", "rx_rate")}
                 {renderSortableHeader("Upload (Tx)", "tx_rate")}
                 {renderSortableHeader("Utilisasi", "usagePercent")}
-                <th className="px-6 py-4 font-semibold text-center text-slate-500">Status</th>
+                <th className="px-6 py-4 font-semibold text-center text-slate-500 dark:text-slate-400">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-850/40">
@@ -430,10 +430,10 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                             : ""
                       }`}
                     >
-                      <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200">{cust.name}</td>
-                      <td className="px-6 py-4 text-slate-500 font-mono text-xs">{cust.user_pppoe}</td>
-                      <td className="px-6 py-4 text-slate-500">{cust.package_name || "-"}</td>
-                      <td className="px-6 py-4 font-semibold text-slate-700 dark:text-slate-350">
+                      <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200">{cust.name}</td>
+                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono text-xs">{cust.user_pppoe}</td>
+                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{cust.package_name || "-"}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-700 dark:text-slate-300 dark:text-slate-350">
                         {cust.limitMbps === 0 ? "Bypass" : `${cust.limitMbps} Mbps`}
                       </td>
                       <td className={`px-6 py-4 font-bold ${isRed ? "text-rose-600 dark:text-rose-450" : isYellow ? "text-amber-600 dark:text-amber-450" : "text-emerald-600 dark:text-emerald-450"}`}>
@@ -456,7 +456,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                               style={{ width: `${Math.min(cust.usagePercent, 100)}%` }}
                             />
                           </div>
-                          <span className={`text-[11px] font-bold shrink-0 ${isRed ? "text-rose-600" : isYellow ? "text-amber-600" : "text-slate-500"}`}>
+                          <span className={`text-[11px] font-bold shrink-0 ${isRed ? "text-rose-600" : isYellow ? "text-amber-600" : "text-slate-500 dark:text-slate-400"}`}>
                             {cust.usagePercent.toFixed(0)}%
                           </span>
                         </div>
@@ -496,7 +496,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                 type="button"
                 variant="ghost"
                 onClick={handleCloseDetails}
-                className="w-8 h-8 rounded-full p-0 flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                className="w-8 h-8 rounded-full p-0 flex items-center justify-center bg-slate-50 dark:bg-slate-950 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
               >
                 <X size={16} />
               </Button>
@@ -506,7 +506,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
             <div className="p-6 space-y-6">
               {/* Active Badges */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-850 flex items-center gap-3">
+                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800 dark:border-slate-850 flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                     <ArrowDown size={18} />
                   </div>
@@ -518,7 +518,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                   </div>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-850 flex items-center gap-3">
+                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800 dark:border-slate-850 flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-pink-50 dark:bg-pink-950/40 text-pink-600 dark:text-pink-400 flex items-center justify-center shrink-0">
                     <ArrowUp size={18} />
                   </div>
@@ -532,7 +532,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
               </div>
 
               {/* Line Chart */}
-              <div className="h-72 border border-slate-100 dark:border-slate-850 p-3 rounded-xl bg-slate-50/50 dark:bg-slate-950/30">
+              <div className="h-72 border border-slate-100 dark:border-slate-800 dark:border-slate-850 p-3 rounded-xl bg-slate-50/50 dark:bg-slate-950/30">
                 <Line
                   data={chartData}
                   options={{

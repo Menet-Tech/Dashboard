@@ -301,7 +301,7 @@ export function TemplatesPage({
     const isSorted = sortField === field;
     return (
       <th 
-        className="px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-slate-500"
+        className="px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
         onClick={() => requestSort(field)}
       >
         <div className="inline-flex items-center gap-1.5">
@@ -371,8 +371,8 @@ export function TemplatesPage({
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-sans">Template & Chatbot WA</h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 font-sans">Template & Chatbot WA</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Konfigurasi template WhatsApp, auto-response custom, dan kelola sesi pendaftaran chatbot.
           </p>
         </div>
@@ -440,7 +440,7 @@ export function TemplatesPage({
           <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-sans">Template Billing & Pengingat</h3>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider font-sans">Template Billing & Pengingat</h3>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Draf template pesan otomatis yang dipicu oleh status tagihan dan penagihan pelanggan.</p>
               </div>
               <div className="flex items-center gap-3">
@@ -464,13 +464,13 @@ export function TemplatesPage({
 
             <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
               <table className="w-full text-left border-collapse text-sm min-w-[700px]">
-                <thead className="bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
+                <thead className="bg-gray-50 dark:bg-slate-800 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
                   <tr>
                     {renderSortableHeader("Nama Template", "name")}
                     {renderSortableHeader("Trigger Key", "trigger_key")}
                     {renderSortableHeader("Status", "is_active")}
-                    <th className="px-6 py-4 font-semibold text-slate-500">Isi Draft Pesan</th>
-                    <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>
+                    <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Isi Draft Pesan</th>
+                    <th className="px-6 py-4 font-semibold text-center text-slate-500 dark:text-slate-400">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
@@ -479,7 +479,7 @@ export function TemplatesPage({
                   ) : (
                     sortedBillingTemplates.map((item) => (
                       <tr key={item.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-850/40 transition-colors">
-                        <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">{item.name}</td>
+                        <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">{item.name}</td>
                         <td className="px-6 py-4 text-indigo-600 dark:text-indigo-400 font-mono text-xs font-semibold">{item.trigger_key}</td>
                         <td className="px-6 py-4">
                           <StatusPill
@@ -490,10 +490,10 @@ export function TemplatesPage({
                         <td className="px-6 py-4 text-slate-700 dark:text-slate-300 max-w-[350px] break-words whitespace-normal text-xs leading-relaxed font-sans">
                           {item.content}
                         </td>
-                        <td className="px-6 py-4 text-gray-700">
+                        <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                           <div className="flex gap-2 justify-center">
                             <Button variant="outline" type="button"
-                              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
+                              className="bg-white dark:bg-slate-900 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
                               onClick={() => {
                                 onEdit(item);
                                 setIsFormOpen(true);
@@ -521,7 +521,7 @@ export function TemplatesPage({
           <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-sans">Template Chatbot (Auto-Response)</h3>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider font-sans">Template Chatbot (Auto-Response)</h3>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Draf template pesan otomatis yang dipicu oleh interaksi menu dan trigger chatbot.</p>
               </div>
               <div className="flex items-center gap-3">
@@ -545,14 +545,14 @@ export function TemplatesPage({
 
             <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
               <table className="w-full text-left border-collapse text-sm min-w-[700px]">
-                <thead className="bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
+                <thead className="bg-gray-50 dark:bg-slate-800 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
                   <tr>
                     {renderSortableHeader("Nama Template", "name")}
                     {renderSortableHeader("Trigger Key", "trigger_key")}
                     {renderSortableHeader("Trigger", "trigger_keywords")}
                     {renderSortableHeader("Status", "is_active")}
-                    <th className="px-6 py-4 font-semibold text-slate-500">Isi Draft Pesan</th>
-                    <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>
+                    <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Isi Draft Pesan</th>
+                    <th className="px-6 py-4 font-semibold text-center text-slate-500 dark:text-slate-400">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
@@ -561,10 +561,10 @@ export function TemplatesPage({
                   ) : (
                     sortedChatbotTemplates.map((item) => (
                       <tr key={item.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-850/40 transition-colors">
-                        <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">{item.name}</td>
+                        <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">{item.name}</td>
                         <td className="px-6 py-4 text-indigo-600 dark:text-indigo-400 font-mono text-xs font-semibold">{item.trigger_key}</td>
                         <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-semibold font-mono text-xs">
-                          {item.trigger_keywords || <span className="text-slate-400 dark:text-slate-600 font-mono">-</span>}
+                          {item.trigger_keywords || <span className="text-slate-400 dark:text-slate-500 dark:text-slate-600 font-mono">-</span>}
                         </td>
                         <td className="px-6 py-4">
                           <StatusPill
@@ -575,10 +575,10 @@ export function TemplatesPage({
                         <td className="px-6 py-4 text-slate-700 dark:text-slate-300 max-w-[300px] break-words whitespace-normal text-xs leading-relaxed font-sans">
                           {item.content}
                         </td>
-                        <td className="px-6 py-4 text-gray-700">
+                        <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                           <div className="flex gap-2 justify-center">
                             <Button variant="outline" type="button"
-                              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
+                              className="bg-white dark:bg-slate-900 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
                               onClick={() => {
                                 onEdit(item);
                                 setIsFormOpen(true);
@@ -604,26 +604,26 @@ export function TemplatesPage({
 
           {/* Placeholders Guide */}
           <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-sans mb-3">Panduan Placeholders</h4>
-            <p className="text-xs text-slate-500 mb-4">
+            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider font-sans mb-3">Panduan Placeholders</h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
               Anda dapat menggunakan tag placeholder kurung kurawal di bawah ini agar data dinamis pelanggan terisi otomatis saat pesan dikirim:
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
-              <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-150 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 font-bold block uppercase mb-1">Informasi Pelanggan</span>
+              <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-150 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase mb-1">Informasi Pelanggan</span>
                 <code>{"{nama}"}</code> - Nama pelanggan<br />
                 <code>{"{alamat}"}</code> - Alamat pemasangan<br />
                 <code>{"{no_hp}"}</code> - Nomor WhatsApp
               </div>
-              <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-150 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 font-bold block uppercase mb-1">Informasi Billing</span>
+              <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-150 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase mb-1">Informasi Billing</span>
                 <code>{"{invoice_number}"}</code> - No. Invoice<br />
                 <code>{"{periode}"}</code> - Periode tagihan<br />
                 <code>{"{nominal}"}</code> - Nominal tagihan<br />
                 <code>{"{jatuh_tempo}"}</code> - Tgl Jatuh tempo
               </div>
-              <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-150 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 font-bold block uppercase mb-1">Status Keterlambatan</span>
+              <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-150 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase mb-1">Status Keterlambatan</span>
                 <code>{"{hari_limit}"}</code> - Hari isolir
               </div>
             </div>
@@ -700,7 +700,7 @@ export function TemplatesPage({
         >
           <form id="template-form" className="flex flex-col gap-4" onSubmit={onSubmit}>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Nama Template</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Nama Template</span>
               <input
                 type="text"
                 className={inputClassName(templateErrors.name)}
@@ -712,7 +712,7 @@ export function TemplatesPage({
               {renderInlineError(templateErrors.name)}
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Trigger Key (Unik untuk Sistem)</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Trigger Key (Unik untuk Sistem)</span>
               <input
                 type="text"
                 className={inputClassName(templateErrors.trigger_key)}
@@ -731,7 +731,7 @@ export function TemplatesPage({
             </label>
             {templateForm.trigger_key.startsWith("chatbot_") && (
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Kata Kunci Trigger</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Kata Kunci Trigger</span>
                 <input
                   type="text"
                   className={inputClassName(templateErrors.trigger_keywords)}
@@ -752,7 +752,7 @@ export function TemplatesPage({
             )}
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Isi Pesan</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Isi Pesan</span>
               <textarea
                 className={`${inputClassName(templateErrors.content)} min-h-[200px] resize-y`}
                 rows={12}
@@ -764,7 +764,7 @@ export function TemplatesPage({
               {renderInlineError(templateErrors.content)}
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Status</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Status</span>
               <select
                 className={inputClassName()}
                 value={templateForm.is_active ? "1" : "0"}

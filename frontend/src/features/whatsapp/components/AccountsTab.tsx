@@ -53,7 +53,7 @@ export function AccountsTab({
     <div className="grid md:grid-cols-3 gap-6">
       {/* Account List */}
       <div className="md:col-span-2 space-y-4">
-        <h3 className="text-md font-bold text-slate-900">Daftar Akun WhatsApp</h3>
+        <h3 className="text-md font-bold text-slate-900 dark:text-slate-50">Daftar Akun WhatsApp</h3>
         {loading ? (
           <div className="space-y-3">
             {[1, 2].map((i) => (
@@ -61,16 +61,16 @@ export function AccountsTab({
             ))}
           </div>
         ) : accounts.length === 0 ? (
-          <div className="text-center p-8 bg-slate-50 rounded-xl border border-slate-200">
+          <div className="text-center p-8 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">
             {gatewayError ? (
               <>
                 <p className="font-semibold text-rose-600 mb-1">Gateway tidak dapat dijangkau</p>
-                <p className="text-xs text-slate-500">Pastikan service WhatsApp Gateway berjalan di <code>{gatewayUrl}</code></p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Pastikan service WhatsApp Gateway berjalan di <code>{gatewayUrl}</code></p>
               </>
             ) : (
               <>
-                <p className="font-semibold text-slate-700 mb-1">Belum ada akun gateway terdaftar</p>
-                <p className="text-xs text-slate-500 mb-4">Tambahkan akun baru di panel sebelah kanan, atau tunggu sebentar jika gateway baru saja dimulai.</p>
+                <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">Belum ada akun gateway terdaftar</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Tambahkan akun baru di panel sebelah kanan, atau tunggu sebentar jika gateway baru saja dimulai.</p>
                 {canDecrypt && apiKey && (
                   <Button
                     type="button"
@@ -98,12 +98,12 @@ export function AccountsTab({
             {accounts.map((acc) => (
               <div
                 key={acc.accountId}
-                className="border border-slate-200 rounded-xl p-5 bg-white shadow-sm flex flex-col justify-between hover:border-slate-300 transition-colors"
+                className="border border-slate-200 dark:border-slate-800 rounded-xl p-5 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between hover:border-slate-300 transition-colors"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h4 className="font-bold text-slate-950 text-md">{acc.accountId}</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">WhatsApp Client Account</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">WhatsApp Client Account</p>
                   </div>
                   {acc.ready ? (
                     <span className="flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
@@ -116,7 +116,7 @@ export function AccountsTab({
                       Scan QR Needed
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1.5 text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded-full">
                       <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                       Offline
                     </span>
@@ -155,8 +155,8 @@ export function AccountsTab({
 
       {/* Create Account Form */}
       {canDecrypt ? (
-        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 h-fit">
-          <h3 className="text-md font-bold text-slate-900 mb-4">Tambah Akun Baru</h3>
+        <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 h-fit">
+          <h3 className="text-md font-bold text-slate-900 dark:text-slate-50 mb-4">Tambah Akun Baru</h3>
 
           {/* API key missing warning */}
           {!apiKey && (
@@ -177,7 +177,7 @@ export function AccountsTab({
                 placeholder="Contoh: CS-Admin-1"
                 className={inputClassName()}
               />
-              <span className="text-[10px] text-slate-400 block mt-1">Hanya huruf, angka, dash, dan underscore.</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-1">Hanya huruf, angka, dash, dan underscore.</span>
             </label>
 
             <label className="block">
@@ -203,7 +203,7 @@ export function AccountsTab({
           </form>
         </div>
       ) : (
-        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 h-fit text-center text-slate-500 text-xs">
+        <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 h-fit text-center text-slate-500 dark:text-slate-400 text-xs">
           Anda login sebagai Viewer. Hak akses pengelolaan dinonaktifkan.
         </div>
       )}

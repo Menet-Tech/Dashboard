@@ -90,13 +90,13 @@ export function Modal({ title, children, actions, onClose, zIndexClass = "z-[80]
         <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
           <h2
             id={titleId}
-            className="text-xl font-semibold text-gray-900 dark:text-slate-100 font-sans"
+            className="text-xl font-semibold text-gray-900 dark:text-slate-50 dark:text-slate-100 font-sans"
           >
             {title}
           </h2>
           <button
             type="button"
-            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-800 dark:hover:text-slate-300 p-2 rounded-lg transition-colors cursor-pointer text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="text-gray-400 dark:text-slate-500 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-800 dark:hover:text-slate-300 p-2 rounded-lg transition-colors cursor-pointer text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
             onClick={onClose}
             aria-label="Tutup dialog"
           >
@@ -105,7 +105,7 @@ export function Modal({ title, children, actions, onClose, zIndexClass = "z-[80]
         </div>
         <div className="p-6 overflow-y-auto">{children}</div>
         {actions && (
-          <div className="p-6 border-t border-slate-100 bg-slate-50 dark:bg-slate-900/50 dark:border-slate-800 flex items-center justify-end gap-3">
+          <div className="p-6 border-t border-slate-100 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 dark:border-slate-800 flex items-center justify-end gap-3">
             {actions}
           </div>
         )}

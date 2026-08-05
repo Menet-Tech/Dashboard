@@ -1122,7 +1122,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
   if (loading && !settings) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[500px] text-slate-400 gap-3">
+      <div className="flex flex-col items-center justify-center min-h-[500px] text-slate-400 dark:text-slate-500 gap-3">
         <RefreshCw className="w-8 h-8 animate-spin text-indigo-600" />
         <span className="text-sm font-medium">Memuat Peta Jaringan Fiber...</span>
       </div>
@@ -1132,14 +1132,14 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in">
       {/* Sidebar Editor */}
-      <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between min-h-[500px]">
+      <div className="lg:col-span-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col justify-between min-h-[500px]">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-4">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2 mb-4">
             <Map className="w-5 h-5 text-indigo-600" />
             Peta Jaringan Fiber
           </h2>
 
-          <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
             Kelola node infrastruktur fiber optik dan penyambungan kabel secara visual. Seret penanda di peta untuk memindahkan lokasi.
           </p>
 
@@ -1152,8 +1152,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               }}
               className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
                 activeTool === "select"
-                  ? "bg-slate-100 border-slate-300 text-slate-900 shadow-sm"
-                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  ? "bg-slate-100 border-slate-300 text-slate-900 dark:text-slate-50 shadow-sm"
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/40"
               }`}
             >
               <Move className="w-4 h-4 text-indigo-500" />
@@ -1168,8 +1168,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               }}
               className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
                 activeTool === "add-node"
-                  ? "bg-slate-100 border-slate-300 text-slate-900 shadow-sm"
-                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  ? "bg-slate-100 border-slate-300 text-slate-900 dark:text-slate-50 shadow-sm"
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/40"
               }`}
             >
               <Plus className="w-4 h-4 text-emerald-500" />
@@ -1184,8 +1184,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               }}
               className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
                 activeTool === "add-edge"
-                  ? "bg-slate-100 border-slate-300 text-slate-900 shadow-sm"
-                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  ? "bg-slate-100 border-slate-300 text-slate-900 dark:text-slate-50 shadow-sm"
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/40"
               }`}
             >
               <Link className="w-4 h-4 text-amber-500" />
@@ -1206,24 +1206,24 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   </span>
                   <Button variant="outline" type="button"
                     onClick={() => setSelectedEdgeForWaypoints(null)}
-                    className="text-slate-400 hover:text-slate-600"
+                    className="text-slate-400 dark:text-slate-500 hover:text-slate-600"
                   >
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-[10px] text-slate-500 leading-snug">
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">
                   Tambahkan titik belokan pada kabel ini. Anda bisa menyeret titik kuning di peta untuk mengatur posisi belokannya.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" type="button"
                     onClick={() => handleAddWaypoint(edge.edge_id)}
-                    className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-indigo-600 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm flex items-center justify-center gap-1 transition-colors"
+                    className="flex-1 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-indigo-600 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm flex items-center justify-center gap-1 transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" /> Tambah Belokan
                   </Button>
                   <Button variant="outline" type="button"
                     onClick={() => handleResetWaypoints(edge.edge_id)}
-                    className="bg-white hover:bg-red-50 border border-slate-200 text-red-600 text-xs font-semibold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
+                    className="bg-white dark:bg-slate-900 hover:bg-red-50 border border-slate-200 dark:border-slate-800 text-red-600 text-xs font-semibold py-1.5 px-3 rounded-lg shadow-sm transition-colors"
                   >
                     Reset
                   </Button>
@@ -1232,7 +1232,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 {edge.waypoints && edge.waypoints.length > 0 && (
                   <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
                     {edge.waypoints.map((wp, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-1.5 text-[10px] font-mono">
+                      <div key={idx} className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 text-[10px] font-mono">
                         <span className="text-slate-600">Pt #{idx + 1}: {wp[0].toFixed(5)}, {wp[1].toFixed(5)}</span>
                         <Button variant="outline" type="button"
                           onClick={() => handleRemoveWaypoint(edge.edge_id, idx)}
@@ -1249,20 +1249,20 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
           })()}
 
           {/* Quick Stats */}
-          <div className="border-t border-slate-100 pt-5 text-xs text-slate-500 grid grid-cols-2 gap-4">
+          <div className="border-t border-slate-100 dark:border-slate-800 pt-5 text-xs text-slate-500 dark:text-slate-400 grid grid-cols-2 gap-4">
             <div>
-              <p className="font-semibold text-slate-400">TOTAL NODE</p>
-              <p className="text-xl font-bold text-slate-800 mt-0.5">{nodes.length}</p>
+              <p className="font-semibold text-slate-400 dark:text-slate-500">TOTAL NODE</p>
+              <p className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{nodes.length}</p>
             </div>
             <div>
-              <p className="font-semibold text-slate-400">TOTAL KABEL</p>
-              <p className="text-xl font-bold text-slate-800 mt-0.5">{edges.length}</p>
+              <p className="font-semibold text-slate-400 dark:text-slate-500">TOTAL KABEL</p>
+              <p className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{edges.length}</p>
             </div>
           </div>
         </div>
 
         {/* Sync Status & Action Bar */}
-        <div className="border-t border-slate-100 pt-5 flex flex-col gap-3">
+        <div className="border-t border-slate-100 dark:border-slate-800 pt-5 flex flex-col gap-3">
           {isDirty && (
             <div className="bg-amber-50 text-amber-800 border border-amber-100 rounded-xl px-3 py-2.5 text-xs font-semibold flex items-center gap-2 animate-pulse">
               <span className="w-2 h-2 bg-amber-500 rounded-full" />
@@ -1283,7 +1283,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               title="Reset Semua ke DB"
               onClick={() => void loadData()}
               disabled={saving}
-              className="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 py-2.5 px-3 rounded-xl transition"
+              className="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 dark:text-slate-300 py-2.5 px-3 rounded-xl transition"
             >
               <RefreshCw className="w-4 h-4" />
             </Button>
@@ -1310,7 +1310,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
       </div>
 
       {/* Leaflet Interactive Map Container */}
-      <div className="lg:col-span-3 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm min-h-[550px] relative">
+      <div className="lg:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm min-h-[550px] relative">
         {activeTool !== "select" && (
           <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[999] bg-indigo-600 text-white font-semibold text-xs px-4 py-2 rounded-full shadow-lg border border-indigo-500 flex items-center gap-2">
             <Info className="w-3.5 h-3.5" />
@@ -1394,8 +1394,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 }}
               >
                 <Popup>
-                  <div className="p-1 text-slate-800 min-w-[200px] dark:text-slate-200">
-                    <p className="font-bold text-sm border-b pb-1 mb-2 text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <div className="p-1 text-slate-800 dark:text-slate-100 min-w-[200px] dark:text-slate-200">
+                    <p className="font-bold text-sm border-b pb-1 mb-2 text-slate-900 dark:text-slate-50 dark:text-white flex items-center gap-1.5">
                       🔌 Kabel Fiber: {edge.edge_id}
                     </p>
                     <div className="space-y-1 text-xs mb-3">
@@ -1425,7 +1425,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                       </div>
                     </div>
                     {edge.notes && (
-                      <p className="text-[10px] italic bg-slate-50 dark:bg-slate-800 p-1.5 border dark:border-slate-700 rounded text-slate-500 dark:text-slate-400 mb-3">
+                      <p className="text-[10px] italic bg-slate-50 dark:bg-slate-950 dark:bg-slate-800 p-1.5 border dark:border-slate-700 rounded text-slate-500 dark:text-slate-400 mb-3">
                         {edge.notes}
                       </p>
                     )}
@@ -1443,7 +1443,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                           setEdgeCountsAsPort(!!edge.counts_as_port);
                           setIsEdgeModalOpen(true);
                         }}
-                        className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition"
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 dark:text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition"
                       >
                         <Edit className="w-3 h-3" /> Edit
                       </Button>
@@ -1498,7 +1498,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 }}
               >
                 <Popup>
-                  <div className="p-1 text-slate-800 min-w-[220px] dark:text-slate-200">
+                  <div className="p-1 text-slate-800 dark:text-slate-100 min-w-[220px] dark:text-slate-200">
                     <div className="flex items-center justify-between mb-2">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${
                         node.type === "server"
@@ -1522,7 +1522,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                         )}
                       </div>
                     </div>
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-2">{node.name}</h3>
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-slate-50 dark:text-white mb-2">{node.name}</h3>
                     
                     <div className="space-y-1 text-xs mb-3 border-t pt-1.5 border-slate-100 dark:border-slate-800">
                       <div className="flex justify-between">
@@ -1582,8 +1582,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                           {/* Slot Usage */}
                           <div>
                             <div className="flex justify-between text-xs font-bold mb-1">
-                              <span className="text-slate-500">Slot Usage</span>
-                              <span className="text-slate-800 dark:text-slate-200">
+                              <span className="text-slate-500 dark:text-slate-400">Slot Usage</span>
+                              <span className="text-slate-800 dark:text-slate-100 dark:text-slate-200">
                                 {connectedOnts.length} / {capacity}
                               </span>
                             </div>
@@ -1595,7 +1595,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                                 style={{ width: `${usagePercent}%` }}
                               />
                             </div>
-                            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                            <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                               <span>Tingkat Kepadatan</span>
                               <span className={isFull ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
                                 {availablePorts} port tersedia
@@ -1605,8 +1605,8 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
                           {/* Connected From */}
                           {parentNode && (
-                            <div className="bg-slate-50 dark:bg-slate-900/40 p-2 rounded-lg border dark:border-slate-800">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Connected From</p>
+                            <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/40 p-2 rounded-lg border dark:border-slate-800">
+                              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">Connected From</p>
                               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
                                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                                 {parentNode.name} ({parentNode.type.toUpperCase()})
@@ -1616,11 +1616,11 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
                           {/* Connected to ONTs */}
                           <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
                               Connected to ONTs ({connectedOnts.length})
                             </p>
                             {connectedOnts.length === 0 ? (
-                              <p className="text-xs text-slate-400 italic">Belum ada ONT terhubung</p>
+                              <p className="text-xs text-slate-400 dark:text-slate-500 italic">Belum ada ONT terhubung</p>
                             ) : (
                               <div className="max-h-24 overflow-y-auto space-y-1 pr-1 scrollbar-thin scrollbar-thumb-slate-200">
                                 {connectedOnts.map((ont) => {
@@ -1649,7 +1649,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                               void navigator.clipboard.writeText(info);
                               pushSuccess("Info ODP disalin ke clipboard!");
                             }}
-                            className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-750 dark:text-slate-300 text-[10px] font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                            className="w-full bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 border border-slate-200 dark:border-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-750 dark:text-slate-300 text-[10px] font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
                           >
                             Copy Info
                           </Button>
@@ -1658,7 +1658,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     })()}
                     
                     {node.notes && (
-                      <p className="text-[10px] italic bg-slate-50 dark:bg-slate-800 p-1.5 border dark:border-slate-700 rounded text-slate-500 dark:text-slate-400 mb-3">
+                      <p className="text-[10px] italic bg-slate-50 dark:bg-slate-950 dark:bg-slate-800 p-1.5 border dark:border-slate-700 rounded text-slate-500 dark:text-slate-400 mb-3">
                         {node.notes}
                       </p>
                     )}
@@ -1669,7 +1669,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                         className={`flex-1 py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition ${
                           isLocked
                             ? "bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-200"
-                            : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-white"
+                            : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 dark:text-white"
                         }`}
                         title={isLocked ? "Klik untuk membuka kunci posisi" : "Klik untuk mengunci posisi node"}
                       >
@@ -1716,7 +1716,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                           
                           setIsNodeModalOpen(true);
                         }}
-                        className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition"
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 dark:text-white py-1 rounded text-center text-xs font-semibold flex items-center justify-center gap-1 transition"
                       >
                         <Edit className="w-3 h-3" /> Edit
                       </Button>
@@ -1744,7 +1744,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 prev === "street" ? "satellite" : prev === "satellite" ? "satellite-plain" : "street"
               );
             }}
-            className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl shadow-lg p-2.5 transition-colors flex flex-col items-center gap-1 min-w-[70px] border border-slate-200 dark:border-slate-700"
+            className="bg-white dark:bg-slate-900 dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-700 rounded-xl shadow-lg p-2.5 transition-colors flex flex-col items-center gap-1 min-w-[70px] border border-slate-200 dark:border-slate-800 dark:border-slate-700"
             title={
               mapLayer === "street"
                 ? "Switch to Satellite"
@@ -1784,15 +1784,15 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <form
             onSubmit={handleSaveNode}
-            className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-md animate-in"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-md animate-in"
           >
             <div className="flex items-center justify-between border-b pb-3 mb-4">
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-50">
                 {editingNode ? `Edit Node: ${editingNode.node_id}` : "Tambah Node Infrastruktur"}
               </h3>
               <Button variant="outline" type="button"
                 onClick={() => setIsNodeModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 dark:text-slate-500 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
               </Button>
@@ -1800,11 +1800,11 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
             <div className="grid gap-3.5 max-h-[450px] overflow-y-auto pr-1">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">ID NODE (KODE)</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">ID NODE (KODE)</label>
                 <input
                   type="text"
                   required
-                  className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                  className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white focus:ring-2 focus:ring-indigo-500"
                   value={nodeIdInput}
                   onChange={(e) => setNodeIdInput(e.target.value)}
                   placeholder="Contoh: ODP-MERDEKA-1"
@@ -1813,9 +1813,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">TIPE INFRASTRUKTUR</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">TIPE INFRASTRUKTUR</label>
                   <select
-                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white"
                     value={nodeTypeInput}
                     onChange={(e) => {
                       const val = e.target.value as "server" | "odc" | "odp" | "ont";
@@ -1843,11 +1843,11 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">NAMA NODE</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">NAMA NODE</label>
                   <input
                     type="text"
                     required
-                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     value={nodeNameInput}
                     onChange={(e) => setNodeNameInput(e.target.value)}
                     placeholder="Contoh: ODP Sudirman 03"
@@ -1858,9 +1858,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               {nodeTypeInput === "ont" && (
                 <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/20 grid gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">TAUTKAN DENGAN PELANGGAN</label>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">TAUTKAN DENGAN PELANGGAN</label>
                     <select
-                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white focus:ring-2 focus:ring-indigo-500"
                       value={selectedCustomerId || ""}
                       onChange={(e) => {
                         const cid = Number(e.target.value) || 0;
@@ -1898,15 +1898,15 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">TIPE IDENTIFIER</label>
-                    <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5">
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">TIPE IDENTIFIER</label>
+                    <div className="flex rounded-lg border border-slate-200 dark:border-slate-800 dark:border-slate-700 bg-white dark:bg-slate-900 dark:bg-slate-800 p-0.5">
                       <Button variant="outline" type="button"
                         onClick={() => {
                           setIdentifierType("pppoe");
                           setSearchQuery("");
                         }}
                         className={`flex-1 px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                          identifierType === "pppoe" ? "bg-orange-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
+                          identifierType === "pppoe" ? "bg-orange-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-700"
                         }`}
                       >
                         PPPoE Username
@@ -1917,7 +1917,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                           setSearchQuery("");
                         }}
                         className={`flex-1 px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                          identifierType === "serialnumber" ? "bg-orange-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
+                          identifierType === "serialnumber" ? "bg-orange-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-700"
                         }`}
                       >
                         Serial Number
@@ -1926,7 +1926,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   </div>
 
                   <div className="relative">
-                    <label className="block text-xs font-bold text-slate-500 mb-1">
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">
                       CARI PERANGKAT GENIEACS
                     </label>
                     <input
@@ -1939,14 +1939,14 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                       onFocus={() => setShowSearchDropdown(true)}
                       onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
                       placeholder={`Ketik untuk mencari ${identifierType === "pppoe" ? "username PPPoE" : "Serial Number"}...`}
-                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white focus:ring-2 focus:ring-indigo-500"
                       autoComplete="off"
                     />
 
                     {showSearchDropdown && searchQuery && (
-                      <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 dark:border-slate-700 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {filteredDevices.length === 0 ? (
-                          <div className="px-3 py-2 text-xs text-slate-400 italic">
+                          <div className="px-3 py-2 text-xs text-slate-400 dark:text-slate-500 italic">
                             Tidak ditemukan hasil yang cocok
                           </div>
                         ) : (
@@ -1960,10 +1960,10 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                                 key={dev._id}
                                 type="button"
                                 onClick={() => handleSelectDevice(dev)}
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700 border-b dark:border-slate-700 last:border-0 flex flex-col"
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-700 border-b dark:border-slate-700 last:border-0 flex flex-col"
                               >
-                                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-                                <span className="text-[10px] text-slate-400">{sub}</span>
+                                <span className="font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200">{val}</span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500">{sub}</span>
                               </Button>
                             );
                           })
@@ -1974,20 +1974,20 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">PPPOE USERNAME</label>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">PPPOE USERNAME</label>
                       <input
                         type="text"
-                        className="w-full text-xs px-3 py-2 border rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500"
+                        className="w-full text-xs px-3 py-2 border rounded-xl bg-slate-50 dark:bg-slate-950 dark:bg-slate-800 text-slate-800 dark:text-slate-100 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500"
                         value={nodePppoeInput}
                         onChange={(e) => setNodePppoeInput(e.target.value)}
                         placeholder="user_pppoe"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">SERIAL NUMBER</label>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">SERIAL NUMBER</label>
                       <input
                         type="text"
-                        className="w-full text-xs px-3 py-2 border rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500"
+                        className="w-full text-xs px-3 py-2 border rounded-xl bg-slate-50 dark:bg-slate-950 dark:bg-slate-800 text-slate-800 dark:text-slate-100 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500"
                         value={nodeSnInput}
                         onChange={(e) => setNodeSnInput(e.target.value)}
                         placeholder="Serial Number (Opsional)"
@@ -1999,9 +1999,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
               {nodeTypeInput === "odp" && existingOdps.length > 0 && (
                 <div className="border border-cyan-100 dark:border-cyan-900/40 rounded-xl p-3 bg-cyan-50/30 dark:bg-cyan-950/20 grid gap-2">
-                  <label className="block text-xs font-bold text-slate-500 mb-0">REFERENSIKAN KE DATA ODP (OPSIONAL)</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-0">REFERENSIKAN KE DATA ODP (OPSIONAL)</label>
                   <select
-                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white focus:ring-2 focus:ring-cyan-500"
                     value={linkedOdpId || ""}
                     onChange={(e) => {
                       const id = Number(e.target.value) || null;
@@ -2047,9 +2047,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               {(nodeTypeInput === "odc" || nodeTypeInput === "odp") && (
                 <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/20 grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">SPLITTER RASIO</label>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">SPLITTER RASIO</label>
                     <select
-                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white focus:ring-2 focus:ring-indigo-500"
                       value={nodeSplitterInput || "1:8"}
                       onChange={(e) => {
                         const val = e.target.value;
@@ -2069,17 +2069,17 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">KAPASITAS PORT</label>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">KAPASITAS PORT</label>
                     <input
                       type="number"
                       required
-                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white focus:ring-2 focus:ring-indigo-500"
                       value={nodeCapacityInput}
                       onChange={(e) => setNodeCapacityInput(e.target.value)}
                       placeholder="Contoh: 8 atau 16"
                     />
                   </div>
-                  <div className="col-span-2 text-[10px] text-slate-500 flex items-center gap-1 leading-snug">
+                  <div className="col-span-2 text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 leading-snug">
                     💡 Mengubah splitter rasio akan memperbarui kapasitas menjadi {nodeSplitterInput.split(":")[1] || "8"} port.
                   </div>
                 </div>
@@ -2087,10 +2087,10 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
               {nodeTypeInput === "server" && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">KAPASITAS CORES / PORT</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">KAPASITAS CORES / PORT</label>
                   <input
                     type="number"
-                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     value={nodeCapacityInput}
                     onChange={(e) => setNodeCapacityInput(e.target.value)}
                     placeholder="Contoh: 96"
@@ -2105,7 +2105,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     id="manualCoords"
                     checked={manualCoords}
                     onChange={(e) => setManualCoords(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500"
+                    className="w-4 h-4 text-indigo-600 bg-white dark:bg-slate-900 border-slate-300 rounded focus:ring-indigo-500"
                   />
                   <label htmlFor="manualCoords" className="text-xs font-semibold text-slate-600 dark:text-slate-400">
                     Masukkan Koordinat Secara Manual
@@ -2113,28 +2113,28 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">LATITUDE</label>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5">LATITUDE</label>
                     <input
                       type="number"
                       step="any"
                       required
                       readOnly={!manualCoords}
                       className={`w-full text-xs px-3 py-2 border rounded-xl font-mono ${
-                        manualCoords ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+                        manualCoords ? "bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed"
                       }`}
                       value={nodeLatInput}
                       onChange={(e) => setNodeLatInput(parseFloat(e.target.value) || 0)}
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">LONGITUDE</label>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5">LONGITUDE</label>
                     <input
                       type="number"
                       step="any"
                       required
                       readOnly={!manualCoords}
                       className={`w-full text-xs px-3 py-2 border rounded-xl font-mono ${
-                        manualCoords ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+                        manualCoords ? "bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed"
                       }`}
                       value={nodeLngInput}
                       onChange={(e) => setNodeLngInput(parseFloat(e.target.value) || 0)}
@@ -2151,10 +2151,10 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               {/* Lock position toggle */}
               <div className="flex items-center justify-between border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-900/20">
                 <div className="flex items-center gap-2">
-                  {nodeLocked ? <Lock className="w-3.5 h-3.5 text-amber-600" /> : <Unlock className="w-3.5 h-3.5 text-slate-400" />}
+                  {nodeLocked ? <Lock className="w-3.5 h-3.5 text-amber-600" /> : <Unlock className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />}
                   <div>
-                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{nodeLocked ? "Posisi Terkunci" : "Posisi Tidak Terkunci"}</p>
-                    <p className="text-[10px] text-slate-400 leading-snug">{nodeLocked ? "Node tidak bisa digeser di peta." : "Node bisa digeser bebas di peta."}</p>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-200">{nodeLocked ? "Posisi Terkunci" : "Posisi Tidak Terkunci"}</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-snug">{nodeLocked ? "Node tidak bisa digeser di peta." : "Node bisa digeser bebas di peta."}</p>
                   </div>
                 </div>
                 <Button variant="outline" type="button"
@@ -2163,16 +2163,16 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     nodeLocked ? "bg-amber-500" : "bg-slate-200 dark:bg-slate-700"
                   }`}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900 shadow transition-transform ${
                     nodeLocked ? "translate-x-6" : "translate-x-1"
                   }`} />
                 </Button>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">CATATAN / INFORMASI TAMBAHAN</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">CATATAN / INFORMASI TAMBAHAN</label>
                 <textarea
-                  className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                  className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white focus:ring-2 focus:ring-indigo-500"
                   rows={2}
                   value={nodeNotesInput}
                   onChange={(e) => setNodeNotesInput(e.target.value)}
@@ -2205,17 +2205,17 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <form
             onSubmit={handleSaveEdge}
-            className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-md animate-in"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-md animate-in"
           >
             <div className="flex items-center justify-between border-b pb-3 mb-4">
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-50">
                 {editingEdge ? `Edit Kabel: ${editingEdge.edge_id}` : "Tambah Sambungan Kabel"}
               </h3>
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => setIsEdgeModalOpen(false)}
-                className="!p-1 text-slate-400 hover:text-slate-600"
+                className="!p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
               </Button>
@@ -2223,7 +2223,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
             <div className="grid gap-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">ID KABEL (KODE)</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">ID KABEL (KODE)</label>
                 <input
                   type="text"
                   required
@@ -2236,9 +2236,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">NODE ASAL</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">NODE ASAL</label>
                   <select
-                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white"
                     value={edgeSourceInput}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -2266,9 +2266,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">NODE TUJUAN</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">NODE TUJUAN</label>
                   <select
-                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white"
                     value={edgeTargetInput}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -2299,9 +2299,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">TIPE FIBER</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">TIPE FIBER</label>
                   <select
-                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                    className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     value={edgeFiberTypeInput}
                     onChange={(e) => setEdgeFiberTypeInput(e.target.value)}
                   >
@@ -2314,12 +2314,12 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">ESTIMASI JARAK (METER)</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">ESTIMASI JARAK (METER)</label>
                   <div className="flex flex-col">
                     <input
                       type="number"
                       step="any"
-                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                      className="w-full text-sm px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-900 dark:text-slate-50 dark:text-white"
                       value={edgeDistanceInput}
                       onChange={(e) => setEdgeDistanceInput(e.target.value)}
                       placeholder="Contoh: 150"
@@ -2355,7 +2355,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">CATATAN / KONDISI KABEL</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">CATATAN / KONDISI KABEL</label>
                 <textarea
                   className="w-full text-sm px-3 py-2 border rounded-xl"
                   rows={2}
@@ -2370,13 +2370,13 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 const tgtNode = nodes.find((n) => n.node_id === edgeTargetInput);
                 if (srcNode?.type === "odp" && tgtNode?.type === "odp") {
                   return (
-                    <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800 dark:border-slate-700">
                       <input
                         type="checkbox"
                         id="countsAsPort"
                         checked={edgeCountsAsPort}
                         onChange={(e) => setEdgeCountsAsPort(e.target.checked)}
-                        className="w-4 h-4 text-indigo-600 bg-white border-slate-350 rounded focus:ring-indigo-500"
+                        className="w-4 h-4 text-indigo-600 bg-white dark:bg-slate-900 border-slate-350 rounded focus:ring-indigo-500"
                       />
                       <label htmlFor="countsAsPort" className="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                         🔌 Gunakan / Makan Port ODP (Default: Tidak)
@@ -2399,7 +2399,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                     type="number"
                     min={1}
                     max={96}
-                    className="w-full text-sm px-3 py-2 border border-amber-300 rounded-xl bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    className="w-full text-sm px-3 py-2 border border-amber-300 rounded-xl bg-white dark:bg-slate-900 focus:ring-2 focus:ring-amber-400 focus:outline-none"
                     value={edgeOdpPortInput}
                     onChange={(e) => setEdgeOdpPortInput(e.target.value)}
                     placeholder="Nomor port (misal: 1, 2, 3...)"
@@ -2432,10 +2432,10 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <form
             onSubmit={handleSaveSettings}
-            className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-md animate-in"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-md animate-in"
           >
             <div className="flex items-center justify-between border-b pb-3 mb-4">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
                 <Settings className="w-5 h-5 text-indigo-600" />
                 Pengaturan Peta Jaringan
               </h3>
@@ -2443,7 +2443,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 type="button"
                 variant="ghost"
                 onClick={() => setIsSettingsModalOpen(false)}
-                className="!p-1 text-slate-400 hover:text-slate-600"
+                className="!p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
               </Button>
@@ -2452,7 +2452,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
             <div className="grid gap-3.5">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">LATITUDE DEFAULTS</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">LATITUDE DEFAULTS</label>
                   <input
                     type="text"
                     required
@@ -2462,7 +2462,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">LONGITUDE DEFAULTS</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">LONGITUDE DEFAULTS</label>
                   <input
                     type="text"
                     required
@@ -2475,7 +2475,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">ZOOM DEFAULT</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">ZOOM DEFAULT</label>
                   <input
                     type="number"
                     required
@@ -2485,7 +2485,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">MAX ZOOM</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">MAX ZOOM</label>
                   <input
                     type="number"
                     required
@@ -2495,7 +2495,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">MIN ZOOM</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">MIN ZOOM</label>
                   <input
                     type="number"
                     required
@@ -2542,7 +2542,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <form
             onSubmit={handleConfirmResetAll}
-            className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-md animate-in"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-md animate-in"
           >
             <div className="flex items-center justify-between border-b pb-3 mb-4">
               <h3 className="text-base font-bold text-red-600 flex items-center gap-2">
@@ -2553,7 +2553,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 type="button"
                 variant="ghost"
                 onClick={() => setIsResetModalOpen(false)}
-                className="!p-1 text-slate-400 hover:text-slate-600"
+                className="!p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
               </Button>
@@ -2568,7 +2568,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">PASSWORD ADMIN</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">PASSWORD ADMIN</label>
                 <input
                   type="password"
                   required
@@ -2605,9 +2605,9 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
       {/* --- CONFIRM MODAL (replaces window.confirm) --- */}
       {confirmModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-sm animate-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl w-full max-w-sm animate-in">
             <div className="flex items-center justify-between border-b pb-3 mb-4">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
                 {confirmModal.title}
               </h3>
@@ -2615,7 +2615,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                 type="button"
                 variant="ghost"
                 onClick={() => setConfirmModal(null)}
-                className="!p-1 text-slate-400 hover:text-slate-600"
+                className="!p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
               </Button>

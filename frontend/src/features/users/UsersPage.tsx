@@ -45,9 +45,9 @@ export function UsersPage({
 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-slate-900">Tambah User Tim</h2>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Tambah User Tim</h2>
         </div>
         <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onSubmit}>
           <label>
@@ -86,22 +86,22 @@ export function UsersPage({
             </Button>
           </div>
         </form>
-        <div className="border-t border-slate-100 pt-6 mt-6">
-          <p className="text-xs text-slate-400 leading-relaxed flex items-center gap-2">
+        <div className="border-t border-slate-100 dark:border-slate-800 pt-6 mt-6">
+          <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed flex items-center gap-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-            Gunakan akun <code className="bg-slate-50 px-1 rounded">petugas</code> untuk operasional harian dan sisakan <code className="bg-slate-50 px-1 rounded">admin</code> hanya untuk konfigurasi dan audit.
+            Gunakan akun <code className="bg-slate-50 dark:bg-slate-950 px-1 rounded">petugas</code> untuk operasional harian dan sisakan <code className="bg-slate-50 dark:bg-slate-950 px-1 rounded">admin</code> hanya untuk konfigurasi dan audit.
           </p>
         </div>
       </article>
 
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-slate-900">Daftar User</h2>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Daftar User</h2>
           <StatusPill label={`${managedUsers.length} user`} tone="slate" />
         </div>
-        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
           <table className="w-full text-left border-collapse text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
+            <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400">
               <tr>
                 <th className="px-6 py-4 font-medium">Username</th>
                 <th className="px-6 py-4 font-medium">Role</th>
@@ -115,11 +115,11 @@ export function UsersPage({
                 <EmptyTableRow message="Belum ada user tim tambahan." colSpan={5} />
               ) : (
                 managedUsers.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-gray-700">{item.username}</td>
-                    <td className="px-6 py-4 text-gray-700">
+                  <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="px-6 py-4 text-gray-700 dark:text-slate-300">{item.username}</td>
+                    <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                       <select
-                        className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         value={item.role}
                         onChange={(e) => onUpdateRole(item, e.target.value)}
                       >
@@ -127,9 +127,9 @@ export function UsersPage({
                         <option value="admin">Admin</option>
                       </select>
                     </td>
-                    <td className="px-6 py-4 text-gray-700">
+                    <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                       <select
-                        className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         value={item.is_active ? "1" : "0"}
                         onChange={(e) => onUpdateStatus(item, e.target.value === "1")}
                       >
@@ -137,7 +137,7 @@ export function UsersPage({
                         <option value="0">Nonaktif</option>
                       </select>
                     </td>
-                    <td className="px-6 py-4 text-gray-700">
+                    <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                       {item.last_login_at ? (
                         <div className="flex flex-col text-sm">
                           <span>{new Date(item.last_login_at).toLocaleString("id-ID")}</span>
@@ -147,7 +147,7 @@ export function UsersPage({
                         <span className="muted">Belum pernah</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-gray-700">
+                    <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                       <Button
                         type="button"
                         variant="outline"

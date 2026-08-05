@@ -820,7 +820,7 @@ export function SettingsPage({
         {/* Header Info */}
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 flex items-center gap-2">
               <Sliders className="text-indigo-600" size={24} />
               Pengaturan Sistem
             </h2>
@@ -842,7 +842,7 @@ export function SettingsPage({
         </div>
 
         {/* Tab Navigation */}
-        <nav className="flex flex-wrap gap-2 p-1.5 bg-slate-50 dark:bg-slate-950/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl">
+        <nav className="flex flex-wrap gap-2 p-1.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -913,7 +913,7 @@ export function SettingsPage({
                           <Settings size={18} />
                         </div>
                         <div>
-                          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">General Configuration</h3>
+                          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">General Configuration</h3>
                           <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi nama portal dan token keamanan captive portal.</p>
                         </div>
                       </div>
@@ -971,7 +971,7 @@ export function SettingsPage({
                             <MessageCircle size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">WhatsApp Gateway</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">WhatsApp Gateway</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Hubungkan dashboard Go dengan gateway WhatsApp JS.</p>
                           </div>
                         </div>
@@ -1093,7 +1093,7 @@ export function SettingsPage({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-805 rounded-2xl p-4 mt-auto">
+                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-805 rounded-2xl p-4 mt-auto">
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Uji kredensial/koneksi WhatsApp Gateway.</span>
                         <div className="flex items-center gap-2">
                           {waResult && (
@@ -1132,7 +1132,7 @@ export function SettingsPage({
                             <Mail size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Template WA Routing</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Template WA Routing</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Pilih akun pengirim WhatsApp untuk masing-masing template pesan otomatis.</p>
                           </div>
                         </div>
@@ -1311,14 +1311,14 @@ export function SettingsPage({
                             <Sliders size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Billing Rules & Automation</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Billing Rules & Automation</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi parameter tagihan otomatis, scheduler backup & retensi.</p>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {/* Subsection A: Billing Intervals */}
-                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
                             <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Tenggat Waktu Billing</h4>
 
                             <label className="flex flex-col gap-1.5">
@@ -1373,7 +1373,7 @@ export function SettingsPage({
                           </div>
 
                           {/* Subsection B: Automation Scheduler */}
-                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
                             <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Scheduler Otomatisasi</h4>
 
                             <label className="flex flex-col gap-1.5">
@@ -1423,7 +1423,7 @@ export function SettingsPage({
                           </div>
 
                           {/* Subsection C: Worker & Auto Backup */}
-                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
                             <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Worker & Backup Sistem</h4>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -1562,7 +1562,7 @@ export function SettingsPage({
                           </div>
 
                           {/* Subsection D: Masa Trial / Percobaan */}
-                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
                             <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Masa Trial / Percobaan</h4>
 
                             <label className="flex flex-col gap-1.5">
@@ -1646,13 +1646,13 @@ export function SettingsPage({
                               <Server size={18} />
                             </div>
                             <div>
-                              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">MikroTik Router Accounts</h3>
+                              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">MikroTik Router Accounts</h3>
                               <p className="text-[10px] text-slate-400 dark:text-slate-500">Kelola dan hubungkan beberapa router MikroTik secara sinkron.</p>
                             </div>
                           </div>
                           <Button variant="outline" type="button"
                             onClick={() => void loadRouters()}
-                            className="p-1.5 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
                             title="Refresh List"
                           >
                             <RefreshCw size={14} className={loadingRouters ? "animate-spin" : ""} />
@@ -1672,7 +1672,7 @@ export function SettingsPage({
                             {routers.map((router) => (
                               <div
                                 key={router.id}
-                                className="border border-slate-200 dark:border-slate-850 rounded-2xl p-5 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between hover:border-slate-350 dark:hover:border-slate-755 transition-colors"
+                                className="border border-slate-200 dark:border-slate-800 dark:border-slate-850 rounded-2xl p-5 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between hover:border-slate-350 dark:hover:border-slate-755 transition-colors"
                               >
                                 <div className="flex items-start justify-between gap-4">
                                   <div>
@@ -1684,7 +1684,7 @@ export function SettingsPage({
                                   </div>
                                   <div className="flex flex-col items-end gap-2">
                                     {!router.is_active ? (
-                                      <span className="flex items-center gap-1 text-[10px] font-bold bg-slate-50 text-slate-500 dark:bg-slate-950/20 dark:text-slate-400 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded-full">
+                                      <span className="flex items-center gap-1 text-[10px] font-bold bg-slate-50 dark:bg-slate-950 text-slate-500 dark:bg-slate-950/20 dark:text-slate-400 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded-full">
                                         <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                                         Nonaktif
                                       </span>
@@ -1807,8 +1807,8 @@ export function SettingsPage({
                     </article>
 
                     {/* Right: Add/Edit Account Router Form */}
-                    <div className="bg-slate-50 dark:bg-slate-900/40 p-5 rounded-3xl border border-slate-200 dark:border-slate-850 h-fit space-y-4">
-                      <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/40 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 dark:border-slate-850 h-fit space-y-4">
+                      <h3 className="text-xs font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 uppercase tracking-wider">
                         {editingRouterId ? "Edit Akun Router" : "Tambah Router Baru"}
                       </h3>
                       <div className="space-y-4">
@@ -1833,7 +1833,7 @@ export function SettingsPage({
                             placeholder="192.168.88.1:8728"
                             className={inputClassName()}
                           />
-                          <span className="text-[9px] text-slate-400 block mt-1">Gunakan port API MikroTik (default: 8728 atau 8729 untuk SSL).</span>
+                          <span className="text-[9px] text-slate-400 dark:text-slate-500 block mt-1">Gunakan port API MikroTik (default: 8728 atau 8729 untuk SSL).</span>
                         </label>
                         <label className="block">
                           <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Username Admin Router</span>
@@ -1916,7 +1916,7 @@ export function SettingsPage({
                                   <RefreshCw size={14} className={fetchingInterfaces ? "animate-spin" : ""} />
                                 </Button>
                               </div>
-                              <span className="text-[9px] text-slate-400 block mt-1">Interface yang digunakan untuk sumber PPPoE (dinonaktifkan otomatis saat Main online).</span>
+                              <span className="text-[9px] text-slate-400 dark:text-slate-500 block mt-1">Interface yang digunakan untuk sumber PPPoE (dinonaktifkan otomatis saat Main online).</span>
                             </label>
                           </div>
                         )}
@@ -1947,7 +1947,7 @@ export function SettingsPage({
                                 setNewRouterIsActive(true);
                                 setChangePassword(false);
                               }}
-                              className="flex-1 bg-white border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-355 font-bold py-2 px-4 rounded-xl text-xs shadow-sm hover:bg-slate-50 transition-all cursor-pointer"
+                              className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 dark:text-slate-355 font-bold py-2 px-4 rounded-xl text-xs shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all cursor-pointer"
                             >
                               Batal
                             </Button>
@@ -2010,7 +2010,7 @@ export function SettingsPage({
                           <Settings size={18} />
                         </div>
                         <div>
-                          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Pengaturan Global MikroTik</h3>
+                          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Pengaturan Global MikroTik</h3>
                           <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi profile bandwidth default untuk status isolir dan suspended.</p>
                         </div>
                       </div>
@@ -2108,16 +2108,16 @@ export function SettingsPage({
 
                             {showSetupForm ? (
                               <div className="mt-4 p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-6 text-slate-800 dark:text-slate-100">
-                                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-350 uppercase tracking-wider">Konfigurasi Setup Profile & Pool</h4>
+                                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350 uppercase tracking-wider">Konfigurasi Setup Profile & Pool</h4>
                                 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                   {/* Isolir Profile Setup */}
-                                  <div className="space-y-4 border-slate-100 dark:border-slate-800/80 lg:border-r pr-0 lg:pr-6">
+                                  <div className="space-y-4 border-slate-100 dark:border-slate-800 dark:border-slate-800/80 lg:border-r pr-0 lg:pr-6">
                                     <div className="border-b pb-1 border-slate-100 dark:border-slate-800">
                                       <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">1. Konfigurasi Profil Limit (Isolir)</span>
                                     </div>
                                     <label className="block">
-                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Nama Profile</span>
+                                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">Nama Profile</span>
                                       <input
                                         type="text"
                                         value={setupIsolirName}
@@ -2126,7 +2126,7 @@ export function SettingsPage({
                                       />
                                     </label>
                                     <label className="block">
-                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Local Address</span>
+                                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">Local Address</span>
                                       <input
                                         type="text"
                                         value={setupIsolirLocal}
@@ -2136,7 +2136,7 @@ export function SettingsPage({
                                       />
                                     </label>
                                     <label className="block">
-                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Rate Limit Bandwidth</span>
+                                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">Rate Limit Bandwidth</span>
                                       <input
                                         type="text"
                                         value={setupIsolirLimit}
@@ -2147,7 +2147,7 @@ export function SettingsPage({
                                     </label>
                                     
                                     <div className="space-y-2">
-                                      <span className="text-[11px] font-semibold text-slate-500 block">Koneksi Remote Address (IP Pool)</span>
+                                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">Koneksi Remote Address (IP Pool)</span>
                                       <div className="flex gap-4">
                                         <label className="flex items-center gap-1.5 cursor-pointer text-xs">
                                           <input
@@ -2170,9 +2170,9 @@ export function SettingsPage({
                                     </div>
 
                                     {setupIsolirPoolMode === "new" ? (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-800">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-800">
                                         <label className="block">
-                                          <span className="text-[10px] font-medium text-slate-500 block mb-1">Nama IP Pool</span>
+                                          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block mb-1">Nama IP Pool</span>
                                           <input
                                             type="text"
                                             value={setupIsolirPoolName}
@@ -2181,7 +2181,7 @@ export function SettingsPage({
                                           />
                                         </label>
                                         <label className="block">
-                                          <span className="text-[10px] font-medium text-slate-500 block mb-1">IP Range</span>
+                                          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block mb-1">IP Range</span>
                                           <input
                                             type="text"
                                             value={setupIsolirPoolRange}
@@ -2193,7 +2193,7 @@ export function SettingsPage({
                                       </div>
                                     ) : (
                                       <label className="block">
-                                        <span className="text-[10px] font-medium text-slate-500 block mb-1">Pilih IP Pool</span>
+                                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block mb-1">Pilih IP Pool</span>
                                         <select
                                           value={setupIsolirPoolName}
                                           onChange={(e) => setSetupIsolirPoolName(e.target.value)}
@@ -2215,7 +2215,7 @@ export function SettingsPage({
                                       <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">2. Konfigurasi Profil Suspended</span>
                                     </div>
                                     <label className="block">
-                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Nama Profile</span>
+                                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">Nama Profile</span>
                                       <input
                                         type="text"
                                         value={setupInactiveName}
@@ -2224,7 +2224,7 @@ export function SettingsPage({
                                       />
                                     </label>
                                     <label className="block">
-                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Local Address</span>
+                                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">Local Address</span>
                                       <input
                                         type="text"
                                         value={setupInactiveLocal}
@@ -2234,7 +2234,7 @@ export function SettingsPage({
                                       />
                                     </label>
                                     <label className="block">
-                                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">Rate Limit Bandwidth</span>
+                                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">Rate Limit Bandwidth</span>
                                       <input
                                         type="text"
                                         value={setupInactiveLimit}
@@ -2245,7 +2245,7 @@ export function SettingsPage({
                                     </label>
 
                                     <div className="space-y-2">
-                                      <span className="text-[11px] font-semibold text-slate-500 block">Koneksi Remote Address (IP Pool)</span>
+                                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">Koneksi Remote Address (IP Pool)</span>
                                       <div className="flex gap-4">
                                         <label className="flex items-center gap-1.5 cursor-pointer text-xs">
                                           <input
@@ -2268,9 +2268,9 @@ export function SettingsPage({
                                     </div>
 
                                     {setupInactivePoolMode === "new" ? (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-800">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-800">
                                         <label className="block">
-                                          <span className="text-[10px] font-medium text-slate-500 block mb-1">Nama IP Pool</span>
+                                          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block mb-1">Nama IP Pool</span>
                                           <input
                                             type="text"
                                             value={setupInactivePoolName}
@@ -2279,7 +2279,7 @@ export function SettingsPage({
                                           />
                                         </label>
                                         <label className="block">
-                                          <span className="text-[10px] font-medium text-slate-500 block mb-1">IP Range</span>
+                                          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block mb-1">IP Range</span>
                                           <input
                                             type="text"
                                             value={setupInactivePoolRange}
@@ -2291,7 +2291,7 @@ export function SettingsPage({
                                       </div>
                                     ) : (
                                       <label className="block">
-                                        <span className="text-[10px] font-medium text-slate-500 block mb-1">Pilih IP Pool</span>
+                                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block mb-1">Pilih IP Pool</span>
                                         <select
                                           value={setupInactivePoolName}
                                           onChange={(e) => setSetupInactivePoolName(e.target.value)}
@@ -2319,7 +2319,7 @@ export function SettingsPage({
                           {showSetupForm && (
                             <Button variant="outline" type="button"
                               onClick={() => setShowSetupForm(false)}
-                              className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center cursor-pointer border border-transparent"
+                              className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-200 text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center cursor-pointer border border-transparent"
                             >
                               Batal
                             </Button>
@@ -2352,7 +2352,7 @@ export function SettingsPage({
                             <RefreshCw size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Sinkronisasi Router Utama ke Slave</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Sinkronisasi Router Utama ke Slave</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Salin otomatis IP Pool, PPP Profile, dan PPP Secret dari router Utama ke semua router Slave.</p>
                           </div>
                         </div>
@@ -2396,7 +2396,7 @@ export function SettingsPage({
                             <RefreshCw size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Sinkronisasi Pelanggan dari MikroTik</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Sinkronisasi Pelanggan dari MikroTik</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Tarik daftar PPPoE secret dari router dan import yang belum terdaftar di dashboard.</p>
                           </div>
                         </div>
@@ -2441,7 +2441,7 @@ export function SettingsPage({
                                   className="accent-indigo-600 w-4 h-4 shrink-0 rounded border-gray-300 dark:border-slate-700"
                                 />
                                 <label htmlFor={`sync-${secret.name}`} className="flex-1 cursor-pointer min-w-0">
-                                  <span className="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{secret.name}</span>
+                                  <span className="block text-xs font-semibold text-slate-800 dark:text-slate-100 dark:text-slate-200 truncate">{secret.name}</span>
                                   <span className="block text-[10px] text-slate-400 dark:text-slate-500 truncate">Profile: {secret.profile || "default"}{secret.disabled ? " • disabled" : ""}</span>
                                 </label>
                                 {secret.exists ? (
@@ -2464,7 +2464,7 @@ export function SettingsPage({
                                   max={31}
                                   value={importDueDay}
                                   onChange={(e) => setImportDueDay(Number(e.target.value))}
-                                  className="w-16 text-center text-xs border border-slate-300 dark:border-slate-850 bg-white dark:bg-slate-900 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 font-mono"
+                                  className="w-16 text-center text-xs border border-slate-300 dark:border-slate-850 bg-white dark:bg-slate-900 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-50 dark:text-slate-100 font-mono"
                                 />
                               </div>
                               <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-2">
@@ -2497,7 +2497,7 @@ export function SettingsPage({
                                 {importResults.map((r) => (
                                   <div key={r.name} className={`flex items-center gap-2 text-xs rounded-lg px-3 py-1.5 ${r.status === "imported" ? "bg-emerald-50 dark:bg-emerald-955/20 text-emerald-700 dark:text-emerald-455" :
                                     r.status === "error" ? "bg-rose-50 dark:bg-rose-955/20 text-rose-700 dark:text-rose-455" :
-                                      "bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-450"
+                                      "bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 dark:text-slate-450"
                                     }`}>
                                     {r.status === "imported" ? <CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> : <AlertCircle size={12} className="text-rose-500 shrink-0" />}
                                     <span className="font-semibold truncate">{r.name}</span>
@@ -2524,7 +2524,7 @@ export function SettingsPage({
                             <Bell size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Discord Notifications</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Discord Notifications</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi log aktivitas operasional penting ke server Discord.</p>
                           </div>
                         </div>
@@ -2591,7 +2591,7 @@ export function SettingsPage({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-805 rounded-2xl p-4 mt-auto">
+                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-805 rounded-2xl p-4 mt-auto">
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Uji webhook Discord masukan di atas.</span>
                         <div className="flex items-center gap-2">
                           {discordResult && (
@@ -2603,7 +2603,7 @@ export function SettingsPage({
                           <Button variant="outline" type="button"
                             onClick={handleTestDiscord}
                             disabled={testingDiscord}
-                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                           >
                             {testingDiscord ? <Loader2 size={12} className="animate-spin" /> : null}
                             {testingDiscord ? "Menguji..." : "Test Webhook"}
@@ -2620,7 +2620,7 @@ export function SettingsPage({
                             <Bot size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Discord Bot Settings</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Discord Bot Settings</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi Discord Bot untuk menerima slash commands.</p>
                           </div>
                         </div>
@@ -2710,7 +2710,7 @@ export function SettingsPage({
                             <Mail size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">SMTP Email Notification</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">SMTP Email Notification</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Konfigurasi server SMTP untuk notifikasi tagihan dan kuitansi via email.</p>
                           </div>
                         </div>
@@ -2799,8 +2799,8 @@ export function SettingsPage({
                         </div>
                       </div>
 
-                      <div className="border-t border-slate-100 dark:border-slate-805 pt-5 space-y-4">
-                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Uji Pengiriman Email</h4>
+                      <div className="border-t border-slate-100 dark:border-slate-800 dark:border-slate-805 pt-5 space-y-4">
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Uji Pengiriman Email</h4>
                         <div className="flex flex-col sm:flex-row gap-3 items-end">
                           <label className="flex-1 flex flex-col gap-1.5 font-sans">
                             <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Email Tujuan Test</span>
@@ -2815,7 +2815,7 @@ export function SettingsPage({
                           <Button variant="outline" type="button"
                             onClick={handleTestSMTP}
                             disabled={testingSMTP}
-                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer h-[42px]"
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer h-[42px]"
                           >
                             {testingSMTP ? <Loader2 size={14} className="animate-spin" /> : null}
                             {testingSMTP ? "Menguji..." : "Kirim Email Test"}
@@ -2895,7 +2895,7 @@ export function SettingsPage({
                             <Wifi size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">GenieACS URL Configuration</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">GenieACS URL Configuration</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Configure connection details for your GenieACS server.</p>
                           </div>
                         </div>
@@ -2940,7 +2940,7 @@ export function SettingsPage({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-805 rounded-2xl p-4 mt-auto">
+                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-805 rounded-2xl p-4 mt-auto">
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Uji server GenieACS.</span>
                         <div className="flex items-center gap-2">
                           {acsResult && (
@@ -2952,7 +2952,7 @@ export function SettingsPage({
                           <Button variant="outline" type="button"
                             onClick={handleTestGenieACS}
                             disabled={testingAcs}
-                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                           >
                             {testingAcs ? <Loader2 size={12} className="animate-spin" /> : null}
                             {testingAcs ? "Menguji..." : "Test URL"}
@@ -2977,7 +2977,7 @@ export function SettingsPage({
                             <Sliders size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Virtual Parameters Configuration (Required)</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Virtual Parameters Configuration (Required)</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Configure the virtual parameter names used in your GenieACS setup.</p>
                           </div>
                         </div>
@@ -3107,7 +3107,7 @@ export function SettingsPage({
                             <Wifi size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Range RX Power Configuration</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Range RX Power Configuration</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Configure the RX Power signal quality thresholds in dBm.</p>
                           </div>
                         </div>
@@ -3141,7 +3141,7 @@ export function SettingsPage({
                             </span>
                           </label>
 
-                          <div className="col-span-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-4 text-xs space-y-2">
+                          <div className="col-span-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-800/80 rounded-2xl p-4 text-xs space-y-2">
                             <p className="font-bold text-slate-850 dark:text-slate-200">How RX Power Thresholds Work:</p>
                             <ul className="list-disc pl-4 space-y-1 text-slate-500 dark:text-slate-400">
                               <li><span className="text-emerald-600 font-semibold">Excellent (Green):</span> Signal &gt;= {settingsForm.gacs_rx_power_excellent || "-21"} dBm</li>
@@ -3173,7 +3173,7 @@ export function SettingsPage({
                             <RefreshCw size={18} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Auto Refresh Intervals Configuration</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Auto Refresh Intervals Configuration</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Configure how often the application refreshes data automatically.</p>
                           </div>
                         </div>
@@ -3265,7 +3265,7 @@ export function SettingsPage({
                         onClick={() => setVendorSubTab("vendors")}
                         className={`text-xs font-bold pb-2 transition-all cursor-pointer border-b-2 px-1 ${vendorSubTab === "vendors"
                           ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                          : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300"
+                          : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300"
                           }`}
                       >
                         📦 Vendors
@@ -3274,7 +3274,7 @@ export function SettingsPage({
                         onClick={() => setVendorSubTab("wifi")}
                         className={`text-xs font-bold pb-2 transition-all cursor-pointer border-b-2 px-1 ${vendorSubTab === "wifi"
                           ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                          : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300"
+                          : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300"
                           }`}
                       >
                         📡 WiFi Security Config
@@ -3286,18 +3286,18 @@ export function SettingsPage({
                       <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Vendors List</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Vendors List</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Manage parameter path mapping configurations per ONT manufacturer.</p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             <Button variant="outline" type="button"
                               onClick={() => exportData(vendors, "vendors_export.json")}
-                              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
                             >
                               <Download size={14} />
                               Export
                             </Button>
-                            <label className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
+                            <label className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
                               <Upload size={14} />
                               Import
                               <input
@@ -3329,7 +3329,7 @@ export function SettingsPage({
                           <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs border-collapse">
                               <thead>
-                                <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+                                <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px]">
                                   <th className="py-3 px-4 font-bold">Vendor Information</th>
                                   <th className="py-3 px-4 font-bold">Configuration</th>
                                   <th className="py-3 px-4 font-bold">Detection Patterns</th>
@@ -3347,19 +3347,19 @@ export function SettingsPage({
                                           {vendor.name.charAt(0)}
                                         </div>
                                         <div>
-                                          <p className="font-bold text-slate-900 dark:text-slate-100">{vendor.name}</p>
+                                          <p className="font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">{vendor.name}</p>
                                           <p className="text-[10px] text-slate-450 mt-0.5 truncate max-w-[200px]" title={vendor.description}>{vendor.description}</p>
                                         </div>
                                       </div>
                                     </td>
                                     <td className="py-3 px-4 space-y-1 text-[10px] text-slate-650 dark:text-slate-400">
-                                      <p><strong className="text-slate-500">Prefix:</strong> {vendor.parameter_prefix}</p>
-                                      {vendor.service_list_path && <p><strong className="text-slate-500">Svc List:</strong> {vendor.service_list_path}</p>}
-                                      {vendor.lan_binding_path && <p><strong className="text-slate-500">LAN Interf:</strong> {vendor.lan_binding_path}</p>}
+                                      <p><strong className="text-slate-500 dark:text-slate-400">Prefix:</strong> {vendor.parameter_prefix}</p>
+                                      {vendor.service_list_path && <p><strong className="text-slate-500 dark:text-slate-400">Svc List:</strong> {vendor.service_list_path}</p>}
+                                      {vendor.lan_binding_path && <p><strong className="text-slate-500 dark:text-slate-400">LAN Interf:</strong> {vendor.lan_binding_path}</p>}
                                     </td>
                                     <td className="py-3 px-4 space-y-1 text-[10px]">
-                                      <p><strong className="text-slate-500">MFR:</strong> <code className="bg-slate-100 dark:bg-slate-800/80 px-1 py-0.5 rounded font-mono">{vendor.manufacturer_patterns}</code></p>
-                                      <p><strong className="text-slate-500">PROD:</strong> <code className="bg-slate-100 dark:bg-slate-800/80 px-1 py-0.5 rounded font-mono">{vendor.product_patterns}</code></p>
+                                      <p><strong className="text-slate-500 dark:text-slate-400">MFR:</strong> <code className="bg-slate-100 dark:bg-slate-800/80 px-1 py-0.5 rounded font-mono">{vendor.manufacturer_patterns}</code></p>
+                                      <p><strong className="text-slate-500 dark:text-slate-400">PROD:</strong> <code className="bg-slate-100 dark:bg-slate-800/80 px-1 py-0.5 rounded font-mono">{vendor.product_patterns}</code></p>
                                     </td>
                                     <td className="py-3 px-4 text-center font-semibold text-slate-700 dark:text-slate-300">{vendor.priority}</td>
                                     <td className="py-3 px-4 text-center">
@@ -3368,7 +3368,7 @@ export function SettingsPage({
                                           Active
                                         </span>
                                       ) : (
-                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded-full">
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded-full">
                                           Disabled
                                         </span>
                                       )}
@@ -3377,14 +3377,14 @@ export function SettingsPage({
                                       <div className="flex items-center justify-end gap-1.5">
                                         <Button variant="outline" type="button"
                                           onClick={() => setEditingVendor(vendor)}
-                                          className="p-1 hover:text-indigo-600 text-slate-500 transition-colors cursor-pointer"
+                                          className="p-1 hover:text-indigo-600 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer"
                                           title="Edit Vendor"
                                         >
                                           <Edit size={14} />
                                         </Button>
                                         <Button variant="outline" type="button"
                                           onClick={() => setDeletingVendorItem(vendor)}
-                                          className="p-1 hover:text-rose-600 text-slate-500 transition-colors cursor-pointer"
+                                          className="p-1 hover:text-rose-600 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer"
                                           title="Delete Vendor"
                                         >
                                           <Trash2 size={14} />
@@ -3405,18 +3405,18 @@ export function SettingsPage({
                       <article className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">WiFi Security Config</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">WiFi Security Config</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Configure WiFi password paths per product class.</p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             <Button variant="outline" type="button"
                               onClick={() => exportData(wifiConfigs, "wifi_configs_export.json")}
-                              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
                             >
                               <Download size={14} />
                               Export
                             </Button>
-                            <label className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
+                            <label className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
                               <Upload size={14} />
                               Import
                               <input
@@ -3448,7 +3448,7 @@ export function SettingsPage({
                           <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs border-collapse">
                               <thead>
-                                <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+                                <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px]">
                                   <th className="py-3 px-4 font-bold">Product Class</th>
                                   <th className="py-3 px-4 font-bold">Password Configuration</th>
                                   <th className="py-3 px-4 font-bold">Security Types</th>
@@ -3458,13 +3458,13 @@ export function SettingsPage({
                               <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
                                 {wifiConfigs.map((item) => (
                                   <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/20 transition-colors">
-                                    <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-100">
+                                    <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-50 dark:text-slate-100">
                                       {item.product_class}
                                     </td>
                                     <td className="py-3 px-4 space-y-1 text-[10px]">
-                                      <p><strong className="text-slate-500">Path:</strong> <code className="bg-slate-100 dark:bg-slate-800/80 px-1 py-0.5 rounded font-mono">{item.password_param_path}</code></p>
+                                      <p><strong className="text-slate-500 dark:text-slate-400">Path:</strong> <code className="bg-slate-100 dark:bg-slate-800/80 px-1 py-0.5 rounded font-mono">{item.password_param_path}</code></p>
                                     </td>
-                                    <td className="py-3 px-4 text-slate-700 dark:text-slate-350">
+                                    <td className="py-3 px-4 text-slate-700 dark:text-slate-300 dark:text-slate-350">
                                       <div className="flex flex-wrap gap-1">
                                         {item.security_types.map((type) => (
                                           <span key={type} className="inline-flex text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
@@ -3477,14 +3477,14 @@ export function SettingsPage({
                                       <div className="flex items-center justify-end gap-1.5">
                                         <Button variant="outline" type="button"
                                           onClick={() => setEditingWifiConfig(item)}
-                                          className="p-1 hover:text-indigo-600 text-slate-500 transition-colors cursor-pointer"
+                                          className="p-1 hover:text-indigo-600 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer"
                                           title="Edit Wifi Config"
                                         >
                                           <Edit size={14} />
                                         </Button>
                                         <Button variant="outline" type="button"
                                           onClick={() => setDeletingWifiItem(item)}
-                                          className="p-1 hover:text-rose-600 text-slate-500 transition-colors cursor-pointer"
+                                          className="p-1 hover:text-rose-600 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer"
                                           title="Delete Wifi Config"
                                         >
                                           <Trash2 size={14} />
@@ -3517,7 +3517,7 @@ export function SettingsPage({
                     <UserIcon size={18} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Change Username</h3>
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Change Username</h3>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500">Update username akun dashboard Anda.</p>
                   </div>
                 </div>
@@ -3561,7 +3561,7 @@ export function SettingsPage({
                     <Lock size={18} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Change Password</h3>
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider">Change Password</h3>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500">Perbarui kata sandi akun keamanan Anda.</p>
                   </div>
                 </div>
@@ -3638,7 +3638,7 @@ export function SettingsPage({
             <>
               <Button variant="outline" type="button"
                 onClick={() => setEditingVendor(null)}
-                className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Cancel
               </Button>
@@ -3738,7 +3738,7 @@ export function SettingsPage({
               </label>
 
               <div className="col-span-full border-t border-slate-100 dark:border-slate-800 pt-3">
-                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 mb-2">WAN Connection Parameters</h4>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 mb-2">WAN Connection Parameters</h4>
               </div>
 
               <label className="block">
@@ -3775,7 +3775,7 @@ export function SettingsPage({
               </label>
 
               <div className="col-span-full border-t border-slate-100 dark:border-slate-800 pt-3">
-                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 mb-2">Security Parameters</h4>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 mb-2">Security Parameters</h4>
               </div>
 
               <label className="block">
@@ -3801,7 +3801,7 @@ export function SettingsPage({
               </label>
 
               <div className="col-span-full border-t border-slate-100 dark:border-slate-800 pt-3">
-                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 mb-2">Settings</h4>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 mb-2">Settings</h4>
               </div>
 
               <label className="block">
@@ -3851,7 +3851,7 @@ export function SettingsPage({
             <>
               <Button variant="outline" type="button"
                 onClick={() => setDeletingVendorItem(null)}
-                className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Batal
               </Button>
@@ -3878,7 +3878,7 @@ export function SettingsPage({
               <AlertTriangle size={20} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-800">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 Apakah Anda yakin ingin menghapus vendor <strong>{deletingVendorItem.name}</strong>?
               </p>
               <p className="text-xs text-slate-450 mt-2 leading-relaxed">
@@ -3898,7 +3898,7 @@ export function SettingsPage({
             <>
               <Button variant="outline" type="button"
                 onClick={() => setEditingWifiConfig(null)}
-                className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Cancel
               </Button>
@@ -3991,7 +3991,7 @@ export function SettingsPage({
             <>
               <Button variant="outline" type="button"
                 onClick={() => setDeletingWifiItem(null)}
-                className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Batal
               </Button>
@@ -4018,7 +4018,7 @@ export function SettingsPage({
               <AlertTriangle size={20} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-800">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 Apakah Anda yakin ingin menghapus konfigurasi WiFi untuk <strong>{deletingWifiItem.product_class}</strong>?
               </p>
               <p className="text-xs text-slate-450 mt-2 leading-relaxed">
@@ -4038,7 +4038,7 @@ export function SettingsPage({
             <>
               <Button variant="outline" type="button"
                 onClick={() => setDeletingRouter(null)}
-                className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 Batal
               </Button>
@@ -4065,7 +4065,7 @@ export function SettingsPage({
               <AlertTriangle size={20} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-800">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 Apakah Anda yakin ingin menghapus router <strong>{deletingRouter.name}</strong>?
               </p>
               <p className="text-xs text-slate-450 mt-2 leading-relaxed">

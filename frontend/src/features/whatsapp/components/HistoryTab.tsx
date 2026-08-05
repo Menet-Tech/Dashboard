@@ -42,7 +42,7 @@ export function HistoryTab({
   return (
     <div className="space-y-6">
       {/* Filters & Decrypt Toggles */}
-      <div className="flex flex-col md:flex-row gap-4 items-end justify-between bg-slate-50 p-4 rounded-xl border border-slate-200">
+      <div className="flex flex-col md:flex-row gap-4 items-end justify-between bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
           <label className="block">
             <span className="text-xs font-semibold text-slate-600 block mb-1">Filter Akun</span>
@@ -98,13 +98,13 @@ export function HistoryTab({
 
       {/* Message History Display */}
       {filteredMessages.length === 0 ? (
-        <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200 text-slate-500">
+        <div className="text-center py-12 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
           Tidak ada log chat yang cocok dengan filter saat ini.
         </div>
       ) : (
-        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm max-h-[600px] overflow-y-auto">
-          <table className="w-full text-left border-collapse bg-white">
-            <thead className="bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+        <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm max-h-[600px] overflow-y-auto">
+          <table className="w-full text-left border-collapse bg-white dark:bg-slate-900">
+            <thead className="bg-slate-50 dark:bg-slate-950 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="p-3">Waktu</th>
                 <th className="p-3">Akun</th>
@@ -129,8 +129,8 @@ export function HistoryTab({
                   : msg.to_number;
 
                 return (
-                  <tr key={msg.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-3 text-slate-500 text-xs whitespace-nowrap">{dateStr}</td>
+                  <tr key={msg.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="p-3 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{dateStr}</td>
                     <td className="p-3 font-semibold text-indigo-700">{msg.account_id}</td>
                     <td className="p-3 font-mono font-semibold">
                       {maskPhone(numberToShow, shouldMask)}
@@ -145,7 +145,7 @@ export function HistoryTab({
                         className={`inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
                           isIncoming
                             ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                            : "bg-slate-100 border-slate-200 text-slate-700"
+                            : "bg-slate-100 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
                         }`}
                       >
                         {isIncoming ? "masuk" : "keluar"}

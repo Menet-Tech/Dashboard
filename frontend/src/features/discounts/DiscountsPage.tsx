@@ -583,7 +583,7 @@ export function DiscountsPage({
             }}
             className={`px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
               activeTab === "discounts"
-                ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                ? "bg-white dark:bg-slate-900 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
             }`}
           >
@@ -597,7 +597,7 @@ export function DiscountsPage({
             }}
             className={`px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
               activeTab === "referrals"
-                ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                ? "bg-white dark:bg-slate-900 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
             }`}
           >
@@ -611,7 +611,7 @@ export function DiscountsPage({
             }}
             className={`px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
               activeTab === "vouchers"
-                ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                ? "bg-white dark:bg-slate-900 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
             }`}
           >
@@ -625,7 +625,7 @@ export function DiscountsPage({
             }}
             className={`px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
               activeTab === "withdrawals"
-                ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                ? "bg-white dark:bg-slate-900 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
             }`}
           >
@@ -661,9 +661,9 @@ export function DiscountsPage({
       </div>
 
       {/* Filter & Search */}
-      <div className="bg-white dark:bg-slate-950 p-6 rounded-3xl border border-slate-100 dark:border-slate-900 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 dark:bg-slate-950 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 dark:border-slate-900 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
           <input
             type="text"
             placeholder={
@@ -675,7 +675,7 @@ export function DiscountsPage({
                 ? "Cari nama pelanggan..."
                 : "Cari data voucher..."
             }
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -732,25 +732,25 @@ export function DiscountsPage({
       </div>
 
       {/* Table Container */}
-      <div className="bg-white dark:bg-slate-950 rounded-3xl border border-slate-100 dark:border-slate-900 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 dark:bg-slate-950 rounded-3xl border border-slate-100 dark:border-slate-800 dark:border-slate-900 shadow-sm overflow-hidden">
         {activeTab === "discounts" ? (
           // === TAB DISKON KHUSUS ===
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
+              <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
                 <tr>
                   {renderSortableHeader("Nama Pelanggan", "name")}
                   {renderSortableHeader("Paket Aktif", "package_name")}
                   {renderSortableHeader("Harga Asli", "package_price")}
                   {renderSortableHeader("Nominal Diskon", "diskon")}
                   {renderSortableHeader("Total Setelah Diskon", "final_price")}
-                  {!isViewer && <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>}
+                  {!isViewer && <th className="px-6 py-4 font-semibold text-center text-slate-500 dark:text-slate-400">Aksi</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 dark:text-slate-350">
                 {sortedDiscountCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={isViewer ? 5 : 6} className="px-6 py-10 text-center text-slate-400">
+                    <td colSpan={isViewer ? 5 : 6} className="px-6 py-10 text-center text-slate-400 dark:text-slate-500">
                       {searchQuery
                         ? "Tidak ada pelanggan berdiskon yang cocok dengan pencarian."
                         : "Belum ada pelanggan yang dikonfigurasi menggunakan diskon khusus. Gunakan tombol 'Beri Diskon Baru' di atas."}
@@ -769,7 +769,7 @@ export function DiscountsPage({
 
                     return (
                       <tr key={customer.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
-                        <td className="px-6 py-4 font-semibold text-slate-900 dark:text-slate-100">
+                        <td className="px-6 py-4 font-semibold text-slate-900 dark:text-slate-50 dark:text-slate-100">
                           {customer.name}
                         </td>
                         <td className="px-6 py-4">{customer.package_name || "-"}</td>
@@ -813,7 +813,7 @@ export function DiscountsPage({
           // === TAB REFERRAL MGM ===
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
+              <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
                 <tr>
                   {renderSortableHeader("Pelanggan", "name")}
                   {renderSortableHeader("Kode Referral", "referral_code")}
@@ -821,13 +821,13 @@ export function DiscountsPage({
                   {renderSortableHeader("Voucher Diskon", "voucher_discount")}
                   {renderSortableHeader("Teman yang Diajak", "referred_count")}
                   {renderSortableHeader("Rekomendasi Oleh", "referred_by_name")}
-                  {!isViewer && <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi / Klaim Reward</th>}
+                  {!isViewer && <th className="px-6 py-4 font-semibold text-center text-slate-500 dark:text-slate-400">Aksi / Klaim Reward</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 dark:text-slate-350">
                 {sortedReferralCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={isViewer ? 6 : 7} className="px-6 py-10 text-center text-slate-400">
+                    <td colSpan={isViewer ? 6 : 7} className="px-6 py-10 text-center text-slate-400 dark:text-slate-500">
                       Tidak ada pelanggan dengan data program referral aktif. Gunakan tombol 'Atur Referral Baru' di atas.
                     </td>
                   </tr>
@@ -841,28 +841,28 @@ export function DiscountsPage({
                     return (
                       <tr key={customer.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
                         <td className="px-6 py-4">
-                          <strong className="block text-slate-900 dark:text-slate-100 font-semibold">{customer.name}</strong>
-                          <span className="text-xs text-slate-400 font-mono">{customer.whatsapp || "No WA"}</span>
+                          <strong className="block text-slate-900 dark:text-slate-50 dark:text-slate-100 font-semibold">{customer.name}</strong>
+                          <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">{customer.whatsapp || "No WA"}</span>
                         </td>
-                        <td className="px-6 py-4 font-mono text-xs font-bold text-slate-800 dark:text-slate-300">
+                        <td className="px-6 py-4 font-mono text-xs font-bold text-slate-800 dark:text-slate-100 dark:text-slate-300">
                           {customer.referral_code || "-"}
                         </td>
-                        <td className="px-6 py-4 font-mono text-xs font-semibold text-slate-900 dark:text-slate-200">
+                        <td className="px-6 py-4 font-mono text-xs font-semibold text-slate-900 dark:text-slate-50 dark:text-slate-200">
                           {formatCurrency(customer.referral_balance)}
                         </td>
                         <td className="px-6 py-4 font-mono text-xs text-indigo-600 dark:text-indigo-400 font-bold">
                           {customer.voucher_discount ? formatCurrency(customer.voucher_discount) : "-"}
                         </td>
-                        <td className="px-6 py-4 font-medium text-slate-800 dark:text-slate-200">
+                        <td className="px-6 py-4 font-medium text-slate-800 dark:text-slate-100 dark:text-slate-200">
                           {referredCount > 0 ? (
                             <span className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-full text-xs font-bold">
                               {referredCount} Orang
                             </span>
                           ) : (
-                            <span className="text-slate-400">0</span>
+                            <span className="text-slate-400 dark:text-slate-500">0</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-xs text-slate-500">{customer.referred_by_name || "-"}</td>
+                        <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">{customer.referred_by_name || "-"}</td>
                         {!isViewer && (
                           <td className="px-6 py-4">
                             <div className="flex flex-col xl:flex-row items-center justify-center gap-2">
@@ -873,7 +873,7 @@ export function DiscountsPage({
                                   disabled={customer.referral_balance <= 0}
                                   className={`text-[10px] px-2.5 py-1 rounded-lg border font-bold flex items-center gap-0.5 transition-all ${
                                     customer.referral_balance > 0
-                                      ? "bg-slate-50 hover:bg-slate-105 border-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-800 text-slate-700 dark:text-slate-355"
+                                      ? "bg-slate-50 hover:bg-slate-105 border-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-800 text-slate-700 dark:text-slate-300 dark:text-slate-355"
                                       : "bg-slate-50/50 border-slate-100 text-slate-300 dark:bg-slate-950/20 dark:border-slate-900 dark:text-slate-600 cursor-not-allowed"
                                   }`}
                                   title="Cairkan saldo referral menjadi uang tunai langsung ke pelanggan"
@@ -887,7 +887,7 @@ export function DiscountsPage({
                                   className={`text-[10px] px-2.5 py-1 rounded-lg border font-bold flex items-center gap-0.5 transition-all ${
                                     customer.referral_balance > 0
                                       ? "bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-600 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/60 dark:border-indigo-900/60 dark:text-indigo-400"
-                                      : "bg-slate-50/50 border-slate-100 text-slate-300 dark:bg-slate-950/20 dark:border-slate-900 dark:text-slate-600 cursor-not-allowed"
+                                      : "bg-slate-50/50 border-slate-100 dark:border-slate-800 text-slate-300 dark:bg-slate-950/20 dark:border-slate-900 dark:text-slate-600 cursor-not-allowed"
                                   }`}
                                   title="Tukarkan saldo referral menjadi voucher pemotong tagihan bulanan"
                                 >
@@ -935,9 +935,9 @@ export function DiscountsPage({
                 Template Voucher Tersedia
               </h4>
               {loadingVouchers ? (
-                <div className="py-8 text-center text-slate-400 text-xs">Memuat data...</div>
+                <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs">Memuat data...</div>
               ) : vouchersList.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
                   Belum ada template voucher. Klik "Buat Voucher Baru" untuk memulainya.
                 </div>
               ) : (
@@ -953,7 +953,7 @@ export function DiscountsPage({
                     return (
                       <div 
                         key={voucher.id} 
-                        className="bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm flex"
+                        className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm flex"
                       >
                         {/* HSL Gradient Tag side */}
                         <div className={`w-24 bg-gradient-to-br ${colorClass} text-white flex flex-col items-center justify-center p-3 text-center shrink-0`}>
@@ -1002,7 +1002,7 @@ export function DiscountsPage({
               </h4>
               <div className="overflow-x-auto border border-slate-150 dark:border-slate-800 rounded-2xl">
                 <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+                  <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800 text-slate-500 dark:text-slate-400">
                     <tr>
                       <th className="px-5 py-3 font-semibold">Nama Pelanggan</th>
                       <th className="px-5 py-3 font-semibold">Kode Voucher</th>
@@ -1013,10 +1013,10 @@ export function DiscountsPage({
                       <th className="px-5 py-3 font-semibold">Dibuat Pada</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 dark:text-slate-350">
                     {customerVouchersList.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-5 py-6 text-center text-slate-400">
+                        <td colSpan={7} className="px-5 py-6 text-center text-slate-400 dark:text-slate-500">
                           Tidak ada data voucher pelanggan aktif.
                         </td>
                       </tr>
@@ -1027,7 +1027,7 @@ export function DiscountsPage({
                         return (
                           <tr key={cv.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
                             <td className="px-5 py-3 font-semibold text-slate-850 dark:text-slate-200">{cv.customer_name}</td>
-                            <td className="px-5 py-3 font-mono font-bold text-slate-800 dark:text-slate-300">{cv.voucher_code}</td>
+                            <td className="px-5 py-3 font-mono font-bold text-slate-800 dark:text-slate-100 dark:text-slate-300">{cv.voucher_code}</td>
                             <td className="px-5 py-3 font-mono text-xs">{formatCurrency(cv.voucher_amount || 0)}</td>
                             <td className="px-5 py-3 font-medium">
                               {cv.remaining_cycles === 0 ? "Permanen" : `${cv.remaining_cycles} Bulan`}
@@ -1048,17 +1048,17 @@ export function DiscountsPage({
                                   className={`px-3 py-1 rounded-xl text-[10px] font-bold transition-all shadow-sm ${
                                     isAuto
                                       ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/10"
-                                      : "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-350 dark:hover:bg-slate-700"
+                                      : "bg-slate-200 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-350 dark:hover:bg-slate-700"
                                   }`}
                                   title="Klik untuk mengubah preferensi penggunaan"
                                 >
                                   {isAuto ? "ON" : "OFF"}
                                 </Button>
                               ) : (
-                                <span className="text-slate-400">{isAuto ? "ON" : "OFF"}</span>
+                                <span className="text-slate-400 dark:text-slate-500">{isAuto ? "ON" : "OFF"}</span>
                               )}
                             </td>
-                            <td className="px-5 py-3 text-slate-400 font-mono text-[10px]">
+                            <td className="px-5 py-3 text-slate-400 dark:text-slate-500 font-mono text-[10px]">
                               {new Date(cv.created_at).toLocaleString("id-ID", {
                                 day: "numeric",
                                 month: "short",
@@ -1084,7 +1084,7 @@ export function DiscountsPage({
               </h4>
               <div className="overflow-x-auto border border-slate-150 dark:border-slate-800 rounded-2xl">
                 <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+                  <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800 text-slate-500 dark:text-slate-400">
                     <tr>
                       <th className="px-5 py-3 font-semibold">Invoice Tagihan</th>
                       <th className="px-5 py-3 font-semibold">Nama Pelanggan</th>
@@ -1094,10 +1094,10 @@ export function DiscountsPage({
                       <th className="px-5 py-3 font-semibold">Tanggal Digunakan</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 dark:text-slate-350">
                     {usageLogsList.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-5 py-6 text-center text-slate-400">
+                        <td colSpan={6} className="px-5 py-6 text-center text-slate-400 dark:text-slate-500">
                           Belum ada riwayat pemakaian voucher tagihan.
                         </td>
                       </tr>
@@ -1108,8 +1108,8 @@ export function DiscountsPage({
                           <td className="px-5 py-3 font-medium text-slate-750 dark:text-slate-300">{log.customer_name}</td>
                           <td className="px-5 py-3 font-mono font-bold text-slate-850 dark:text-slate-250">{log.voucher_code}</td>
                           <td className="px-5 py-3 font-mono font-bold text-red-600 dark:text-red-400">- {formatCurrency(log.amount_applied)}</td>
-                          <td className="px-5 py-3 text-slate-800 dark:text-slate-200">Siklus #{log.cycle_number}</td>
-                          <td className="px-5 py-3 text-slate-400 font-mono text-[10px]">
+                          <td className="px-5 py-3 text-slate-800 dark:text-slate-100 dark:text-slate-200">Siklus #{log.cycle_number}</td>
+                          <td className="px-5 py-3 text-slate-400 dark:text-slate-500 font-mono text-[10px]">
                             {new Date(log.created_at).toLocaleString("id-ID", {
                               day: "numeric",
                               month: "short",
@@ -1130,7 +1130,7 @@ export function DiscountsPage({
           // === TAB REFERRAL WITHDRAWALS ===
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
+              <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
                 <tr>
                   {renderSortableHeader("Pelanggan", "customer_name")}
                   {renderSortableHeader("Nominal", "amount")}
@@ -1139,13 +1139,13 @@ export function DiscountsPage({
                   {renderSortableHeader("Status", "status")}
                   {renderSortableHeader("Tanggal", "created_at")}
                   <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Catatan / Bukti</th>
-                  {!isViewer && <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>}
+                  {!isViewer && <th className="px-6 py-4 font-semibold text-center text-slate-500 dark:text-slate-400">Aksi</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 dark:text-slate-350">
                 {sortedWithdrawalsList.length === 0 ? (
                   <tr>
-                    <td colSpan={isViewer ? 7 : 8} className="px-6 py-10 text-center text-slate-400">
+                    <td colSpan={isViewer ? 7 : 8} className="px-6 py-10 text-center text-slate-400 dark:text-slate-500">
                       Tidak ada permintaan penarikan saldo referral.
                     </td>
                   </tr>
@@ -1154,10 +1154,10 @@ export function DiscountsPage({
                       return (
                         <tr key={w.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
                           <td className="px-6 py-4">
-                            <strong className="block text-slate-900 dark:text-slate-100 font-semibold">{w.customer_name}</strong>
-                            <span className="text-xs text-slate-400 font-mono">{w.customer_phone || "-"}</span>
+                            <strong className="block text-slate-900 dark:text-slate-50 dark:text-slate-100 font-semibold">{w.customer_name}</strong>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">{w.customer_phone || "-"}</span>
                           </td>
-                          <td className="px-6 py-4 font-mono text-xs font-semibold text-slate-900 dark:text-slate-200">
+                          <td className="px-6 py-4 font-mono text-xs font-semibold text-slate-900 dark:text-slate-50 dark:text-slate-200">
                             {formatCurrency(w.amount)}
                           </td>
                           <td className="px-6 py-4">
@@ -1172,7 +1172,7 @@ export function DiscountsPage({
                             )}
                           </td>
                           <td className="px-6 py-4 text-xs font-mono text-slate-600 dark:text-slate-300">
-                            {w.payment_target || <span className="text-slate-400 italic">Serah terima tunai</span>}
+                            {w.payment_target || <span className="text-slate-400 dark:text-slate-500 italic">Serah terima tunai</span>}
                           </td>
                           <td className="px-6 py-4">
                             {w.status === "pending" && (
@@ -1191,7 +1191,7 @@ export function DiscountsPage({
                               </span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-xs text-slate-500">
+                          <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">
                             {new Date(w.created_at).toLocaleString("id-ID", {
                               day: "numeric",
                               month: "short",
@@ -1213,7 +1213,7 @@ export function DiscountsPage({
                                 Lihat Bukti
                               </a>
                             ) : (
-                              <span className="text-slate-400 italic">Belum ada bukti</span>
+                              <span className="text-slate-400 dark:text-slate-500 italic">Belum ada bukti</span>
                             )}
                           </td>
                           {!isViewer && (
@@ -1246,7 +1246,7 @@ export function DiscountsPage({
                                     </Button>
                                   </>
                                 ) : (
-                                  <span className="text-slate-400 italic text-xs">No Action</span>
+                                  <span className="text-slate-400 dark:text-slate-500 italic text-xs">No Action</span>
                                 )}
                               </div>
                             </td>
@@ -1271,7 +1271,7 @@ export function DiscountsPage({
                 setSelectedCustomerForNewDiscount(0);
                 setDiscountValueInput("");
               }}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              className="absolute right-4 top-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
             </Button>
@@ -1391,7 +1391,7 @@ export function DiscountsPage({
                     setDiscountValueInput("");
                   }}
                   disabled={submitting}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
                 </Button>
@@ -1413,7 +1413,7 @@ export function DiscountsPage({
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
             <Button type="button" variant="outline"
               onClick={() => setEditingDiscountCustomer(null)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              className="absolute right-4 top-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
             </Button>
@@ -1499,7 +1499,7 @@ export function DiscountsPage({
                 <Button variant="outline" type="button"
                   onClick={() => setEditingDiscountCustomer(null)}
                   disabled={submitting}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
                 </Button>
@@ -1528,7 +1528,7 @@ export function DiscountsPage({
                 setNewVoucherCycles(1);
                 setNewVoucherDesc("");
               }}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              className="absolute right-4 top-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
             </Button>
@@ -1563,7 +1563,7 @@ export function DiscountsPage({
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={newVoucherAmount}
                   onChange={(e) => {
                     const rawVal = e.target.value.replace(/\D/g, "");
@@ -1580,7 +1580,7 @@ export function DiscountsPage({
                 </label>
                 <select
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={newVoucherType}
                   onChange={(e) => {
                     const type = e.target.value as "one-time" | "multi-use" | "permanent";
@@ -1605,7 +1605,7 @@ export function DiscountsPage({
                     required
                     min={1}
                     max={120}
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 font-mono"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 font-mono"
                     value={newVoucherCycles}
                     onChange={(e) => setNewVoucherCycles(Math.max(1, Number(e.target.value) || 1))}
                     placeholder="Contoh: 3"
@@ -1618,7 +1618,7 @@ export function DiscountsPage({
                   Deskripsi Voucher
                 </label>
                 <textarea
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 min-h-[60px]"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 min-h-[60px]"
                   value={newVoucherDesc}
                   onChange={(e) => setNewVoucherDesc(e.target.value)}
                   placeholder="Keterangan promosi..."
@@ -1636,7 +1636,7 @@ export function DiscountsPage({
                     setNewVoucherDesc("");
                   }}
                   disabled={submitting}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
                 </Button>
@@ -1662,7 +1662,7 @@ export function DiscountsPage({
                 setSelectedCustomerForVoucher(0);
                 setSelectedVoucherTemplate(0);
               }}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              className="absolute right-4 top-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
             </Button>
@@ -1682,7 +1682,7 @@ export function DiscountsPage({
                 </label>
                 <select
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={selectedCustomerForVoucher}
                   onChange={(e) => setSelectedCustomerForVoucher(Number(e.target.value) || 0)}
                 >
@@ -1701,7 +1701,7 @@ export function DiscountsPage({
                 </label>
                 <select
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={selectedVoucherTemplate}
                   onChange={(e) => setSelectedVoucherTemplate(Number(e.target.value) || 0)}
                 >
@@ -1722,7 +1722,7 @@ export function DiscountsPage({
                     setSelectedVoucherTemplate(0);
                   }}
                   disabled={submitting}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
                 </Button>
@@ -1742,7 +1742,7 @@ export function DiscountsPage({
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
             <Button type="button" variant="outline"
               onClick={() => setEditingReferralCustomer(null)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              className="absolute right-4 top-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
             </Button>
@@ -1791,7 +1791,7 @@ export function DiscountsPage({
                   onChange={(e) => setRefCode(e.target.value.toUpperCase().replace(/\s+/g, ""))}
                   placeholder="Contoh: MENET50K (Kosongkan untuk auto-generate)"
                 />
-                <span className="text-[10px] text-slate-400 mt-1 block">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block">
                   *Digunakan calon pelanggan saat mendaftar mandiri via WhatsApp Chatbot.
                 </span>
               </div>
@@ -1835,7 +1835,7 @@ export function DiscountsPage({
                 <Button variant="outline" type="button"
                   onClick={() => setEditingReferralCustomer(null)}
                   disabled={submitting}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-350 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
                 </Button>
@@ -1862,7 +1862,7 @@ export function DiscountsPage({
                 setCompleteProofFile(null);
                 setCompleteNotes("");
               }}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              className="absolute right-4 top-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
             </Button>
@@ -1938,7 +1938,7 @@ export function DiscountsPage({
                     setCompleteNotes("");
                   }}
                   disabled={submitting}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-355 font-bold rounded-xl text-xs transition-all"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-355 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
                 </Button>
@@ -1964,7 +1964,7 @@ export function DiscountsPage({
                 setSelectedWithdrawForReject(null);
                 setRejectNotes("");
               }}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              className="absolute right-4 top-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={18} />
             </Button>
@@ -2022,7 +2022,7 @@ export function DiscountsPage({
                     setRejectNotes("");
                   }}
                   disabled={submitting}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-355 font-bold rounded-xl text-xs transition-all"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-355 font-bold rounded-xl text-xs transition-all"
                 >
                   Batal
                 </Button>

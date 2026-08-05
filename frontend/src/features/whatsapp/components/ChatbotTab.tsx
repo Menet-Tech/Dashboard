@@ -131,20 +131,20 @@ export function ChatbotTab({
         <>
           {/* Gateway Accounts Configuration */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <form onSubmit={handleSettingsSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-850/70 shadow-sm space-y-5">
-          <div className="flex items-start gap-3 border-b border-slate-100 dark:border-slate-850 pb-4">
+        <form onSubmit={handleSettingsSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 dark:border-slate-850/70 shadow-sm space-y-5">
+          <div className="flex items-start gap-3 border-b border-slate-100 dark:border-slate-800 dark:border-slate-850 pb-4">
             <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl">
               <Sliders size={20} />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-850 dark:text-slate-100 uppercase tracking-wider">Pengaturan Akun Bot</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Pilih akun WA untuk chatbot dan auto-reply. Gunakan <code>*</code> untuk semua.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Pilih akun WA untuk chatbot dan auto-reply. Gunakan <code>*</code> untuk semua.</p>
             </div>
           </div>
           
           <div className="space-y-4">
             <label className="block">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Status Chatbot ISP</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Status Chatbot ISP</span>
               <select
                 value={localSettings.chatbot_enabled || "1"}
                 onChange={(e) => setLocalSettings((current) => ({ ...current, chatbot_enabled: e.target.value }))}
@@ -156,7 +156,7 @@ export function ChatbotTab({
             </label>
 
             <label className="block">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Akun Chatbot ISP</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Akun Chatbot ISP</span>
               <select
                 value={localSettings.chatbot_account_id || "*"}
                 onChange={(e) => setLocalSettings((current) => ({ ...current, chatbot_account_id: e.target.value }))}
@@ -170,7 +170,7 @@ export function ChatbotTab({
             </label>
             
             <label className="block">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Akun Auto-Response Custom</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Akun Auto-Response Custom</span>
               <select
                 value={localSettings.auto_reply_account_id || "*"}
                 onChange={(e) => setLocalSettings((current) => ({ ...current, auto_reply_account_id: e.target.value }))}
@@ -184,7 +184,7 @@ export function ChatbotTab({
             </label>
             
             <label className="block">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Urutan Auto-Response</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Urutan Auto-Response</span>
               <select
                 value={localSettings.auto_reply_before_chatbot || "1"}
                 onChange={(e) => setLocalSettings((current) => ({ ...current, auto_reply_before_chatbot: e.target.value }))}
@@ -203,20 +203,20 @@ export function ChatbotTab({
           </div>
         </form>
 
-        <form onSubmit={handleAddRuleSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-850/70 shadow-sm space-y-5">
-          <div className="flex items-start gap-3 border-b border-slate-100 dark:border-slate-850 pb-4">
+        <form onSubmit={handleAddRuleSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 dark:border-slate-850/70 shadow-sm space-y-5">
+          <div className="flex items-start gap-3 border-b border-slate-100 dark:border-slate-800 dark:border-slate-850 pb-4">
             <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl">
               <PlusCircle size={20} />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-850 dark:text-slate-100 uppercase tracking-wider">Tambah Auto-Response</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Balasan cepat kata kunci seperti: harga, jam layanan, rekening, dll.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Balasan cepat kata kunci seperti: harga, jam layanan, rekening, dll.</p>
             </div>
           </div>
           
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="block">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Akun</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Akun</span>
               <select
                 value={autoReplyForm.accountId}
                 onChange={(e) => setAutoReplyForm((current) => ({ ...current, accountId: e.target.value }))}
@@ -230,7 +230,7 @@ export function ChatbotTab({
             </label>
             
             <label className="block">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Tipe Cocok</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Tipe Cocok</span>
               <select
                 value={autoReplyForm.matchType}
                 onChange={(e) => setAutoReplyForm((current) => ({ ...current, matchType: e.target.value as AutoReplyRule["match_type"] }))}
@@ -247,23 +247,23 @@ export function ChatbotTab({
           
           <div className="grid sm:grid-cols-3 gap-4">
             <label className="block sm:col-span-2">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Keyword</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Keyword</span>
               <input className={inputClassName()} value={autoReplyForm.keyword} onChange={(e) => setAutoReplyForm((current) => ({ ...current, keyword: e.target.value }))} placeholder="contoh: rekening" required />
             </label>
             
             <label className="block">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Prioritas</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Prioritas</span>
               <input type="number" className={inputClassName()} value={autoReplyForm.priority} onChange={(e) => setAutoReplyForm((current) => ({ ...current, priority: Number(e.target.value) || 100 }))} />
             </label>
           </div>
           
            <label className="block">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Balasan</span>
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Balasan</span>
             <textarea className={inputClassName()} rows={3} value={autoReplyForm.reply} onChange={(e) => setAutoReplyForm((current) => ({ ...current, reply: e.target.value }))} placeholder="Tulis pesan balasan otomatis..." required />
           </label>
 
           <label className="block">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Gambar Lampiran (Opsional)</span>
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Gambar Lampiran (Opsional)</span>
             <input 
               id="auto-reply-image-input"
               type="file" 
@@ -282,7 +282,7 @@ export function ChatbotTab({
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-md font-bold text-slate-900 dark:text-slate-150 flex items-center gap-1.5">
+        <h3 className="text-md font-bold text-slate-900 dark:text-slate-50 dark:text-slate-150 flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-600" />
           Rule Auto-Response ({autoReplyRules.length})
         </h3>
@@ -306,14 +306,14 @@ export function ChatbotTab({
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <label className="block">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Akun</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Akun</span>
                 <select value={editForm.accountId} onChange={(e) => setEditForm((c) => ({ ...c, accountId: e.target.value }))} className={inputClassName()}>
                   <option value="*">Semua akun (*)</option>
                   {accounts.map((acc) => (<option key={acc.accountId} value={acc.accountId}>{acc.accountId}</option>))}
                 </select>
               </label>
               <label className="block">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Tipe Cocok</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Tipe Cocok</span>
                 <select value={editForm.matchType} onChange={(e) => setEditForm((c) => ({ ...c, matchType: e.target.value as AutoReplyRule["match_type"] }))} className={inputClassName()}>
                   <option value="contains">Mengandung Kata</option>
                   <option value="exact">Sama Persis</option>
@@ -325,20 +325,20 @@ export function ChatbotTab({
             </div>
             <div className="grid sm:grid-cols-3 gap-4">
               <label className="block sm:col-span-2">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Keyword</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Keyword</span>
                 <input className={inputClassName()} value={editForm.keyword} onChange={(e) => setEditForm((c) => ({ ...c, keyword: e.target.value }))} required />
               </label>
               <label className="block">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Prioritas</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Prioritas</span>
                 <input type="number" className={inputClassName()} value={editForm.priority} onChange={(e) => setEditForm((c) => ({ ...c, priority: Number(e.target.value) || 100 }))} />
               </label>
             </div>
             <label className="block">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Balasan</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Balasan</span>
               <textarea className={inputClassName()} rows={3} value={editForm.reply} onChange={(e) => setEditForm((c) => ({ ...c, reply: e.target.value }))} required />
             </label>
             <label className="block">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-400 block mb-1.5">Gambar Lampiran Baru (Opsional — kosongkan untuk mempertahankan gambar lama)</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-400 block mb-1.5">Gambar Lampiran Baru (Opsional — kosongkan untuk mempertahankan gambar lama)</span>
               <input id="edit-reply-image-input" type="file" accept="image/*" className={inputClassName()} onChange={(e) => setEditImage(e.target.files?.[0])} />
             </label>
             {editingRule.image_path && !editImage && (
@@ -358,7 +358,7 @@ export function ChatbotTab({
         )}
 
         {autoReplyRules.length === 0 ? (
-          <div className="text-center py-6 bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500">
+          <div className="text-center py-6 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 dark:text-slate-400">
             Belum ada rule auto-response custom.
           </div>
         ) : (
@@ -368,19 +368,19 @@ export function ChatbotTab({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider">Kata Kunci</span>
-                    <p className="font-bold text-slate-900 dark:text-slate-100 text-sm font-mono mt-0.5">{rule.keyword}</p>
+                    <p className="font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 text-sm font-mono mt-0.5">{rule.keyword}</p>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${rule.enabled ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900" : "bg-slate-55 bg-slate-100 border-slate-250 text-slate-650 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-500"}`}>
                     {rule.enabled ? "AKTIF" : "NONAKTIF"}
                   </span>
                 </div>
                 
-                <div className="mt-3 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-lg border border-slate-100 dark:border-slate-850">
+                <div className="mt-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 dark:border-slate-850">
                   <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{rule.reply}</p>
                 </div>
                 
                 {rule.image_path && (
-                  <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 dark:border-slate-850 bg-slate-50 dark:bg-slate-950/50 flex items-center justify-center p-2">
+                  <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800 dark:border-slate-850 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/50 flex items-center justify-center p-2">
                     <img 
                       src={`${gatewayUrl.replace(/\/$/, '')}/uploads/${rule.image_path}`} 
                       alt={`Lampiran untuk ${rule.keyword}`} 
@@ -389,13 +389,13 @@ export function ChatbotTab({
                   </div>
                 )}
                 
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-850">
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 dark:border-slate-850">
                   <div className="text-[10px] text-slate-450 dark:text-slate-500 flex flex-wrap gap-2">
-                    <span>Akun: <strong className="text-slate-700 dark:text-slate-350">{rule.account_id || "*"}</strong></span>
+                    <span>Akun: <strong className="text-slate-700 dark:text-slate-300 dark:text-slate-350">{rule.account_id || "*"}</strong></span>
                     <span>•</span>
-                    <span>Tipe: <strong className="text-slate-700 dark:text-slate-350">{rule.match_type}</strong></span>
+                    <span>Tipe: <strong className="text-slate-700 dark:text-slate-300 dark:text-slate-350">{rule.match_type}</strong></span>
                     <span>•</span>
-                    <span>Prio: <strong className="text-slate-700 dark:text-slate-350">{rule.priority}</strong></span>
+                    <span>Prio: <strong className="text-slate-700 dark:text-slate-300 dark:text-slate-350">{rule.priority}</strong></span>
                   </div>
                   {canDecrypt ? (
                     <div className="flex gap-1">
@@ -444,12 +444,12 @@ export function ChatbotTab({
         <>
           {/* Active Sessions List */}
       <div className="space-y-4">
-        <h3 className="text-md font-bold text-slate-900 dark:text-slate-150 flex items-center gap-1.5">
+        <h3 className="text-md font-bold text-slate-900 dark:text-slate-50 dark:text-slate-150 flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-indigo-600" />
           Sesi Chatbot Aktif ({chatbotSessions.length})
         </h3>
         {chatbotSessions.length === 0 ? (
-          <div className="text-center py-6 bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500">
+          <div className="text-center py-6 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 dark:text-slate-400">
             Tidak ada sesi percakapan chatbot aktif saat ini.
           </div>
         ) : (
@@ -457,7 +457,7 @@ export function ChatbotTab({
             {chatbotSessions.map((session) => (
               <div
                 key={session.phone}
-                className="border border-slate-200 dark:border-slate-850 border-t-2 border-t-indigo-500 rounded-xl p-5 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between"
+                className="border border-slate-200 dark:border-slate-800 dark:border-slate-850 border-t-2 border-t-indigo-500 rounded-xl p-5 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between"
               >
                 <div>
                   <div className="flex justify-between items-center mb-3">
@@ -474,7 +474,7 @@ export function ChatbotTab({
                     </span>
                   </div>
                   
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3 bg-slate-50 dark:bg-slate-950/30 py-1 px-2.5 rounded-lg border border-slate-100 dark:border-slate-850 w-fit">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mb-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/30 py-1 px-2.5 rounded-lg border border-slate-100 dark:border-slate-800 dark:border-slate-850 w-fit">
                     <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                     <span>Akun: <strong className="text-slate-755 dark:text-slate-300 font-mono">{session.account_id}</strong></span>
                   </div>
@@ -486,7 +486,7 @@ export function ChatbotTab({
                         {Object.entries(session.form_data).map(([key, val]) => (
                           <div key={key} className="flex flex-col min-w-0">
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">{key.replace(/_/g, " ")}</span>
-                            <span className="text-slate-800 dark:text-slate-300 truncate font-semibold font-sans mt-0.5 text-xs" title={String(val)}>{String(val)}</span>
+                            <span className="text-slate-800 dark:text-slate-100 dark:text-slate-300 truncate font-semibold font-sans mt-0.5 text-xs" title={String(val)}>{String(val)}</span>
                           </div>
                         ))}
                       </div>
@@ -494,7 +494,7 @@ export function ChatbotTab({
                   )}
                 </div>
 
-                <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-850 mt-2">
+                <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-800 dark:border-slate-850 mt-2">
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
                     <Clock size={12} />
                     {new Date(session.updated_at).toLocaleTimeString("id-ID")}
@@ -519,12 +519,12 @@ export function ChatbotTab({
 
       {/* Submitted Forms List */}
       <div className="space-y-4">
-        <h3 className="text-md font-bold text-slate-900 dark:text-slate-150 flex items-center gap-1.5 border-t border-slate-100 dark:border-slate-850 pt-6">
+        <h3 className="text-md font-bold text-slate-900 dark:text-slate-50 dark:text-slate-150 flex items-center gap-1.5 border-t border-slate-100 dark:border-slate-800 dark:border-slate-850 pt-6">
           <span className="w-2 h-2 rounded-full bg-emerald-600" />
           Registrasi & Tiket Masuk via WhatsApp ({contactForms.length})
         </h3>
         {contactForms.length === 0 ? (
-          <div className="text-center py-8 bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500">
+          <div className="text-center py-8 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 dark:text-slate-400">
             Belum ada formulir pendaftaran atau keluhan support yang dikirim pelanggan.
           </div>
         ) : (
@@ -560,7 +560,7 @@ export function ChatbotTab({
                         <td className="px-6 py-4">
                           <div className="flex flex-wrap gap-2 max-w-2xl">
                             {Object.entries(form.data).map(([k, v]) => (
-                              <div key={k} className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 dark:bg-slate-950/55 rounded-xl border border-slate-200 dark:border-slate-850 text-xs shadow-sm">
+                              <div key={k} className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/55 rounded-xl border border-slate-200 dark:border-slate-800 dark:border-slate-850 text-xs shadow-sm">
                                 <span className="font-bold text-slate-400 dark:text-slate-500 uppercase text-[9px] tracking-wider">{k.replace(/_/g, " ")}:</span>
                                 <span className="font-semibold text-slate-750 dark:text-slate-200 font-sans">{String(v)}</span>
                               </div>

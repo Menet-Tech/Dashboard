@@ -138,12 +138,12 @@ export function Sidebar({
 
   return (
     <aside
-      className={`sticky top-0 w-72 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-900 flex flex-col shadow-xl shrink-0 h-screen transition-all duration-300 z-40 ${navOpen ? "translate-x-0 fixed inset-y-0 left-0 shadow-2xl" : "hidden lg:flex"
+      className={`sticky top-0 w-72 bg-white dark:bg-slate-900 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 dark:border-slate-900 flex flex-col shadow-xl shrink-0 h-screen transition-all duration-300 z-40 ${navOpen ? "translate-x-0 fixed inset-y-0 left-0 shadow-2xl" : "hidden lg:flex"
         }`}
       aria-label="Navigasi utama"
     >
       {/* Sidebar Header — branding, not a page heading */}
-      <div className="p-6 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between">
+      <div className="p-6 border-b border-slate-200 dark:border-slate-800 dark:border-slate-800/60 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-extrabold tracking-widest text-indigo-600 dark:text-indigo-400 uppercase mb-0.5">v2.1.0-stable</p>
           <p className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-200 dark:via-purple-200 dark:to-pink-200 leading-tight">
@@ -168,7 +168,7 @@ export function Sidebar({
               key={group.id}
               className={`border rounded-2xl overflow-hidden transition-all duration-300 ${isGroupActive
                   ? "border-indigo-500/35 bg-indigo-50/5 dark:bg-indigo-950/5 shadow-sm shadow-indigo-500/5"
-                  : "border-slate-100 dark:border-slate-900 bg-white dark:bg-slate-950/20"
+                  : "border-slate-100 dark:border-slate-800 dark:border-slate-900 bg-white dark:bg-slate-900 dark:bg-slate-950/20"
                 }`}
             >
               {/* Group Card Header */}
@@ -183,13 +183,13 @@ export function Sidebar({
                   <div
                     className={`p-1.5 rounded-lg border transition-colors ${isGroupActive
                         ? "bg-indigo-600 border-indigo-500 text-white"
-                        : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
+                        : "bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
                       }`}
                   >
                     <GroupIcon size={14} aria-hidden="true" />
                   </div>
                   <div>
-                    <span className="font-bold text-xs text-slate-800 dark:text-slate-200 font-sans tracking-wide">
+                    <span className="font-bold text-xs text-slate-800 dark:text-slate-100 dark:text-slate-200 font-sans tracking-wide">
                       {group.title}
                     </span>
                     <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium">
@@ -207,7 +207,7 @@ export function Sidebar({
               {/* Group Card Features */}
               <div
                 id={`nav-group-${group.id}`}
-                className={`transition-all duration-300 ${isCollapsed ? "max-h-0 opacity-0 pointer-events-none" : "max-h-[800px] opacity-100 p-2 space-y-1 bg-slate-50/30 dark:bg-slate-950/40 border-t border-slate-100 dark:border-slate-900/60"
+                className={`transition-all duration-300 ${isCollapsed ? "max-h-0 opacity-0 pointer-events-none" : "max-h-[800px] opacity-100 p-2 space-y-1 bg-slate-50/30 dark:bg-slate-950/40 border-t border-slate-100 dark:border-slate-800 dark:border-slate-900/60"
                   }`}
               >
                 {groupItems.map((item) => {
@@ -249,13 +249,13 @@ export function Sidebar({
       </nav>
 
       {/* Profile & Logout Section */}
-      <div className="p-4 border-t border-slate-200 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-950/20">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-800 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-950/20">
         <div className="flex items-center gap-3 mb-4 px-2">
           <div className="w-9 h-9 rounded-full bg-indigo-50 dark:bg-indigo-950 border border-indigo-100 dark:border-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold uppercase shrink-0 text-sm">
             {user.username.charAt(0)}
           </div>
           <div className="min-w-0">
-            <strong className="block text-xs font-bold text-slate-800 dark:text-slate-250 truncate">{user.username}</strong>
+            <strong className="block text-xs font-bold text-slate-800 dark:text-slate-100 dark:text-slate-250 truncate">{user.username}</strong>
             <span className="block text-[8px] uppercase font-black tracking-wider text-indigo-600 dark:text-indigo-450 truncate">
               {user.role}
             </span>

@@ -13,7 +13,7 @@ type TopbarProps = {
 
 export function Topbar({ navOpen, onToggleNav, health, user, theme, onToggleTheme }: TopbarProps) {
   return (
-    <header className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200 dark:border-slate-800/60">
+    <header className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200 dark:border-slate-800 dark:border-slate-800/60">
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
@@ -26,7 +26,7 @@ export function Topbar({ navOpen, onToggleNav, health, user, theme, onToggleThem
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </Button>
         <div>
-          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 hidden lg:block" role="heading" aria-level={1}>Menet-Tech Dashboard</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 hidden lg:block" role="heading" aria-level={1}>Menet-Tech Dashboard</p>
         </div>
       </div>
       <div className="flex items-center gap-3">

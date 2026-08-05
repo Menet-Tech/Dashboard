@@ -61,7 +61,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               <>
                 <button
                   type="button"
-                  className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors cursor-pointer text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+                  className="bg-white dark:bg-slate-900 border border-gray-300 text-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800/40 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors cursor-pointer text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
                   onClick={() => dialog.resolve(false)}
                 >
                   Batal

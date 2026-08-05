@@ -92,7 +92,7 @@ export function MikrotikSyncModal({
       }
     >
       <div className="space-y-4 min-h-[300px] max-h-[500px] flex flex-col">
-        <p className="text-xs text-slate-500 leading-relaxed">
+        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
           Pilih salah satu akun PPPoE Secret di bawah ini untuk didaftarkan sebagai pelanggan baru. 
           Sistem akan mengisi username, password, dan mencocokkan profil paket secara otomatis. 
           Anda hanya perlu melengkapi data manual lainnya setelah memilih.
@@ -100,7 +100,7 @@ export function MikrotikSyncModal({
 
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
+            <Search className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500" size={14} />
             <input
               type="text"
               placeholder="Cari PPPoE Username / Profil..."
@@ -124,21 +124,21 @@ export function MikrotikSyncModal({
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center py-10 gap-2">
             <Loader2 className="animate-spin text-indigo-600" size={24} />
-            <span className="text-xs text-slate-400 font-semibold">Mengambil secrets dari MikroTik...</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold">Mengambil secrets dari MikroTik...</span>
           </div>
         ) : error ? (
           <div className="flex-1 flex flex-col items-center justify-center py-10 text-center gap-3">
             <AlertCircle className="text-rose-500" size={32} />
             <div className="space-y-1">
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Gagal Membaca MikroTik</p>
-              <p className="text-[11px] text-slate-400 max-w-sm leading-relaxed">{error}</p>
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-200">Gagal Membaca MikroTik</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 max-w-sm leading-relaxed">{error}</p>
             </div>
             <Button type="button" variant="primary" onClick={() => void loadSecrets()}>
               Coba Lagi
             </Button>
           </div>
         ) : filteredSecrets.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center py-10 text-slate-400 text-xs">
+          <div className="flex-1 flex flex-col items-center justify-center py-10 text-slate-400 dark:text-slate-500 text-xs">
             {secrets.length === 0
               ? "Semua PPPoE secret di MikroTik sudah terdaftar di dashboard."
               : "Tidak ada PPPoE secret yang cocok dengan pencarian Anda."}
@@ -155,7 +155,7 @@ export function MikrotikSyncModal({
                   className="flex items-center justify-between p-3.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors"
                 >
                   <div className="space-y-1">
-                    <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 font-mono">
+                    <span className="block text-xs font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 font-mono">
                       {secret.name}
                     </span>
                     <div className="flex items-center gap-2">

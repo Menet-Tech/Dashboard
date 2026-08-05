@@ -63,10 +63,10 @@ export function BroadcastModal({
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xl max-w-lg w-full flex flex-col gap-4 animate-in fade-in zoom-in duration-200">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-lg font-bold text-slate-900">Broadcast WhatsApp</h3>
-          <Button variant="ghost" size="icon" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl max-w-lg w-full flex flex-col gap-4 animate-in fade-in zoom-in duration-200">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50">Broadcast WhatsApp</h3>
+          <Button variant="ghost" size="icon" onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600">
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"></path></svg>
           </Button>
         </div>
@@ -84,9 +84,9 @@ export function BroadcastModal({
 
         <form onSubmit={handleSendBroadcast} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-slate-700">Target Pelanggan</span>
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Target Pelanggan</span>
             <select
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
               value={targetType}
               onChange={(e) => setTargetType(e.target.value as any)}
             >
@@ -100,9 +100,9 @@ export function BroadcastModal({
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-slate-700">Pesan Broadcast</span>
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Pesan Broadcast</span>
             <textarea
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
               rows={6}
               placeholder="Ketik pesan di sini... Gunakan {nama} untuk mempersonalisasi nama pelanggan."
               value={message}
@@ -111,11 +111,11 @@ export function BroadcastModal({
             />
           </label>
 
-          <p className="text-[10px] text-slate-400">
+          <p className="text-[10px] text-slate-400 dark:text-slate-500">
             Pesan akan dikirim menggunakan antrean (queue) latar belakang dengan delay jeda waktu 2 detik per pesan untuk mencegah ban nomor WhatsApp.
           </p>
 
-          <div className="flex justify-end gap-3 border-t border-slate-100 pt-3 mt-2">
+          <div className="flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800 pt-3 mt-2">
             <Button type="button" variant="outline" onClick={onClose}>
             Batal
           </Button>

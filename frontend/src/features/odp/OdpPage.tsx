@@ -57,7 +57,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
     const isSorted = sortField === field;
     return (
       <th 
-        className={`px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-105 dark:hover:bg-slate-805 transition-colors text-slate-500 ${align === "center" ? "text-center" : "text-left"}`}
+        className={`px-6 py-4 font-semibold select-none cursor-pointer hover:bg-gray-105 dark:hover:bg-slate-805 transition-colors text-slate-500 dark:text-slate-400 ${align === "center" ? "text-center" : "text-left"}`}
         onClick={() => requestSort(field)}
       >
         <div className={`inline-flex items-center gap-1.5 ${align === "center" ? "justify-center w-full" : ""}`}>
@@ -265,8 +265,8 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
       {/* Header and Title */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-sans">Manajemen ODP (Optical Distribution Point)</h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 font-sans">Manajemen ODP (Optical Distribution Point)</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Kelola data titik distribusi ODP dan kirim notifikasi gangguan/maintenance massal berdasarkan node ODP.
           </p>
         </div>
@@ -284,22 +284,22 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
       </div>
 
       {/* ODP List Table */}
-      <article className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-sans">Daftar Titik ODP</h3>
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider font-sans">Daftar Titik ODP</h3>
           <StatusPill label={`${odps.length} Node`} tone="slate" />
         </div>
 
-        <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm scrollbar-thin">
+        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
           <table className="w-full text-left border-collapse text-sm min-w-[800px]">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
+            <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400">
               <tr>
                 {renderSortableHeader("Nama Node ODP", "nama")}
                 {renderSortableHeader("Lokasi / Koordinat", "lokasi")}
                 {renderSortableHeader("Splitter Ratio", "splitter_ratio")}
                 {renderSortableHeader("Deskripsi", "deskripsi")}
                 {renderSortableHeader("Port Terpakai / Total", "customer_count", "center")}
-                <th className="px-6 py-4 font-semibold text-center text-slate-500">Aksi</th>
+                <th className="px-6 py-4 font-semibold text-center text-slate-500 dark:text-slate-400">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -314,7 +314,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
               ) : (
                 sortedOdps.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">
+                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">
                       <div className="flex items-center gap-2">
                         {item.nama}
                         {(item.latitude !== 0 || item.longitude !== 0) && (
@@ -333,12 +333,12 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
                     <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-xs font-sans max-w-[200px] truncate" title={item.deskripsi}>
                       {item.deskripsi || "—"}
                     </td>
-                    <td className="px-6 py-4 text-slate-800 dark:text-slate-200 font-bold text-center">
+                    <td className="px-6 py-4 text-slate-800 dark:text-slate-100 dark:text-slate-200 font-bold text-center">
                       <span className="bg-slate-100 px-2.5 py-1 rounded-full text-xs font-semibold">
                         {item.customer_count} / {item.ports || 8} Port
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-700">
+                    <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                       <div className="flex gap-2 justify-center">
                         <Button
                           type="button"
@@ -429,7 +429,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
               <span className="text-xs font-bold text-slate-750">Nama ODP</span>
               <input
                 type="text"
-                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 placeholder="contoh: ODP-LNK-01"
@@ -441,7 +441,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
               <span className="text-xs font-bold text-slate-750">Lokasi / Area</span>
               <input
                 type="text"
-                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 value={formLocation}
                 onChange={(e) => setFormLocation(e.target.value)}
                 placeholder="contoh: Jl. Mawar No. 12 atau nama area"
@@ -450,36 +450,36 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
             </label>
 
             {/* Coordinates */}
-            <div className="border border-slate-100 rounded-xl p-3.5 bg-slate-50/50 grid gap-3">
+            <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3.5 bg-slate-50/50 grid gap-3">
               <div className="flex items-center gap-2">
                 <MapPin size={14} className="text-cyan-600 shrink-0" />
                 <span className="text-xs font-bold text-slate-600">Koordinat GPS (untuk peta)</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] font-semibold text-slate-500">LATITUDE</span>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">LATITUDE</span>
                   <input
                     type="number"
                     step="any"
-                    className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-mono shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-mono shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     value={formLatitude}
                     onChange={(e) => setFormLatitude(e.target.value)}
                     placeholder="-6.2088"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] font-semibold text-slate-500">LONGITUDE</span>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">LONGITUDE</span>
                   <input
                     type="number"
                     step="any"
-                    className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-mono shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-mono shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     value={formLongitude}
                     onChange={(e) => setFormLongitude(e.target.value)}
                     placeholder="106.8456"
                   />
                 </label>
               </div>
-              <p className="text-[10px] text-slate-400 leading-snug">
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-snug">
                 💡 Isi koordinat agar ODP langsung muncul di peta jaringan. Kosongkan jika koordinat belum diketahui.
               </p>
             </div>
@@ -489,7 +489,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-bold text-slate-750">Splitter Ratio</span>
                 <select
-                  className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   value={formSplitterRatio}
                   onChange={(e) => handleSplitterChange(e.target.value)}
                 >
@@ -507,7 +507,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
                   type="number"
                   min={1}
                   max={64}
-                  className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   value={formPorts}
                   onChange={(e) => setFormPorts(Number(e.target.value) || 8)}
                   placeholder="8"
@@ -519,7 +519,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-bold text-slate-750">Deskripsi / Catatan</span>
               <textarea
-                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
                 placeholder="contoh: Port 1-8 aktif, terpasang di tiang PLN dekat pertigaan"
@@ -605,7 +605,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-bold text-slate-750">Pesan WhatsApp</span>
               <textarea
-                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans"
+                className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans"
                 value={broadcastMessage}
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 rows={8}
@@ -632,7 +632,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
           }
         >
           <div className="flex flex-col gap-4">
-            <div className="text-xs text-slate-500 bg-slate-50 border border-slate-150 p-3.5 rounded-xl leading-relaxed">
+            <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 border border-slate-150 p-3.5 rounded-xl leading-relaxed">
               <p><strong>Lokasi:</strong> {selectedOdpForDetail.lokasi}</p>
               {selectedOdpForDetail.latitude !== 0 && (
                 <p className="mt-1"><strong>Koordinat:</strong> {selectedOdpForDetail.latitude?.toFixed(6)}, {selectedOdpForDetail.longitude?.toFixed(6)}</p>
@@ -642,9 +642,9 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
               <p className="mt-1"><strong>Kapasitas:</strong> {selectedOdpForDetail.ports || 8} Port</p>
             </div>
 
-            <div className="overflow-hidden border border-gray-200 rounded-xl bg-white shadow-sm">
+            <div className="overflow-hidden border border-gray-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 shadow-sm">
               <table className="w-full text-left border-collapse text-xs">
-                <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-semibold">
+                <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-semibold">
                   <tr>
                     <th className="px-4 py-3 text-center w-16">Port</th>
                     <th className="px-4 py-3">Pelanggan</th>
@@ -661,10 +661,10 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
 
                     return (
                       <tr key={portNum} className="hover:bg-slate-50/50">
-                        <td className="px-4 py-3 font-bold text-slate-700 text-center">#{portNum}</td>
+                        <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300 text-center">#{portNum}</td>
                         {matchedCustomer ? (
                           <>
-                            <td className="px-4 py-3 font-bold text-slate-900">{matchedCustomer.name}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-50">{matchedCustomer.name}</td>
                             <td className="px-4 py-3 font-mono text-slate-600">{matchedCustomer.user_pppoe || "—"}</td>
                             <td className="px-4 py-3 text-center">
                               <span
@@ -692,7 +692,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
                           </>
                         ) : (
                           <>
-                            <td className="px-4 py-3 text-slate-400 italic" colSpan={3}>
+                            <td className="px-4 py-3 text-slate-400 dark:text-slate-500 italic" colSpan={3}>
                               Kosong (Belum terpakai)
                             </td>
                             <td className="px-4 py-3 text-center text-slate-350">-</td>

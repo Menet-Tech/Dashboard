@@ -373,7 +373,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
     >
       <div className="min-h-[420px]">
         {loading ? (
-          <div className="flex items-center justify-center h-48 text-slate-400 text-sm animate-pulse">
+          <div className="flex items-center justify-center h-48 text-slate-400 dark:text-slate-500 text-sm animate-pulse">
             Memuat detail perangkat...
           </div>
         ) : !detail ? (
@@ -401,7 +401,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                   className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
                     activeTab === tab
                       ? "border-indigo-600 text-indigo-750"
-                      : "border-transparent text-slate-500 hover:text-slate-705"
+                      : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-705"
                   }`}
                 >
                   {tab === "info" ? "Informasi Utama" 
@@ -429,9 +429,9 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                   ["TX Power", getTxPower()],
                   ["Temperature", detail.virtualParameters?.temperature?.value ? `${detail.virtualParameters.temperature.value} °C` : ""],
                 ].filter(([, v]) => v).map(([label, value]) => (
-                  <div key={label} className="py-2 border-b border-slate-100">
-                    <dt className="text-slate-500 font-medium mb-0.5">{label}</dt>
-                    <dd className="text-slate-900 font-semibold font-mono text-xs break-all">{value}</dd>
+                  <div key={label} className="py-2 border-b border-slate-100 dark:border-slate-800">
+                    <dt className="text-slate-500 dark:text-slate-400 font-medium mb-0.5">{label}</dt>
+                    <dd className="text-slate-900 dark:text-slate-50 font-semibold font-mono text-xs break-all">{value}</dd>
                   </div>
                 ))}
               </dl>
@@ -440,27 +440,27 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
             {activeTab === "mikrotik" && (
               <div className="space-y-6 animate-in fade-in duration-200">
                 {/* 1. Customer Database Matching */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-4 border-b border-slate-200 pb-2">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <User size={18} className="text-indigo-500" />
-                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Database Pelanggan
                     </h4>
                   </div>
                   {detail.customer ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Nama Lengkap</span>
-                        <strong className="text-slate-800 text-sm mt-0.5 block">{detail.customer.name}</strong>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Nama Lengkap</span>
+                        <strong className="text-slate-800 dark:text-slate-100 text-sm mt-0.5 block">{detail.customer.name}</strong>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Status Pelanggan</span>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Status Pelanggan</span>
                         <span className="mt-1 block">
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                             detail.customer.status === "active"  ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
                             detail.customer.status === "limit"   ? "bg-rose-50 text-rose-700 border border-rose-200" :
                             detail.customer.status === "pending" ? "bg-amber-50 text-amber-700 border border-amber-200" :
-                            "bg-slate-100 text-slate-650 border border-slate-200"
+                            "bg-slate-100 text-slate-650 border border-slate-200 dark:border-slate-800"
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${
                               detail.customer.status === "active"  ? "bg-emerald-500" :
@@ -477,13 +477,13 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Username PPPoE</span>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Username PPPoE</span>
                         <code className="text-indigo-600 font-mono text-xs font-semibold bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 block mt-0.5 w-max">
                           {detail.customer.user_pppoe || "-"}
                         </code>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Nomor WhatsApp</span>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Nomor WhatsApp</span>
                         {detail.customer.whatsapp ? (
                           <a
                             href={`https://wa.me/+${detail.customer.whatsapp.replace(/[+\-\s]/g, "").replace(/^0/, "62")}`}
@@ -496,8 +496,8 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                         ) : "-"}
                       </div>
                       <div className="sm:col-span-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Alamat</span>
-                        <p className="text-slate-600 mt-1 leading-relaxed bg-white border border-slate-150 p-2.5 rounded-xl">{detail.customer.address || "Belum ada alamat."}</p>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Alamat</span>
+                        <p className="text-slate-600 mt-1 leading-relaxed bg-white dark:bg-slate-900 border border-slate-150 p-2.5 rounded-xl">{detail.customer.address || "Belum ada alamat."}</p>
                       </div>
                     </div>
                   ) : (
@@ -509,27 +509,27 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                 </div>
 
                 {/* 2. MikroTik Router PPP Secret details */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-4 border-b border-slate-200 pb-2">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <Shield size={18} className="text-indigo-500" />
-                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       MikroTik PPP Secret
                     </h4>
                   </div>
                   {detail.mikrotikSecret ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">PPP Secret Username</span>
-                        <strong className="text-slate-800 font-mono block mt-0.5">{detail.mikrotikSecret.username}</strong>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">PPP Secret Username</span>
+                        <strong className="text-slate-800 dark:text-slate-100 font-mono block mt-0.5">{detail.mikrotikSecret.username}</strong>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Profile Paket</span>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Profile Paket</span>
                         <span className="bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 border border-indigo-150 rounded block mt-0.5 w-max">
                           {detail.mikrotikSecret.profile}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Status Akun (Disabled)</span>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Status Akun (Disabled)</span>
                         <span className="mt-1 block">
                           {detail.mikrotikSecret.disabled ? (
                             <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 w-max">
@@ -545,15 +545,15 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Last Caller ID (MAC)</span>
-                        <code className="text-slate-700 font-mono block mt-0.5">{detail.mikrotikSecret.last_caller_id || "-"}</code>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Last Caller ID (MAC)</span>
+                        <code className="text-slate-700 dark:text-slate-300 font-mono block mt-0.5">{detail.mikrotikSecret.last_caller_id || "-"}</code>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Last Logged Out</span>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Last Logged Out</span>
                         <span className="text-slate-750 block mt-0.5">{detail.mikrotikSecret.last_logged_out || "-"}</span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Last Disconnect Reason</span>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Last Disconnect Reason</span>
                         <span className="text-slate-750 font-medium block mt-0.5">{detail.mikrotikSecret.last_disconnect_reason || "-"}</span>
                       </div>
                     </div>
@@ -566,17 +566,17 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                 </div>
 
                 {/* 3. MikroTik Router PPP Active Session details */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-4 border-b border-slate-200 pb-2">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <Activity size={18} className="text-indigo-500" />
-                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Sesi Aktif PPP MikroTik
                     </h4>
                   </div>
                   {detail.mikrotikActiveConn ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Status Sesi PPPoE</span>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Status Sesi PPPoE</span>
                         <span className="mt-1 block">
                           <span className="bg-emerald-50 text-emerald-700 border border-emerald-250 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1.5 animate-pulse">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -585,21 +585,21 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Alamat IP Sesi</span>
-                        <code className="text-slate-700 font-mono text-xs font-semibold block mt-0.5">{detail.mikrotikActiveConn.address}</code>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Alamat IP Sesi</span>
+                        <code className="text-slate-700 dark:text-slate-300 font-mono text-xs font-semibold block mt-0.5">{detail.mikrotikActiveConn.address}</code>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Uptime Sesi</span>
-                        <strong className="text-slate-800 font-semibold block mt-0.5">{detail.mikrotikActiveConn.uptime}</strong>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Uptime Sesi</span>
+                        <strong className="text-slate-800 dark:text-slate-100 font-semibold block mt-0.5">{detail.mikrotikActiveConn.uptime}</strong>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Active Caller ID</span>
-                        <code className="text-slate-700 font-mono block mt-0.5">{detail.mikrotikActiveConn.caller_id || "-"}</code>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Active Caller ID</span>
+                        <code className="text-slate-700 dark:text-slate-300 font-mono block mt-0.5">{detail.mikrotikActiveConn.caller_id || "-"}</code>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 p-3 bg-slate-100 border border-slate-200 text-slate-600 rounded-xl text-xs">
-                      <WifiOff size={16} className="shrink-0 text-slate-400" />
+                    <div className="flex items-center gap-2 p-3 bg-slate-100 border border-slate-200 dark:border-slate-800 text-slate-600 rounded-xl text-xs">
+                      <WifiOff size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
                       <span>Pelanggan ini sedang tidak memiliki sesi aktif di MikroTik (Offline).</span>
                     </div>
                   )}
@@ -610,7 +610,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
             {activeTab === "wan" && (
               <div className="space-y-6 animate-in fade-in duration-200">
                 {/* 1. Fiber Mode */}
-                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+                <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
                   <div className="flex items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <Activity size={18} className="text-indigo-500" />
                     <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -618,14 +618,14 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                     </h4>
                   </div>
                   {modeLoading ? (
-                    <div className="text-slate-400 text-xs animate-pulse">Mendeteksi GPON/EPON...</div>
+                    <div className="text-slate-400 dark:text-slate-500 text-xs animate-pulse">Mendeteksi GPON/EPON...</div>
                   ) : (
                     <div className="flex items-center gap-3 text-xs">
-                      <span className="text-slate-500">Mode Deteksi ONT:</span>
+                      <span className="text-slate-500 dark:text-slate-400">Mode Deteksi ONT:</span>
                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                         deviceMode === "GPON" ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400" :
                         deviceMode === "EPON" ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" :
-                        "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                        "bg-slate-100 text-slate-700 dark:text-slate-300 dark:bg-slate-800 dark:text-slate-400"
                       }`}>
                         {deviceMode || "UNKNOWN"}
                       </span>
@@ -654,19 +654,19 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                         return (
                           <div 
                             key={`${conn.path}-${idx}`} 
-                            className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden"
+                            className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden"
                           >
                             <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600" />
                             
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-3 mb-4">
                               <div>
-                                <h5 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+                                <h5 className="font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 text-sm flex items-center gap-2">
                                   {conn.name?.value || "Connection"} 
                                   <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded font-mono font-medium">
                                     {isPPP ? "PPP" : "IP"}
                                   </span>
                                 </h5>
-                                <span className="text-[10px] text-slate-400 font-mono block mt-0.5 truncate max-w-xs sm:max-w-md">
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono block mt-0.5 truncate max-w-xs sm:max-w-md">
                                   {conn.path}
                                 </span>
                               </div>
@@ -680,40 +680,40 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-xs mb-4">
                               <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase block">IP Address WAN</span>
+                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">IP Address WAN</span>
                                 <code className="text-slate-700 dark:text-slate-300 font-mono font-semibold block mt-0.5">
                                   {conn.externalIPAddress?.value || "—"}
                                 </code>
                               </div>
                               {isPPP && (
                                 <div>
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Username PPPoE</span>
+                                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Username PPPoE</span>
                                   <code className="text-indigo-600 dark:text-indigo-400 font-mono font-semibold block mt-0.5">
                                     {conn.username || "—"}
                                   </code>
                                 </div>
                               )}
                               <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase block">DNS Servers</span>
+                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">DNS Servers</span>
                                 <code className="text-slate-700 dark:text-slate-300 font-mono block mt-0.5 truncate">
                                   {conn.dnsServers?.value || "—"}
                                 </code>
                               </div>
                               <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase block">VLAN ID</span>
+                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">VLAN ID</span>
                                 <code className="text-slate-700 dark:text-slate-300 font-mono block mt-0.5">
                                   {conn.vlanInfo?.value !== undefined && conn.vlanInfo?.value !== null ? String(conn.vlanInfo.value) : "Untagged / None"}
                                 </code>
                               </div>
                               <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase block">Service List</span>
-                                <span className="text-slate-800 dark:text-slate-200 font-medium block mt-0.5">
+                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Service List</span>
+                                <span className="text-slate-800 dark:text-slate-100 dark:text-slate-200 font-medium block mt-0.5">
                                   {conn.serviceList?.serviceList?.value || "—"}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase block">NAT Status</span>
-                                <span className="text-slate-800 dark:text-slate-200 font-medium block mt-0.5">
+                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">NAT Status</span>
+                                <span className="text-slate-800 dark:text-slate-100 dark:text-slate-200 font-medium block mt-0.5">
                                   {conn.natEnabled?.value !== undefined ? (conn.natEnabled.value ? "Enabled" : "Disabled") : "—"}
                                 </span>
                               </div>
@@ -721,8 +721,8 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
 
                             {/* LAN Port / SSID Bindings */}
                             {conn.lanBinding?.normalized && (
-                              <div className="bg-white dark:bg-slate-950 p-3 rounded-xl border border-slate-150 dark:border-slate-800/60">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Interface Port Bindings</span>
+                              <div className="bg-white dark:bg-slate-900 dark:bg-slate-950 p-3 rounded-xl border border-slate-150 dark:border-slate-800/60">
+                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block mb-2">Interface Port Bindings</span>
                                 <div className="flex flex-wrap gap-1.5">
                                   {Object.entries(conn.lanBinding.normalized).map(([key, enabled]) => (
                                     <span 
@@ -730,7 +730,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                                       className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono font-bold ${
                                         enabled 
                                           ? "bg-indigo-650 text-indigo-100" 
-                                          : "bg-slate-150 text-slate-400 dark:bg-slate-850 dark:text-slate-600"
+                                          : "bg-slate-150 text-slate-400 dark:text-slate-500 dark:bg-slate-850 dark:text-slate-600"
                                       }`}
                                     >
                                       {key}
@@ -744,7 +744,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                       })}
                     </div>
                   ) : (
-                    <div className="p-8 text-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed">
+                    <div className="p-8 text-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 rounded-2xl border border-dashed">
                       Tidak ada koneksi WAN aktif.
                     </div>
                   )}
@@ -769,21 +769,21 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                           return (
                             <div 
                               key={wlanKey} 
-                              className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm relative overflow-hidden"
+                              className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm relative overflow-hidden"
                             >
                               <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-2.5 mb-3">
                                 <div>
-                                  <strong className="text-slate-800 dark:text-slate-200 text-sm font-bold">
+                                  <strong className="text-slate-800 dark:text-slate-100 dark:text-slate-200 text-sm font-bold">
                                     {config.ssid?.value || "Unknown SSID"}
                                   </strong>
-                                  <span className="text-[10px] text-slate-400 font-mono block mt-0.5 uppercase">
+                                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono block mt-0.5 uppercase">
                                     Interface {wlanKey}
                                   </span>
                                 </div>
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                   isEnabled 
                                     ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" 
-                                    : "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-500"
+                                    : "bg-slate-200 text-slate-500 dark:text-slate-400 dark:bg-slate-800 dark:text-slate-500"
                                 }`}>
                                   {isEnabled ? "Aktif" : "Nonaktif"}
                                 </span>
@@ -791,20 +791,20 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
 
                               <div className="space-y-1.5 text-xs">
                                 <div className="flex justify-between">
-                                  <span className="text-slate-400">Keamanan (Security)</span>
+                                  <span className="text-slate-400 dark:text-slate-500">Keamanan (Security)</span>
                                   <span className="font-semibold text-slate-700 dark:text-slate-300">
                                     {config.security?.normalizedValue || config.security?.rawValue || "Open/None"}
                                   </span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span className="text-slate-400">Jumlah Client Terkoneksi</span>
-                                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                                  <span className="text-slate-400 dark:text-slate-500">Jumlah Client Terkoneksi</span>
+                                  <span className="font-mono font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200">
                                     {config.stations?.value !== undefined && config.stations?.value !== null ? String(config.stations.value) : "0"}
                                   </span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span className="text-slate-400">Kanal (Channel)</span>
-                                  <span className="font-mono text-slate-700 dark:text-slate-355">
+                                  <span className="text-slate-400 dark:text-slate-500">Kanal (Channel)</span>
+                                  <span className="font-mono text-slate-700 dark:text-slate-300 dark:text-slate-355">
                                     {config.channel?.value !== undefined && config.channel?.value !== null ? String(config.channel.value) : "Auto"}
                                   </span>
                                 </div>
@@ -813,7 +813,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                           );
                         })
                     ) : (
-                      <div className="col-span-2 p-8 text-center text-slate-400 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed">
+                      <div className="col-span-2 p-8 text-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 rounded-2xl border border-dashed">
                         Informasi WiFi tidak tersedia.
                       </div>
                     )}
@@ -828,22 +828,22 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                   </h4>
                   <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl">
                     <table className="w-full text-left border-collapse text-xs">
-                      <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-250 dark:border-slate-850 text-slate-500 dark:text-slate-400">
+                      <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 border-b border-slate-250 dark:border-slate-850 text-slate-500 dark:text-slate-400">
                         <tr>
                           <th className="px-4 py-2.5 font-semibold">Nama Host (Device)</th>
                           <th className="px-4 py-2.5 font-semibold font-mono">Alamat IP</th>
                           <th className="px-4 py-2.5 font-semibold font-mono">Alamat MAC</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-350">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 dark:text-slate-350">
                         {detail.wifiClients && detail.wifiClients.length > 0 ? (
                           detail.wifiClients.map((client, idx) => (
                             <tr key={`${client.mac}-${idx}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
-                              <td className="px-4 py-2 font-semibold text-slate-800 dark:text-slate-200">
-                                {client.hostname || <span className="text-slate-400 italic">No Hostname</span>}
+                              <td className="px-4 py-2 font-semibold text-slate-800 dark:text-slate-100 dark:text-slate-200">
+                                {client.hostname || <span className="text-slate-400 dark:text-slate-500 italic">No Hostname</span>}
                               </td>
                               <td className="px-4 py-2 font-mono">{client.ip || "—"}</td>
-                              <td className="px-4 py-2 font-mono text-slate-500">{client.mac || "—"}</td>
+                              <td className="px-4 py-2 font-mono text-slate-500 dark:text-slate-400">{client.mac || "—"}</td>
                             </tr>
                           ))
                         ) : (
@@ -861,24 +861,24 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
             )}
 
             {activeTab === "params" && (
-              <div className="overflow-auto max-h-96 rounded-xl border border-slate-100">
+              <div className="overflow-auto max-h-96 rounded-xl border border-slate-100 dark:border-slate-800">
                 <table className="w-full text-xs">
-                  <thead className="bg-slate-50 sticky top-0">
+                  <thead className="bg-slate-50 dark:bg-slate-950 sticky top-0">
                     <tr>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-500">Parameter</th>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-500">Nilai</th>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-500">Tipe</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-500 dark:text-slate-400">Parameter</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-500 dark:text-slate-400">Nilai</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-500 dark:text-slate-400">Tipe</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {flatParams.length === 0 ? (
-                      <tr><td colSpan={3} className="px-3 py-4 text-center text-slate-400">Tidak ada parameter tersedia. Lakukan Refresh Data terlebih dahulu.</td></tr>
+                      <tr><td colSpan={3} className="px-3 py-4 text-center text-slate-400 dark:text-slate-500">Tidak ada parameter tersedia. Lakukan Refresh Data terlebih dahulu.</td></tr>
                     ) : (
                       flatParams.map((p) => (
-                        <tr key={p.path} className="hover:bg-slate-50">
+                        <tr key={p.path} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                           <td className="px-3 py-1.5 font-mono text-slate-600 break-all max-w-xs">{p.path}</td>
-                          <td className="px-3 py-1.5 font-mono text-slate-900 break-all max-w-xs">{p.value}</td>
-                          <td className="px-3 py-1.5 text-slate-400">{p.type}</td>
+                          <td className="px-3 py-1.5 font-mono text-slate-900 dark:text-slate-50 break-all max-w-xs">{p.value}</td>
+                          <td className="px-3 py-1.5 text-slate-400 dark:text-slate-500">{p.type}</td>
                         </tr>
                       ))
                     )}
@@ -922,13 +922,13 @@ function FaultsPanel({ pushError }: { pushError: (msg: string) => void }) {
   };
 
   if (loading) {
-    return <div className="text-center text-sm text-slate-400 py-8 animate-pulse">Memuat fault data...</div>;
+    return <div className="text-center text-sm text-slate-400 dark:text-slate-500 py-8 animate-pulse">Memuat fault data...</div>;
   }
 
   return (
-    <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
+    <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
       <table className="w-full text-left border-collapse text-sm">
-        <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
+        <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400">
           <tr>
             <th className="px-5 py-3 font-medium">Device ID</th>
             <th className="px-5 py-3 font-medium">Channel</th>
@@ -942,7 +942,7 @@ function FaultsPanel({ pushError }: { pushError: (msg: string) => void }) {
         <tbody className="divide-y divide-gray-100">
           {faults.length === 0 ? (
             <tr>
-              <td colSpan={7} className="px-5 py-8 text-center text-slate-400 text-sm">
+              <td colSpan={7} className="px-5 py-8 text-center text-slate-400 dark:text-slate-500 text-sm">
                 ✅ Tidak ada fault aktif.
               </td>
             </tr>
@@ -950,13 +950,13 @@ function FaultsPanel({ pushError }: { pushError: (msg: string) => void }) {
             faults.map((f) => (
               <tr key={f._id} className="hover:bg-red-50 transition-colors">
                 <td className="px-5 py-3 font-mono text-xs text-slate-600 max-w-[180px] truncate">{f.device_id}</td>
-                <td className="px-5 py-3 text-slate-700">{f.channel}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.channel}</td>
                 <td className="px-5 py-3">
                   <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded">{f.code}</span>
                 </td>
-                <td className="px-5 py-3 text-slate-700 max-w-[240px] truncate" title={f.message}>{f.message}</td>
-                <td className="px-5 py-3 text-slate-500 text-xs">{formatDateTime(f.timestamp)}</td>
-                <td className="px-5 py-3 text-slate-700">{f.retries ?? 0}x</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300 max-w-[240px] truncate" title={f.message}>{f.message}</td>
+                <td className="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs">{formatDateTime(f.timestamp)}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.retries ?? 0}x</td>
                 <td className="px-5 py-3">
                   <Button
                     type="button"
@@ -1012,7 +1012,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
     const isSorted = sortField === field;
     return (
       <th 
-        className="px-5 py-3 text-left font-semibold select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500"
+        className="px-5 py-3 text-left font-semibold select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
         onClick={() => requestSort(field)}
       >
         <div className="inline-flex items-center gap-1.5">
@@ -1153,14 +1153,14 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
           { label: "Total Perangkat", value: devices.length, color: "text-slate-800", icon: <Cpu className="text-indigo-500 shrink-0" size={20} /> },
           { label: "Online", value: onlineCount, color: "text-emerald-700", icon: <Activity className="text-emerald-500 shrink-0" size={20} /> },
           { label: "Offline", value: offlineCount, color: "text-rose-700", icon: <WifiOff className="text-rose-500 shrink-0" size={20} /> },
-          { label: "Tidak Diketahui", value: devices.length - onlineCount - offlineCount, color: "text-slate-500", icon: <HelpCircle className="text-slate-400 shrink-0" size={20} /> },
+          { label: "Tidak Diketahui", value: devices.length - onlineCount - offlineCount, color: "text-slate-500", icon: <HelpCircle className="text-slate-400 dark:text-slate-500 shrink-0" size={20} /> },
         ].map(({ label, value, color, icon }) => (
-          <article key={label} className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm flex items-center justify-between hover:shadow-md hover:border-slate-200 transition-all duration-300">
+          <article key={label} className="bg-white dark:bg-slate-900 border border-slate-150 rounded-2xl p-5 shadow-sm flex items-center justify-between hover:shadow-md hover:border-slate-200 transition-all duration-300">
             <div className="space-y-1">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
+              <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{label}</p>
               <p className={`text-2xl font-black ${color}`}>{loading ? "—" : value}</p>
             </div>
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            <div className="bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
               {icon}
             </div>
           </article>
@@ -1168,7 +1168,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
       </div>
 
       {/* Main Card */}
-      <article className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
         {/* Tabs & Actions */}
         <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-slate-150 bg-slate-50/50">
           <div className="flex gap-1">
@@ -1180,7 +1180,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                 className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
                   activeTab === tab
                     ? "border-indigo-600 text-indigo-750"
-                    : "border-transparent text-slate-500 hover:text-slate-705"
+                    : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-705"
                 }`}
               >
                 {tab === "registered" ? "Perangkat Terdaftar" : tab === "all" ? "Seluruh Perangkat" : "Fault Log"}
@@ -1203,10 +1203,10 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
           {(activeTab === "registered" || activeTab === "all") && (
             <>
               <div className="mb-5 relative w-full md:w-96">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <input
                   type="search"
-                  className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition"
+                  className="w-full border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition"
                   placeholder="Cari SN, ProductClass, SSID, PPPoE username..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -1214,29 +1214,29 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
               </div>
 
               {loading ? (
-                <div className="flex flex-col items-center justify-center h-48 text-slate-400 text-sm gap-2">
+                <div className="flex flex-col items-center justify-center h-48 text-slate-400 dark:text-slate-500 text-sm gap-2">
                   <RefreshCw className="animate-spin text-indigo-600" size={24} />
                   <p className="animate-pulse font-medium">Sinkronisasi perangkat dengan GenieACS...</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto border border-slate-150 rounded-xl">
                   <table className="compact-table w-full text-xs">
-                    <thead className="bg-slate-50 text-slate-650 font-semibold border-b border-slate-200">
+                    <thead className="bg-slate-50 dark:bg-slate-950 text-slate-650 font-semibold border-b border-slate-200 dark:border-slate-800">
                       <tr>
                         {renderSortableHeader("Perangkat", "device")}
                         {renderSortableHeader("Serial Number", "serial")}
                         {renderSortableHeader("Status", "status")}
                         {renderSortableHeader("Last Inform", "last_inform")}
-                        <th className="px-5 py-3 text-left text-slate-500 font-semibold">SSID / PPPoE</th>
+                        <th className="px-5 py-3 text-left text-slate-500 dark:text-slate-400 font-semibold">SSID / PPPoE</th>
                         {renderSortableHeader("RX Power", "rx_power")}
-                        <th className="px-5 py-3 text-left text-slate-500 font-semibold">Tag</th>
-                        <th className="px-5 py-3 text-left text-slate-500 font-semibold">Aksi</th>
+                        <th className="px-5 py-3 text-left text-slate-500 dark:text-slate-400 font-semibold">Tag</th>
+                        <th className="px-5 py-3 text-left text-slate-500 dark:text-slate-400 font-semibold">Aksi</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-250 bg-white">
+                    <tbody className="divide-y divide-slate-250 bg-white dark:bg-slate-900">
                       {sortedDevices.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="px-5 py-12 text-center text-slate-400 font-medium">
+                          <td colSpan={8} className="px-5 py-12 text-center text-slate-400 dark:text-slate-500 font-medium">
                             {search ? "Tidak ada perangkat yang cocok." : "Tidak ada perangkat terdaftar di GenieACS."}
                           </td>
                         </tr>
@@ -1251,14 +1251,14 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                           return (
                             <tr key={d._id} className="hover:bg-slate-50/50 transition-colors">
                               <td className="px-5 py-3.5">
-                                <p className="font-bold text-slate-800">{deviceLabel(d)}</p>
-                                <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[180px]" title={d._id}>{d._id}</p>
+                                <p className="font-bold text-slate-800 dark:text-slate-100">{deviceLabel(d)}</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5 truncate max-w-[180px]" title={d._id}>{d._id}</p>
                                 {d.customer_name ? (
                                   <span className="inline-flex items-center gap-1 mt-1.5 bg-indigo-55 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full text-[10px] font-bold">
                                     👤 {d.customer_name}
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 mt-1.5 bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full text-[10px] font-medium">
+                                  <span className="inline-flex items-center gap-1 mt-1.5 bg-slate-100 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded-full text-[10px] font-medium">
                                     Belum Terhubung
                                   </span>
                                 )}
@@ -1267,7 +1267,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                               <td className="px-5 py-3.5">
                                 <StatusBadge status={status} />
                               </td>
-                              <td className="px-5 py-3.5 text-slate-500 font-medium">{formatDateTime(d._lastInform)}</td>
+                              <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400 font-medium">{formatDateTime(d._lastInform)}</td>
                               <td className="px-5 py-3.5">
                                 {d._summary?.ssid && (
                                   <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded font-medium mb-1">
@@ -1279,7 +1279,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                                     👤 {d._summary.pppoe_username}
                                   </span>
                                 )}
-                                {!d._summary?.ssid && !d._summary?.pppoe_username && <span className="text-slate-400">—</span>}
+                                {!d._summary?.ssid && !d._summary?.pppoe_username && <span className="text-slate-400 dark:text-slate-500">—</span>}
                               </td>
                               <td className="px-5 py-3.5">
                                 {d._summary?.rx_power ? (
@@ -1287,7 +1287,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                                     {d._summary.rx_power}
                                   </span>
                                 ) : (
-                                  <span className="text-slate-400">—</span>
+                                  <span className="text-slate-400 dark:text-slate-500">—</span>
                                 )}
                               </td>
                               <td className="px-5 py-3.5">
@@ -1297,7 +1297,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                                       {tag}
                                     </span>
                                   ))}
-                                  {!(d._tag ?? []).length && <span className="text-slate-400 text-xs">—</span>}
+                                  {!(d._tag ?? []).length && <span className="text-slate-400 dark:text-slate-500 text-xs">—</span>}
                                 </div>
                               </td>
                               <td className="px-5 py-3.5">
@@ -1319,7 +1319,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                   </table>
                 </div>
               )}
-              <p className="mt-3 text-[11px] text-slate-400 font-medium">{filtered.length} dari {devices.length} perangkat terdeteksi</p>
+              <p className="mt-3 text-[11px] text-slate-400 dark:text-slate-500 font-medium">{filtered.length} dari {devices.length} perangkat terdeteksi</p>
             </>
           )}
 
