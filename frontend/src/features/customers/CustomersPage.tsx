@@ -257,9 +257,9 @@ export function CustomersPage({
 
   const selectedCount = Object.values(selectedIds).filter(Boolean).length;
 
-  const handleOpenDetails = (customer: CustomerItem) => {
+  const handleOpenDetails = useCallback((customer: CustomerItem) => {
     setDetailedCustomer(customer);
-  };
+  }, []);
 
   const handleToggleSelectAll = (checked: boolean) => {
     const next: Record<number, boolean> = {};
@@ -341,9 +341,150 @@ export function CustomersPage({
     }
   };
 
-  const handleToggleSelectOne = (id: number, checked: boolean) => {
-    setSelectedIds((prev) => ({ ...prev, [id]: checked }));
-  };
+  const renderTableRows = useMemo(() => {
+    if (sortedCustomers.length === 0) {
+      return (
+        <EmptyTableRow
+          message={
+            customers.length === 0
+              ? "Belum ada pelanggan terdaftar."
+              : "Tidak ada pelanggan yang cocok dengan filter role saat ini."
+          }
+          colSpan={user?.role !== "viewer" ? 13 : 12}
+        />
+      );
+    }
+
+    return sortedCustomers.map((customer) => {
+      const isMultiAccount = customer.whatsapp && customers.filter(c => {
+        if (!c.whatsapp) return false;
+        const p1 = c.whatsapp.trim().replace(/[+\-\s]/g, "").replace(/^0/, "62");
+        const p2 = customer.whatsapp.trim().replace(/[+\-\s]/g, "").replace(/^0/, "62");
+        return p1 === p2;
+      }).length > 1;
+
+      return (
+        <tr key={customer.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
+          {user?.role !== "viewer" && (
+            <td className="px-4 py-4 text-center">
+              <input
+                type="checkbox"
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                checked={!!selectedIds[customer.id]}
+                onChange={(e) => handleToggleSelectOne(customer.id, e.target.checked)}
+                aria-label={`Pilih ${customer.name}`}
+              />
+            </td>
+          )}
+          <td className="px-4 py-4 font-semibold text-slate-900 dark:text-slate-50 dark:text-slate-100">
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="link"
+                type="button"
+                onClick={() => handleOpenDetails(customer)}
+                className="px-0 py-0 h-auto text-indigo-600 hover:text-indigo-700 font-semibold text-left transition-colors"
+              >
+                {customer.name}
+              </Button>
+              {isMultiAccount && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+                  Multi-Akun
+                </span>
+              )}
+            </div>
+          </td>
+          <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-medium">{customer.package_name ?? "-"}</td>
+          <td className="px-4 py-4 text-slate-600 dark:text-slate-400">Tgl {customer.due_day}</td>
+          <td className="px-4 py-4 text-gray-700 dark:text-slate-300">
+            <div className="flex flex-col items-start gap-1">
+              <StatusPill
+                label={customerLifecycleMap[customer.id]?.label ?? "Lunas"}
+                tone={customerLifecycleMap[customer.id]?.tone ?? "green"}
+              />
+              <span className="block text-[11px] text-slate-500 dark:text-slate-400 max-w-[260px] leading-relaxed break-words whitespace-normal font-sans">
+                {customerLifecycleMap[customer.id]?.note ?? "Tidak ada tagihan aktif."}
+              </span>
+            </div>
+          </td>
+          <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-medium">{customer.odp_name || "-"}</td>
+          <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-semibold">
+            {customer.diskon > 0 ? (customer.tipe_diskon === "percent" ? `${customer.diskon}%` : `Rp ${customer.diskon.toLocaleString("id-ID")}`) : "-"}
+          </td>
+          <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-semibold">
+            {customer.referral_balance > 0 ? `Rp ${customer.referral_balance.toLocaleString("id-ID")}` : "-"}
+          </td>
+          <td className="px-4 py-4 text-slate-750 dark:text-slate-300 font-mono text-xs">{customer.referral_code || "-"}</td>
+          <td className="px-4 py-4 text-slate-600 dark:text-slate-400 font-semibold">{customer.referred_by_name || "-"}</td>
+          <td className="px-4 py-4 text-center">
+            <select
+              className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-slate-750 dark:text-slate-200 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+              value={customer.status}
+              onChange={(e) => onStatusChange(customer.id, e.target.value as CustomerItem["status"])}
+            >
+              <option value="active">Active</option>
+              <option value="limit">Limit</option>
+              <option value="suspended">Suspended</option>
+              <option value="inactive">Inactive</option>
+              <option value="wifi_umum">WiFi Umum</option>
+            </select>
+          </td>
+          <td className="px-4 py-4 text-slate-700 dark:text-slate-300">
+            {customer.whatsapp ? (
+              <a
+                href={`https://wa.me/+${customer.whatsapp.replace(/[+\-\s]/g, "").replace(/^0/, "62")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline font-mono text-xs font-semibold"
+              >
+                {customer.whatsapp}
+              </a>
+            ) : (
+              "-"
+            )}
+          </td>
+          <td className="px-4 py-4 text-center">
+            {user?.role !== "viewer" && (
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300"
+                  onClick={() => {
+                    onEdit(customer);
+                    onSetFormOpen(true);
+                  }}
+                >
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  className="bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
+                  onClick={() => onDelete(customer.id)}
+                >
+                  Hapus
+                </Button>
+              </div>
+            )}
+          </td>
+        </tr>
+      );
+    });
+  }, [
+    sortedCustomers,
+    customers,
+    user?.role,
+    selectedIds,
+    customerLifecycleMap,
+    handleToggleSelectOne,
+    handleOpenDetails,
+    onStatusChange,
+    onEdit,
+    onSetFormOpen,
+    onDelete
+  ]);
 
   const handleCloseForm = () => {
     onSetFormOpen(false);
@@ -491,133 +632,6 @@ export function CustomersPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {sortedCustomers.length === 0 ? (
-                <EmptyTableRow
-                  message={
-                    customers.length === 0
-                      ? "Belum ada pelanggan terdaftar."
-                      : "Tidak ada pelanggan yang cocok dengan filter role saat ini."
-                  }
-                  colSpan={user?.role !== "viewer" ? 13 : 12}
-                />
-              ) : (
-                sortedCustomers.map((customer) => {
-                  const isMultiAccount = customer.whatsapp && customers.filter(c => {
-                    if (!c.whatsapp) return false;
-                    const p1 = c.whatsapp.trim().replace(/[+\-\s]/g, "").replace(/^0/, "62");
-                    const p2 = customer.whatsapp.trim().replace(/[+\-\s]/g, "").replace(/^0/, "62");
-                    return p1 === p2;
-                  }).length > 1;
-
-                  return (
-                    <tr key={customer.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
-                      {user?.role !== "viewer" && (
-                        <td className="px-4 py-4 text-center">
-                          <input
-                            type="checkbox"
-                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                            checked={!!selectedIds[customer.id]}
-                            onChange={(e) => handleToggleSelectOne(customer.id, e.target.checked)}
-                            aria-label={`Pilih ${customer.name}`}
-                          />
-                        </td>
-                      )}
-                      <td className="px-4 py-4 font-semibold text-slate-900 dark:text-slate-50 dark:text-slate-100">
-                        <div className="flex items-center gap-1.5">
-                          <Button
-                            variant="link"
-                            type="button"
-                            onClick={() => handleOpenDetails(customer)}
-                            className="px-0 py-0 h-auto text-indigo-600 hover:text-indigo-700 font-semibold text-left transition-colors"
-                          >
-                            {customer.name}
-                          </Button>
-                          {isMultiAccount && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
-                              Multi-Akun
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-medium">{customer.package_name ?? "-"}</td>
-                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400">Tgl {customer.due_day}</td>
-                    <td className="px-4 py-4 text-gray-700 dark:text-slate-300">
-                      <div className="flex flex-col items-start gap-1">
-                        <StatusPill
-                          label={customerLifecycleMap[customer.id]?.label ?? "Lunas"}
-                          tone={customerLifecycleMap[customer.id]?.tone ?? "green"}
-                        />
-                        <span className="block text-[11px] text-slate-500 dark:text-slate-400 max-w-[260px] leading-relaxed break-words whitespace-normal font-sans">
-                          {customerLifecycleMap[customer.id]?.note ?? "Tidak ada tagihan aktif."}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-medium">{customer.odp_name || "-"}</td>
-                    <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-semibold">
-                      {customer.diskon > 0 ? (customer.tipe_diskon === "percent" ? `${customer.diskon}%` : `Rp ${customer.diskon.toLocaleString("id-ID")}`) : "-"}
-                    </td>
-                    <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-semibold">
-                      {customer.referral_balance > 0 ? `Rp ${customer.referral_balance.toLocaleString("id-ID")}` : "-"}
-                    </td>
-                    <td className="px-4 py-4 text-slate-750 dark:text-slate-300 font-mono text-xs">{customer.referral_code || "-"}</td>
-                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400 font-semibold">{customer.referred_by_name || "-"}</td>
-                    <td className="px-4 py-4 text-center">
-                      <select
-                        className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-slate-750 dark:text-slate-200 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
-                        value={customer.status}
-                        onChange={(e) => onStatusChange(customer.id, e.target.value as CustomerItem["status"])}
-                      >
-                        <option value="active">Active</option>
-                        <option value="limit">Limit</option>
-                        <option value="suspended">Suspended</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="wifi_umum">WiFi Umum</option>
-                      </select>
-                    </td>
-                    <td className="px-4 py-4 text-slate-700 dark:text-slate-300">
-                      {customer.whatsapp ? (
-                        <a
-                          href={`https://wa.me/+${customer.whatsapp.replace(/[+\-\s]/g, "").replace(/^0/, "62")}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline font-mono text-xs font-semibold"
-                        >
-                          {customer.whatsapp}
-                        </a>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      {user?.role !== "viewer" && (
-                        <div className="flex items-center justify-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300"
-                            onClick={() => {
-                              onEdit(customer);
-                              onSetFormOpen(true);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="danger"
-                            size="sm"
-                            className="bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
-                            onClick={() => onDelete(customer.id)}
-                          >
-                            Hapus
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
             )}
             </tbody>
           </table>
