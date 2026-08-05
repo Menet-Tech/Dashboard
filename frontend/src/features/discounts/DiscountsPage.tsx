@@ -576,7 +576,7 @@ export function DiscountsPage({
 
         {/* Tab Selector */}
         <div className="bg-slate-100 dark:bg-slate-900 p-1.5 rounded-card flex border border-slate-200 dark:border-slate-800 shrink-0">
-          <Button type="button" variant="outline"
+          <Button type="button" variant="primary"
             onClick={() => {
               setActiveTab("discounts");
               setSearchQuery("");
@@ -686,13 +686,13 @@ export function DiscountsPage({
             {activeTab === "discounts" ? (
               <Button type="button" variant="outline"
                 onClick={() => setIsCreateDiscountOpen(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-card transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
+                className="hover:font-semibold text-xs px-4 py-2.5 rounded-card transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
               >
                 <Plus size={14} />
                 Beri Diskon Baru
               </Button>
             ) : activeTab === "referrals" ? (
-              <Button type="button" variant="outline"
+              <Button type="button" variant="primary"
                 onClick={async () => {
                   // Find first customer with no code to edit referral
                   const firstWithoutRef = customers.find(c => !c.referral_code);
@@ -704,21 +704,21 @@ export function DiscountsPage({
                     await showAlert("Belum ada pelanggan terdaftar.");
                   }
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-card transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
+                className="hover:font-semibold text-xs px-4 py-2.5 rounded-card transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
               >
                 <Plus size={14} />
                 Atur Referral Baru
               </Button>
             ) : activeTab === "vouchers" ? (
               <>
-                <Button type="button" variant="outline"
+                <Button type="button" variant="primary"
                   onClick={() => setIsCreateVoucherOpen(true)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-card transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
+                  className="hover:font-semibold text-xs px-4 py-2.5 rounded-card transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
                 >
                   <Plus size={14} />
                   Buat Voucher Baru
                 </Button>
-                <Button type="button" variant="outline"
+                <Button type="button" variant="primary"
                   onClick={() => setIsAssignVoucherOpen(true)}
                   className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-750 dark:hover:bg-slate-700 text-white font-semibold text-xs px-4 py-2.5 rounded-card transition-all shadow-md flex items-center gap-1.5 shrink-0"
                 >
@@ -1397,7 +1397,7 @@ export function DiscountsPage({
                 </Button>
                 <Button variant="outline" type="submit"
                   disabled={submitting || selectedCustomerForNewDiscount === 0}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50"
+                  className="px-4 py-2 hover:font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50"
                 >
                   {submitting ? "Menyimpan..." : "Tambahkan Diskon"}
                 </Button>
@@ -1411,7 +1411,7 @@ export function DiscountsPage({
       {editingDiscountCustomer && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
-            <Button type="button" variant="outline"
+            <Button type="button" variant="primary"
               onClick={() => setEditingDiscountCustomer(null)}
               className="absolute right-4 top-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
@@ -1505,7 +1505,7 @@ export function DiscountsPage({
                 </Button>
                 <Button variant="outline" type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20"
+                  className="px-4 py-2 hover:font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20"
                 >
                   {submitting ? "Menyimpan..." : "Simpan Diskon"}
                 </Button>
@@ -1519,7 +1519,7 @@ export function DiscountsPage({
       {isCreateVoucherOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
-            <Button type="button" variant="outline"
+            <Button type="button" variant="primary"
               onClick={() => {
                 setIsCreateVoucherOpen(false);
                 setNewVoucherCode("");
@@ -1642,7 +1642,7 @@ export function DiscountsPage({
                 </Button>
                 <Button variant="outline" type="submit"
                   disabled={submitting || !newVoucherCode}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20"
+                  className="px-4 py-2 hover:font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20"
                 >
                   {submitting ? "Menyimpan..." : "Buat Voucher"}
                 </Button>
@@ -1656,7 +1656,7 @@ export function DiscountsPage({
       {isAssignVoucherOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
-            <Button type="button" variant="outline"
+            <Button type="button" variant="primary"
               onClick={() => {
                 setIsAssignVoucherOpen(false);
                 setSelectedCustomerForVoucher(0);
@@ -1728,7 +1728,7 @@ export function DiscountsPage({
                 </Button>
                 <Button variant="outline" type="submit"
                   disabled={submitting || selectedCustomerForVoucher === 0 || selectedVoucherTemplate === 0}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50"
+                  className="px-4 py-2 hover:font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50"
                 >
                   {submitting ? "Mengaitkan..." : "Kaitkan Voucher"}
                 </Button>
@@ -1740,7 +1740,7 @@ export function DiscountsPage({
       {editingReferralCustomer && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden animate-scale-in">
-            <Button type="button" variant="outline"
+            <Button type="button" variant="primary"
               onClick={() => setEditingReferralCustomer(null)}
               className="absolute right-4 top-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
@@ -1841,7 +1841,7 @@ export function DiscountsPage({
                 </Button>
                 <Button variant="outline" type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20"
+                  className="px-4 py-2 hover:font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-600/20"
                 >
                   {submitting ? "Menyimpan..." : "Simpan Data"}
                 </Button>

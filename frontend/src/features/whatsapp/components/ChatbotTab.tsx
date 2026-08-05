@@ -276,7 +276,7 @@ export function ChatbotTab({
           </label>
           
           <div className="pt-2">
-            <Button type="submit" variant="primary" className="w-full bg-emerald-600 hover:bg-emerald-700 text-center text-white">
+            <Button type="submit" variant="success" className="w-full text-center">
               Tambah Rule Baru
             </Button>
           </div>
@@ -349,7 +349,7 @@ export function ChatbotTab({
               </div>
             )}
             <div className="flex gap-2 pt-1">
-                <Button type="submit" variant="primary" className="flex-1 bg-amber-500 hover:bg-amber-600 text-center">
+                <Button type="submit" variant="warning" className="flex-1 text-center">
                   Simpan Perubahan
                 </Button>
                 <Button type="button" variant="outline" onClick={cancelEditing}>

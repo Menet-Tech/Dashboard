@@ -847,7 +847,7 @@ export function SettingsPage({
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <Button variant="outline"
+              <Button variant="primary"
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id as any)}
@@ -1995,7 +1995,7 @@ export function SettingsPage({
                                 pushError(err.message || "Gagal menyimpan konfigurasi router");
                               }
                             }}
-                            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-md transition-all cursor-pointer text-center"
+                            className="flex-1 hover:font-bold py-2 px-4 rounded-xl text-xs shadow-md transition-all cursor-pointer text-center"
                           >
                             {editingRouterId ? "Simpan Perubahan" : "Daftarkan Router"}
                           </Button>
@@ -2071,10 +2071,10 @@ export function SettingsPage({
                         </label>
                       </div>
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <Button variant="outline" type="button"
+                        <Button variant="primary" type="button"
                           onClick={() => saveSection("MikroTik Global", ["mikrotik_isolir_profile", "mikrotik_inactive_profile", "mikrotik_auto_sync_hours", "mikrotik_delete_unregistered"])}
                           disabled={savingSection === "MikroTik Global"}
-                          className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          className="hover:text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           {savingSection === "MikroTik Global" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save MikroTik Settings
@@ -2317,7 +2317,7 @@ export function SettingsPage({
                         </div>
                         <div className="flex justify-end pt-3 border-t border-amber-100 dark:border-amber-900/30 gap-3">
                           {showSetupForm && (
-                            <Button variant="outline" type="button"
+                            <Button variant="primary" type="button"
                               onClick={() => setShowSetupForm(false)}
                               className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-200 text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center cursor-pointer border border-transparent"
                             >
@@ -2359,7 +2359,7 @@ export function SettingsPage({
                         <Button variant="outline" type="button"
                           onClick={handleRouterSync}
                           disabled={syncingRouters}
-                          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm cursor-pointer"
+                          className="flex items-center gap-2 hover:disabled:opacity-60 text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm cursor-pointer"
                         >
                           {syncingRouters ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                           {syncingRouters ? "Menyinkronkan..." : "Sync Main -> Slave Sekarang"}
@@ -2400,10 +2400,10 @@ export function SettingsPage({
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Tarik daftar PPPoE secret dari router dan import yang belum terdaftar di dashboard.</p>
                           </div>
                         </div>
-                        <Button variant="outline" type="button"
+                        <Button variant="primary" type="button"
                           onClick={handleSyncPreview}
                           disabled={syncLoading}
-                          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm cursor-pointer"
+                          className="flex items-center gap-2 hover:disabled:opacity-60 text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm cursor-pointer"
                         >
                           {syncLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                           {syncLoading ? "Memuat..." : "Preview Secrets"}
@@ -2424,7 +2424,7 @@ export function SettingsPage({
                               <span className="font-bold text-slate-700 dark:text-slate-300">{syncSecrets.length}</span> secret ditemukan &bull;{" "}
                               <span className="font-bold text-emerald-600 dark:text-emerald-455">{syncSecrets.filter((s) => !s.exists).length}</span> belum di dashboard
                             </p>
-                            <Button variant="outline" type="button" onClick={toggleAll} className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer">
+                            <Button variant="primary" type="button" onClick={toggleAll} className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer">
                               {selected.size === syncSecrets.filter((s) => !s.exists).length ? "Batalkan Semua" : "Pilih Semua Baru"}
                             </Button>
                           </div>
@@ -2690,7 +2690,7 @@ export function SettingsPage({
                             "discord_bot_guild_id", "discord_bot_enabled"
                           ])}
                           disabled={savingSection === "Discord & Bot"}
-                          className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          className="hover:text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           {savingSection === "Discord & Bot" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save Discord Settings
@@ -2812,7 +2812,7 @@ export function SettingsPage({
                               placeholder="tujuan@gmail.com"
                             />
                           </label>
-                          <Button variant="outline" type="button"
+                          <Button variant="primary" type="button"
                             onClick={handleTestSMTP}
                             disabled={testingSMTP}
                             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer h-[42px]"
@@ -2839,7 +2839,7 @@ export function SettingsPage({
                             "smtp_from_email", "smtp_encryption"
                           ])}
                           disabled={savingSection === "SMTP Email"}
-                          className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          className="hover:text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           {savingSection === "SMTP Email" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save SMTP Settings
@@ -2865,7 +2865,7 @@ export function SettingsPage({
                   const SubIcon = sub.icon;
                   const isSubActive = acsSubTab === sub.id;
                   return (
-                    <Button variant="outline"
+                    <Button variant="primary"
                       key={sub.id}
                       type="button"
                       onClick={() => setAcsSubTab(sub.id as any)}
@@ -2960,7 +2960,7 @@ export function SettingsPage({
                           <Button variant="outline" type="button"
                             onClick={() => saveSection("GenieACS URL", ["acs_url", "acs_username", "acs_password"])}
                             disabled={savingSection === "GenieACS URL"}
-                            className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-1.5 px-3.5 rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 font-sans"
+                            className="hover:text-xs font-bold py-1.5 px-3.5 rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 font-sans"
                           >
                             {savingSection === "GenieACS URL" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                             Save URL
@@ -3085,13 +3085,13 @@ export function SettingsPage({
                       </div>
 
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <Button variant="outline" type="button"
+                        <Button variant="primary" type="button"
                           onClick={() => saveSection("Virtual Parameters", [
                             "vpPppoeUsername", "vpWanBridge", "vpRxPower", "vpTemperature",
                             "vpActiveDevices", "vpSuperAdmin", "vpSuperPassword", "vpUserAdmin", "vpUserPassword"
                           ])}
                           disabled={savingSection === "Virtual Parameters"}
-                          className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          className="hover:text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           {savingSection === "Virtual Parameters" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save Virtual Parameters
@@ -3154,10 +3154,10 @@ export function SettingsPage({
                       </div>
 
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <Button variant="outline" type="button"
+                        <Button variant="primary" type="button"
                           onClick={() => saveSection("RX Power Settings", ["gacs_rx_power_excellent", "gacs_rx_power_fair", "rxPowerThresholds"])}
                           disabled={savingSection === "RX Power Settings"}
-                          className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          className="hover:text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           {savingSection === "RX Power Settings" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save RX Power Settings
@@ -3242,10 +3242,10 @@ export function SettingsPage({
                       </div>
 
                       <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800/60 mt-auto">
-                        <Button variant="outline" type="button"
+                        <Button variant="primary" type="button"
                           onClick={() => saveSection("Auto Refresh Intervals", ["autoRefreshIntervals"])}
                           disabled={savingSection === "Auto Refresh Intervals"}
-                          className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          className="hover:text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           {savingSection === "Auto Refresh Intervals" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save RX Power Settings
@@ -3261,7 +3261,7 @@ export function SettingsPage({
 
                     {/* Sub-tab Navigation */}
                     <div className="flex gap-4 border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <Button variant="outline" type="button"
+                      <Button variant="primary" type="button"
                         onClick={() => setVendorSubTab("vendors")}
                         className={`text-xs font-bold pb-2 transition-all cursor-pointer border-b-2 px-1 ${vendorSubTab === "vendors"
                           ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
@@ -3309,7 +3309,7 @@ export function SettingsPage({
                             </label>
                             <Button variant="outline" type="button"
                               onClick={() => setEditingVendor({})}
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 cursor-pointer"
+                              className="hover:text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 cursor-pointer"
                             >
                               <Plus size={14} />
                               Add Vendor
@@ -3375,7 +3375,7 @@ export function SettingsPage({
                                     </td>
                                     <td className="py-3 px-4 text-right shrink-0">
                                       <div className="flex items-center justify-end gap-1.5">
-                                        <Button variant="outline" type="button"
+                                        <Button variant="primary" type="button"
                                           onClick={() => setEditingVendor(vendor)}
                                           className="p-1 hover:text-indigo-600 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer"
                                           title="Edit Vendor"
@@ -3428,7 +3428,7 @@ export function SettingsPage({
                             </label>
                             <Button variant="outline" type="button"
                               onClick={() => setEditingWifiConfig({})}
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 cursor-pointer"
+                              className="hover:text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 cursor-pointer"
                             >
                               <Plus size={14} />
                               Add WiFi Config
@@ -3475,7 +3475,7 @@ export function SettingsPage({
                                     </td>
                                     <td className="py-3 px-4 text-right">
                                       <div className="flex items-center justify-end gap-1.5">
-                                        <Button variant="outline" type="button"
+                                        <Button variant="primary" type="button"
                                           onClick={() => setEditingWifiConfig(item)}
                                           className="p-1 hover:text-indigo-600 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer"
                                           title="Edit Wifi Config"
@@ -3621,7 +3621,7 @@ export function SettingsPage({
           </p>
           <Button variant="outline" type="submit"
             disabled={submitting}
-            className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold py-2.5 px-6 rounded-xl shadow-md hover:shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            className="w-full sm:w-auto hover:text-xs font-bold py-2.5 px-6 rounded-xl shadow-md hover:shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isBusy("save-settings") ? <Loader2 size={14} className="animate-spin" /> : null}
             {isBusy("save-settings") ? "Menyimpan..." : "Simpan Semua Pengaturan"}
@@ -3636,7 +3636,7 @@ export function SettingsPage({
           onClose={() => setEditingVendor(null)}
           actions={
             <>
-              <Button variant="outline" type="button"
+              <Button variant="primary" type="button"
                 onClick={() => setEditingVendor(null)}
                 className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
@@ -3680,7 +3680,7 @@ export function SettingsPage({
                     pushError(err.message || "Gagal menyimpan vendor.");
                   }
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-md hover:shadow-indigo-500/20 transition-all cursor-pointer"
+                className="hover:text-xs font-bold py-2 px-4 rounded-xl shadow-md hover:shadow-indigo-500/20 transition-all cursor-pointer"
               >
                 Save
               </Button>
@@ -3849,7 +3849,7 @@ export function SettingsPage({
           onClose={() => setDeletingVendorItem(null)}
           actions={
             <>
-              <Button variant="outline" type="button"
+              <Button variant="primary" type="button"
                 onClick={() => setDeletingVendorItem(null)}
                 className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition-colors cursor-pointer"
               >
@@ -3929,7 +3929,7 @@ export function SettingsPage({
                     pushError(err.message || "Gagal menyimpan WiFi Security Config.");
                   }
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-md hover:shadow-indigo-500/20 transition-all cursor-pointer"
+                className="hover:text-xs font-bold py-2 px-4 rounded-xl shadow-md hover:shadow-indigo-500/20 transition-all cursor-pointer"
               >
                 Save
               </Button>

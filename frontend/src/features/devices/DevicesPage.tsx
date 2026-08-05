@@ -394,7 +394,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
             {/* Tab switcher */}
             <div className="flex gap-1 mb-5 border-b border-slate-150">
               {(["info", "wan", "wifi", "mikrotik", "params"] as const).map((tab) => (
-                <Button variant="outline"
+                <Button variant="primary"
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
@@ -656,7 +656,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                             key={`${conn.path}-${idx}`} 
                             className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card p-5 shadow-sm relative overflow-hidden"
                           >
-                            <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600" />
+                            <div className="absolute top-0 left-0 w-1.5 h-full" />
                             
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-3 mb-4">
                               <div>
@@ -1173,7 +1173,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
         <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-slate-150 bg-slate-50/50">
           <div className="flex gap-1">
             {(["registered", "all", "faults"] as const).map((tab) => (
-              <Button variant="outline"
+              <Button variant="primary"
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
@@ -1305,7 +1305,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                                   type="button"
                                   variant="primary"
                                   size="sm"
-                                  className="bg-indigo-600 hover:bg-indigo-700"
+                                  className="hover:"
                                   onClick={() => setDetailId(d._id)}
                                 >
                                   Detail

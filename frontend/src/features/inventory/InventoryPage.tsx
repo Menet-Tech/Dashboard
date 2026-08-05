@@ -362,8 +362,8 @@ export default function InventoryPage() {
               </label>
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs">Batal</Button>
-              <Button type="submit" variant="primary" className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">Simpan Item</Button>
+              <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)}>Batal</Button>
+              <Button type="submit" variant="primary">Simpan Item</Button>
             </div>
           </form>
         </div>
@@ -405,8 +405,8 @@ export default function InventoryPage() {
               </label>
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <Button type="button" variant="ghost" onClick={() => setIsLogFormOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs">Batal</Button>
-              <Button type="submit" variant="primary" className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">Simpan Transaksi</Button>
+              <Button type="button" variant="ghost" onClick={() => setIsLogFormOpen(false)}>Batal</Button>
+              <Button type="submit" variant="primary">Simpan Transaksi</Button>
             </div>
           </form>
         </div>

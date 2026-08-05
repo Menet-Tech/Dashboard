@@ -257,7 +257,7 @@ export function PackagesPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" type="button"
+          <Button variant="primary" type="button"
             onClick={loadSyncProfiles}
             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300 font-semibold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
             onClickCapture={() => setIsSyncOpen(true)}
@@ -265,13 +265,12 @@ export function PackagesPage({
             <RefreshCw size={14} />
             Sinkronisasi MikroTik
           </Button>
-          <Button variant="outline" type="button"
+          <Button variant="primary" type="button"
             onClick={() => {
               onCancelEdit();
               setIsCreatingNewPool(false);
               setIsFormOpen(true);
             }}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
           >
             <Plus size={14} />
             Tambah Paket
@@ -365,7 +364,7 @@ export function PackagesPage({
               </Button>
               <Button variant="outline" type="submit"
                 form="package-form"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                className="hover:font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 disabled={submitting}
               >
                 {isBusy("save-package") ? "Menyimpan..." : editingPackageId ? "Update Paket" : "Simpan Paket"}
@@ -450,7 +449,7 @@ export function PackagesPage({
               <div className="p-4 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200">Buat IP Pool Baru di MikroTik</span>
-                  <Button variant="outline" type="button"
+                  <Button variant="primary" type="button"
                     className="text-xs font-bold text-indigo-650 hover:text-indigo-700"
                     onClick={() => {
                       setIsCreatingNewPool(false);
@@ -515,7 +514,7 @@ export function PackagesPage({
               </Button>
               <Button variant="outline" type="button"
                 onClick={handleImportSync}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
+                className="hover:font-semibold py-2.5 px-5 rounded-lg shadow-sm transition-colors"
                 disabled={syncLoading || !anySyncSelected}
               >
                 {syncLoading ? "Mengimpor..." : "Impor Profil Terpilih"}

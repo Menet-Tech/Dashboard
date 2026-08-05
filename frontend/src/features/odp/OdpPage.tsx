@@ -365,7 +365,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
                           <>
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="primary"
                               size="sm"
                               onClick={() => handleOpenEdit(item)}
                             >
@@ -414,7 +414,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
                 type="submit"
                 form="odp-form"
                 variant="primary"
-                className="bg-indigo-600 hover:bg-indigo-700"
+                className="hover:"
                 disabled={submitting}
                 isLoading={submitting}
                 loadingText="Menyimpan..."
