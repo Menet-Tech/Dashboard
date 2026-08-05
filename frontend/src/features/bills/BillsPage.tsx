@@ -1,6 +1,7 @@
 import { Button } from "../../components/ui/Button";
 import { Fragment, useState, useMemo, type FormEvent } from "react";
-import { ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
+import { ChevronUp, ChevronDown, ArrowUpDown, MoreVertical } from "lucide-react";
+import { Modal } from "../../components/ui/Modal";
 import { formatCurrency } from "../../utils/format";
 import { displayStatusLabel, displayStatusTone } from "../../utils/status";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow } from "../../components/ui";
@@ -87,6 +88,9 @@ export function BillsPage({
 
   const [sortField, setSortField] = useState<string | null>("invoice_number");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [waModalBillId, setWaModalBillId] = useState<number | null>(null);
+  const [selectedWaTemplate, setSelectedWaTemplate] = useState<string>("");
 
   const requestSort = (field: string) => {
     if (sortField === field) {
@@ -314,127 +318,128 @@ export function BillsPage({
                         )}
                       </td>
                       <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
-                        <div className="flex flex-wrap gap-2 items-center">
-                          {/* Dokumen & Log - Grup 1 */}
-                          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="bg-white dark:bg-slate-900 dark:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-200"
-                              onClick={() => window.open(`/api/v1/bills/${bill.id}/invoice`, "_blank")}
-                              title="Buka PDF Invoice"
-                            >
-                              PDF
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
-                              onClick={() => onToggleNotifications(bill.id)}
-                            >
-                              Log WA
-                            </Button>
-                          </div>
-                          
-                          {/* WA Notify Native Select */}
-                          <div className="relative">
-                            <select
-                              className="appearance-none bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold py-1.5 pl-3 pr-8 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                              defaultValue=""
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  void handleSendManualWA(bill.id, e.target.value);
-                                  e.target.value = "";
-                                }
-                              }}
-                              disabled={isBusy(`notify-${bill.id}`)}
-                              aria-label="Kirim Notifikasi WA"
-                            >
-                              <option value="" disabled>Kirim WA</option>
-                              <option value="tagihan-h7">H-7</option>
-                              <option value="reminder-h3">H-3</option>
-                              <option value="reminder-h5">H-5</option>
-                              <option value="jatuh_tempo">Jatuh Tempo</option>
-                              <option value="limit_5hari">Limit 5H</option>
-                              <option value="isolir_20hari">Isolir 20H</option>
-                              <option value="lunas">Lunas</option>
-                            </select>
-                          </div>
-
-                          {/* Action Buttons (Lunas / Perpanjang / Batal) */}
+                        <div className="flex gap-2 items-center justify-end">
                           {user?.role !== "viewer" && bill.status === "belum_bayar" && bill.display_status !== "perpanjangan" ? (
                             <Button
                               type="button"
                               variant="primary"
+                              size="sm"
+                              className="px-3 py-1 text-xs"
                               onClick={() => onMarkBillPaid(bill.id)}
                               disabled={isBusy("mark-paid")}
                             >
                               {isBusy("mark-paid") ? "Proses..." : "Lunas"}
                             </Button>
                           ) : null}
-                          {user?.role !== "viewer" && bill.status === "belum_bayar" && bill.display_status !== "perpanjangan" && onGrantExtension ? (
-                            <Button
-                              type="button"
-                              variant="primary"
-                              size="sm"
-                              className="bg-amber-500 hover:bg-amber-600 text-white"
-                              title="Perpanjangan: tagihan ini digabung ke bulan depan (nominal dikali 2)"
-                              onClick={async () => {
-                                if (await showConfirm(`Perpanjang tagihan ${bill.invoice_number}? Pelanggan akan dialihkan ke status 'pending' (perpanjangan) dan tagihan bulan depan digabung (nominal dikali 2).`)) {
-                                  onGrantExtension(bill.id);
-                                }
-                              }}
-                            >
-                              Perpanjang
-                            </Button>
-                          ) : null}
-                          {user?.role !== "viewer" && (bill.status === "pending_paid" || bill.status === "pending_extension") && onCancelPendingAction ? (
-                            <Button
-                              type="button"
-                              variant="danger"
-                              size="sm"
-                              className="bg-rose-600 hover:bg-rose-700 animate-pulse"
-                              onClick={() => onCancelPendingAction(bill.id)}
-                              disabled={isBusy(`cancel-pending-${bill.id}`)}
-                              isLoading={isBusy(`cancel-pending-${bill.id}`)}
-                              loadingText="Batal..."
-                            >
-                              Batal
-                            </Button>
-                          ) : null}
+                          
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 px-3 py-1 text-xs"
+                            onClick={() => window.open(`/api/v1/bills/${bill.id}/invoice`, "_blank")}
+                            title="Buka PDF Invoice"
+                          >
+                            PDF
+                          </Button>
 
-                          {/* Proof Upload */}
-                          {user?.role !== "viewer" && bill.status !== "lunas" && bill.display_status !== "perpanjangan" && (
-                            <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-800 dark:border-slate-700 rounded-lg p-0.5 ml-auto">
-                              <input
-                                type="file"
-                                accept=".jpg,.jpeg,.png,.pdf,.webp"
-                                className="hidden"
-                                id={`proof-upload-${bill.id}`}
-                                onChange={(e) => onProofFileChange(bill.id, e.target.files?.[0] ?? null)}
-                              />
-                              <label
-                                htmlFor={`proof-upload-${bill.id}`}
-                                className="bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium py-1 px-2 rounded cursor-pointer transition-colors max-w-[80px] truncate"
-                              >
-                                {proofFiles[bill.id] ? proofFiles[bill.id]?.name : "Pilih File"}
-                              </label>
-                              <Button
-                                type="button"
-                                variant="primary"
-                                size="sm"
-                                className="bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500"
-                                onClick={() => onUploadProof(bill.id)}
-                                disabled={isBusy("upload-proof")}
-                                isLoading={isBusy("upload-proof")}
-                                loadingText="↑"
-                              >
-                                Upload
-                              </Button>
-                            </div>
-                          )}
+                          <div className="relative">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="w-8 h-8 rounded-full"
+                              onClick={() => setOpenMenuId(openMenuId === bill.id ? null : bill.id)}
+                              aria-label="Tampilkan aksi lainnya"
+                              aria-expanded={openMenuId === bill.id}
+                            >
+                              <MoreVertical size={16} />
+                            </Button>
+
+                            {openMenuId === bill.id && (
+                              <>
+                                <div 
+                                  className="fixed inset-0 z-40" 
+                                  onClick={() => setOpenMenuId(null)} 
+                                  aria-hidden="true"
+                                />
+                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-50 animate-in">
+                                  <button
+                                    type="button"
+                                    className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    onClick={() => {
+                                      setWaModalBillId(bill.id);
+                                      setSelectedWaTemplate("");
+                                      setOpenMenuId(null);
+                                    }}
+                                  >
+                                    Kirim Notifikasi WA
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    onClick={() => {
+                                      onToggleNotifications(bill.id);
+                                      setOpenMenuId(null);
+                                    }}
+                                  >
+                                    Log Riwayat Notifikasi
+                                  </button>
+
+                                  {user?.role !== "viewer" && bill.status === "belum_bayar" && bill.display_status !== "perpanjangan" && onGrantExtension && (
+                                    <button
+                                      type="button"
+                                      className="w-full text-left px-4 py-2 text-xs text-amber-600 dark:text-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                      onClick={async () => {
+                                        setOpenMenuId(null);
+                                        if (await showConfirm(`Perpanjang tagihan ${bill.invoice_number}? Pelanggan akan dialihkan ke status 'pending' (perpanjangan) dan tagihan bulan depan digabung (nominal dikali 2).`)) {
+                                          onGrantExtension(bill.id);
+                                        }
+                                      }}
+                                    >
+                                      Perpanjang Masa Aktif
+                                    </button>
+                                  )}
+
+                                  {user?.role !== "viewer" && (bill.status === "pending_paid" || bill.status === "pending_extension") && onCancelPendingAction && (
+                                    <button
+                                      type="button"
+                                      className="w-full text-left px-4 py-2 text-xs text-rose-600 dark:text-rose-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                      onClick={() => {
+                                        setOpenMenuId(null);
+                                        onCancelPendingAction(bill.id);
+                                      }}
+                                    >
+                                      Batalkan Aksi Tertunda
+                                    </button>
+                                  )}
+
+                                  {user?.role !== "viewer" && bill.status !== "lunas" && bill.display_status !== "perpanjangan" && (
+                                    <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer text-left">
+                                      <label
+                                        htmlFor={`proof-upload-${bill.id}`}
+                                        className="text-xs text-slate-700 dark:text-slate-300 cursor-pointer block w-full"
+                                      >
+                                        Upload Bukti Transfer
+                                      </label>
+                                      <input
+                                        type="file"
+                                        accept=".jpg,.jpeg,.png,.pdf,.webp"
+                                        className="hidden"
+                                        id={`proof-upload-${bill.id}`}
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0] ?? null;
+                                          onProofFileChange(bill.id, file);
+                                          if (file) onUploadProof(bill.id);
+                                          setOpenMenuId(null);
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -603,6 +608,63 @@ export function BillsPage({
           </div>
         )}
       </article>
+
+      {waModalBillId && (
+        <Modal
+          title="Pilih Template WhatsApp"
+          onClose={() => setWaModalBillId(null)}
+          actions={
+            <>
+              <Button type="button" variant="outline" onClick={() => setWaModalBillId(null)}>
+                Batal
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={!selectedWaTemplate || isBusy(`notify-${waModalBillId}`)}
+                isLoading={isBusy(`notify-${waModalBillId}`)}
+                onClick={() => {
+                  if (selectedWaTemplate) {
+                    void handleSendManualWA(waModalBillId, selectedWaTemplate);
+                    setWaModalBillId(null);
+                  }
+                }}
+              >
+                Kirim Notifikasi
+              </Button>
+            </>
+          }
+        >
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Silakan pilih template pesan WhatsApp yang akan dikirimkan ke pelanggan untuk tagihan ini:
+            </p>
+            <div className="grid gap-2">
+              {[
+                { value: "tagihan-h7", label: "H-7 (Pengingat Tagihan Baru)" },
+                { value: "reminder-h3", label: "H-3 (Pengingat Sebentar Lagi)" },
+                { value: "reminder-h5", label: "H-5 (Pengingat Medis/Penting)" },
+                { value: "jatuh_tempo", label: "Jatuh Tempo (Hari H)" },
+                { value: "limit_5hari", label: "Limit 5 Hari (Segera Isolir)" },
+                { value: "isolir_20hari", label: "Isolir 20 Hari (Pemutusan sementara)" },
+                { value: "lunas", label: "Lunas (Terima Kasih)" },
+              ].map((template) => (
+                <label key={template.value} className="flex items-center gap-3 p-3 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <input
+                    type="radio"
+                    name="wa_template"
+                    value={template.value}
+                    checked={selectedWaTemplate === template.value}
+                    onChange={(e) => setSelectedWaTemplate(e.target.value)}
+                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                  />
+                  <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{template.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </Modal>
+      )}
     </section>
   );
 }
