@@ -102,7 +102,9 @@ const initWhatsAppClient = (accountId = 'default') => {
         '--disable-blink-features=AutomationControlled',
         '--disable-features=IsolateOrigins,site-per-process',
         '--disable-site-isolation-trials',
-        '--disable-web-security',
+        // NOTE: --disable-web-security DIHAPUS — flag ini mematikan same-origin policy
+        // di dalam renderer Chromium, membuka celah RCE jika WhatsApp Web merender
+        // konten berbahaya (payload XSS, gambar exploit, dsb.) langsung di server.
         // Low-memory flags for VPS
         '--disable-background-networking',
         '--disable-default-apps',
@@ -192,13 +194,9 @@ const initWhatsAppClient = (accountId = 'default') => {
             global.io.emit('account_status', { accountId, ready: false, hasQr: false });
         }
         sendDiscordNotification(`⚠️ **[${accountId}]** WhatsApp Client Disconnected! Reason: ${reason}`);
-        // Destroy client dulu sebelum reconnect agar Chrome lama tidak OOM-kill Chrome baru
-        try {
-            await client.destroy();
-            logger.info(`[${accountId}] Browser destroyed after disconnect.`);
-        } catch (e) {
-            logger.warn(`[${accountId}] Error destroying client after disconnect: ${e.message}`);
-        }
+        // Destroy client dengan timeout 5 detik agar tidak pernah hang selamanya
+        // (mitigasi deadlock jika socket Puppeteer sudah crash tanpa exit code bersih)
+        await destroyWithTimeout(client, accountId, 5000);
         scheduleReconnect(accountId);
     });
 
@@ -211,7 +209,7 @@ const initWhatsAppClient = (accountId = 'default') => {
         const errMsg = err ? (err.stack || err.message || (typeof err === 'string' ? err : JSON.stringify(err))) : 'Unknown initialize error';
         logger.error(`[${accountId}] Failed to initialize client: ${errMsg}`, { error: err });
         readyStatuses.set(accountId, false);
-        try { await client.destroy(); } catch (e) { }
+        await destroyWithTimeout(client, accountId, 5000);
         scheduleReconnect(accountId);
     });
 
@@ -312,6 +310,25 @@ const removeAccount = async (accountId) => {
     return true;
 };
 
+/**
+ * Menghancurkan Puppeteer client dengan batas waktu (timeout) agar tidak
+ * pernah hang selamanya jika browser sudah crash tanpa exit code yang bersih.
+ * @param {import('whatsapp-web.js').Client} client
+ * @param {string} accountId
+ * @param {number} [timeoutMs=5000]
+ */
+const destroyWithTimeout = (client, accountId, timeoutMs = 5000) => {
+    return Promise.race([
+        client.destroy()
+            .then(() => logger.info(`[${accountId}] Browser berhasil dihancurkan.`))
+            .catch(e => logger.warn(`[${accountId}] Error saat destroy client: ${e.message}`)),
+        new Promise(resolve => setTimeout(() => {
+            logger.warn(`[${accountId}] destroy() melebihi batas waktu ${timeoutMs}ms — diabaikan, lanjut reconnect.`);
+            resolve();
+        }, timeoutMs))
+    ]);
+};
+
 const scheduleReconnect = (accountId = 'default') => {
     if (reconnectTimers.has(accountId)) {
         logger.info(`[${accountId}] Reconnect already scheduled. Skipping duplicate scheduleReconnect.`);
@@ -326,11 +343,7 @@ const scheduleReconnect = (accountId = 'default') => {
             clients.delete(accountId);
             readyStatuses.delete(accountId);
             qrs.delete(accountId);
-            try {
-                await client.destroy();
-            } catch (err) {
-                logger.warn(`[${accountId}] Error destroying client during reconnect: ${err.message}`);
-            }
+            await destroyWithTimeout(client, accountId, 5000);
         }
         initWhatsAppClient(accountId);
     }, 10000);

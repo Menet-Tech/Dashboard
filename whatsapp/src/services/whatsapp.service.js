@@ -1,4 +1,35 @@
-global.automatedMessageIds = global.automatedMessageIds || new Set();
+// Ganti Set tak terbatas dengan Map berbasis TTL (15 menit) untuk mencegah memory leak.
+// Setiap entri menyimpan timestamp sehingga dapat dibersihkan secara periodik.
+global._automatedMessageIds = global._automatedMessageIds || new Map();
+const AUTOMATED_MSG_TTL_MS = 15 * 60 * 1000; // 15 menit
+
+// Bersihkan entri yang sudah kadaluarsa setiap 5 menit
+if (!global._automatedMsgCleanupRegistered) {
+    global._automatedMsgCleanupRegistered = true;
+    setInterval(() => {
+        const now = Date.now();
+        for (const [key, ts] of global._automatedMessageIds.entries()) {
+            if (now - ts > AUTOMATED_MSG_TTL_MS) {
+                global._automatedMessageIds.delete(key);
+            }
+        }
+    }, 5 * 60 * 1000);
+}
+
+/** Catat ID pesan outbound otomatis agar tidak dihitung sebagai balasan admin manual. */
+const registerAutomatedMessage = (result) => {
+    if (result && result.id) {
+        const now = Date.now();
+        if (result.id.id)          global._automatedMessageIds.set(result.id.id, now);
+        if (result.id._serialized) global._automatedMessageIds.set(result.id._serialized, now);
+    }
+};
+
+/**
+ * Cek apakah ID pesan termasuk pesan otomatis.
+ * Digunakan oleh events.js untuk mengecek `message_create`.
+ */
+const isAutomatedMessage = (msgId) => global._automatedMessageIds.has(msgId);
 
 const logger = require('../utils/logger');
 const getClient = (accountId) => {
@@ -50,8 +81,7 @@ const sendTextMessage = async (accountId, to, text, quotedMessageId = null, is_m
         const result = await client.sendMessage(chatId, text, options);
         logger.debug(`[sendTextMessage] result type=${typeof result}, hasId=${!!(result && result.id)}, result=${JSON.stringify(result?.id)}`);
         if (!is_manual && result && result.id) {
-            global.automatedMessageIds.add(result.id.id);
-            global.automatedMessageIds.add(result.id._serialized);
+            registerAutomatedMessage(result);
         }
         // Simpan ke database
         try {
@@ -83,10 +113,8 @@ const sendMediaMessage = async (accountId, to, filePath, caption = '', quotedMes
         const options = { caption, ...(quotedMessageId ? { quotedMessageId } : {}) };
         const result = await client.sendMessage(chatId, media, options);
         if (!is_manual && result && result.id) {
-            global.automatedMessageIds.add(result.id.id);
-            global.automatedMessageIds.add(result.id._serialized);
+            registerAutomatedMessage(result);
         }
-        // Simpan ke database
         try { 
             const newId = saveMessage(to, caption || '[media]', 'media', result?.id?._serialized, 'outbound', null, accountId); 
             if (global.io) {
@@ -110,8 +138,7 @@ const sendButtonMessage = async (accountId, to, body, buttons, title, footer, is
         const buttonObj = new Buttons(body, buttons, title, footer);
         const result = await client.sendMessage(chatId, buttonObj);
         if (!is_manual && result && result.id) {
-            global.automatedMessageIds.add(result.id.id);
-            global.automatedMessageIds.add(result.id._serialized);
+            registerAutomatedMessage(result);
         }
         try { recordOutboundMessage(accountId, to, title || body || 'Button Message', 'button', result); } catch (_) { }
         return result;
@@ -127,8 +154,7 @@ const sendListMessage = async (accountId, to, body, buttonText, sections, title,
         const listObj = new List(body, buttonText, sections, title, footer);
         const result = await client.sendMessage(chatId, listObj);
         if (!is_manual && result && result.id) {
-            global.automatedMessageIds.add(result.id.id);
-            global.automatedMessageIds.add(result.id._serialized);
+            registerAutomatedMessage(result);
         }
         try { recordOutboundMessage(accountId, to, title || body || 'List Message', 'list', result); } catch (_) { }
         return result;
@@ -186,5 +212,7 @@ module.exports = {
     isRegisteredUser,
     createGroup,
     getChats,
-    getChatById
+    getChatById,
+    isAutomatedMessage,
+    registerAutomatedMessage,
 };

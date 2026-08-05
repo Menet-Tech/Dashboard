@@ -24,6 +24,11 @@ const sendMessage = async (req, res, next) => {
         // Return cached response immediately if this is a retry for the same send attempt in RAM.
         if (idempotencyKey && idempotencyCache.has(idempotencyKey)) {
             const cached = idempotencyCache.get(idempotencyKey);
+            // Jika sedang dalam proses pengiriman (pending), tolak untuk mencegah double-send
+            if (cached.status === 'pending') {
+                logger.warn(`[Messages] Idempotency key ${idempotencyKey} sedang dalam proses (pending) — menolak request duplikat`);
+                return res.status(429).json({ status: 'error', message: 'Request sedang diproses, coba beberapa saat lagi' });
+            }
             logger.info(`[Messages] Idempotency hit in RAM for key ${idempotencyKey} — returning cached response`);
             return res.json(cached.response);
         }
@@ -61,10 +66,26 @@ const sendMessage = async (req, res, next) => {
             }
         }
 
+        // Kunci request dengan status 'pending' di RAM sebelum memulai pengiriman.
+        // Ini mencegah race condition jika 2 request paralel dengan key yang sama masuk
+        // pada saat bersamaan (keduanya lolos cek di atas, tapi hanya 1 yang boleh lanjut).
+        if (idempotencyKey) {
+            idempotencyCache.set(idempotencyKey, { status: 'pending', ts: Date.now() });
+        }
+
         // Record time just before sending so we can verify in DB afterward
         const sendAttemptTime = new Date().toISOString();
 
-        const result = await sendTextMessage(req.accountId, to, text, quotedMessageId, is_manual, idempotencyKey);
+        let result;
+        try {
+            result = await sendTextMessage(req.accountId, to, text, quotedMessageId, is_manual, idempotencyKey);
+        } catch (err) {
+            // Hapus lock pending jika pengiriman gagal agar retry berikutnya bisa mencoba lagi
+            if (idempotencyKey && idempotencyCache.get(idempotencyKey)?.status === 'pending') {
+                idempotencyCache.delete(idempotencyKey);
+            }
+            throw err;
+        }
 
         // whatsapp-web.js sometimes returns null/undefined even after successfully
         // delivering the message (confirmed: message appears in wa_gateway.db messages table).
@@ -98,9 +119,9 @@ const sendMessage = async (req, res, next) => {
 
         const responseBody = { status: 'success', message: 'Message sent', id: messageId };
 
-        // Cache successful send so retries don't cause duplicate delivery.
+        // Ganti status pending dengan respons final agar retry berikutnya langsung dapat respons cached.
         if (idempotencyKey) {
-            idempotencyCache.set(idempotencyKey, { response: responseBody, ts: Date.now() });
+            idempotencyCache.set(idempotencyKey, { status: 'done', response: responseBody, ts: Date.now() });
             try {
                 const db = getDb();
                 if (db && messageId) {

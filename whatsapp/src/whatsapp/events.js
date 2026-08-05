@@ -1,7 +1,7 @@
 const logger = require('../utils/logger');
 const { saveMessage, getGatewaySetting, getSession } = require('../utils/database');
 const { handleMessage } = require('../services/chatbot.service');
-const { sendTextMessage, sendMediaMessage } = require('../services/whatsapp.service');
+const { sendTextMessage, sendMediaMessage, isAutomatedMessage } = require('../services/whatsapp.service');
 const { findReplyRule } = require('../services/autoReply.service');
 const {
     getSettings,
@@ -27,11 +27,9 @@ const setupEvents = (client, accountId) => {
     // Track admin outbound messages to enforce 15-minute cooldown
     client.on('message_create', (message) => {
         if (message.fromMe) {
-            // Check if this is an automated outbound alert (should not count as manual admin reply)
-            const automatedIds = global.automatedMessageIds || new Set();
-            if (automatedIds.has(message.id.id) || automatedIds.has(message.id._serialized)) {
-                automatedIds.delete(message.id.id);
-                automatedIds.delete(message.id._serialized);
+            // Cek apakah pesan ini adalah notifikasi otomatis yang dikirim oleh sistem.
+            // Gunakan isAutomatedMessage() agar tidak bergantung langsung ke global state.
+            if (isAutomatedMessage(message.id.id) || isAutomatedMessage(message.id._serialized)) {
                 logger.debug(`[${accountId}] Balasan admin diabaikan karena terdeteksi sebagai notifikasi otomatis system: ${message.id.id}`);
                 return;
             }

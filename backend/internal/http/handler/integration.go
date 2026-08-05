@@ -41,6 +41,28 @@ func NewIntegrationHandler(settingsService settings.Service, whatsAppService not
 	}
 }
 
+// requireHTTPSForRemoteGateway memastikan bahwa URL gateway menggunakan HTTPS
+// jika host bukan localhost/127.0.0.1. Ini mencegah API Key dikirim dalam plaintext
+// melalui jaringan (CWE-319 / OWASP A02: Cryptographic Failures).
+// Mengembalikan error string jika URL berbahaya, string kosong jika aman.
+func requireHTTPSForRemoteGateway(rawURL string) string {
+	if rawURL == "" {
+		return ""
+	}
+	// Izinkan HTTP hanya untuk localhost dan loopback
+	lower := strings.ToLower(rawURL)
+	isLocal := strings.Contains(lower, "://localhost") ||
+		strings.Contains(lower, "://127.0.0.1") ||
+		strings.Contains(lower, "://[::1]")
+	if isLocal {
+		return ""
+	}
+	if strings.HasPrefix(lower, "http://") {
+		return "Gateway URL harus menggunakan HTTPS untuk host non-localhost demi melindungi API Key dari penyadapan jaringan (Man-in-the-Middle Attack). Gunakan https:// sebagai skema URL."
+	}
+	return ""
+}
+
 // resolveActiveMikrotik returns the host, username, and password to use for a
 // MikroTik operation. It first checks the old single-router settings keys;
 // if those are empty it falls back to the first active router in the DB table.
@@ -585,6 +607,11 @@ func (h IntegrationHandler) TestWhatsApp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	gatewayURL := strings.TrimRight(settings.ResolveWAGatewayURL(payload.GatewayURL), "/")
+	// Tolak jika URL bukan localhost tapi menggunakan HTTP plaintext — API Key akan terekspos
+	if errMsg := requireHTTPSForRemoteGateway(gatewayURL); errMsg != "" {
+		WriteError(w, http.StatusBadRequest, errMsg)
+		return
+	}
 	statusURL := fmt.Sprintf("%s/api/v1/status", gatewayURL)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, statusURL, nil)
 	if err != nil {
