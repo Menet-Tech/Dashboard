@@ -635,6 +635,30 @@ for svc in "${SERVICES[@]}"; do
 done
 log_success "Seluruh layanan utama (API + Worker) berhasil dijalankan!"
 
+# ──── Pasang monitor-chrome.sh sebagai cronjob ────────────────────────────────
+log_step "Pasang Monitor Chrome (Anti-Zombie Cronjob)"
+MONITOR_SCRIPT="/usr/local/bin/menettech-monitor-chrome"
+if [[ -f "${SCRIPT_DIR}/deploy/monitor-chrome.sh" ]]; then
+    cp "${SCRIPT_DIR}/deploy/monitor-chrome.sh" "${MONITOR_SCRIPT}"
+    chmod +x "${MONITOR_SCRIPT}"
+    # Pasang cronjob untuk root, cek dulu apakah sudah ada agar idempotent
+    CRON_ENTRY="*/10 * * * * ${MONITOR_SCRIPT} >> /var/log/menettech-monitor-chrome.log 2>&1"
+    if crontab -l 2>/dev/null | grep -qF "${MONITOR_SCRIPT}"; then
+        log_info "Cronjob monitor-chrome sudah terpasang, dilewati."
+    else
+        ( crontab -l 2>/dev/null; echo "${CRON_ENTRY}" ) | crontab -
+        log_success "Cronjob monitor-chrome terpasang (setiap 10 menit): ${MONITOR_SCRIPT}"
+    fi
+else
+    log_warn "File monitor-chrome.sh tidak ditemukan, cronjob tidak dipasang."
+fi
+
+# ──── Pasang logrotate config ──────────────────────────────────────────────────
+if [[ -f "${SCRIPT_DIR}/deploy/logrotate/menettech" ]]; then
+    cp "${SCRIPT_DIR}/deploy/logrotate/menettech" /etc/logrotate.d/menettech
+    log_success "Logrotate config terpasang: /etc/logrotate.d/menettech"
+fi
+
 # ══════════════════════════════════════════════════════════════════════════════
 # RINGKASAN & PANDUAN AKSES
 # ══════════════════════════════════════════════════════════════════════════════

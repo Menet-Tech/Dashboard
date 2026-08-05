@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/url"
 	"os"
 	"os/exec"
@@ -22,18 +23,33 @@ type ServiceManager struct {
 	sqlitePath          string
 	mu                  sync.Mutex
 	processes           map[string]*exec.Cmd
+	restartAttempts     map[string]int   // tracks consecutive crash-restart attempts per service
+	processStartedAt    map[string]time.Time // tracks when each process was last started
 	runningWAAPIKey     string
 	runningWAGatewayURL string
 	runningWAAccountID  string
 	runningDiscordToken string
 }
 
+const (
+	// maxRestartAttempts is the maximum number of consecutive crash-restarts before giving up.
+	maxRestartAttempts = 10
+	// minRestartDelay is the base delay for the first restart attempt.
+	minRestartDelay = 5 * time.Second
+	// maxRestartDelay caps the exponential backoff.
+	maxRestartDelay = 5 * time.Minute
+	// stableRunDuration resets the restart counter if a process lives longer than this.
+	stableRunDuration = 2 * time.Minute
+)
+
 func NewServiceManager(settingsSvc settings.Service, logger *slog.Logger, sqlitePath string) *ServiceManager {
 	return &ServiceManager{
-		settingsSvc: settingsSvc,
-		logger:      logger,
-		sqlitePath:  sqlitePath,
-		processes:   make(map[string]*exec.Cmd),
+		settingsSvc:      settingsSvc,
+		logger:           logger,
+		sqlitePath:       sqlitePath,
+		processes:        make(map[string]*exec.Cmd),
+		restartAttempts:  make(map[string]int),
+		processStartedAt: make(map[string]time.Time),
 	}
 }
 
@@ -251,6 +267,7 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 	}
 
 	s.processes["whatsapp"] = cmd
+	s.processStartedAt["whatsapp"] = time.Now()
 	s.runningWAAPIKey = waAPIKey
 	s.runningWAGatewayURL = waGatewayURL
 	s.runningWAAccountID = waAccountID
@@ -265,9 +282,33 @@ func (s *ServiceManager) startWhatsApp(ctx context.Context) error {
 			delete(s.processes, "whatsapp")
 			s.logger.Warn("WhatsApp Gateway service exited", "error", err)
 
-			// Auto-restart if still enabled (with a delay to prevent tight loop)
+			// If the process ran stably for more than stableRunDuration, reset the counter.
+			if startedAt, ok := s.processStartedAt["whatsapp"]; ok && time.Since(startedAt) > stableRunDuration {
+				s.logger.Info("WhatsApp Gateway ran stably, resetting restart counter")
+				s.restartAttempts["whatsapp"] = 0
+			}
+
+			attemptsNow := s.restartAttempts["whatsapp"]
+			if attemptsNow >= maxRestartAttempts {
+				s.logger.Error("WhatsApp Gateway has crashed too many times. Giving up to prevent resource exhaustion.",
+					"attempts", attemptsNow)
+				return
+			}
+
+			// Exponential backoff: 5s, 10s, 20s, 40s ... up to maxRestartDelay
+			delay := time.Duration(float64(minRestartDelay) * math.Pow(2, float64(attemptsNow)))
+			if delay > maxRestartDelay {
+				delay = maxRestartDelay
+			}
+			s.restartAttempts["whatsapp"]++
+			s.logger.Warn("WhatsApp Gateway will be restarted with backoff",
+				"attempt", s.restartAttempts["whatsapp"],
+				"max_attempts", maxRestartAttempts,
+				"delay", delay)
+
+			// Auto-restart if still enabled (with exponential backoff)
 			go func() {
-				time.Sleep(5 * time.Second)
+				time.Sleep(delay)
 				s.mu.Lock()
 				enabledStr, _ := s.settingsSvc.GetString(context.Background(), settings.KeyWAGatewayEnabled)
 				s.mu.Unlock()
@@ -347,6 +388,7 @@ func (s *ServiceManager) startDiscord(ctx context.Context) error {
 	discordToken, _ := s.settingsSvc.GetString(ctx, "discord_bot_token")
 
 	s.processes["discord"] = cmd
+	s.processStartedAt["discord"] = time.Now()
 	s.runningDiscordToken = discordToken
 	s.logger.Info("Discord Bot started successfully", "pid", cmd.Process.Pid)
 
@@ -359,9 +401,31 @@ func (s *ServiceManager) startDiscord(ctx context.Context) error {
 			delete(s.processes, "discord")
 			s.logger.Warn("Discord Bot service exited", "error", err)
 
-			// Auto-restart if still enabled (with a delay to prevent tight loop)
+			// If the process ran stably for more than stableRunDuration, reset the counter.
+			if startedAt, ok := s.processStartedAt["discord"]; ok && time.Since(startedAt) > stableRunDuration {
+				s.logger.Info("Discord Bot ran stably, resetting restart counter")
+				s.restartAttempts["discord"] = 0
+			}
+
+			attemptsNow := s.restartAttempts["discord"]
+			if attemptsNow >= maxRestartAttempts {
+				s.logger.Error("Discord Bot has crashed too many times. Giving up to prevent resource exhaustion.",
+					"attempts", attemptsNow)
+				return
+			}
+
+			delay := time.Duration(float64(minRestartDelay) * math.Pow(2, float64(attemptsNow)))
+			if delay > maxRestartDelay {
+				delay = maxRestartDelay
+			}
+			s.restartAttempts["discord"]++
+			s.logger.Warn("Discord Bot will be restarted with backoff",
+				"attempt", s.restartAttempts["discord"],
+				"max_attempts", maxRestartAttempts,
+				"delay", delay)
+
 			go func() {
-				time.Sleep(5 * time.Second)
+				time.Sleep(delay)
 				s.mu.Lock()
 				enabledStr, _ := s.settingsSvc.GetString(context.Background(), settings.KeyDiscordBotEnabled)
 				s.mu.Unlock()

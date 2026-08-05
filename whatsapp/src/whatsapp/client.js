@@ -12,6 +12,11 @@ const clients = new Map();
 const qrs = new Map();
 const readyStatuses = new Map();
 const reconnectTimers = new Map();
+const reconnectAttempts = new Map(); // tracks consecutive reconnect failures per accountId
+
+const MAX_RECONNECT_ATTEMPTS = 8;
+const BASE_RECONNECT_DELAY_MS = 10_000; // 10 seconds
+const MAX_RECONNECT_DELAY_MS = 5 * 60_000; // 5 minutes
 
 const sessionRoot = path.resolve(__dirname, 'sessions');
 
@@ -179,6 +184,8 @@ const initWhatsAppClient = (accountId = 'default') => {
         logger.info(`[${accountId}] WhatsApp client is ready!`);
         readyStatuses.set(accountId, true);
         qrs.delete(accountId); // Hapus QR setelah ready
+        // Reset reconnect counter karena koneksi berhasil
+        reconnectAttempts.set(accountId, 0);
         if (global.io) {
             global.io.emit('account_status', { accountId, ready: true, hasQr: false });
         }
@@ -334,7 +341,25 @@ const scheduleReconnect = (accountId = 'default') => {
         logger.info(`[${accountId}] Reconnect already scheduled. Skipping duplicate scheduleReconnect.`);
         return;
     }
-    logger.info(`Scheduling reconnect for ${accountId} in 10 seconds...`);
+
+    const attempts = (reconnectAttempts.get(accountId) || 0);
+    if (attempts >= MAX_RECONNECT_ATTEMPTS) {
+        logger.error(`[${accountId}] Reached maximum reconnect attempts (${MAX_RECONNECT_ATTEMPTS}). Exiting process for clean systemd restart.`);
+        sendDiscordNotification(
+            `🔴 **[${accountId}]** WhatsApp Gateway telah gagal reconnect ${MAX_RECONNECT_ATTEMPTS}x berturut-turut.\n` +
+            `Proses akan **dihentikan** agar systemd dapat me-restart ulang dengan bersih.\n` +
+            `⚠️ Periksa log server untuk diagnosis lebih lanjut.`
+        ).finally(() => {
+            process.exit(1);
+        });
+        return;
+    }
+
+    // Exponential backoff: 10s, 20s, 40s, 80s ... up to MAX_RECONNECT_DELAY_MS
+    const delay = Math.min(BASE_RECONNECT_DELAY_MS * Math.pow(2, attempts), MAX_RECONNECT_DELAY_MS);
+    reconnectAttempts.set(accountId, attempts + 1);
+
+    logger.info(`Scheduling reconnect for ${accountId} in ${delay / 1000}s (attempt ${attempts + 1}/${MAX_RECONNECT_ATTEMPTS})...`);
     const timer = setTimeout(async () => {
         reconnectTimers.delete(accountId);
         logger.info(`Attempting to reconnect ${accountId}...`);
@@ -346,7 +371,7 @@ const scheduleReconnect = (accountId = 'default') => {
             await destroyWithTimeout(client, accountId, 5000);
         }
         initWhatsAppClient(accountId);
-    }, 10000);
+    }, delay);
     reconnectTimers.set(accountId, timer);
 };
 
