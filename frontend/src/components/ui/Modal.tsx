@@ -23,6 +23,11 @@ export function Modal({ title, children, actions, onClose, zIndexClass = "z-[80]
   const modalRef = useRef<HTMLElement>(null);
   const titleId = useId();
 
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     const el = modalRef.current;
     if (!el) return;
@@ -35,14 +40,19 @@ export function Modal({ title, children, actions, onClose, zIndexClass = "z-[80]
         (node) => !node.closest("[hidden]")
       );
 
-    // Set initial focus on first focusable element
+    // Set initial focus on first focusable element ONLY ONCE when modal mounts
     const focusables = getFocusable();
-    focusables[0]?.focus();
+    if (focusables.length > 0) {
+      // Don't focus if the active element is already inside the modal
+      if (!el.contains(document.activeElement)) {
+        focusables[0]?.focus();
+      }
+    }
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -71,7 +81,7 @@ export function Modal({ title, children, actions, onClose, zIndexClass = "z-[80]
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, []);
 
   return createPortal(
     <div
