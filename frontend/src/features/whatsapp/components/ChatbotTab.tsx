@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "../../../components/ui/Button";
 import { type GatewayAccount, type ChatbotSession, type ContactForm, type AutoReplyRule, type ChatbotSettings } from "../../../lib/gatewayApi";
 import { inputClassName } from "../../../components/ui";
@@ -59,9 +59,11 @@ export function ChatbotTab({
   // Local states for chatbot settings form editing
   const [localSettings, setLocalSettings] = useState<ChatbotSettings>(chatbotSettings);
 
-  useEffect(() => {
+  const [prevSettings, setPrevSettings] = useState(chatbotSettings);
+  if (chatbotSettings !== prevSettings) {
+    setPrevSettings(chatbotSettings);
     setLocalSettings(chatbotSettings);
-  }, [chatbotSettings]);
+  }
 
   // Local state for auto reply form
   const [autoReplyForm, setAutoReplyForm] = useState({

@@ -79,9 +79,11 @@ export function WhatsAppPage({
     onError: pushError,
   });
 
-  useEffect(() => {
+  const [prevConfiguredAccountId, setPrevConfiguredAccountId] = useState(configuredAccountId);
+  if (configuredAccountId !== prevConfiguredAccountId) {
+    setPrevConfiguredAccountId(configuredAccountId);
     setQrSelectedAccountId(configuredAccountId);
-  }, [configuredAccountId]);
+  }
 
   // Fetch initial gateway details & history
   useEffect(() => {

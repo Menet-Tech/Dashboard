@@ -27,7 +27,7 @@ export async function copyToClipboard(text: string): Promise<void> {
       throw new Error("execCommand copy failed");
     }
   } catch (err) {
-    throw new Error("Gagal menyalin teks ke clipboard");
+    throw new Error("Gagal menyalin teks ke clipboard", { cause: err });
   } finally {
     document.body.removeChild(textArea);
   }

@@ -28,9 +28,16 @@ export function useWhatsAppGateway({ gatewayUrl, apiKey, onChatMessage, onError 
     onErrorRef.current = onError;
   }, [onError]);
 
-  useEffect(() => {
+  const [prevGatewayUrl, setPrevGatewayUrl] = useState(gatewayUrl);
+  if (gatewayUrl !== prevGatewayUrl) {
+    setPrevGatewayUrl(gatewayUrl);
     if (!gatewayUrl) {
       setSocketConnected(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!gatewayUrl) {
       return;
     }
 
