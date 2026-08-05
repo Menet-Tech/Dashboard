@@ -131,7 +131,7 @@ export function ChatbotTab({
         <>
           {/* Gateway Accounts Configuration */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <form onSubmit={handleSettingsSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 dark:border-slate-850/70 shadow-sm space-y-5">
+        <form onSubmit={handleSettingsSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-card border border-slate-200 dark:border-slate-800 dark:border-slate-850/70 shadow-sm space-y-5">
           <div className="flex items-start gap-3 border-b border-slate-100 dark:border-slate-800 dark:border-slate-850 pb-4">
             <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl">
               <Sliders size={20} />
@@ -203,7 +203,7 @@ export function ChatbotTab({
           </div>
         </form>
 
-        <form onSubmit={handleAddRuleSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 dark:border-slate-850/70 shadow-sm space-y-5">
+        <form onSubmit={handleAddRuleSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-card border border-slate-200 dark:border-slate-800 dark:border-slate-850/70 shadow-sm space-y-5">
           <div className="flex items-start gap-3 border-b border-slate-100 dark:border-slate-800 dark:border-slate-850 pb-4">
             <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl">
               <PlusCircle size={20} />
@@ -291,7 +291,7 @@ export function ChatbotTab({
         {editingRule && (
           <form
             onSubmit={handleEditRuleSubmit}
-            className="bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-700/50 rounded-2xl p-5 space-y-4 shadow-md"
+            className="bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-700/50 rounded-card p-5 space-y-4 shadow-md"
           >
             <div className="flex items-center justify-between border-b border-amber-200 dark:border-amber-800/40 pb-3">
               <div className="flex items-center gap-2">
@@ -528,7 +528,7 @@ export function ChatbotTab({
             Belum ada formulir pendaftaran atau keluhan support yang dikirim pelanggan.
           </div>
         ) : (
-          <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-slate-900">
+          <div className="border border-slate-200 dark:border-slate-800 rounded-card overflow-hidden shadow-sm bg-white dark:bg-slate-900">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse bg-white dark:bg-slate-900 min-w-[700px]">
                 <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase border-b border-slate-200 dark:border-slate-800">

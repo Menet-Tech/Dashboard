@@ -456,7 +456,7 @@ export function RegistrationPage({
       </div>
 
       {/* Leads Table */}
-      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm overflow-hidden flex flex-col w-full">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider font-sans">List Pendaftaran Calon Pelanggan</h3>
           <Button
@@ -470,7 +470,7 @@ export function RegistrationPage({
           </Button>
         </div>
 
-        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
+        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-card bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
           <table className="w-full text-left border-collapse text-sm min-w-[1000px]">
             <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
               <tr>

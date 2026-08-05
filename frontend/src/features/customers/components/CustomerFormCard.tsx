@@ -212,7 +212,7 @@ export function CustomerFormCard({
         </label>
 
         <div className="pt-2">
-          <label className="relative flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 hover:border-indigo-300 dark:hover:border-indigo-800 transition-all cursor-pointer select-none group shadow-xs">
+          <label className="relative flex items-center justify-between p-3.5 rounded-card border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 hover:border-indigo-300 dark:hover:border-indigo-800 transition-all cursor-pointer select-none group shadow-xs">
             <div className="flex items-center gap-3">
               <div className={`p-2.5 rounded-xl transition-colors ${customerForm.status === "trial" || customerForm.is_trial ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}>
                 <Sparkles size={16} />

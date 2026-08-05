@@ -166,7 +166,7 @@ export function Sidebar({
           return (
             <div
               key={group.id}
-              className={`border rounded-2xl overflow-hidden transition-all duration-300 ${isGroupActive
+              className={`border rounded-card overflow-hidden transition-all duration-300 ${isGroupActive
                   ? "border-indigo-500/35 bg-indigo-50/5 dark:bg-indigo-950/5 shadow-sm shadow-indigo-500/5"
                   : "border-slate-100 dark:border-slate-800 dark:border-slate-900 bg-white dark:bg-slate-900 dark:bg-slate-950/20"
                 }`}

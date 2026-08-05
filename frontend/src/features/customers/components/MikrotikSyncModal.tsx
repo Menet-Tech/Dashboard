@@ -145,7 +145,7 @@ export function MikrotikSyncModal({
               : "Tidak ada PPPoE secret yang cocok dengan pencarian Anda."}
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto border border-slate-150 dark:border-slate-800/80 rounded-2xl bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="flex-1 overflow-y-auto border border-slate-150 dark:border-slate-800/80 rounded-card bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
             {filteredSecrets.map((secret) => {
               const guessedId = guessPackageId(secret.profile);
               const matchedPkg = packages.find((p) => p.id === guessedId);

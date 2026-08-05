@@ -5,7 +5,7 @@
 export function SkeletonCard() {
   return (
     <article
-      className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm"
+      className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-5 shadow-sm"
       aria-hidden="true"
     >
       <div className="flex flex-col gap-3">

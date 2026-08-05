@@ -91,7 +91,7 @@ export function QrTab({
       )}
 
       {/* QR Card Container */}
-      <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center shadow-inner relative min-h-[350px]">
+      <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-6 flex flex-col items-center justify-center shadow-inner relative min-h-[350px]">
         {!target ? (
           <p className="text-slate-500 dark:text-slate-400 text-sm">Pilih atau buat akun gateway terlebih dahulu.</p>
         ) : target.ready ? (

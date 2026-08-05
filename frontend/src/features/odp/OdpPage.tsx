@@ -284,13 +284,13 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
       </div>
 
       {/* ODP List Table */}
-      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm overflow-hidden flex flex-col">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider font-sans">Daftar Titik ODP</h3>
           <StatusPill label={`${odps.length} Node`} tone="slate" />
         </div>
 
-        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
+        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-card bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
           <table className="w-full text-left border-collapse text-sm min-w-[800px]">
             <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400">
               <tr>

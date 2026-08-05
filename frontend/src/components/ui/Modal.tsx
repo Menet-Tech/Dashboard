@@ -81,7 +81,7 @@ export function Modal({ title, children, actions, onClose, zIndexClass = "z-[80]
     >
       <section
         ref={modalRef}
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -94,14 +94,15 @@ export function Modal({ title, children, actions, onClose, zIndexClass = "z-[80]
           >
             {title}
           </h2>
-          <button
+          <Button
             type="button"
-            className="text-gray-400 dark:text-slate-500 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-800 dark:hover:text-slate-300 p-2 rounded-lg transition-colors cursor-pointer text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            variant="ghost"
+            size="sm"
             onClick={onClose}
             aria-label="Tutup dialog"
           >
             Tutup
-          </button>
+          </Button>
         </div>
         <div className="p-6 overflow-y-auto">{children}</div>
         {actions && (

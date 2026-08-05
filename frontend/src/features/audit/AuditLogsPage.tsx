@@ -95,7 +95,7 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
 
   return (
     <section className="grid gap-6">
-      <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+      <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
             <label className="block">
@@ -152,7 +152,7 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
         </div>
       </article>
 
-      <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden">
+      <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card p-6 shadow-sm overflow-hidden">
         <div className="overflow-x-auto border border-slate-100 dark:border-slate-800 rounded-xl">
           <table className="w-full text-left border-collapse text-sm">
             <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400">

@@ -154,7 +154,7 @@ export function DashboardPage({
           summaryCards.map((card) => (
             <article
               key={card.key}
-              className={`bg-white dark:bg-slate-900 border-x border-b border-slate-200 dark:border-slate-800 ${card.color} border-t-4 rounded-2xl p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between`}
+              className={`bg-white dark:bg-slate-900 border-x border-b border-slate-200 dark:border-slate-800 ${card.color} border-t-4 rounded-card p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between`}
             >
               <span className="text-xs font-bold text-slate-400 dark:text-slate-500 dark:text-slate-550 uppercase tracking-wider mb-2">{card.label}</span>
               <strong className="text-xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">
@@ -170,7 +170,7 @@ export function DashboardPage({
 
       {user?.role === "admin" && (
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+          <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card p-5 shadow-sm">
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider mb-4">Pendapatan Bulanan</h3>
             {safeRevenue.length > 0 ? (
               <div className="h-72">
@@ -231,7 +231,7 @@ export function DashboardPage({
               </div>
             )}
           </article>
-          <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+          <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card p-5 shadow-sm">
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider mb-4">Aging Piutang (Belum Bayar)</h3>
             {aging && (aging.current > 0 || aging.days_1_30 > 0 || aging.days_31_60 > 0 || aging.over_60 > 0) ? (
               <div className="max-w-xs mx-auto">
@@ -267,7 +267,7 @@ export function DashboardPage({
       )}
 
       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow hover:shadow-md transition-shadow flex items-start gap-4">
+        <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card p-5 shadow hover:shadow-md transition-shadow flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
           </div>
@@ -285,7 +285,7 @@ export function DashboardPage({
             </div>
           </div>
         </article>
-        <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow hover:shadow-md transition-shadow flex items-start gap-4">
+        <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card p-5 shadow hover:shadow-md transition-shadow flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
           </div>
@@ -308,12 +308,12 @@ export function DashboardPage({
       </section>
 
       <section className="grid grid-cols-1">
-        <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+        <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 uppercase tracking-wider">5 Pembayaran Terbaru</h2>
             <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full uppercase tracking-wider">Realisasi Kas</span>
           </div>
-          <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
+          <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-card bg-white dark:bg-slate-900 shadow-sm">
             <table className="w-full text-left border-collapse text-sm min-w-[600px]">
               <thead className="bg-gray-50 dark:bg-slate-800 dark:bg-slate-950 border-b border-gray-250 dark:border-slate-850 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">
                 <tr>
@@ -353,7 +353,7 @@ export function DashboardPage({
       </section>
 
       <section className="grid grid-cols-1">
-        <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+        <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-5 shadow-sm">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-sm font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 uppercase tracking-wider">Service Snapshot</h2>
             <StatusPill label={health?.status ?? "checking"} tone={appTone} />

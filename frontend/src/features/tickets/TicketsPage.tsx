@@ -335,7 +335,7 @@ export function TicketsPage({
   return (
     <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)] min-h-[500px]">
       {/* Left pane: list of tickets */}
-      <article className="lg:col-span-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col h-full">
+      <article className="lg:col-span-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm flex flex-col h-full">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 flex items-center gap-1.5 font-sans">
@@ -420,10 +420,10 @@ export function TicketsPage({
       </article>
 
       {/* Right pane: ticket details & messages thread */}
-      <article className="lg:col-span-7 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-sm flex flex-col h-full overflow-hidden">
+      <article className="lg:col-span-7 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card shadow-sm flex flex-col h-full overflow-hidden">
         {selectedTicketId === null ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50/50 dark:bg-slate-950/20">
-            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-2xl flex items-center justify-center mb-4">
+            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-card flex items-center justify-center mb-4">
               <svg
                 width="28"
                 height="28"
@@ -520,7 +520,7 @@ export function TicketsPage({
                         className={`flex flex-col max-w-[85%] ${isAdmin ? "self-end items-end" : "self-start items-start"}`}
                       >
                         <div
-                          className={`p-3.5 rounded-2xl text-xs leading-relaxed shadow-sm ${
+                          className={`p-3.5 rounded-card text-xs leading-relaxed shadow-sm ${
                             isAdmin
                               ? "bg-indigo-600 text-white rounded-tr-none"
                               : "bg-white dark:bg-slate-900 dark:bg-slate-800 text-slate-700 dark:text-slate-300 dark:text-slate-200 border border-slate-200 dark:border-slate-800 dark:border-slate-700 rounded-tl-none"
@@ -795,7 +795,7 @@ export function TicketsPage({
       {/* Manual Ticket Creation Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-md rounded-2xl shadow-xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-md rounded-card shadow-xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Header */}
             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-950/20">
               <div>

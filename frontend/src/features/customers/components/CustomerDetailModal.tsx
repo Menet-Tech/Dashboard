@@ -231,7 +231,7 @@ export function CustomerDetailModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-slate-150 animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-white dark:bg-slate-900 rounded-card max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-slate-150 animate-in fade-in zoom-in-95 duration-200">
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-150 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
           <div>
@@ -257,7 +257,7 @@ export function CustomerDetailModal({
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
           {customer.is_trial && (
-            <div className="bg-amber-50 border border-amber-250 dark:bg-slate-900/60 dark:border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="bg-amber-50 border border-amber-250 dark:bg-slate-900/60 dark:border-amber-500/30 rounded-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-250 dark:border-amber-500/20">
                   Masa Trial Aktif
@@ -288,7 +288,7 @@ export function CustomerDetailModal({
           )}
 
           {/* Profile Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-150">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50 dark:bg-slate-950 p-5 rounded-card border border-slate-150">
             <div>
               <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Nama Lengkap</span>
               <strong className="text-slate-800 dark:text-slate-100 text-sm mt-0.5 block">{customer.name}</strong>
@@ -630,7 +630,7 @@ export function CustomerDetailModal({
           </div>
 
           {/* Integration Status Cache */}
-          <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl space-y-4">
+          <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-5 rounded-card space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
               <span className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider block font-sans">
                 Status Integrasi (Data Terakhir Di-Pool)
@@ -731,7 +731,7 @@ export function CustomerDetailModal({
           </div>
 
           {/* Referral Management Card */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl space-y-4 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-card space-y-4 shadow-sm">
             <div className="border-b border-slate-100 dark:border-slate-800 pb-2 flex justify-between items-center">
               <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider font-sans">
                 Referral Reward & Voucher
@@ -784,7 +784,7 @@ export function CustomerDetailModal({
           </div>
 
           {/* Customer Bills list */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl space-y-4 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-card space-y-4 shadow-sm">
             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider font-sans border-b border-slate-100 dark:border-slate-800 pb-2">
               Riwayat Tagihan
             </h4>

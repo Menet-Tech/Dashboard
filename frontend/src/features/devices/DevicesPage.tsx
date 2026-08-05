@@ -440,7 +440,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
             {activeTab === "mikrotik" && (
               <div className="space-y-6 animate-in fade-in duration-200">
                 {/* 1. Customer Database Matching */}
-                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-5 shadow-sm">
                   <div className="flex items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <User size={18} className="text-indigo-500" />
                     <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -509,7 +509,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                 </div>
 
                 {/* 2. MikroTik Router PPP Secret details */}
-                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-5 shadow-sm">
                   <div className="flex items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <Shield size={18} className="text-indigo-500" />
                     <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -566,7 +566,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                 </div>
 
                 {/* 3. MikroTik Router PPP Active Session details */}
-                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-5 shadow-sm">
                   <div className="flex items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <Activity size={18} className="text-indigo-500" />
                     <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -610,7 +610,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
             {activeTab === "wan" && (
               <div className="space-y-6 animate-in fade-in duration-200">
                 {/* 1. Fiber Mode */}
-                <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+                <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card p-5 shadow-sm">
                   <div className="flex items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <Activity size={18} className="text-indigo-500" />
                     <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -654,7 +654,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                         return (
                           <div 
                             key={`${conn.path}-${idx}`} 
-                            className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden"
+                            className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card p-5 shadow-sm relative overflow-hidden"
                           >
                             <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600" />
                             
@@ -744,7 +744,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                       })}
                     </div>
                   ) : (
-                    <div className="p-8 text-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 rounded-2xl border border-dashed">
+                    <div className="p-8 text-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 rounded-card border border-dashed">
                       Tidak ada koneksi WAN aktif.
                     </div>
                   )}
@@ -769,7 +769,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                           return (
                             <div 
                               key={wlanKey} 
-                              className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm relative overflow-hidden"
+                              className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-card shadow-sm relative overflow-hidden"
                             >
                               <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-2.5 mb-3">
                                 <div>
@@ -813,7 +813,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                           );
                         })
                     ) : (
-                      <div className="col-span-2 p-8 text-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 rounded-2xl border border-dashed">
+                      <div className="col-span-2 p-8 text-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 rounded-card border border-dashed">
                         Informasi WiFi tidak tersedia.
                       </div>
                     )}
@@ -826,7 +826,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                     <Database size={14} className="text-indigo-500" />
                     Klien Terhubung (Daftar Host Aktif)
                   </h4>
-                  <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl">
+                  <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-card">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 border-b border-slate-250 dark:border-slate-850 text-slate-500 dark:text-slate-400">
                         <tr>
@@ -926,7 +926,7 @@ function FaultsPanel({ pushError }: { pushError: (msg: string) => void }) {
   }
 
   return (
-    <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
+    <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-card bg-white dark:bg-slate-900 shadow-sm">
       <table className="w-full text-left border-collapse text-sm">
         <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400">
           <tr>
@@ -1155,7 +1155,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
           { label: "Offline", value: offlineCount, color: "text-rose-700", icon: <WifiOff className="text-rose-500 shrink-0" size={20} /> },
           { label: "Tidak Diketahui", value: devices.length - onlineCount - offlineCount, color: "text-slate-500", icon: <HelpCircle className="text-slate-400 dark:text-slate-500 shrink-0" size={20} /> },
         ].map(({ label, value, color, icon }) => (
-          <article key={label} className="bg-white dark:bg-slate-900 border border-slate-150 rounded-2xl p-5 shadow-sm flex items-center justify-between hover:shadow-md hover:border-slate-200 transition-all duration-300">
+          <article key={label} className="bg-white dark:bg-slate-900 border border-slate-150 rounded-card p-5 shadow-sm flex items-center justify-between hover:shadow-md hover:border-slate-200 transition-all duration-300">
             <div className="space-y-1">
               <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{label}</p>
               <p className={`text-2xl font-black ${color}`}>{loading ? "—" : value}</p>
@@ -1168,7 +1168,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
       </div>
 
       {/* Main Card */}
-      <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+      <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card shadow-sm overflow-hidden">
         {/* Tabs & Actions */}
         <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-slate-150 bg-slate-50/50">
           <div className="flex gap-1">

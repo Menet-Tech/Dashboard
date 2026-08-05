@@ -45,7 +45,7 @@ export function UsersPage({
 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Tambah User Tim</h2>
         </div>
@@ -94,12 +94,12 @@ export function UsersPage({
         </div>
       </article>
 
-      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Daftar User</h2>
           <StatusPill label={`${managedUsers.length} user`} tone="slate" />
         </div>
-        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
+        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-card bg-white dark:bg-slate-900 shadow-sm">
           <table className="w-full text-left border-collapse text-sm">
             <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400">
               <tr>

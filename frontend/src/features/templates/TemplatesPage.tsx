@@ -419,7 +419,7 @@ export function TemplatesPage({
       </nav>
 
       {gatewayError && (activeTab === "autoreply" || activeTab === "sessions") ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="rounded-card border border-rose-200 bg-rose-50 p-4 text-rose-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="font-bold">Gateway WhatsApp bermasalah</p>
             <p className="text-sm mt-1">{gatewayError}</p>
@@ -437,7 +437,7 @@ export function TemplatesPage({
       {activeTab === "templates" && (
         <>
           {/* Templates Table Card 1: Billing & Reminders */}
-          <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
+          <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm overflow-hidden flex flex-col w-full">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider font-sans">Template Billing & Pengingat</h3>
@@ -462,7 +462,7 @@ export function TemplatesPage({
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
+            <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-card bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
               <table className="w-full text-left border-collapse text-sm min-w-[700px]">
                 <thead className="bg-gray-50 dark:bg-slate-800 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
                   <tr>
@@ -518,7 +518,7 @@ export function TemplatesPage({
           </article>
 
           {/* Templates Table Card 2: Chatbot Templates */}
-          <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
+          <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm overflow-hidden flex flex-col w-full">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider font-sans">Template Chatbot (Auto-Response)</h3>
@@ -543,7 +543,7 @@ export function TemplatesPage({
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
+            <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-card bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
               <table className="w-full text-left border-collapse text-sm min-w-[700px]">
                 <thead className="bg-gray-50 dark:bg-slate-800 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
                   <tr>
@@ -603,7 +603,7 @@ export function TemplatesPage({
           </article>
 
           {/* Placeholders Guide */}
-          <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+          <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm">
             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200 uppercase tracking-wider font-sans mb-3">Panduan Placeholders</h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
               Anda dapat menggunakan tag placeholder kurung kurawal di bawah ini agar data dinamis pelanggan terisi otomatis saat pesan dikirim:

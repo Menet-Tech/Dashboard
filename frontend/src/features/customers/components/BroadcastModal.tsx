@@ -63,7 +63,7 @@ export function BroadcastModal({
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl max-w-lg w-full flex flex-col gap-4 animate-in fade-in zoom-in duration-200">
+      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-xl max-w-lg w-full flex flex-col gap-4 animate-in fade-in zoom-in duration-200">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50">Broadcast WhatsApp</h3>
           <Button variant="ghost" size="icon" onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600">

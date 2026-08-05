@@ -59,20 +59,20 @@ export function DialogProvider({ children }: { children: ReactNode }) {
           actions={
             dialog.type === "confirm" ? (
               <>
-                <button
+                <Button
                   type="button"
-                  className="bg-white dark:bg-slate-900 border border-gray-300 text-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800/40 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors cursor-pointer text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+                  variant="outline"
                   onClick={() => dialog.resolve(false)}
                 >
                   Batal
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className="bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors cursor-pointer text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  variant="danger"
                   onClick={() => dialog.resolve(true)}
                 >
                   Ya, Lanjutkan
-                </button>
+                </Button>
               </>
             ) : (
               <Button

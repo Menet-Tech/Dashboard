@@ -155,7 +155,7 @@ export function AccountsTab({
 
       {/* Create Account Form */}
       {canDecrypt ? (
-        <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 h-fit">
+        <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-card border border-slate-200 dark:border-slate-800 h-fit">
           <h3 className="text-md font-bold text-slate-900 dark:text-slate-50 mb-4">Tambah Akun Baru</h3>
 
           {/* API key missing warning */}
@@ -203,7 +203,7 @@ export function AccountsTab({
           </form>
         </div>
       ) : (
-        <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 h-fit text-center text-slate-500 dark:text-slate-400 text-xs">
+        <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-card border border-slate-200 dark:border-slate-800 h-fit text-center text-slate-500 dark:text-slate-400 text-xs">
           Anda login sebagai Viewer. Hak akses pengelolaan dinonaktifkan.
         </div>
       )}

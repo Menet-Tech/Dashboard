@@ -3,6 +3,14 @@
  */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --color-brand-deep: #4f46e5;
+  --color-brand-warm: #6366f1;
+  --radius-card: 1rem;
+  --radius-button: 0.5rem;
+}
+
 @import "leaflet/dist/leaflet.css";
 
 @variant dark (&:where(.dark, .dark *));

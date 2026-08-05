@@ -1,10 +1,9 @@
-import { Button } from "../components/ui/Button";
 import { createContext, useContext, useState, ReactNode } from "react";
-import type { ToastItem } from "../components/ui/Toast";
 import type { ConfirmDialogState } from "../hooks/types";
 import { toErrorMessage } from "../utils/format";
-import { ToastStack } from "../components/ui/Toast";
 import { Modal } from "../components/ui/Modal";
+import { ToastStack, type ToastItem } from "../components/ui/Toast";
+import { Button } from "../components/ui/Button";
 
 type FeedbackContextType = {
   submitting: boolean;
@@ -102,24 +101,20 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
           onClose={dismissConfirmDialog}
           actions={
             <>
-              <button
-                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800 transition-colors"
+              <Button
+                variant="outline"
                 onClick={dismissConfirmDialog}
                 disabled={submitting}
               >
                 Batal
-              </button>
-              <button
-                className={`px-4 py-2 rounded-lg text-white transition-colors ${
-                  confirmDialog.tone === "danger"
-                    ? "bg-rose-600 hover:bg-rose-700"
-                    : "bg-indigo-600 hover:bg-indigo-700"
-                }`}
+              </Button>
+              <Button
+                variant={confirmDialog.tone === "danger" ? "danger" : "primary"}
                 onClick={() => void confirmAndRun()}
                 disabled={submitting}
               >
-                {confirmDialog.confirmLabel}
-              </button>
+                {submitting ? "Memproses..." : "Ya, Lanjutkan"}
+              </Button>
             </>
           }
         >

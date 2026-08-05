@@ -171,7 +171,7 @@ export function PaymentConfirmationsPage({
 
   return (
     <section className="grid grid-cols-1 gap-6">
-      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-55">Review Pembayaran</h2>
@@ -200,8 +200,8 @@ export function PaymentConfirmationsPage({
             <span className="text-sm text-slate-450">Memuat data review...</span>
           </div>
         ) : confirmations.length === 0 ? (
-          <div className="py-20 flex flex-col items-center justify-center text-center bg-slate-50/50 dark:bg-slate-950/20 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
-            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-2xl flex items-center justify-center mb-4">
+          <div className="py-20 flex flex-col items-center justify-center text-center bg-slate-50/50 dark:bg-slate-950/20 border border-dashed border-slate-200 dark:border-slate-800 rounded-card">
+            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-card flex items-center justify-center mb-4">
               <Check className="w-6 h-6" />
             </div>
             <h3 className="font-bold text-slate-700 dark:text-slate-300 mb-1">Semua Bersih!</h3>
@@ -224,7 +224,7 @@ export function PaymentConfirmationsPage({
               return (
                 <div
                   key={item.id}
-                  className="bg-white dark:bg-slate-900 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-all duration-350"
+                  className="bg-white dark:bg-slate-900 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-card overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-all duration-350"
                 >
                   <div className="relative bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 h-64 border-b border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden group">
                     {isImg ? (

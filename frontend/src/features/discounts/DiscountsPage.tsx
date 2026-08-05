@@ -575,7 +575,7 @@ export function DiscountsPage({
         </div>
 
         {/* Tab Selector */}
-        <div className="bg-slate-100 dark:bg-slate-900 p-1.5 rounded-2xl flex border border-slate-200 dark:border-slate-800 shrink-0">
+        <div className="bg-slate-100 dark:bg-slate-900 p-1.5 rounded-card flex border border-slate-200 dark:border-slate-800 shrink-0">
           <Button type="button" variant="outline"
             onClick={() => {
               setActiveTab("discounts");
@@ -675,7 +675,7 @@ export function DiscountsPage({
                 ? "Cari nama pelanggan..."
                 : "Cari data voucher..."
             }
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -686,7 +686,7 @@ export function DiscountsPage({
             {activeTab === "discounts" ? (
               <Button type="button" variant="outline"
                 onClick={() => setIsCreateDiscountOpen(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-2xl transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-card transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
               >
                 <Plus size={14} />
                 Beri Diskon Baru
@@ -704,7 +704,7 @@ export function DiscountsPage({
                     await showAlert("Belum ada pelanggan terdaftar.");
                   }
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-2xl transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-card transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
               >
                 <Plus size={14} />
                 Atur Referral Baru
@@ -713,14 +713,14 @@ export function DiscountsPage({
               <>
                 <Button type="button" variant="outline"
                   onClick={() => setIsCreateVoucherOpen(true)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-2xl transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-card transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
                 >
                   <Plus size={14} />
                   Buat Voucher Baru
                 </Button>
                 <Button type="button" variant="outline"
                   onClick={() => setIsAssignVoucherOpen(true)}
-                  className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-750 dark:hover:bg-slate-700 text-white font-semibold text-xs px-4 py-2.5 rounded-2xl transition-all shadow-md flex items-center gap-1.5 shrink-0"
+                  className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-750 dark:hover:bg-slate-700 text-white font-semibold text-xs px-4 py-2.5 rounded-card transition-all shadow-md flex items-center gap-1.5 shrink-0"
                 >
                   <Gift size={14} />
                   Beri Voucher ke Pelanggan
@@ -937,7 +937,7 @@ export function DiscountsPage({
               {loadingVouchers ? (
                 <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs">Memuat data...</div>
               ) : vouchersList.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 rounded-card border border-dashed border-slate-200 dark:border-slate-800">
                   Belum ada template voucher. Klik "Buat Voucher Baru" untuk memulainya.
                 </div>
               ) : (
@@ -953,7 +953,7 @@ export function DiscountsPage({
                     return (
                       <div 
                         key={voucher.id} 
-                        className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm flex"
+                        className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 rounded-card overflow-hidden shadow-sm flex"
                       >
                         {/* HSL Gradient Tag side */}
                         <div className={`w-24 bg-gradient-to-br ${colorClass} text-white flex flex-col items-center justify-center p-3 text-center shrink-0`}>
@@ -1000,7 +1000,7 @@ export function DiscountsPage({
                 <Settings size={16} className="text-indigo-600" />
                 Voucher Aktif Pelanggan
               </h4>
-              <div className="overflow-x-auto border border-slate-150 dark:border-slate-800 rounded-2xl">
+              <div className="overflow-x-auto border border-slate-150 dark:border-slate-800 rounded-card">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800 text-slate-500 dark:text-slate-400">
                     <tr>
@@ -1082,7 +1082,7 @@ export function DiscountsPage({
                 <Clock size={16} className="text-indigo-600" />
                 Riwayat Penggunaan Voucher (Logs)
               </h4>
-              <div className="overflow-x-auto border border-slate-150 dark:border-slate-800 rounded-2xl">
+              <div className="overflow-x-auto border border-slate-150 dark:border-slate-800 rounded-card">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 border-b border-slate-150 dark:border-slate-800 text-slate-500 dark:text-slate-400">
                     <tr>
@@ -1302,7 +1302,7 @@ export function DiscountsPage({
                 </label>
                 <select
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={selectedCustomerForNewDiscount}
                   onChange={(e) => {
                     const cid = Number(e.target.value) || 0;
@@ -1327,7 +1327,7 @@ export function DiscountsPage({
                       Tipe Diskon
                     </label>
                     <select
-                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                       value={discountTypeInput}
                       onChange={(e) => {
                         const newType = e.target.value as "flat" | "percent";
@@ -1347,7 +1347,7 @@ export function DiscountsPage({
                     <input
                       type="text"
                       required
-                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                       value={discountValueInput}
                       onChange={(e) => {
                         const rawVal = e.target.value.replace(/\D/g, "");
@@ -1368,7 +1368,7 @@ export function DiscountsPage({
               )}
 
               {selectedCustomerForNewDiscount > 0 && parseFormattedNumber(discountValueInput) > 0 && (
-                <div className="bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/40 p-3 rounded-2xl text-xs text-green-700 dark:text-green-300 font-semibold">
+                <div className="bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/40 p-3 rounded-card text-xs text-green-700 dark:text-green-300 font-semibold">
                   Harga Akhir Tagihan:{" "}
                   {formatCurrency(
                     Math.max(
@@ -1430,7 +1430,7 @@ export function DiscountsPage({
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
                   Paket & Harga Asli
                 </label>
-                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-4 py-2.5 rounded-2xl text-xs text-slate-650 dark:text-slate-300">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-4 py-2.5 rounded-card text-xs text-slate-650 dark:text-slate-300">
                   {editingDiscountCustomer.package_name || "Tanpa Paket"} ({formatCurrency(editingDiscountCustomer.package_price || 0)})
                 </div>
               </div>
@@ -1441,7 +1441,7 @@ export function DiscountsPage({
                     Tipe Diskon
                   </label>
                   <select
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                     value={discountTypeInput}
                     onChange={(e) => {
                       const newType = e.target.value as "flat" | "percent";
@@ -1461,7 +1461,7 @@ export function DiscountsPage({
                   <input
                     type="text"
                     required
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                     value={discountValueInput}
                     onChange={(e) => {
                       const rawVal = e.target.value.replace(/\D/g, "");
@@ -1481,7 +1481,7 @@ export function DiscountsPage({
               </div>
 
               {parseFormattedNumber(discountValueInput) > 0 && (
-                <div className="bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/40 p-3 rounded-2xl text-xs text-green-700 dark:text-green-300 font-semibold">
+                <div className="bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/40 p-3 rounded-card text-xs text-green-700 dark:text-green-300 font-semibold">
                   Harga Akhir Tagihan:{" "}
                   {formatCurrency(
                     Math.max(
@@ -1549,7 +1549,7 @@ export function DiscountsPage({
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 font-mono"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 font-mono"
                   value={newVoucherCode}
                   onChange={(e) => setNewVoucherCode(e.target.value.toUpperCase().replace(/\s+/g, ""))}
                   placeholder="Contoh: PROMO100K"
@@ -1563,7 +1563,7 @@ export function DiscountsPage({
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={newVoucherAmount}
                   onChange={(e) => {
                     const rawVal = e.target.value.replace(/\D/g, "");
@@ -1580,7 +1580,7 @@ export function DiscountsPage({
                 </label>
                 <select
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={newVoucherType}
                   onChange={(e) => {
                     const type = e.target.value as "one-time" | "multi-use" | "permanent";
@@ -1605,7 +1605,7 @@ export function DiscountsPage({
                     required
                     min={1}
                     max={120}
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 font-mono"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 font-mono"
                     value={newVoucherCycles}
                     onChange={(e) => setNewVoucherCycles(Math.max(1, Number(e.target.value) || 1))}
                     placeholder="Contoh: 3"
@@ -1618,7 +1618,7 @@ export function DiscountsPage({
                   Deskripsi Voucher
                 </label>
                 <textarea
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 min-h-[60px]"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-card text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 min-h-[60px]"
                   value={newVoucherDesc}
                   onChange={(e) => setNewVoucherDesc(e.target.value)}
                   placeholder="Keterangan promosi..."
@@ -1682,7 +1682,7 @@ export function DiscountsPage({
                 </label>
                 <select
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={selectedCustomerForVoucher}
                   onChange={(e) => setSelectedCustomerForVoucher(Number(e.target.value) || 0)}
                 >
@@ -1701,7 +1701,7 @@ export function DiscountsPage({
                 </label>
                 <select
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={selectedVoucherTemplate}
                   onChange={(e) => setSelectedVoucherTemplate(Number(e.target.value) || 0)}
                 >
@@ -1762,7 +1762,7 @@ export function DiscountsPage({
                   Pelanggan Yang Diedit
                 </label>
                 <select
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={editingReferralCustomer.id}
                   onChange={(e) => {
                     const cid = Number(e.target.value) || 0;
@@ -1786,7 +1786,7 @@ export function DiscountsPage({
                 </label>
                 <input
                   type="text"
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 font-mono"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 font-mono"
                   value={refCode}
                   onChange={(e) => setRefCode(e.target.value.toUpperCase().replace(/\s+/g, ""))}
                   placeholder="Contoh: MENET50K (Kosongkan untuk auto-generate)"
@@ -1804,7 +1804,7 @@ export function DiscountsPage({
                   type="number"
                   required
                   min={0}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={refBalance}
                   onChange={(e) => setRefBalance(Number(e.target.value) || 0)}
                   placeholder="Contoh: 100000"
@@ -1816,7 +1816,7 @@ export function DiscountsPage({
                   Direkomendasikan Oleh (Sponsor)
                 </label>
                 <select
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                   value={refReferredById}
                   onChange={(e) => setRefReferredById(Number(e.target.value) || 0)}
                 >
@@ -1922,7 +1922,7 @@ export function DiscountsPage({
                   Catatan Pembayaran
                 </label>
                 <textarea
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 h-20 resize-none"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 h-20 resize-none"
                   value={completeNotes}
                   onChange={(e) => setCompleteNotes(e.target.value)}
                   placeholder="Misal: Uang diserahkan tunai di rumah pelanggan / Ditransfer via SeaBank"
@@ -2007,7 +2007,7 @@ export function DiscountsPage({
                 </label>
                 <textarea
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 h-24 resize-none"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200 h-24 resize-none"
                   value={rejectNotes}
                   onChange={(e) => setRejectNotes(e.target.value)}
                   placeholder="Masukkan alasan penolakan agar pelanggan mengetahui penyebabnya..."

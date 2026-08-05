@@ -237,7 +237,7 @@ export function WhatsAppPage({
   return (
     <section className="grid gap-6">
       {/* Overview Card */}
-      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
@@ -277,7 +277,7 @@ export function WhatsAppPage({
         </div>
 
         {gatewayError ? (
-          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="mb-6 rounded-card border border-rose-200 bg-rose-50 p-4 text-rose-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="font-bold">Gateway WhatsApp bermasalah</p>
               <p className="text-sm mt-1">{gatewayError}</p>

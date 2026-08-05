@@ -98,7 +98,7 @@ export function HistoryTab({
 
       {/* Message History Display */}
       {filteredMessages.length === 0 ? (
-        <div className="text-center py-12 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+        <div className="text-center py-12 bg-slate-50 dark:bg-slate-950 rounded-card border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
           Tidak ada log chat yang cocok dengan filter saat ini.
         </div>
       ) : (

@@ -842,7 +842,7 @@ export function SettingsPage({
         </div>
 
         {/* Tab Navigation */}
-        <nav className="flex flex-wrap gap-2 p-1.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/60 border border-slate-200/50 dark:border-slate-800/60 rounded-2xl">
+        <nav className="flex flex-wrap gap-2 p-1.5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/60 border border-slate-200/50 dark:border-slate-800/60 rounded-card">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -977,7 +977,7 @@ export function SettingsPage({
                         </div>
 
                         {/* Status info card */}
-                        <div className="bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/40 rounded-2xl p-4 flex items-start gap-3">
+                        <div className="bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/40 rounded-card p-4 flex items-start gap-3">
                           <div className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full p-2 mt-0.5 shrink-0">
                             <MessageCircle size={14} />
                           </div>
@@ -1093,7 +1093,7 @@ export function SettingsPage({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-805 rounded-2xl p-4 mt-auto">
+                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-805 rounded-card p-4 mt-auto">
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Uji kredensial/koneksi WhatsApp Gateway.</span>
                         <div className="flex items-center gap-2">
                           {waResult && (
@@ -1318,7 +1318,7 @@ export function SettingsPage({
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {/* Subsection A: Billing Intervals */}
-                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
+                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-card border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
                             <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Tenggat Waktu Billing</h4>
 
                             <label className="flex flex-col gap-1.5">
@@ -1373,7 +1373,7 @@ export function SettingsPage({
                           </div>
 
                           {/* Subsection B: Automation Scheduler */}
-                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
+                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-card border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
                             <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Scheduler Otomatisasi</h4>
 
                             <label className="flex flex-col gap-1.5">
@@ -1423,7 +1423,7 @@ export function SettingsPage({
                           </div>
 
                           {/* Subsection C: Worker & Auto Backup */}
-                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
+                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-card border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
                             <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Worker & Backup Sistem</h4>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -1562,7 +1562,7 @@ export function SettingsPage({
                           </div>
 
                           {/* Subsection D: Masa Trial / Percobaan */}
-                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
+                          <div className="space-y-4 p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-card border border-slate-100 dark:border-slate-800 dark:border-slate-800/60">
                             <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Masa Trial / Percobaan</h4>
 
                             <label className="flex flex-col gap-1.5">
@@ -1664,7 +1664,7 @@ export function SettingsPage({
                             <Loader2 className="animate-spin text-indigo-650" />
                           </div>
                         ) : routers.length === 0 ? (
-                          <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                          <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-card">
                             <p className="text-xs text-slate-400 dark:text-slate-500">Belum ada router MikroTik terdaftar. Silakan tambahkan akun router pertama Anda di sebelah kanan.</p>
                           </div>
                         ) : (
@@ -1672,7 +1672,7 @@ export function SettingsPage({
                             {routers.map((router) => (
                               <div
                                 key={router.id}
-                                className="border border-slate-200 dark:border-slate-800 dark:border-slate-850 rounded-2xl p-5 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between hover:border-slate-350 dark:hover:border-slate-755 transition-colors"
+                                className="border border-slate-200 dark:border-slate-800 dark:border-slate-850 rounded-card p-5 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between hover:border-slate-350 dark:hover:border-slate-755 transition-colors"
                               >
                                 <div className="flex items-start justify-between gap-4">
                                   <div>
@@ -2107,7 +2107,7 @@ export function SettingsPage({
                             </ul>
 
                             {showSetupForm ? (
-                              <div className="mt-4 p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-6 text-slate-800 dark:text-slate-100">
+                              <div className="mt-4 p-5 bg-white dark:bg-slate-900 rounded-card border border-slate-200 dark:border-slate-800 space-y-6 text-slate-800 dark:text-slate-100">
                                 <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350 uppercase tracking-wider">Konfigurasi Setup Profile & Pool</h4>
                                 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2429,7 +2429,7 @@ export function SettingsPage({
                             </Button>
                           </div>
 
-                          <div className="max-h-64 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800/85">
+                          <div className="max-h-64 overflow-y-auto rounded-card border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800/85">
                             {syncSecrets.map((secret) => (
                               <div key={secret.name} className={`flex items-center gap-3 px-4 py-3 ${secret.exists ? "opacity-50" : ""}`}>
                                 <input
@@ -2591,7 +2591,7 @@ export function SettingsPage({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-805 rounded-2xl p-4 mt-auto">
+                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-805 rounded-card p-4 mt-auto">
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Uji webhook Discord masukan di atas.</span>
                         <div className="flex items-center gap-2">
                           {discordResult && (
@@ -2940,7 +2940,7 @@ export function SettingsPage({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-805 rounded-2xl p-4 mt-auto">
+                      <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-805 rounded-card p-4 mt-auto">
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Uji server GenieACS.</span>
                         <div className="flex items-center gap-2">
                           {acsResult && (
@@ -3141,7 +3141,7 @@ export function SettingsPage({
                             </span>
                           </label>
 
-                          <div className="col-span-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-800/80 rounded-2xl p-4 text-xs space-y-2">
+                          <div className="col-span-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-800/80 rounded-card p-4 text-xs space-y-2">
                             <p className="font-bold text-slate-850 dark:text-slate-200">How RX Power Thresholds Work:</p>
                             <ul className="list-disc pl-4 space-y-1 text-slate-500 dark:text-slate-400">
                               <li><span className="text-emerald-600 font-semibold">Excellent (Green):</span> Signal &gt;= {settingsForm.gacs_rx_power_excellent || "-21"} dBm</li>
@@ -3322,7 +3322,7 @@ export function SettingsPage({
                             <Loader2 className="animate-spin text-indigo-650" />
                           </div>
                         ) : vendors.length === 0 ? (
-                          <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                          <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-card">
                             <p className="text-xs text-slate-400 dark:text-slate-500">No vendor configurations found. Add one or import JSON to get started.</p>
                           </div>
                         ) : (
@@ -3441,7 +3441,7 @@ export function SettingsPage({
                             <Loader2 className="animate-spin text-indigo-650" />
                           </div>
                         ) : wifiConfigs.length === 0 ? (
-                          <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                          <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-card">
                             <p className="text-xs text-slate-400 dark:text-slate-500">No WiFi security configurations found. Add one or import JSON to get started.</p>
                           </div>
                         ) : (

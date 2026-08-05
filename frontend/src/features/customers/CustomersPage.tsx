@@ -355,7 +355,7 @@ export function CustomersPage({
   return (
     <section className="flex flex-col gap-6 w-full">
       {/* Customer List Card (Full Width) */}
-      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col w-full">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm overflow-hidden flex flex-col w-full">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50 font-sans">Daftar Pelanggan</h2>
@@ -461,7 +461,7 @@ export function CustomersPage({
           </div>
         </div>
 
-        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
+        <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-card bg-white dark:bg-slate-900 shadow-sm scrollbar-thin">
           <table className="w-full text-left border-collapse text-sm min-w-[1000px]">
             <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 font-sans">
               <tr>

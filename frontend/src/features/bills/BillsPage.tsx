@@ -163,7 +163,7 @@ export function BillsPage({
   return (
     <section className="grid grid-cols-1 gap-6">
       {user?.role !== "viewer" && (
-        <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+        <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Generate Tagihan</h2>
           </div>
@@ -194,7 +194,7 @@ export function BillsPage({
         </article>
       )}
 
-      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+      <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Daftar Tagihan</h2>
@@ -250,7 +250,7 @@ export function BillsPage({
           </div>
         </div>
 
-         <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
+         <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-card bg-white dark:bg-slate-900 shadow-sm">
           <table className="w-full text-left border-collapse text-sm">
             <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400">
               <tr>
@@ -441,7 +441,7 @@ export function BillsPage({
                     {expandedBillId === bill.id && (
                       <tr className="expanded-row">
                         <td className="px-6 py-4 text-gray-700 dark:text-slate-300" colSpan={8}>
-                          <div className="expanded-content p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-900/60 shadow-inner">
+                          <div className="expanded-content p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/40 rounded-card border border-slate-100 dark:border-slate-800 dark:border-slate-900/60 shadow-inner">
                             <div className="flex items-center justify-between mb-3">
                               <h4 className="font-bold text-xs text-slate-850 dark:text-slate-200 tracking-wide uppercase">Riwayat Notifikasi</h4>
                               {notificationLogs[bill.id]?.length ? (

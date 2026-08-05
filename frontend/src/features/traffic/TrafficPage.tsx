@@ -339,7 +339,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
 
       {/* Summary Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-card shadow-sm flex items-center gap-4">
           <div className="w-11 h-11 bg-indigo-50 dark:bg-indigo-950/40 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
             <Activity size={20} />
           </div>
@@ -349,7 +349,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-card shadow-sm flex items-center gap-4">
           <div className="w-11 h-11 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
             <ArrowDown size={20} />
           </div>
@@ -359,7 +359,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-card shadow-sm flex items-center gap-4">
           <div className="w-11 h-11 bg-pink-50 dark:bg-pink-950/40 rounded-xl flex items-center justify-center text-pink-600 dark:text-pink-400 shrink-0">
             <ArrowUp size={20} />
           </div>
@@ -369,7 +369,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-card shadow-sm flex items-center gap-4">
           <div className="w-11 h-11 bg-amber-50 dark:bg-amber-950/40 rounded-xl flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
             <Info size={20} />
           </div>
@@ -379,7 +379,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 dark:border-slate-800/80 p-5 rounded-card shadow-sm flex items-center gap-4">
           <div className="w-11 h-11 bg-rose-50 dark:bg-rose-950/40 rounded-xl flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
             <Info size={20} />
           </div>
@@ -391,7 +391,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
       </div>
 
       {/* Main Customers Traffic Table */}
-      <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 dark:border-slate-850 rounded-2xl shadow-sm overflow-hidden backdrop-blur-md">
+      <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 dark:border-slate-850 rounded-card shadow-sm overflow-hidden backdrop-blur-md">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
             <thead className="bg-slate-55/60 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 dark:border-slate-850/80 text-slate-500 dark:text-slate-400 text-xs uppercase font-extrabold tracking-wider">
@@ -478,7 +478,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
       {/* Real-time statistics modal chart */}
       {selectedCust && activeStats && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all duration-300 fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden transform scale-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card shadow-2xl w-full max-w-3xl overflow-hidden transform scale-in">
             {/* Modal Header */}
             <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
