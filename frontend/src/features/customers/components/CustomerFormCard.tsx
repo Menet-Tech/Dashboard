@@ -1,4 +1,4 @@
-import { type FormEvent } from "react";
+import { type FormEvent, useState, useEffect } from "react";
 import { Sparkles, Calendar } from "lucide-react";
 import { inputClassName, renderInlineError } from "../../../components/ui";
 import { type CustomerItem, type PackageItem, type User, type OdpItem } from "../../../types";
@@ -46,6 +46,17 @@ export function CustomerFormCard({
   odps,
 }: CustomerFormCardProps) {
   const isEditing = Boolean(editingCustomerId);
+  const [localForm, setLocalForm] = useState<CustomerFormState>(customerForm);
+
+  useEffect(() => {
+    setLocalForm(customerForm);
+  }, [customerForm]);
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    // @ts-ignore
+    onSubmit(e, localForm);
+  };
 
   return (
     <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-6">
@@ -73,7 +84,7 @@ export function CustomerFormCard({
         )}
       </div>
 
-      <form id="customer-form" onSubmit={onSubmit} className="space-y-4">
+      <form id="customer-form" onSubmit={handleSubmit} className="space-y-4">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
             Nama Pelanggan *
@@ -81,9 +92,9 @@ export function CustomerFormCard({
           <input
             autoFocus={true}
             className={inputClassName(customerErrors.name)}
-            value={customerForm.name}
+            value={localForm.name}
             onChange={(e) =>
-              onFormChange((curr) => ({ ...curr, name: e.target.value }))
+              setLocalForm((curr) => ({ ...curr, name: e.target.value }))
             }
             placeholder="Masukkan nama pelanggan"
           />
@@ -96,9 +107,9 @@ export function CustomerFormCard({
           </span>
           <select
             className={inputClassName(customerErrors.package_id)}
-            value={customerForm.package_id || ""}
+            value={localForm.package_id || ""}
             onChange={(e) =>
-              onFormChange((curr) => ({
+              setLocalForm((curr) => ({
                 ...curr,
                 package_id: Number(e.target.value),
               }))
@@ -124,9 +135,9 @@ export function CustomerFormCard({
             </span>
             <input
               className={inputClassName()}
-              value={customerForm.user_pppoe}
+              value={localForm.user_pppoe}
               onChange={(e) =>
-                onFormChange((curr) => ({ ...curr, user_pppoe: e.target.value }))
+                setLocalForm((curr) => ({ ...curr, user_pppoe: e.target.value }))
               }
               placeholder="Username login PPPoE"
             />
@@ -138,9 +149,9 @@ export function CustomerFormCard({
             </span>
             <input
               className={inputClassName()}
-              value={customerForm.password_pppoe}
+              value={localForm.password_pppoe}
               onChange={(e) =>
-                onFormChange((curr) => ({
+                setLocalForm((curr) => ({
                   ...curr,
                   password_pppoe: e.target.value,
                 }))
@@ -157,9 +168,9 @@ export function CustomerFormCard({
             </span>
             <input
               className={inputClassName(customerErrors.whatsapp)}
-              value={customerForm.whatsapp}
+              value={localForm.whatsapp}
               onChange={(e) =>
-                onFormChange((curr) => ({ ...curr, whatsapp: e.target.value }))
+                setLocalForm((curr) => ({ ...curr, whatsapp: e.target.value }))
               }
               placeholder="Contoh: 08123456789"
             />
@@ -173,9 +184,9 @@ export function CustomerFormCard({
             <input
               className={inputClassName()}
               type="email"
-              value={customerForm.email}
+              value={localForm.email}
               onChange={(e) =>
-                onFormChange((curr) => ({ ...curr, email: e.target.value }))
+                setLocalForm((curr) => ({ ...curr, email: e.target.value }))
               }
               placeholder="Alamat email pelanggan"
             />
@@ -189,9 +200,9 @@ export function CustomerFormCard({
           <textarea
             rows={2}
             className={inputClassName()}
-            value={customerForm.address}
+            value={localForm.address}
             onChange={(e) =>
-              onFormChange((curr) => ({ ...curr, address: e.target.value }))
+              setLocalForm((curr) => ({ ...curr, address: e.target.value }))
             }
             placeholder="Alamat lengkap lokasi pemasangan"
           />
@@ -203,9 +214,9 @@ export function CustomerFormCard({
           </span>
           <input
             className={inputClassName()}
-            value={customerForm.sn_ont}
+            value={localForm.sn_ont}
             onChange={(e) =>
-              onFormChange((curr) => ({ ...curr, sn_ont: e.target.value }))
+              setLocalForm((curr) => ({ ...curr, sn_ont: e.target.value }))
             }
             placeholder="Serial Number ONT"
           />
@@ -214,7 +225,7 @@ export function CustomerFormCard({
         <div className="pt-2">
           <label className="relative flex items-center justify-between p-3.5 rounded-card border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 hover:border-indigo-300 dark:hover:border-indigo-800 transition-all cursor-pointer select-none group shadow-xs">
             <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl transition-colors ${customerForm.status === "trial" || customerForm.is_trial ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}>
+              <div className={`p-2.5 rounded-xl transition-colors ${localForm.status === "trial" || localForm.is_trial ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}>
                 <Sparkles size={16} />
               </div>
               <div>
@@ -222,7 +233,7 @@ export function CustomerFormCard({
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200">
                     Aktifkan Masa Trial (Percobaan)
                   </span>
-                  {(customerForm.status === "trial" || customerForm.is_trial) && (
+                  {(localForm.status === "trial" || localForm.is_trial) && (
                     <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-955/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                       Trial Aktif
                     </span>
@@ -239,10 +250,10 @@ export function CustomerFormCard({
                 type="checkbox"
                 id="is_trial"
                 className="sr-only peer"
-                checked={customerForm.status === "trial" || customerForm.is_trial}
+                checked={localForm.status === "trial" || localForm.is_trial}
                 onChange={(e) => {
                   const checked = e.target.checked;
-                  onFormChange((curr) => {
+                  setLocalForm((curr) => {
                     const nextStatus = checked ? "trial" : "active";
                     let nextDueDay = curr.due_day;
                     if (checked) {
@@ -266,11 +277,11 @@ export function CustomerFormCard({
           <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Status Layanan</span>
           <select
             className={inputClassName()}
-            value={customerForm.status}
+            value={localForm.status}
             onChange={(e) => {
               const nextStatus = e.target.value as CustomerItem["status"];
               const isTrial = nextStatus === "trial";
-              onFormChange((curr) => {
+              setLocalForm((curr) => {
                 let nextDueDay = curr.due_day;
                 if (isTrial) {
                   nextDueDay = calculateTrialDueDay(curr.trial_days || 3);
@@ -297,7 +308,7 @@ export function CustomerFormCard({
         </label>
 
         {/* Trial days — only visible when status is "trial" or is_trial is true */}
-        {(customerForm.status === "trial" || customerForm.is_trial) && (
+        {(localForm.status === "trial" || localForm.is_trial) && (
           <label className="flex flex-col gap-1">
             <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
               Durasi Trial (Hari)
@@ -307,10 +318,10 @@ export function CustomerFormCard({
               min={1}
               max={365}
               className={inputClassName()}
-              value={customerForm.trial_days}
+              value={localForm.trial_days}
               onChange={(e) => {
                 const val = Math.max(1, Number(e.target.value));
-                onFormChange((curr) => {
+                setLocalForm((curr) => {
                   return {
                     ...curr,
                     trial_days: val,
@@ -331,10 +342,10 @@ export function CustomerFormCard({
           <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-355">Tanggal Jatuh Tempo Bulanan</span>
           <select
             className={inputClassName(customerErrors.due_day)}
-            value={customerForm.due_day}
-            disabled={customerForm.status === "wifi_umum"}
+            value={localForm.due_day}
+            disabled={localForm.status === "wifi_umum"}
             onChange={(e) =>
-              onFormChange((curr) => ({
+              setLocalForm((curr) => ({
                 ...curr,
                 due_day: Number(e.target.value),
               }))
@@ -347,14 +358,14 @@ export function CustomerFormCard({
             ))}
           </select>
           {renderInlineError(customerErrors.due_day)}
-          {customerForm.status === "wifi_umum" ? (
+          {localForm.status === "wifi_umum" ? (
             <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
               🛜 WiFi Umum gratis / fasilitas umum — tidak memerlukan tanggal jatuh tempo & tidak dibuatkan tagihan.
             </span>
-          ) : (customerForm.status === "trial" || customerForm.is_trial) ? (
+          ) : (localForm.status === "trial" || localForm.is_trial) ? (
             <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mt-0.5">
               <Calendar size={12} className="shrink-0" />
-              Tanggal jatuh tempo dihitung otomatis: Hari ini + {customerForm.trial_days || 3} hari trial + 5 hari jeda = Tanggal {customerForm.due_day}
+              Tanggal jatuh tempo dihitung otomatis: Hari ini + {localForm.trial_days || 3} hari trial + 5 hari jeda = Tanggal {localForm.due_day}
             </span>
           ) : null}
         </label>
@@ -365,7 +376,7 @@ export function CustomerFormCard({
           <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Titik Distribusi ODP</span>
           <select
             className={inputClassName()}
-            value={customerForm.odp_id || 0}
+            value={localForm.odp_id || 0}
             onChange={(e) => {
               const nextOdpId = Number(e.target.value) || 0;
               // Find the first available port for this ODP
@@ -383,7 +394,7 @@ export function CustomerFormCard({
                   }
                 }
               }
-              onFormChange((curr) => ({
+              setLocalForm((curr) => ({
                 ...curr,
                 odp_id: nextOdpId,
                 odp_port: nextOdpId > 0 ? firstAvailablePort : undefined,
@@ -399,27 +410,27 @@ export function CustomerFormCard({
           </select>
         </label>
 
-        {(customerForm.odp_id || 0) > 0 && (
+        {(localForm.odp_id || 0) > 0 && (
           <label className="flex flex-col gap-1">
             <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Port ODP</span>
             <select
               className={inputClassName()}
-              value={customerForm.odp_port || 1}
+              value={localForm.odp_port || 1}
               onChange={(e) =>
-                onFormChange((curr) => ({
+                setLocalForm((curr) => ({
                   ...curr,
                   odp_port: Number(e.target.value),
                 }))
               }
             >
               {Array.from(
-                { length: odps.find((o) => o.id === customerForm.odp_id)?.ports || 8 },
+                { length: odps.find((o) => o.id === localForm.odp_id)?.ports || 8 },
                 (_, i) => i + 1
               )
                 .filter((portNum) => {
                   // Only show ports that are not occupied by other customers (exclude current editing customer)
                   const isOccupied = customers.some(
-                    (c) => c.odp_id === customerForm.odp_id && c.odp_port === portNum && c.id !== editingCustomerId
+                    (c) => c.odp_id === localForm.odp_id && c.odp_port === portNum && c.id !== editingCustomerId
                   );
                   return !isOccupied;
                 })
@@ -437,9 +448,9 @@ export function CustomerFormCard({
         <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Direkomendasikan Oleh (Referral)</span>
         <select
           className={inputClassName()}
-          value={customerForm.referred_by_id}
+          value={localForm.referred_by_id}
           onChange={(e) =>
-            onFormChange((curr) => ({
+            setLocalForm((curr) => ({
               ...curr,
               referred_by_id: Number(e.target.value) || 0,
             }))
@@ -460,9 +471,9 @@ export function CustomerFormCard({
         <textarea
           className={inputClassName()}
           rows={3}
-          value={customerForm.address}
+          value={localForm.address}
           onChange={(e) =>
-            onFormChange((curr) => ({ ...curr, address: e.target.value }))
+            setLocalForm((curr) => ({ ...curr, address: e.target.value }))
           }
           placeholder="Alamat lengkap lokasi pemasangan"
         />

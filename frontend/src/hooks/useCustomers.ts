@@ -35,12 +35,13 @@ export function useCustomers({ withFeedback, askForConfirmation, onSuccess }: Pi
     setCustomers(payload.data);
   }
 
-  async function handleCustomerSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleCustomerSubmit(event: FormEvent<HTMLFormElement>, overrideForm?: CustomerFormState) {
     event.preventDefault();
+    const targetForm = overrideForm || customerForm;
     // For WiFi Umum nodes, due_day is meaningless — normalise to 1 before validation/submit
-    const formToSubmit = customerForm.status === "wifi_umum"
-      ? { ...customerForm, due_day: 1 }
-      : customerForm;
+    const formToSubmit = targetForm.status === "wifi_umum"
+      ? { ...targetForm, due_day: 1 }
+      : targetForm;
     const nextErrors = validateCustomer(formToSubmit);
     setCustomerErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
