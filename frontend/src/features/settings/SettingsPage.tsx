@@ -2317,14 +2317,14 @@ export function SettingsPage({
                         </div>
                         <div className="flex justify-end pt-3 border-t border-amber-100 dark:border-amber-900/30 gap-3">
                           {showSetupForm && (
-                            <Button variant="primary" type="button"
+                            <Button variant="secondary" type="button"
                               onClick={() => setShowSetupForm(false)}
-                              className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-200 text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center cursor-pointer border border-transparent"
+                              className="text-xs font-bold py-2 px-5 rounded-xl transition-all flex items-center cursor-pointer"
                             >
                               Batal
                             </Button>
                           )}
-                          <Button variant="outline" type="button"
+                          <Button variant="warning" type="button"
                             onClick={() => {
                               if (!showSetupForm) {
                                 setSetupIsolirName(settingsForm.mikrotik_isolir_profile || "isolir");
@@ -2335,7 +2335,7 @@ export function SettingsPage({
                               }
                             }}
                             disabled={settingUpProfiles}
-                            className="bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="active:scale-[0.98] text-xs font-bold py-2 px-5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
                             {settingUpProfiles ? <Loader2 size={12} className="animate-spin" /> : <Settings size={12} />}
                             {showSetupForm ? "Mulai Setup" : "Setup Profile Otomatis"}
