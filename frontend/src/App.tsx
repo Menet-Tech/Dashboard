@@ -436,7 +436,24 @@ function AppRouter() {
         ) : null}
 
         <div key={view} className="fade-in-slide-up flex-1 flex flex-col gap-6">
-          {view === "dashboard" ? (
+          {pageLoading && view !== "dashboard" ? (
+             <div className="flex-1 space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <div className="h-6 w-48 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                    <div className="h-3 w-64 bg-slate-100 dark:bg-slate-800 rounded animate-pulse mt-2" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                   <SkeletonCard />
+                   <SkeletonCard />
+                   <SkeletonCard />
+                   <SkeletonCard />
+                   <SkeletonCard />
+                   <SkeletonCard />
+                </div>
+             </div>
+          ) : view === "dashboard" ? (
             <DashboardPage
               pageLoading={pageLoading}
               summary={summary}

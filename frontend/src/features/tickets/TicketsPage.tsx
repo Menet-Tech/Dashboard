@@ -153,6 +153,7 @@ export function TicketsPage({
   useWhatsAppGateway({
     gatewayUrl,
     apiKey,
+    onError: pushError,
     onChatMessage: (msg) => {
       // 1. Silent reload ticket list to reflect new message previews / status updates
       void loadTickets(true);
@@ -375,7 +376,10 @@ export function TicketsPage({
 
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 pr-1 scrollbar-thin">
           {loading ? (
-            <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs">Memuat daftar tiket...</div>
+            <div className="py-12 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">Memuat daftar tiket...</span>
+            </div>
           ) : tickets.length === 0 ? (
             <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs">Tidak ada tiket yang ditemukan.</div>
           ) : (
@@ -439,8 +443,9 @@ export function TicketsPage({
             </p>
           </div>
         ) : detailLoading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <span className="text-xs text-slate-400 dark:text-slate-500">Memuat detail tiket...</span>
+          <div className="flex-1 flex flex-col items-center justify-center gap-3">
+            <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">Memuat detail tiket...</span>
           </div>
         ) : !detail ? (
           <div className="flex-1 flex items-center justify-center">

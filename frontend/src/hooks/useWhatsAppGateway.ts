@@ -6,9 +6,10 @@ type UseWhatsAppGatewayProps = {
   gatewayUrl?: string;
   apiKey?: string;
   onChatMessage?: (message: GatewayMessage) => void;
+  onError?: (msg: string) => void;
 };
 
-export function useWhatsAppGateway({ gatewayUrl, apiKey, onChatMessage }: UseWhatsAppGatewayProps) {
+export function useWhatsAppGateway({ gatewayUrl, apiKey, onChatMessage, onError }: UseWhatsAppGatewayProps) {
   const [socketConnected, setSocketConnected] = useState(false);
   const [accounts, setAccounts] = useState<GatewayAccount[]>([]);
   const [qrs, setQrs] = useState<Record<string, string>>({});
@@ -16,9 +17,16 @@ export function useWhatsAppGateway({ gatewayUrl, apiKey, onChatMessage }: UseWha
 
   // Use a ref to store the latest callback to avoid dependency changes triggering re-connection
   const onChatMessageRef = useRef(onChatMessage);
+  const onErrorRef = useRef(onError);
+  const lastErrorTimeRef = useRef<number>(0);
+
   useEffect(() => {
     onChatMessageRef.current = onChatMessage;
   }, [onChatMessage]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   useEffect(() => {
     if (!gatewayUrl) {
@@ -56,10 +64,31 @@ export function useWhatsAppGateway({ gatewayUrl, apiKey, onChatMessage }: UseWha
 
     socket.on("connect", () => {
       setSocketConnected(true);
+      // Reset error timer on successful connection
+      lastErrorTimeRef.current = 0;
     });
 
-    socket.on("disconnect", () => {
+    const triggerError = (msg: string) => {
+      const now = Date.now();
+      // Debounce 60 seconds
+      if (now - lastErrorTimeRef.current > 60000) {
+        lastErrorTimeRef.current = now;
+        if (onErrorRef.current) {
+          onErrorRef.current(msg);
+        }
+      }
+    };
+
+    socket.on("connect_error", () => {
       setSocketConnected(false);
+      triggerError("Koneksi ke WhatsApp Gateway gagal. Sistem akan mencoba kembali secara otomatis.");
+    });
+
+    socket.on("disconnect", (reason) => {
+      setSocketConnected(false);
+      if (reason !== "io client disconnect") {
+        triggerError("Koneksi WebSocket ke WhatsApp Gateway terputus.");
+      }
     });
 
     socket.on("qr_code", (data: { accountId: string; qr: string }) => {

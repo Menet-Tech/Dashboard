@@ -76,6 +76,7 @@ export function WhatsAppPage({
     gatewayUrl,
     apiKey,
     onChatMessage: handleIncomingMessage,
+    onError: pushError,
   });
 
   useEffect(() => {
