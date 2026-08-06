@@ -36,6 +36,15 @@ function Write-OK($msg) { Write-Host "  [OK] $msg" -ForegroundColor Green }
 function Write-Warn($msg) { Write-Host "  [!]  $msg" -ForegroundColor Yellow }
 function Write-Err($msg) { Write-Host "  [x]  $msg" -ForegroundColor Red }
 
+function Copy-WithLF($src, $dst) {
+    if (Test-Path $src) {
+        $content = [IO.File]::ReadAllText($src)
+        $content = $content -replace "`r`n", "`n"
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        [IO.File]::WriteAllText($dst, $content, $utf8NoBom)
+    }
+}
+
 # ─── Validate target argument ────────────────────────────────────────────────
 $target = $args[0]
 if ($target -ne "linux") {
@@ -218,29 +227,31 @@ Write-Step 7 $TOTAL_STEPS "Menyalin service files dan installer script..."
 $deployOut = Join-Path $releasesDir "deploy"
 $productionDir = Join-Path $scriptDir "..\production"
 
-# Salin systemd service files
+# Salin systemd service files dan script tambahan
 $serviceFiles = @(
     "menettech-api.service",
     "menettech-worker.service",
     "menettech-discord.service",
-    "menettech-whatsapp.service"
+    "menettech-whatsapp.service",
+    "monitor-chrome.sh",
+    "cleanup-zombies.sh"
 )
 foreach ($svc in $serviceFiles) {
     $srcSvc = Join-Path $productionDir $svc
     if (Test-Path $srcSvc) {
-        Copy-Item -Path $srcSvc -Destination $deployOut -Force
+        Copy-WithLF $srcSvc (Join-Path $deployOut $svc)
         Write-OK "Disalin: deploy\$svc"
     }
     else {
-        Write-Warn "Service file tidak ditemukan: $srcSvc"
+        Write-Warn "File tidak ditemukan: $srcSvc"
     }
 }
 
 # Salin Linux-installer.sh ke root Releases (SELALU dari sumber, agar selalu terbaru)
 $fallbackInstaller = Join-Path $productionDir "install.sh"
 if (Test-Path $fallbackInstaller) {
-    Copy-Item -Path $fallbackInstaller -Destination (Join-Path $releasesDir "Linux-installer.sh") -Force
-    Write-OK "Linux-installer.sh disalin dari deploy\production\install.sh"
+    Copy-WithLF $fallbackInstaller (Join-Path $releasesDir "Linux-installer.sh")
+    Write-OK "Linux-installer.sh disalin dari deploy\production\install.sh (dengan format LF)"
 }
 else {
     Write-Warn "install.sh tidak ditemukan di deploy\production\ - Linux-installer.sh tidak akan ada di Releases!"
