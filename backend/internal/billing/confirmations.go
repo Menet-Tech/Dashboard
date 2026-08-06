@@ -200,9 +200,19 @@ func (s Service) ListPendingConfirmations(ctx context.Context) ([]PaymentConfirm
 			pc.BuktiTransfer = &val
 		}
 		pc.LinkedTagihanIDs = linkedIDs
+		list = append(list, pc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating pending confirmations: %w", err)
+	}
+	
+	// Close rows explicitly to free the database connection before running subsequent queries
+	rows.Close()
 
-		if linkedIDs != "" {
-			ids := strings.Split(linkedIDs, ",")
+	// Populate linked bills (done outside the main loop to prevent SQLite deadlock when MaxOpenConns=1)
+	for i := range list {
+		if list[i].LinkedTagihanIDs != "" {
+			ids := strings.Split(list[i].LinkedTagihanIDs, ",")
 			for _, idStr := range ids {
 				idStr = strings.TrimSpace(idStr)
 				if idStr == "" {
@@ -211,16 +221,12 @@ func (s Service) ListPendingConfirmations(ctx context.Context) ([]PaymentConfirm
 				var lb LinkedBillDetail
 				err := s.Repository.DB.QueryRowContext(ctx, "SELECT id, invoice_number, nominal FROM tagihan WHERE id = ?", idStr).Scan(&lb.TagihanID, &lb.InvoiceNumber, &lb.Amount)
 				if err == nil {
-					pc.LinkedBills = append(pc.LinkedBills, lb)
+					list[i].LinkedBills = append(list[i].LinkedBills, lb)
 				}
 			}
 		}
+	}
 
-		list = append(list, pc)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating pending confirmations: %w", err)
-	}
 	return list, nil
 }
 

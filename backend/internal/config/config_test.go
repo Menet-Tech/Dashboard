@@ -110,6 +110,10 @@ func TestValidateForProduction(t *testing.T) {
 	oldSecret := os.Getenv("JWT_SECRET")
 	defer os.Setenv("JWT_SECRET", oldSecret)
 	os.Setenv("JWT_SECRET", "super-secure-secret-key-123456789")
+	
+	oldAPIKey := os.Getenv("DASHBOARD_INTERNAL_API_KEY")
+	defer os.Setenv("DASHBOARD_INTERNAL_API_KEY", oldAPIKey)
+	os.Setenv("DASHBOARD_INTERNAL_API_KEY", "secure-internal-key-123")
 
 	valid := Config{
 		Environment:            "production",
