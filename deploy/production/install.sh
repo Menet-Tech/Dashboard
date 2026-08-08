@@ -603,7 +603,11 @@ if [[ -f "${INSTALL_DIR}/integration/discord-bot" ]]; then
     chmod +x "${INSTALL_DIR}/integration/discord-bot"
 fi
 
-chmod -R 700 "${INSTALL_DIR}/backend/storage"
+chmod 711 "${INSTALL_DIR}/backend/storage"
+chmod 600 "${INSTALL_DIR}/backend/storage"/*.db 2>/dev/null || true
+# uploads folder needs to be readable by nginx
+chmod 755 "${INSTALL_DIR}/backend/storage/uploads"
+chmod -R 644 "${INSTALL_DIR}/backend/storage/uploads"/* 2>/dev/null || true
 # nginx perlu bisa baca frontend
 chmod -R o+rX "${INSTALL_DIR}/frontend"
 log_success "Permission dan kepemilikan seluruh berkas berhasil dikonfigurasi!"
