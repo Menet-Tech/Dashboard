@@ -156,6 +156,27 @@ var slashCommands = []*discordgo.ApplicationCommand{
 		Description: "Pusat monitoring & kontrol interaktif (summary, health, dan navigasi cepat)",
 	},
 	{
+		Name:        "sesi",
+		Description: "Lihat status sesi PPPoE pelanggan (aktif/online atau mati/offline)",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Name:        "ringkasan",
+				Description: "Tampilkan jumlah pelanggan yang online dan offline",
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+			},
+			{
+				Name:        "aktif",
+				Description: "Tampilkan daftar sesi yang sedang aktif (online)",
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+			},
+			{
+				Name:        "mati",
+				Description: "Tampilkan daftar sesi yang sedang mati (offline)",
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+			},
+		},
+	},
+	{
 		Name:        "pelanggan",
 		Description: "Cari dan kelola pelanggan secara interaktif (ONT, MikroTik, status, tagihan)",
 		Options: []*discordgo.ApplicationCommandOption{
@@ -270,6 +291,15 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	switch cmdData.Name {
 	case "dashboard":
 		embed, components = buildDashboardEmbed()
+	case "sesi":
+		subcmd := ""
+		if len(cmdData.Options) > 0 {
+			subcmd = cmdData.Options[0].Name
+		}
+		if subcmd == "" {
+			subcmd = "ringkasan"
+		}
+		embed, components = buildSesiInteractiveEmbed(subcmd, 0, 10)
 	case "tagihan":
 		limit := 5
 		periode := ""
@@ -445,6 +475,79 @@ func queryCustomers(name string, offset int, limit int) ([]customerRow, error) {
 	return result, rows.Err()
 }
 
+type sesiRow struct {
+	ID          int64
+	Name        string
+	UserPPPoE   string
+	Status      string
+	PppoeStatus string
+	PppoeUptime string
+	LastSyncAt  string
+}
+
+func querySesi(status string, offset int, limit int) ([]sesiRow, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var rows *sql.Rows
+	var err error
+
+	if status == "aktif" {
+		rows, err = db.QueryContext(ctx, `
+			SELECT id, nama, user_pppoe, status, COALESCE(pppoe_status, ''), COALESCE(pppoe_uptime, ''), COALESCE(last_sync_at, '')
+			FROM pelanggan
+			WHERE status = 'active' AND pppoe_status = 'online'
+			ORDER BY nama ASC
+			LIMIT ? OFFSET ?
+		`, limit, offset)
+	} else {
+		// mati (offline)
+		rows, err = db.QueryContext(ctx, `
+			SELECT id, nama, user_pppoe, status, COALESCE(pppoe_status, ''), COALESCE(pppoe_uptime, ''), COALESCE(last_sync_at, '')
+			FROM pelanggan
+			WHERE status = 'active' AND (pppoe_status = 'offline' OR pppoe_status IS NULL OR pppoe_status = '')
+			ORDER BY last_sync_at DESC
+			LIMIT ? OFFSET ?
+		`, limit, offset)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []sesiRow
+	for rows.Next() {
+		var r sesiRow
+		if err := rows.Scan(&r.ID, &r.Name, &r.UserPPPoE, &r.Status, &r.PppoeStatus, &r.PppoeUptime, &r.LastSyncAt); err != nil {
+			continue
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+type sesiSummary struct {
+	TotalActive int
+	Online      int
+	Offline     int
+}
+
+func querySesiSummary() (sesiSummary, error) {
+	var s sesiSummary
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pelanggan WHERE status = 'active'`).Scan(&s.TotalActive); err != nil {
+		return s, err
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pelanggan WHERE status = 'active' AND pppoe_status = 'online'`).Scan(&s.Online); err != nil {
+		return s, err
+	}
+	s.Offline = s.TotalActive - s.Online
+	return s, nil
+}
+
 // ─── Message builders (Rich Embeds) ──────────────────────────────────────────
 
 func buildRythmTabs(activeTab string) discordgo.ActionsRow {
@@ -490,7 +593,7 @@ func buildDashboardEmbed() (*discordgo.MessageEmbed, []discordgo.MessageComponen
 				"**2. Pelanggan Aktif (Online)**\n`%d Pelanggan` memiliki sesi PPPoE/Layanan aktif\n\n"+
 				"**3. Tagihan Menunggak (Belum Bayar)**\n`%d Tagihan` belum terbayar (Total Tunggakan: **Rp %s**)\n\n"+
 				"**4. Tagihan Lunas Bulan Ini**\n`%d Tagihan` telah dibayarkan dengan sukses\n\n"+
-				"Page 1/1 • Rythm-Style Navigation UI • ISP Hub",
+				"Page 1/1",
 			s.TotalCustomers, s.ActiveCustomers, s.UnpaidBills, formatRupiah(s.UnpaidAmount), s.PaidBills),
 		Color: 0x5865F2, // Rythm Blue
 		Footer: &discordgo.MessageEmbedFooter{
@@ -560,10 +663,104 @@ func buildHealthEmbed() *discordgo.MessageEmbed {
 
 	return &discordgo.MessageEmbed{
 		Title:       fmt.Sprintf("%s Status Kesehatan Sistem: %s", emoji, strings.ToUpper(overallStatus)),
-		Description: descAlerts + "\n\nPage 1/1 • Rythm-Style System Diagnostics",
+		Description: descAlerts + "\n\nPage 1/1",
 		Color:       color,
 		Fields:      fields,
 	}
+}
+
+func buildSesiInteractiveEmbed(subcmd string, offset int, limit int) (*discordgo.MessageEmbed, []discordgo.MessageComponent) {
+	if limit <= 0 {
+		limit = 10
+	}
+
+	var embed *discordgo.MessageEmbed
+	var components []discordgo.MessageComponent
+
+	switch subcmd {
+	case "ringkasan":
+		summary, err := querySesiSummary()
+		if err != nil {
+			return errorEmbed("Gagal membaca summary sesi: " + err.Error()), nil
+		}
+		embed = &discordgo.MessageEmbed{
+			Title: "📊 Ringkasan Sesi PPPoE",
+			Description: fmt.Sprintf(
+				"**1. Total Pelanggan Aktif**\n`%d Pelanggan` aktif (non-suspend) dalam database\n\n"+
+					"**2. Sesi Aktif (Online)**\n`%d Pelanggan` memiliki sesi PPPoE aktif (online)\n\n"+
+					"**3. Sesi Mati (Offline)**\n`%d Pelanggan` memiliki sesi PPPoE yang sedang mati\n\n"+
+					"Gunakan `/sesi aktif` atau `/sesi mati` untuk melihat rincian.",
+				summary.TotalActive, summary.Online, summary.Offline),
+			Color: 0x5865F2, // Rythm Blue
+		}
+
+	case "aktif", "mati":
+		sesi, err := querySesi(subcmd, offset, limit)
+		if err != nil {
+			return errorEmbed(fmt.Sprintf("Gagal membaca daftar sesi %s: %s", subcmd, err.Error())), nil
+		}
+
+		title := "🟢 Daftar Sesi Aktif (Online)"
+		descStr := "Menampilkan sesi PPPoE pelanggan yang sedang online."
+		if subcmd == "mati" {
+			title = "🔴 Daftar Sesi Mati (Offline)"
+			descStr = "Menampilkan sesi PPPoE pelanggan yang sedang offline."
+		}
+
+		if len(sesi) == 0 && offset == 0 {
+			desc := "Tidak ada sesi " + subcmd + " saat ini."
+			embed = &discordgo.MessageEmbed{
+				Title:       title,
+				Description: desc + "\n\n • ISP Hub",
+				Color:       0x2ECC71, // Green
+			}
+			return embed, components
+		}
+
+		var sb strings.Builder
+		sb.WriteString(descStr)
+		sb.WriteString("\n\n")
+
+		for idx, s := range sesi {
+			num := offset + idx + 1
+			waktu := s.PppoeUptime
+			if subcmd == "mati" {
+				waktu = s.LastSyncAt
+			}
+			if waktu == "" {
+				waktu = "N/A"
+			}
+			sb.WriteString(fmt.Sprintf("**%d. %s** (User: %s)\nStatus: **%s** • Uptime/Sync: %s\n\n", num, s.Name, s.UserPPPoE, s.Status, waktu))
+		}
+
+		sb.WriteString(fmt.Sprintf("Page %d • Showing %d results on this page", (offset/limit)+1, len(sesi)))
+
+		embed = &discordgo.MessageEmbed{
+			Title:       fmt.Sprintf("%s (Hal %d)", title, (offset/limit)+1),
+			Description: strings.TrimSpace(sb.String()),
+			Color:       0x5865F2, // Rythm Blue
+		}
+
+		btnPrev := discordgo.Button{
+			Label:    "＜ Prev",
+			Style:    discordgo.SecondaryButton,
+			CustomID: fmt.Sprintf("sesi_prev_%s_%d_%d", subcmd, limit, offset),
+			Disabled: offset == 0,
+		}
+		btnNext := discordgo.Button{
+			Label:    "Next ＞",
+			Style:    discordgo.SecondaryButton,
+			CustomID: fmt.Sprintf("sesi_next_%s_%d_%d", subcmd, limit, offset),
+			Disabled: len(sesi) < limit,
+		}
+
+		row := discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{btnPrev, btnNext},
+		}
+		components = append(components, row)
+	}
+
+	return embed, components
 }
 
 func buildTagihanInteractiveEmbed(limit int, periode string, offset int) (*discordgo.MessageEmbed, []discordgo.MessageComponent) {
@@ -590,7 +787,7 @@ func buildTagihanInteractiveEmbed(limit int, periode string, offset int) (*disco
 		}
 		embed := &discordgo.MessageEmbed{
 			Title:       title,
-			Description: desc + "\n\nRythm-Style Navigation UI • ISP Hub",
+			Description: desc + "\n\n • ISP Hub",
 			Color:       0x2ECC71, // Green
 		}
 		return embed, []discordgo.MessageComponent{row1, row2}
@@ -610,7 +807,7 @@ func buildTagihanInteractiveEmbed(limit int, periode string, offset int) (*disco
 		})
 	}
 
-	sb.WriteString(fmt.Sprintf("Page %d • Showing %d results on this page • Rythm-Style UI", (offset/limit)+1, len(bills)))
+	sb.WriteString(fmt.Sprintf("Page %d • Showing %d results on this page", (offset/limit)+1, len(bills)))
 
 	embed := &discordgo.MessageEmbed{
 		Title:       fmt.Sprintf("%s (Hal %d)", title, (offset/limit)+1),
@@ -687,7 +884,7 @@ func buildPelangganEmbed(name string, offset int) (*discordgo.MessageEmbed, []di
 		}
 		embed := &discordgo.MessageEmbed{
 			Title:       "👥 Daftar Pelanggan",
-			Description: desc + "\n\nRythm-Style Navigation UI • ISP Hub",
+			Description: desc + "\n\n • ISP Hub",
 			Color:       0x5865F2, // Rythm Blue
 		}
 		return embed, []discordgo.MessageComponent{row1, row2}
@@ -714,7 +911,7 @@ func buildPelangganEmbed(name string, offset int) (*discordgo.MessageEmbed, []di
 		})
 	}
 
-	sb.WriteString(fmt.Sprintf("Page %d • Showing %d results on this page • Rythm-Style UI", (offset/limit)+1, len(customers)))
+	sb.WriteString(fmt.Sprintf("Page %d • Showing %d results on this page", (offset/limit)+1, len(customers)))
 
 	embed := &discordgo.MessageEmbed{
 		Title:       "👥 Daftar Pelanggan & Status Layanan",
@@ -1072,6 +1269,37 @@ func handleComponentInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 		return
 	}
 
+	if strings.HasPrefix(data.CustomID, "sesi_") {
+		parts := strings.Split(data.CustomID, "_")
+		if len(parts) >= 5 && (parts[1] == "prev" || parts[1] == "next") {
+			subcmd := parts[2]
+			limit := 10
+			fmt.Sscanf(parts[3], "%d", &limit)
+			offset := 0
+			fmt.Sscanf(parts[4], "%d", &offset)
+
+			switch parts[1] {
+			case "prev":
+				offset -= limit
+				if offset < 0 {
+					offset = 0
+				}
+			case "next":
+				offset += limit
+			}
+
+			embed, components := buildSesiInteractiveEmbed(subcmd, offset, limit)
+			_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseUpdateMessage,
+				Data: &discordgo.InteractionResponseData{
+					Embeds:     []*discordgo.MessageEmbed{embed},
+					Components: components,
+				},
+			})
+			return
+		}
+	}
+
 	if strings.HasPrefix(data.CustomID, "tagihan_") {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
@@ -1387,7 +1615,6 @@ func handleComponentInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 		}
 	}
 }
-
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

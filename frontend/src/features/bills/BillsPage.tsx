@@ -35,7 +35,7 @@ type BillsPageProps = {
   onMarkBillPaid: (id: number) => void;
   onToggleNotifications: (id: number) => void;
   onProofFileChange: (id: number, file: File | null) => void;
-  onUploadProof: (id: number) => void;
+  onUploadProof: (id: number, file?: File | null) => void;
   onSearchChange: (search: string) => void;
   onStatusChange: (status: string) => void;
   onPageChange: (page: number) => void;
@@ -449,7 +449,7 @@ export function BillsPage({
                                         onChange={(e) => {
                                           const file = e.target.files?.[0] ?? null;
                                           onProofFileChange(bill.id, file);
-                                          if (file) onUploadProof(bill.id);
+                                          if (file) onUploadProof(bill.id, file);
                                           setOpenMenuId(null);
                                         }}
                                       />

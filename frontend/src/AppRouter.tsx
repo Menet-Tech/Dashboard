@@ -630,7 +630,7 @@ export default function AppRouter() {
                   [id]: file,
                 }))
               }
-              onUploadProof={(id) => void billsHook.handlers.handleUploadProof(id)}
+              onUploadProof={(id, file) => void billsHook.handlers.handleUploadProof(id, file)}
               pushToast={feedback.pushToast}
               pushSuccess={feedback.pushSuccess}
               pushError={feedback.pushError}
