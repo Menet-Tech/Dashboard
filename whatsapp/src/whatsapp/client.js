@@ -4,7 +4,8 @@ const {
     DisconnectReason,
     fetchLatestBaileysVersion,
     makeCacheableSignalKeyStore,
-    isJidBroadcast
+    isJidBroadcast,
+    Browsers
 } = require('@whiskeysockets/baileys');
 const fs = require('fs/promises');
 const path = require('path');
@@ -64,7 +65,7 @@ const initWhatsAppClient = async (accountId = 'default') => {
         },
         generateHighQualityLinkPreview: true,
         shouldIgnoreJid: jid => isJidBroadcast(jid),
-        browser: ['Menet-Tech Gateway', 'Chrome', '1.0.0'],
+        browser: Browsers.ubuntu('Chrome'),
     });
 
     clients.set(accountId, sock);

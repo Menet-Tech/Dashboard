@@ -79,14 +79,29 @@ const getPairingCode = async (req, res, next) => {
         }
         
         const client = getClient(id);
+        if (!client) {
+            return res.status(404).json({ status: 'error', message: 'Akun belum diinisialisasi. Silakan refresh halaman.' });
+        }
+        
         if (isReady(id)) {
             return res.status(400).json({ status: 'error', message: 'Akun WhatsApp sudah siap (ready)' });
         }
         
         // Remove +, spaces, dashes, etc
         const cleanPhone = String(phoneNumber).replace(/\D/g, '');
-        const code = await client.requestPairingCode(cleanPhone);
-        res.json({ status: 'success', data: { code } });
+        
+        // Timeout to allow socket to settle if just created
+        setTimeout(async () => {
+            try {
+                const code = await client.requestPairingCode(cleanPhone);
+                // Format code nicely
+                const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
+                res.json({ status: 'success', data: { code: formattedCode } });
+            } catch (err) {
+                // If it fails (e.g., rate limited, or invalid number)
+                res.status(500).json({ status: 'error', message: 'Gagal mendapatkan kode pairing: ' + err.message });
+            }
+        }, 1500);
     } catch (err) {
         next(err);
     }
