@@ -1,22 +1,22 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    DisconnectReason,
+    fetchLatestBaileysVersion,
+    makeCacheableSignalKeyStore,
+    isJidBroadcast
+} = require('@whiskeysockets/baileys');
 const fs = require('fs/promises');
-const fsSync = require('fs');
 const path = require('path');
-const qrcode = require('qrcode-terminal');
+const pino = require('pino');
 const logger = require('../utils/logger');
 const { sendDiscordNotification } = require('../utils/discord');
 const { setupEvents } = require('./events');
 
-// Maps untuk mengelola multi-account
 const clients = new Map();
 const qrs = new Map();
 const readyStatuses = new Map();
 const reconnectTimers = new Map();
-const reconnectAttempts = new Map(); // tracks consecutive reconnect failures per accountId
-
-const MAX_RECONNECT_ATTEMPTS = 8;
-const BASE_RECONNECT_DELAY_MS = 10_000; // 10 seconds
-const MAX_RECONNECT_DELAY_MS = 5 * 60_000; // 5 minutes
 
 const sessionRoot = path.resolve(__dirname, 'sessions');
 
@@ -37,345 +37,154 @@ const resolveSessionPath = (accountId) => {
     return target;
 };
 
-const cleanupSessionLocks = (accountId) => {
-    try {
-        const sessionDir = resolveSessionPath(accountId);
-        const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
-        for (const file of lockFiles) {
-            try { fsSync.rmSync(path.join(sessionDir, file), { force: true }); } catch (e) { }
-            try { fsSync.rmSync(path.join(sessionDir, 'session', file), { force: true }); } catch (e) { }
-        }
-    } catch (err) {
-        logger.warn(`[${accountId}] Failed to clean up session locks: ${err.message}`);
-    }
-};
-
-const resolveExecutablePath = () => {
-    if (process.env.PUPPETEER_EXECUTABLE_PATH && fsSync.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
-        return process.env.PUPPETEER_EXECUTABLE_PATH;
-    }
-    const commonPaths = [
-        '/usr/bin/google-chrome-stable',
-        '/usr/bin/google-chrome',
-        '/usr/bin/chromium-browser',
-        '/usr/bin/chromium',
-        '/usr/lib/chromium-browser/chromium-browser',
-        '/snap/bin/chromium'
-    ];
-    for (const p of commonPaths) {
-        if (fsSync.existsSync(p)) {
-            logger.info(`Using detected system Chromium: ${p}`);
-            return p;
-        }
-    }
-    try {
-        const puppeteer = require('puppeteer');
-        if (puppeteer && typeof puppeteer.executablePath === 'function') {
-            const pPath = puppeteer.executablePath();
-            if (pPath && fsSync.existsSync(pPath)) {
-                logger.info(`Using Puppeteer cached browser: ${pPath}`);
-                return pPath;
-            }
-        }
-    } catch (e) { }
-    return process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
-};
-
-/**
- * Inisialisasi WhatsApp Client baru
- * @param {string} accountId 
- */
-const initWhatsAppClient = (accountId = 'default') => {
+const initWhatsAppClient = async (accountId = 'default') => {
     assertSafeAccountId(accountId);
     if (clients.has(accountId)) return clients.get(accountId);
 
-    logger.info(`Initializing client for account: ${accountId}`);
-    cleanupSessionLocks(accountId);
-    if (!process.env.DBUS_SESSION_BUS_ADDRESS) {
-        delete process.env.DBUS_SESSION_BUS_ADDRESS;
-    }
-    const defaultArgs = [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-extensions',
-        '--disable-software-rasterizer',
-        '--mute-audio',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--disable-site-isolation-trials',
-        // NOTE: --disable-web-security DIHAPUS — flag ini mematikan same-origin policy
-        // di dalam renderer Chromium, membuka celah RCE jika WhatsApp Web merender
-        // konten berbahaya (payload XSS, gambar exploit, dsb.) langsung di server.
-        // Low-memory flags for VPS
-        '--disable-background-networking',
-        '--disable-default-apps',
-        '--disable-sync',
-        '--disable-translate',
-        '--hide-scrollbars',
-        '--metrics-recording-only',
-        '--no-default-browser-check',
-        '--disable-hang-monitor',
-        '--disable-prompt-on-repost',
-        '--disable-background-timer-throttling',
-        '--disable-client-side-phishing-detection',
-        '--disable-popup-blocking',
-        '--disable-component-extensions-with-background-pages',
-        '--disable-ipc-flooding-protection',
-        '--js-flags=--max-old-space-size=128',
-        '--renderer-process-limit=1',
-        // Optimizations for faster loading
-        '--blink-settings=imagesEnabled=false', // Disable images (saves huge bandwidth/CPU)
-        '--disable-accelerated-2d-canvas',
-        '--disable-accelerated-video-decode',
-        '--disable-features=WebGL',
-    ];
+    logger.info(`Initializing Baileys client for account: ${accountId}`);
+    const sessionDir = resolveSessionPath(accountId);
+    
+    // Pastikan direktori sesi ada
+    await fs.mkdir(sessionDir, { recursive: true }).catch(() => {});
 
-    const customArgs = process.env.PUPPETEER_ARGS ? process.env.PUPPETEER_ARGS.split(',').map(a => a.trim()).filter(Boolean) : [];
-    const mergedArgs = Array.from(new Set([...defaultArgs, ...customArgs]));
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+    const { version, isLatest } = await fetchLatestBaileysVersion();
+    logger.info(`[${accountId}] Using WA v${version.join('.')}, isLatest: ${isLatest}`);
 
-    const client = new Client({
-        authStrategy: new LocalAuth({
-            dataPath: resolveSessionPath(accountId)
-        }),
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
-        authTimeoutMs: 300000,
-        puppeteer: {
-            executablePath: resolveExecutablePath(),
-            args: mergedArgs,
-            timeout: 600000,
-            protocolTimeout: 0
-        }
+    const pinoLogger = pino({ level: 'silent' });
+
+    const sock = makeWASocket({
+        version,
+        logger: pinoLogger,
+        printQRInTerminal: false,
+        auth: {
+            creds: state.creds,
+            // Cache keys for faster initial sync
+            keys: makeCacheableSignalKeyStore(state.keys, pinoLogger),
+        },
+        generateHighQualityLinkPreview: true,
+        shouldIgnoreJid: jid => isJidBroadcast(jid),
+        browser: ['Menet-Tech Gateway', 'Chrome', '1.0.0'],
     });
 
+    clients.set(accountId, sock);
     readyStatuses.set(accountId, false);
+
     if (global.io) {
         global.io.emit('account_status', { accountId, ready: false, hasQr: false });
     }
 
-    client.on('qr', (qr) => {
-        logger.info(`[${accountId}] QR Code received, scan with WhatsApp`);
-        if (process.env.ENABLE_DASHBOARD !== 'true') {
-            try {
-                qrcode.generate(qr, { small: true });
-            } catch (e) {}
-        }
-        qrs.set(accountId, qr);
-        if (global.io) {
-            global.io.emit('qr_code', { accountId, qr });
-            global.io.emit('account_status', { accountId, ready: false, hasQr: true });
-        }
-        sendDiscordNotification(`📲 **[${accountId}]** Menunggu Scan QR Code. Silakan periksa dashboard atau terminal.`);
-    });
+    sock.ev.process(async (events) => {
+        if (events['connection.update']) {
+            const update = events['connection.update'];
+            const { connection, lastDisconnect, qr } = update;
 
-    client.on('authenticated', () => {
-        logger.info(`[${accountId}] WhatsApp authenticated`);
-        qrs.delete(accountId);
-        if (global.io) {
-            global.io.emit('account_status', { accountId, ready: false, hasQr: false });
-        }
-        sendDiscordNotification(`✅ **[${accountId}]** WhatsApp Authenticated!`);
-    });
-
-    client.on('ready', () => {
-        logger.info(`[${accountId}] WhatsApp client is ready!`);
-        readyStatuses.set(accountId, true);
-        qrs.delete(accountId); // Hapus QR setelah ready
-        // Reset reconnect counter karena koneksi berhasil
-        reconnectAttempts.set(accountId, 0);
-        if (global.io) {
-            global.io.emit('account_status', { accountId, ready: true, hasQr: false });
-        }
-        sendDiscordNotification(`🚀 **[${accountId}]** WhatsApp Client is Ready & Online!`);
-    });
-
-    client.on('disconnected', async (reason) => {
-        if (!clients.has(accountId)) return; // Account was removed manually
-        logger.warn(`[${accountId}] Client disconnected: ${reason}`);
-        readyStatuses.set(accountId, false);
-        qrs.delete(accountId);
-        if (global.io) {
-            global.io.emit('account_status', { accountId, ready: false, hasQr: false });
-        }
-        sendDiscordNotification(`⚠️ **[${accountId}]** WhatsApp Client Disconnected! Reason: ${reason}`);
-        // Destroy client dengan timeout 5 detik agar tidak pernah hang selamanya
-        // (mitigasi deadlock jika socket Puppeteer sudah crash tanpa exit code bersih)
-        await destroyWithTimeout(client, accountId, 5000);
-        scheduleReconnect(accountId);
-    });
-
-    // Pasang listener untuk menerima pesan (AutoReply / AI / Webhook)
-    setupEvents(client, accountId);
-
-    logger.info(`[${accountId}] Sedang mencoba menghubungi peladen WhatsApp (membuka browser). Mohon tunggu...`);
-    cleanupSessionLocks(accountId);
-    client.initialize().catch(async (err) => {
-        const errMsg = err ? (err.stack || err.message || (typeof err === 'string' ? err : JSON.stringify(err))) : 'Unknown initialize error';
-        logger.error(`[${accountId}] Failed to initialize client: ${errMsg}`, { error: err });
-        readyStatuses.set(accountId, false);
-        await destroyWithTimeout(client, accountId, 5000);
-        scheduleReconnect(accountId);
-    });
-
-    // Fallback DOM Scanner: ekstraksi QR langsung dari canvas Chromium jika event terhalang
-    let domScanCount = 0;
-    const domScanInterval = setInterval(async () => {
-        domScanCount++;
-        if (readyStatuses.get(accountId) || domScanCount > 30) {
-            clearInterval(domScanInterval);
-            return;
-        }
-        if (client && client.pupPage) {
-            try {
-                const qrRes = await client.pupPage.evaluate(() => {
-                    const divRef = document.querySelector('div[data-ref]');
-                    if (divRef) return divRef.getAttribute('data-ref');
-                    const canvas = document.querySelector('canvas');
-                    if (canvas && canvas.parentElement) {
-                        return canvas.parentElement.getAttribute('data-ref');
-                    }
-                    return null;
-                });
-                
-                if (qrRes && qrs.get(accountId) !== qrRes) {
-                    logger.info(`[${accountId}] QR Code diperbarui via DOM Fallback Scanner!`);
-                    qrs.set(accountId, qrRes);
-                    if (global.io) {
-                        global.io.emit('qr_code', { accountId, qr: qrRes });
-                        global.io.emit('account_status', { accountId, ready: false, hasQr: true });
-                    }
-                    if (process.env.ENABLE_DASHBOARD !== 'true') {
-                        try {
-                            qrcode.generate(qrRes, { small: true });
-                        } catch (e) {}
-                    }
+            if (qr) {
+                logger.info(`[${accountId}] QR Code received, scan with WhatsApp`);
+                qrs.set(accountId, qr);
+                if (global.io) {
+                    global.io.emit('qr_code', { accountId, qr });
+                    global.io.emit('account_status', { accountId, ready: false, hasQr: true });
                 }
-            } catch (e) {
-                // ignore transient errors during page load
+            }
+
+            if (connection === 'close') {
+                readyStatuses.set(accountId, false);
+                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                
+                logger.warn(`[${accountId}] Connection closed due to: ${lastDisconnect?.error?.message}. Reconnecting: ${shouldReconnect}`);
+                
+                if (global.io) {
+                    global.io.emit('account_status', { accountId, ready: false, hasQr: false });
+                }
+
+                if (shouldReconnect) {
+                    scheduleReconnect(accountId);
+                } else {
+                    logger.warn(`[${accountId}] Logged out. Session deleted.`);
+                    // Hapus file kredensial jika di-logout
+                    await removeAccount(accountId);
+                }
+            }
+
+            if (connection === 'open') {
+                logger.info(`[${accountId}] WhatsApp client is ready!`);
+                readyStatuses.set(accountId, true);
+                qrs.delete(accountId);
+                
+                if (global.io) {
+                    global.io.emit('account_status', { accountId, ready: true, hasQr: false });
+                }
+                sendDiscordNotification(`🚀 **[${accountId}]** WhatsApp Client is Ready & Online!`);
             }
         }
-    }, 2000);
 
-    clients.set(accountId, client);
-    return client;
+        if (events['creds.update']) {
+            await saveCreds();
+        }
+    });
+
+    // Pasang listener untuk pesan (AutoReply / AI / Webhook)
+    setupEvents(sock, accountId);
+
+    return sock;
 };
 
-/**
- * Mendapatkan instance Client berdasarkan accountId
- */
-const getClient = (accountId = 'default') => {
-    if (!clients.has(accountId)) throw new Error(`WhatsApp client for account '${accountId}' not initialized or not found`);
-    return clients.get(accountId);
+const scheduleReconnect = (accountId) => {
+    if (reconnectTimers.has(accountId)) {
+        clearTimeout(reconnectTimers.get(accountId));
+    }
+    const delay = 5000;
+    logger.info(`[${accountId}] Scheduling reconnect in ${delay}ms`);
+    reconnectTimers.set(accountId, setTimeout(() => {
+        clients.delete(accountId); // Clear old socket
+        initWhatsAppClient(accountId).catch(e => logger.error(`[${accountId}] Reconnect failed: ${e.message}`));
+    }, delay));
 };
 
-const isReady = (accountId = 'default') => !!readyStatuses.get(accountId);
+const getClient = (accountId) => clients.get(accountId);
 
-const getQr = (accountId = 'default') => qrs.get(accountId) || null;
+const isReady = (accountId) => {
+    if (!clients.has(accountId)) return false;
+    return readyStatuses.get(accountId) === true;
+};
+
+const getQr = (accountId) => qrs.get(accountId) || null;
 
 const getAllAccounts = () => {
     return Array.from(clients.keys()).map(id => ({
         accountId: id,
         ready: isReady(id),
-        hasQr: !!getQr(id)
+        hasQr: qrs.has(id)
     }));
 };
 
 const removeAccount = async (accountId) => {
-    assertSafeAccountId(accountId);
-    if (reconnectTimers.has(accountId)) {
-        clearTimeout(reconnectTimers.get(accountId));
-        reconnectTimers.delete(accountId);
-    }
-    if (!clients.has(accountId)) return false;
     const client = clients.get(accountId);
-
-    // Hapus duluan dari memory supaya disconnected-event tahu bahwa ini dihapus manual
-    clients.delete(accountId);
-    readyStatuses.delete(accountId);
-    qrs.delete(accountId);
-
+    if (client) {
+        try {
+            client.logout().catch(() => {});
+        } catch(e) {}
+        client.end(new Error('Manually removed'));
+        clients.delete(accountId);
+        readyStatuses.delete(accountId);
+        qrs.delete(accountId);
+        if (reconnectTimers.has(accountId)) {
+            clearTimeout(reconnectTimers.get(accountId));
+            reconnectTimers.delete(accountId);
+        }
+    }
+    
+    // Hapus file sesi
     try {
-        await client.destroy();
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const sessionPath = resolveSessionPath(accountId);
+        await fs.rm(sessionPath, { recursive: true, force: true, maxRetries: 3 });
+        logger.info(`[${accountId}] Session folder deleted`);
     } catch (err) {
-        logger.error(`Error destroying client ${accountId}:`, err);
+        logger.error(`[${accountId}] Error removing session folder: ${err.message}`);
     }
-
-    try {
-        await fs.rm(resolveSessionPath(accountId), { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
-    } catch (err) {
-        logger.error(`Error removing session folder ${accountId}:`, err);
-    }
-
-    if (global.io) {
-        global.io.emit('account_removed', { accountId });
-    }
-    sendDiscordNotification(`🗑️ **[${accountId}]** Akun WhatsApp telah dihapus.`);
     return true;
 };
-
-/**
- * Menghancurkan Puppeteer client dengan batas waktu (timeout) agar tidak
- * pernah hang selamanya jika browser sudah crash tanpa exit code yang bersih.
- * @param {import('whatsapp-web.js').Client} client
- * @param {string} accountId
- * @param {number} [timeoutMs=5000]
- */
-const destroyWithTimeout = (client, accountId, timeoutMs = 5000) => {
-    return Promise.race([
-        client.destroy()
-            .then(() => logger.info(`[${accountId}] Browser berhasil dihancurkan.`))
-            .catch(e => logger.warn(`[${accountId}] Error saat destroy client: ${e.message}`)),
-        new Promise(resolve => setTimeout(() => {
-            logger.warn(`[${accountId}] destroy() melebihi batas waktu ${timeoutMs}ms — diabaikan, lanjut reconnect.`);
-            resolve();
-        }, timeoutMs))
-    ]);
-};
-
-const scheduleReconnect = (accountId = 'default') => {
-    if (reconnectTimers.has(accountId)) {
-        logger.info(`[${accountId}] Reconnect already scheduled. Skipping duplicate scheduleReconnect.`);
-        return;
-    }
-
-    const attempts = (reconnectAttempts.get(accountId) || 0);
-    if (attempts >= MAX_RECONNECT_ATTEMPTS) {
-        logger.error(`[${accountId}] Reached maximum reconnect attempts (${MAX_RECONNECT_ATTEMPTS}). Exiting process for clean systemd restart.`);
-        sendDiscordNotification(
-            `🔴 **[${accountId}]** WhatsApp Gateway telah gagal reconnect ${MAX_RECONNECT_ATTEMPTS}x berturut-turut.\n` +
-            `Proses akan **dihentikan** agar systemd dapat me-restart ulang dengan bersih.\n` +
-            `⚠️ Periksa log server untuk diagnosis lebih lanjut.`
-        ).finally(() => {
-            process.exit(1);
-        });
-        return;
-    }
-
-    // Exponential backoff: 10s, 20s, 40s, 80s ... up to MAX_RECONNECT_DELAY_MS
-    const delay = Math.min(BASE_RECONNECT_DELAY_MS * Math.pow(2, attempts), MAX_RECONNECT_DELAY_MS);
-    reconnectAttempts.set(accountId, attempts + 1);
-
-    logger.info(`Scheduling reconnect for ${accountId} in ${delay / 1000}s (attempt ${attempts + 1}/${MAX_RECONNECT_ATTEMPTS})...`);
-    const timer = setTimeout(async () => {
-        reconnectTimers.delete(accountId);
-        logger.info(`Attempting to reconnect ${accountId}...`);
-        if (clients.has(accountId)) {
-            const client = clients.get(accountId);
-            clients.delete(accountId);
-            readyStatuses.delete(accountId);
-            qrs.delete(accountId);
-            await destroyWithTimeout(client, accountId, 5000);
-        }
-        initWhatsAppClient(accountId);
-    }, delay);
-    reconnectTimers.set(accountId, timer);
-};
-
-// Server.js will handle initialization
 
 module.exports = {
     initWhatsAppClient,
@@ -384,6 +193,5 @@ module.exports = {
     getQr,
     getAllAccounts,
     removeAccount,
-    scheduleReconnect,
-    resolveSessionPath,
+    resolveSessionPath
 };

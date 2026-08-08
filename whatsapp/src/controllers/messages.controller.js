@@ -87,10 +87,8 @@ const sendMessage = async (req, res, next) => {
             throw err;
         }
 
-        // whatsapp-web.js sometimes returns null/undefined even after successfully
-        // delivering the message (confirmed: message appears in wa_gateway.db messages table).
-        // Check the DB to determine if the message was truly sent.
-        let messageId = result?.id?.id || result?.id?._serialized || null;
+        // Baileys returns result.key.id
+        let messageId = result?.key?.id || null;
 
         if (!messageId && !result) {
             // result is null — verify if the message was saved to the messages DB

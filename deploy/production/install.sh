@@ -191,7 +191,7 @@ if [[ "${UPDATE_MODE}" == "false" ]]; then
     apt-get update -y -q
 
     log_info "Menginstal utilitas dasar..."
-    apt-get install -y -q curl wget unzip git sqlite3 ca-certificates build-essential iproute2
+    apt-get install -y -q curl wget unzip git sqlite3 ca-certificates build-essential iproute2 cron
 
     log_info "Menginstal nginx..."
     apt-get install -y -q nginx
@@ -276,7 +276,11 @@ if [[ ! -f "${INSTALL_DIR}/backend/.env" ]]; then
         sed -i "s|BOOTSTRAP_ADMIN_PASSWORD=.*|BOOTSTRAP_ADMIN_PASSWORD=${ADMIN_PASSWORD_ESCAPED}|g" "${INSTALL_DIR}/backend/.env"
         # ─── Auto-generate JWT_SECRET (wajib untuk keamanan produksi) ─────────
         JWT_SECRET_VAL=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p)
-        sed -i "s|JWT_SECRET=.*|JWT_SECRET=${JWT_SECRET_VAL}|g" "${INSTALL_DIR}/backend/.env"
+        if grep -q "^JWT_SECRET=" "${INSTALL_DIR}/backend/.env"; then
+            sed -i "s|JWT_SECRET=.*|JWT_SECRET=${JWT_SECRET_VAL}|g" "${INSTALL_DIR}/backend/.env"
+        else
+            echo "JWT_SECRET=${JWT_SECRET_VAL}" >> "${INSTALL_DIR}/backend/.env"
+        fi
         log_success "JWT_SECRET di-generate otomatis (random 256-bit)"
         log_success "File .env backend dibuat, password admin telah diset"
     fi
@@ -287,7 +291,11 @@ else
     EXISTING_JWT=$(grep -E '^JWT_SECRET=' "${INSTALL_DIR}/backend/.env" | cut -d'=' -f2- | tr -d ' ')
     if [[ -z "${EXISTING_JWT}" ]] || [[ "${EXISTING_JWT}" == "your-secret-key" ]] || [[ "${EXISTING_JWT}" == "change-me" ]] || [[ ${#EXISTING_JWT} -lt 32 ]]; then
         JWT_SECRET_VAL=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p)
-        sed -i "s|JWT_SECRET=.*|JWT_SECRET=${JWT_SECRET_VAL}|g" "${INSTALL_DIR}/backend/.env"
+        if grep -q "^JWT_SECRET=" "${INSTALL_DIR}/backend/.env"; then
+            sed -i "s|JWT_SECRET=.*|JWT_SECRET=${JWT_SECRET_VAL}|g" "${INSTALL_DIR}/backend/.env"
+        else
+            echo "JWT_SECRET=${JWT_SECRET_VAL}" >> "${INSTALL_DIR}/backend/.env"
+        fi
         log_success "JWT_SECRET lama kosong/tidak aman — di-generate ulang otomatis"
     else
         log_info "JWT_SECRET sudah ada, melewati regenerasi."
@@ -549,7 +557,7 @@ if [[ "${UPDATE_MODE}" == "false" ]]; then
                 sed -i "s|SESSION_COOKIE_SECURE=.*|SESSION_COOKIE_SECURE=true|g" "${INSTALL_DIR}/backend/.env"
             fi
             # Setup auto-renewal cron
-            (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --post-hook 'systemctl reload nginx'") | crontab -
+            (crontab -l 2>/dev/null || true; echo "0 3 * * * certbot renew --quiet --post-hook 'systemctl reload nginx'") | crontab -
             log_success "Auto-renewal SSL certificate dikonfigurasi (cron setiap hari jam 03:00)"
             ACCESS_URL="https://${DOMAIN_NAME}"
         else
@@ -646,7 +654,7 @@ if [[ -f "${SCRIPT_DIR}/deploy/monitor-chrome.sh" ]]; then
     if crontab -l 2>/dev/null | grep -qF "${MONITOR_SCRIPT}"; then
         log_info "Cronjob monitor-chrome sudah terpasang, dilewati."
     else
-        ( crontab -l 2>/dev/null; echo "${CRON_ENTRY}" ) | crontab -
+        ( crontab -l 2>/dev/null || true; echo "${CRON_ENTRY}" ) | crontab -
         log_success "Cronjob monitor-chrome terpasang (setiap 10 menit): ${MONITOR_SCRIPT}"
     fi
 else

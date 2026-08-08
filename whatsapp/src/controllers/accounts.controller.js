@@ -85,32 +85,6 @@ const getPairingCode = async (req, res, next) => {
         
         // Remove +, spaces, dashes, etc
         const cleanPhone = String(phoneNumber).replace(/\D/g, '');
-        // Pastikan onCodeReceivedEvent diexpose ke puppeteer page (karena jika tidak diset di options saat init, fungsi ini tidak ada)
-        try {
-            await client.pupPage.exposeFunction('onCodeReceivedEvent', (code) => {
-                return code;
-            });
-        } catch (e) {
-            // Abaikan jika sudah terekspos
-        }
-
-        // Wait until AuthStore and PairingCodeLinkUtils are injected by WhatsApp Web
-        try {
-            await client.pupPage.waitForFunction(() => {
-                return window.AuthStore && window.AuthStore.PairingCodeLinkUtils;
-            }, { timeout: 15000 });
-        } catch (e) {
-            // Debugging: what does AuthStore contain?
-            try {
-                const keys = await client.pupPage.evaluate(() => {
-                    return window.AuthStore ? Object.keys(window.AuthStore) : ['AuthStore is null/undefined'];
-                });
-                console.error("[DEBUG] AuthStore keys:", keys);
-            } catch (err) {}
-
-            return res.status(400).json({ status: 'error', message: 'Halaman WhatsApp belum siap untuk Tautkan Nomor. Coba beberapa saat lagi atau muat ulang QR code.' });
-        }
-
         const code = await client.requestPairingCode(cleanPhone);
         res.json({ status: 'success', data: { code } });
     } catch (err) {

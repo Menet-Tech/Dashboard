@@ -36,12 +36,13 @@ const getClient = (accountId) => {
     return require('../whatsapp/client').getClient(accountId);
 };
 const { formatPhoneNumber } = require('../utils/formatter');
-const { MessageMedia, Buttons, List } = require('whatsapp-web.js');
 const { WhatsAppError } = require('../utils/errors');
 const { saveMessage } = require('../utils/database');
+const fs = require('fs');
 
 const recordOutboundMessage = (accountId, to, body, type, result) => {
-    const newId = saveMessage(to, body, type, result?.id?._serialized, 'outbound', null, accountId);
+    const msgId = result?.key?.id;
+    const newId = saveMessage(to, body, type, msgId, 'outbound', null, accountId);
     if (global.io) {
         global.io.emit('chat_message', {
             id: newId,
@@ -51,77 +52,86 @@ const recordOutboundMessage = (accountId, to, body, type, result) => {
             to_number: to,
             body,
             type,
-            wa_message_id: result?.id?._serialized,
+            wa_message_id: msgId,
             created_at: new Date().toISOString()
         });
     }
 };
 
 const sendTextMessage = async (accountId, to, text, quotedMessageId = null, is_manual = false, idempotencyKey = null) => {
-    const client = getClient(accountId);
+    const sock = getClient(accountId);
+    if (!sock) throw new WhatsAppError('WhatsApp client not found');
     const chatId = formatPhoneNumber(to);
-    const options = quotedMessageId ? { quotedMessageId } : {};
     
     // OpSec: Simulate typing delay for automated messages
     if (!is_manual) {
         try {
-            await client.sendPresenceAvailable();
-            const chat = await client.getChatById(chatId);
-            if (chat) {
-                await chat.sendStateTyping();
-            }
+            await sock.sendPresenceUpdate('composing', chatId);
             const delayMs = Math.floor(Math.random() * 2000) + 1500;
             await new Promise(resolve => setTimeout(resolve, delayMs));
+            await sock.sendPresenceUpdate('paused', chatId);
         } catch (e) {
-            // Abaikan error jika chat belum ada atau fitur tidak didukung
+            // Ignore
         }
     }
 
     try {
-        const result = await client.sendMessage(chatId, text, options);
-        logger.debug(`[sendTextMessage] result type=${typeof result}, hasId=${!!(result && result.id)}, result=${JSON.stringify(result?.id)}`);
-        if (!is_manual && result && result.id) {
-            registerAutomatedMessage(result);
+        const result = await sock.sendMessage(chatId, { text });
+        if (!is_manual && result?.key?.id) {
+            registerAutomatedMessage({ id: { _serialized: result.key.id } }); // Polyfill for existing code
         }
-        // Simpan ke database
+        
         try {
-            const newId = saveMessage(to, text, 'text', result?.id?._serialized, 'outbound', null, accountId, idempotencyKey);
+            const newId = saveMessage(to, text, 'text', result?.key?.id, 'outbound', null, accountId, idempotencyKey);
             if (global.io) {
                 global.io.emit('chat_message', {
                     id: newId, account_id: accountId, direction: 'outbound',
                     from_number: null, to_number: to, body: text, type: 'text',
-                    wa_message_id: result?.id?._serialized, created_at: new Date().toISOString()
+                    wa_message_id: result?.key?.id, created_at: new Date().toISOString()
                 });
             }
         } catch (_) { }
         return result;
     } catch (err) {
-        logger.error(`[sendTextMessage] client.sendMessage threw: ${err?.message || err}`, { chatId, errType: err?.constructor?.name });
-        if (err.message && err.message.includes('invalid number')) {
-            throw new WhatsAppError('Nomor tidak valid');
-        }
+        logger.error(`[sendTextMessage] sock.sendMessage threw: ${err?.message || err}`);
         throw new WhatsAppError('Gagal mengirim pesan: ' + err.message);
     }
 };
 
 
 const sendMediaMessage = async (accountId, to, filePath, caption = '', quotedMessageId = null, is_manual = false) => {
-    const client = getClient(accountId);
+    const sock = getClient(accountId);
+    if (!sock) throw new WhatsAppError('WhatsApp client not found');
     const chatId = formatPhoneNumber(to);
     try {
-        const media = MessageMedia.fromFilePath(filePath);
-        const options = { caption, ...(quotedMessageId ? { quotedMessageId } : {}) };
-        const result = await client.sendMessage(chatId, media, options);
-        if (!is_manual && result && result.id) {
-            registerAutomatedMessage(result);
+        const buffer = fs.readFileSync(filePath);
+        // Determine mimetype roughly
+        const ext = filePath.split('.').pop().toLowerCase();
+        let mimetype = 'image/jpeg';
+        let msgType = 'image';
+        
+        if (['mp4', 'avi', 'mov'].includes(ext)) { mimetype = 'video/mp4'; msgType = 'video'; }
+        else if (['pdf', 'doc', 'docx', 'xls'].includes(ext)) { mimetype = 'application/pdf'; msgType = 'document'; }
+        
+        const messageContent = {};
+        if (msgType === 'image') messageContent.image = buffer;
+        else if (msgType === 'video') messageContent.video = buffer;
+        else messageContent.document = buffer;
+        
+        if (caption) messageContent.caption = caption;
+        messageContent.mimetype = mimetype;
+
+        const result = await sock.sendMessage(chatId, messageContent);
+        if (!is_manual && result?.key?.id) {
+            registerAutomatedMessage({ id: { _serialized: result.key.id } });
         }
         try { 
-            const newId = saveMessage(to, caption || '[media]', 'media', result?.id?._serialized, 'outbound', null, accountId); 
+            const newId = saveMessage(to, caption || '[media]', 'media', result?.key?.id, 'outbound', null, accountId); 
             if (global.io) {
                 global.io.emit('chat_message', {
                     id: newId, account_id: accountId, direction: 'outbound', 
                     from_number: null, to_number: to, body: caption || '[media]', type: 'media',
-                    wa_message_id: result?.id?._serialized, created_at: new Date().toISOString()
+                    wa_message_id: result?.key?.id, created_at: new Date().toISOString()
                 });
             }
         } catch (_) { }
@@ -132,73 +142,49 @@ const sendMediaMessage = async (accountId, to, filePath, caption = '', quotedMes
 };
 
 const sendButtonMessage = async (accountId, to, body, buttons, title, footer, is_manual = false) => {
-    const client = getClient(accountId);
-    const chatId = formatPhoneNumber(to);
-    try {
-        const buttonObj = new Buttons(body, buttons, title, footer);
-        const result = await client.sendMessage(chatId, buttonObj);
-        if (!is_manual && result && result.id) {
-            registerAutomatedMessage(result);
-        }
-        try { recordOutboundMessage(accountId, to, title || body || 'Button Message', 'button', result); } catch (_) { }
-        return result;
-    } catch (err) {
-        throw new WhatsAppError('Gagal mengirim pesan tombol: ' + err.message);
-    }
+    throw new WhatsAppError('Buttons are deprecated in standard Baileys API/WhatsApp API for regular accounts.');
 };
 
 const sendListMessage = async (accountId, to, body, buttonText, sections, title, footer, is_manual = false) => {
-    const client = getClient(accountId);
-    const chatId = formatPhoneNumber(to);
-    try {
-        const listObj = new List(body, buttonText, sections, title, footer);
-        const result = await client.sendMessage(chatId, listObj);
-        if (!is_manual && result && result.id) {
-            registerAutomatedMessage(result);
-        }
-        try { recordOutboundMessage(accountId, to, title || body || 'List Message', 'list', result); } catch (_) { }
-        return result;
-    } catch (err) {
-        throw new WhatsAppError('Gagal mengirim pesan list: ' + err.message);
-    }
+    throw new WhatsAppError('Lists are deprecated in standard Baileys API/WhatsApp API for regular accounts.');
 };
 
 
 const getContacts = async (accountId) => {
-    const client = getClient(accountId);
-    return await client.getContacts();
+    return []; // NotImplemented in pure Baileys easily without store
 };
 const getContactById = async (accountId, contactId) => {
-    const client = getClient(accountId);
-    const chatId = formatPhoneNumber(contactId);
-    return await client.getContactById(chatId);
+    const sock = getClient(accountId);
+    const [result] = await sock.onWhatsApp(contactId);
+    return result;
 };
 const getProfilePicUrl = async (accountId, contactId) => {
-    const client = getClient(accountId);
+    const sock = getClient(accountId);
     const chatId = formatPhoneNumber(contactId);
-    return await client.getProfilePicUrl(chatId);
+    try {
+        return await sock.profilePictureUrl(chatId);
+    } catch(e) { return null; }
 };
 
 const isRegisteredUser = async (accountId, contactId) => {
-    const client = getClient(accountId);
+    const sock = getClient(accountId);
     const chatId = formatPhoneNumber(contactId);
-    return await client.isRegisteredUser(chatId);
+    const [result] = await sock.onWhatsApp(chatId);
+    return !!result;
 };
 
 // Group Functions
 const createGroup = async (accountId, title, participants) => {
-    const client = getClient(accountId);
-    // format all numbers
+    const sock = getClient(accountId);
     const formattedParticipants = participants.map(p => formatPhoneNumber(p));
-    return await client.createGroup(title, formattedParticipants);
+    return await sock.groupCreate(title, formattedParticipants);
 };
 const getChats = async (accountId) => {
-    const client = getClient(accountId);
-    return await client.getChats();
+    return []; // Requires Baileys memory store
 };
 const getChatById = async (accountId, groupId) => {
-    const client = getClient(accountId);
-    return await client.getChatById(groupId);
+    const sock = getClient(accountId);
+    return await sock.groupMetadata(groupId);
 };
 
 module.exports = {

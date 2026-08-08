@@ -4,10 +4,10 @@
  */
 const request = require('supertest');
 
-jest.mock('whatsapp-web.js');
+jest.mock('@whiskeysockets/baileys');
 jest.mock('../src/whatsapp/client', () => ({
     isReady: () => true,
-    getClient: () => require('whatsapp-web.js').__mocks__ || {},
+    getClient: () => require('@whiskeysockets/baileys').__mocks__ || {},
     initWhatsAppClient: jest.fn(),
     waitForClientReady: jest.fn().mockResolvedValue(),
     scheduleReconnect: jest.fn(),

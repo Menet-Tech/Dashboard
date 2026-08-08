@@ -7,7 +7,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-jest.mock('whatsapp-web.js');
+jest.mock('@whiskeysockets/baileys');
 jest.mock('../src/whatsapp/client', () => ({
     isReady: () => true,
     getClient: jest.fn(),
