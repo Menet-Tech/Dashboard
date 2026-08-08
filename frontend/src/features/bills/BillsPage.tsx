@@ -1,6 +1,6 @@
 import { Button } from "../../components/ui/Button";
-import { Fragment, useState, useMemo, type FormEvent } from "react";
-import { ChevronUp, ChevronDown, ArrowUpDown, MoreVertical } from "lucide-react";
+import { Fragment, useState, useMemo, useEffect, type FormEvent } from "react";
+import { ChevronUp, ChevronDown, ArrowUpDown, MoreVertical, MessageSquare, History, Clock, RotateCcw, Upload } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
 import { formatCurrency } from "../../utils/format";
 import { displayStatusLabel, displayStatusTone } from "../../utils/status";
@@ -89,6 +89,16 @@ export function BillsPage({
   const [sortField, setSortField] = useState<string | null>("invoice_number");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenMenuId(null);
+    };
+    if (openMenuId !== null) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [openMenuId]);
   const [waModalBillId, setWaModalBillId] = useState<number | null>(null);
   const [selectedWaTemplate, setSelectedWaTemplate] = useState<string>("");
 
@@ -254,7 +264,7 @@ export function BillsPage({
           </div>
         </div>
 
-         <div className="overflow-x-auto border border-gray-200 dark:border-slate-800 rounded-card bg-white dark:bg-slate-900 shadow-sm">
+          <div className="overflow-x-auto min-h-[300px] border border-gray-200 dark:border-slate-800 rounded-card bg-white dark:bg-slate-900 shadow-sm">
           <table className="w-full text-left border-collapse text-sm">
             <thead className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400">
               <tr>
@@ -363,33 +373,35 @@ export function BillsPage({
                                   onClick={() => setOpenMenuId(null)} 
                                   aria-hidden="true"
                                 />
-                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-50 animate-in">
+                                <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 p-1 z-50 animate-in">
                                   <button
                                     type="button"
-                                    className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md transition-colors"
                                     onClick={() => {
                                       setWaModalBillId(bill.id);
                                       setSelectedWaTemplate("");
                                       setOpenMenuId(null);
                                     }}
                                   >
-                                    Kirim Notifikasi WA
+                                    <MessageSquare size={14} className="text-emerald-500" />
+                                    <span>Kirim Notifikasi WA</span>
                                   </button>
                                   <button
                                     type="button"
-                                    className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md transition-colors"
                                     onClick={() => {
                                       onToggleNotifications(bill.id);
                                       setOpenMenuId(null);
                                     }}
                                   >
-                                    Log Riwayat Notifikasi
+                                    <History size={14} className="text-blue-500" />
+                                    <span>Log Riwayat Notifikasi</span>
                                   </button>
 
                                   {user?.role !== "viewer" && bill.status === "belum_bayar" && bill.display_status !== "perpanjangan" && onGrantExtension && (
                                     <button
                                       type="button"
-                                      className="w-full text-left px-4 py-2 text-xs text-amber-600 dark:text-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-amber-600 dark:text-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md transition-colors"
                                       onClick={async () => {
                                         setOpenMenuId(null);
                                         if (await showConfirm(`Perpanjang tagihan ${bill.invoice_number}? Pelanggan akan dialihkan ke status 'pending' (perpanjangan) dan tagihan bulan depan digabung (nominal dikali 2).`)) {
@@ -397,31 +409,38 @@ export function BillsPage({
                                         }
                                       }}
                                     >
-                                      Perpanjang Masa Aktif
+                                      <Clock size={14} className="text-amber-500" />
+                                      <span>Perpanjang Masa Aktif</span>
                                     </button>
                                   )}
 
                                   {user?.role !== "viewer" && (bill.status === "pending_paid" || bill.status === "pending_extension") && onCancelPendingAction && (
                                     <button
                                       type="button"
-                                      className="w-full text-left px-4 py-2 text-xs text-rose-600 dark:text-rose-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-600 dark:text-rose-500 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md transition-colors"
                                       onClick={() => {
                                         setOpenMenuId(null);
                                         onCancelPendingAction(bill.id);
                                       }}
                                     >
-                                      Batalkan Aksi Tertunda
+                                      <RotateCcw size={14} className="text-rose-500" />
+                                      <span>Batalkan Aksi Tertunda</span>
                                     </button>
                                   )}
 
                                   {user?.role !== "viewer" && bill.status !== "lunas" && bill.display_status !== "perpanjangan" && (
-                                    <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer text-left">
-                                      <label
-                                        htmlFor={`proof-upload-${bill.id}`}
-                                        className="text-xs text-slate-700 dark:text-slate-300 cursor-pointer block w-full"
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md transition-colors"
+                                        onClick={() => {
+                                          setOpenMenuId(null);
+                                          document.getElementById(`proof-upload-${bill.id}`)?.click();
+                                        }}
                                       >
-                                        Upload Bukti Transfer
-                                      </label>
+                                        <Upload size={14} className="text-slate-400" />
+                                        <span>Upload Bukti Transfer</span>
+                                      </button>
                                       <input
                                         type="file"
                                         accept=".jpg,.jpeg,.png,.pdf,.webp"
@@ -434,7 +453,7 @@ export function BillsPage({
                                           setOpenMenuId(null);
                                         }}
                                       />
-                                    </div>
+                                    </>
                                   )}
                                 </div>
                               </>
