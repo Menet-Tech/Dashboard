@@ -95,7 +95,8 @@ func (h CustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, err := h.Service.Create(r.Context(), payload)
+	ctx := context.WithValue(r.Context(), "skip_trial_activation", true)
+	item, err := h.Service.Create(ctx, payload)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
 		return
