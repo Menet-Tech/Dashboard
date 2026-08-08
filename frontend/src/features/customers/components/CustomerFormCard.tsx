@@ -169,10 +169,32 @@ export function CustomerFormCard({
             <input
               className={inputClassName(customerErrors.whatsapp)}
               value={localForm.whatsapp}
-              onChange={(e) =>
-                setLocalForm((curr) => ({ ...curr, whatsapp: e.target.value }))
-              }
-              placeholder="Contoh: 08123456789"
+              onChange={(e) => {
+                let val = e.target.value.replace(/[^\d+]/g, '');
+                let prefix = '';
+                let rest = val;
+                
+                if (val.startsWith('+62')) {
+                  prefix = '+62';
+                  rest = val.slice(3);
+                } else if (val.startsWith('62')) {
+                  prefix = '+62';
+                  rest = val.slice(2);
+                } else if (val.startsWith('0')) {
+                  prefix = '0';
+                  rest = val.slice(1);
+                }
+
+                if (prefix) {
+                  if (rest.length === 0) val = prefix === '+62' ? '+62 ' : '0';
+                  else if (rest.length <= 3) val = prefix === '+62' ? `+62 ${rest}` : `0${rest}`;
+                  else if (rest.length <= 7) val = prefix === '+62' ? `+62 ${rest.slice(0, 3)}-${rest.slice(3)}` : `0${rest.slice(0, 3)}-${rest.slice(3)}`;
+                  else val = prefix === '+62' ? `+62 ${rest.slice(0, 3)}-${rest.slice(3, 7)}-${rest.slice(7, 12)}` : `0${rest.slice(0, 3)}-${rest.slice(3, 7)}-${rest.slice(7, 12)}`;
+                }
+
+                setLocalForm((curr) => ({ ...curr, whatsapp: val }));
+              }}
+              placeholder="Contoh: 0812-3456-7890"
             />
             {renderInlineError(customerErrors.whatsapp)}
           </label>
@@ -223,7 +245,7 @@ export function CustomerFormCard({
         </label>
 
         <div className="pt-2">
-          <label className="relative flex items-center justify-between p-3.5 rounded-card border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 hover:border-indigo-300 dark:hover:border-indigo-800 transition-all cursor-pointer select-none group shadow-xs">
+          <div className="relative flex items-center justify-between p-3.5 rounded-card border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 shadow-xs">
             <div className="flex items-center gap-3">
               <div className={`p-2.5 rounded-xl transition-colors ${localForm.status === "trial" || localForm.is_trial ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}>
                 <Sparkles size={16} />
@@ -245,7 +267,7 @@ export function CustomerFormCard({
               </div>
             </div>
 
-            <div className="relative inline-flex items-center shrink-0 ml-3">
+            <label className="relative inline-flex items-center shrink-0 ml-3 cursor-pointer">
               <input
                 type="checkbox"
                 id="is_trial"
@@ -269,8 +291,8 @@ export function CustomerFormCard({
                 }}
               />
               <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:shadow-xs peer-checked:bg-indigo-600"></div>
-            </div>
-          </label>
+            </label>
+          </div>
         </div>
 
         <label className="flex flex-col gap-1">

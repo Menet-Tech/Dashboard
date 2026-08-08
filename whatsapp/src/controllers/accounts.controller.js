@@ -88,7 +88,10 @@ const getPairingCode = async (req, res, next) => {
         }
         
         // Remove +, spaces, dashes, etc
-        const cleanPhone = String(phoneNumber).replace(/\D/g, '');
+        let cleanPhone = String(phoneNumber).replace(/\D/g, '');
+        if (cleanPhone.startsWith('0')) {
+            cleanPhone = '62' + cleanPhone.substring(1);
+        }
         
         // Timeout to allow socket to settle if just created
         setTimeout(async () => {

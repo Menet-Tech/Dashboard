@@ -37,5 +37,9 @@ module.exports = {
     makeCacheableSignalKeyStore: jest.fn(),
     isJidBroadcast: jest.fn(),
     downloadMediaMessage: jest.fn().mockResolvedValue(Buffer.from('mock-media-data')),
+    Browsers: {
+        ubuntu: jest.fn().mockReturnValue(['Ubuntu', 'Chrome', '20.0.04']),
+        macOS: jest.fn().mockReturnValue(['Mac OS', 'Chrome', '10.15.7']),
+    },
     mockSocket // Export for assertions if needed
 };
