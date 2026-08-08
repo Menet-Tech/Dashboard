@@ -605,9 +605,9 @@ fi
 
 chmod 711 "${INSTALL_DIR}/backend/storage"
 chmod 600 "${INSTALL_DIR}/backend/storage"/*.db 2>/dev/null || true
-# uploads folder needs to be readable by nginx
-chmod 755 "${INSTALL_DIR}/backend/storage/uploads"
-chmod -R 644 "${INSTALL_DIR}/backend/storage/uploads"/* 2>/dev/null || true
+# Pastikan folder uploads dan isinya bisa diakses oleh nginx (www-data)
+find "${INSTALL_DIR}/backend/storage/uploads" -type d -exec chmod 755 {} \;
+find "${INSTALL_DIR}/backend/storage/uploads" -type f -exec chmod 644 {} \;
 # nginx perlu bisa baca frontend
 chmod -R o+rX "${INSTALL_DIR}/frontend"
 log_success "Permission dan kepemilikan seluruh berkas berhasil dikonfigurasi!"
