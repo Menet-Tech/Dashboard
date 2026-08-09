@@ -34,7 +34,7 @@ let packagesCacheTime = 0;
  * @returns {object|null}    — data pelanggan atau null jika tidak terdaftar
  */
 const findCustomerByPhone = async (rawPhone) => {
-    const phone = rawPhone.replace(/@(c\.us|lid)$/, '').replace(/^0/, '62');
+    const phone = rawPhone.replace(/@(c\.us|s\.whatsapp\.net|lid)$/, '').replace(/^0/, '62');
     try {
         const res = await client.get('/api/v1/customers', { params: { wa_number: phone, limit: 1 } });
         const data = res.data?.data;

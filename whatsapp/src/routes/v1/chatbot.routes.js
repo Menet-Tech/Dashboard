@@ -104,8 +104,8 @@ router.post('/sessions/:phone/resolve', async (req, res, next) => {
         const phone = decodeURIComponent(req.params.phone);
         const { accountId } = req.body;
         
-        // Normalize: if it doesn't end with @c.us and doesn't contain @, append it
-        const rawFrom = (phone.includes('@') || phone.endsWith('@c.us')) ? phone : `${phone}@c.us`;
+        // Normalize: if it doesn't end with @s.whatsapp.net and doesn't contain @, append it
+        const rawFrom = (phone.includes('@') || phone.endsWith('@s.whatsapp.net')) ? phone : `${phone}@s.whatsapp.net`;
         
         // 1. Delete chatbot session
         deleteSession(rawFrom);
