@@ -43,20 +43,20 @@ describe('Gateway SQLite database utilities', () => {
     });
 
     it('mengelola chatbot session', () => {
-        database.upsertSession('6281@c.us', 'billing', 'REG_MENU', { customerId: 1 });
-        expect(database.getSession('6281@c.us')).toEqual(expect.objectContaining({
-            phone: '6281@c.us',
+        database.upsertSession('6281@s.whatsapp.net', 'billing', 'REG_MENU', { customerId: 1 });
+        expect(database.getSession('6281@s.whatsapp.net')).toEqual(expect.objectContaining({
+            phone: '6281@s.whatsapp.net',
             account_id: 'billing',
             state: 'REG_MENU',
             form_data: { customerId: 1 },
         }));
         expect(database.getAllSessions()).toHaveLength(1);
-        database.deleteSession('6281@c.us');
-        expect(database.getSession('6281@c.us')).toBeNull();
+        database.deleteSession('6281@s.whatsapp.net');
+        expect(database.getSession('6281@s.whatsapp.net')).toBeNull();
     });
 
     it('menyimpan forms dan accounts', () => {
-        const formId = database.saveContactForm('registration', '6282@c.us', 'support', { nama: 'Ani' });
+        const formId = database.saveContactForm('registration', '6282@s.whatsapp.net', 'support', { nama: 'Ani' });
         expect(formId).toBeTruthy();
         expect(database.getForms('registration', 10)[0].data.nama).toBe('Ani');
 

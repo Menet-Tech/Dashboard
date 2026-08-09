@@ -162,8 +162,8 @@ func (s Service) CreatePaymentConfirmation(ctx context.Context, tagihanID int64,
 				admin = strings.TrimSpace(admin)
 				if admin != "" {
 					toNum := admin
-					if !strings.HasSuffix(toNum, "@c.us") {
-						toNum = toNum + "@c.us"
+					if !strings.HasSuffix(toNum, "@s.whatsapp.net") && !strings.HasSuffix(toNum, "@c.us") {
+						toNum = toNum + "@s.whatsapp.net"
 					}
 					_ = s.WhatsApp.SendDirectMessage(bgCtx, "default", toNum, alertMsg)
 				}

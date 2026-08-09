@@ -9,7 +9,7 @@ const mockSendMessage = jest.fn().mockResolvedValue({
 const mockOn = jest.fn();
 const mockInitialize = jest.fn().mockResolvedValue(undefined);
 const mockGetContacts = jest.fn().mockResolvedValue([
-    { id: { _serialized: '6281234567890@c.us' }, name: 'Test User', number: '6281234567890' }
+    { id: { _serialized: '6281234567890@s.whatsapp.net' }, name: 'Test User', number: '6281234567890' }
 ]);
 const mockGetChats = jest.fn().mockResolvedValue([
     { id: { _serialized: 'group1@g.us' }, name: 'Test Group', isGroup: true }
@@ -18,7 +18,7 @@ const mockGetChatById = jest.fn().mockResolvedValue({
     id: { _serialized: 'group1@g.us' }, name: 'Test Group', isGroup: true
 });
 const mockGetContactById = jest.fn().mockResolvedValue({
-    id: { _serialized: '6281234567890@c.us' }, name: 'Test User'
+    id: { _serialized: '6281234567890@s.whatsapp.net' }, name: 'Test User'
 });
 const mockGetProfilePicUrl = jest.fn().mockResolvedValue('https://example.com/pic.jpg');
 const mockIsRegisteredUser = jest.fn().mockResolvedValue(true);
@@ -26,7 +26,7 @@ const mockCreateGroup = jest.fn().mockResolvedValue({ gid: { _serialized: 'newgr
 const mockDestroy = jest.fn().mockResolvedValue(undefined);
 const mockInfo = {
     pushname: 'Test Account',
-    wid: { _serialized: '6281234567890@c.us' }
+    wid: { _serialized: '6281234567890@s.whatsapp.net' }
 };
 
 module.exports = {

@@ -5,16 +5,16 @@
 const { formatPhoneNumber } = require('../src/utils/formatter');
 
 describe('📞 Formatter — formatPhoneNumber()', () => {
-    it('harus mengubah angka 0xxx menjadi 62xxx@c.us', () => {
-        expect(formatPhoneNumber('081234567890')).toBe('6281234567890@c.us');
+    it('harus mengubah angka 0xxx menjadi 62xxx@s.whatsapp.net', () => {
+        expect(formatPhoneNumber('081234567890')).toBe('6281234567890@s.whatsapp.net');
     });
 
-    it('harus menambahkan @c.us jika sudah pakai kode negara', () => {
-        expect(formatPhoneNumber('6281234567890')).toBe('6281234567890@c.us');
+    it('harus menambahkan @s.whatsapp.net jika sudah pakai kode negara', () => {
+        expect(formatPhoneNumber('6281234567890')).toBe('6281234567890@s.whatsapp.net');
     });
 
-    it('harus diteruskan apa adanya jika sudah dalam format WhatsApp (@c.us)', () => {
-        expect(formatPhoneNumber('6281234567890@c.us')).toBe('6281234567890@c.us');
+    it('harus diteruskan apa adanya jika sudah dalam format WhatsApp (@s.whatsapp.net)', () => {
+        expect(formatPhoneNumber('6281234567890@s.whatsapp.net')).toBe('6281234567890@s.whatsapp.net');
     });
 
     it('harus diteruskan apa adanya jika sudah dalam format grup (@g.us)', () => {
@@ -26,6 +26,6 @@ describe('📞 Formatter — formatPhoneNumber()', () => {
     });
 
     it('harus membersihkan karakter non-digit seperti +, -, dan spasi', () => {
-        expect(formatPhoneNumber('+62-812-3456-7890')).toBe('6281234567890@c.us');
+        expect(formatPhoneNumber('+62-812-3456-7890')).toBe('6281234567890@s.whatsapp.net');
     });
 });

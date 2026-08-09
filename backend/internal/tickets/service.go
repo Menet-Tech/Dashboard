@@ -118,7 +118,7 @@ func (s Service) AddTicketMessage(ctx context.Context, ticketID int64, senderTyp
 		// Clean phone for WhatsApp destination
 		targetPhone := detail.NoHP
 		if !strings.Contains(targetPhone, "@") {
-			targetPhone = targetPhone + "@c.us"
+			targetPhone = targetPhone + "@s.whatsapp.net"
 		}
 		
 		// Resolve the configured account ID

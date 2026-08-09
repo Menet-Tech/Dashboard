@@ -40,7 +40,7 @@ describe('🪝 Webhook Service — Unit Tests', () => {
 
         const mockMessage = {
             id: { _serialized: 'test-msg-id' },
-            from: '6281234567890@c.us',
+            from: '6281234567890@s.whatsapp.net',
             body: 'Halo test',
             type: 'chat',
             timestamp: Date.now(),
@@ -61,7 +61,7 @@ describe('🪝 Webhook Service — Unit Tests', () => {
 
         const mockMessage = {
             id: { _serialized: 'test-msg-id-2' },
-            from: '6281234567890@c.us',
+            from: '6281234567890@s.whatsapp.net',
             body: 'Test signature',
             type: 'chat',
             timestamp: Date.now(),
@@ -82,7 +82,7 @@ describe('🪝 Webhook Service — Unit Tests', () => {
 
         const mockMessage = {
             id: { _serialized: 'test-verify' },
-            from: '6281@c.us',
+            from: '6281@s.whatsapp.net',
             body: 'Verify',
             type: 'chat',
             timestamp: 1000,

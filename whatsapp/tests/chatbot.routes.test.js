@@ -70,7 +70,7 @@ describe('🤖 Chatbot API Routes — Integration Tests', () => {
 
         it('DELETE /sessions/:phone harus sukses menghapus session', async () => {
             // Setup session dummy
-            database.upsertSession('628999@c.us', 'support', 'REG_FORM_1', { name: 'Ani' });
+            database.upsertSession('628999@s.whatsapp.net', 'support', 'REG_FORM_1', { name: 'Ani' });
             
             const res = await request(app)
                 .delete('/api/v1/chatbot/sessions/628999%40c.us')
@@ -80,7 +80,7 @@ describe('🤖 Chatbot API Routes — Integration Tests', () => {
             expect(res.body.message).toContain('dires');
 
             // Cek di DB
-            expect(database.getSession('628999@c.us')).toBeNull();
+            expect(database.getSession('628999@s.whatsapp.net')).toBeNull();
         });
     });
 
@@ -180,7 +180,7 @@ describe('🤖 Chatbot API Routes — Integration Tests', () => {
 
     describe('POST /api/v1/chatbot/sessions/:phone/resolve', () => {
         it('POST /sessions/:phone/resolve harus menghapus session dan mengirim menu utama', async () => {
-            database.upsertSession('628555@c.us', 'default', 'WAITING_ADMIN', { activeTicketId: 10 });
+            database.upsertSession('628555@s.whatsapp.net', 'default', 'WAITING_ADMIN', { activeTicketId: 10 });
             
             const res = await request(app)
                 .post('/api/v1/chatbot/sessions/628555%40c.us/resolve')
@@ -191,7 +191,7 @@ describe('🤖 Chatbot API Routes — Integration Tests', () => {
             expect(res.body.status).toBe('success');
             
             // Cek di DB bahwa state direset ke UNREG_MENU
-            const session = database.getSession('628555@c.us');
+            const session = database.getSession('628555@s.whatsapp.net');
             expect(session).not.toBeNull();
             expect(session.state).toBe('UNREG_MENU');
         });
