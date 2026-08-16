@@ -62,23 +62,34 @@ const setupEvents = (sock, accountId) => {
             let messageType = 'text';
             let hasMedia = false;
 
-            if (msg.message.conversation) {
-                messageBody = msg.message.conversation;
-            } else if (msg.message.extendedTextMessage) {
-                messageBody = msg.message.extendedTextMessage.text;
-            } else if (msg.message.imageMessage) {
-                messageBody = msg.message.imageMessage.caption || '';
+            const unwrapMessage = (m) => {
+                if (!m) return m;
+                if (m.ephemeralMessage) return unwrapMessage(m.ephemeralMessage.message);
+                if (m.viewOnceMessage) return unwrapMessage(m.viewOnceMessage.message);
+                if (m.viewOnceMessageV2) return unwrapMessage(m.viewOnceMessageV2.message);
+                if (m.viewOnceMessageV2Extension) return unwrapMessage(m.viewOnceMessageV2Extension.message);
+                if (m.documentWithCaptionMessage) return unwrapMessage(m.documentWithCaptionMessage.message);
+                return m;
+            };
+            const actualMsg = unwrapMessage(msg.message) || msg.message;
+
+            if (actualMsg.conversation) {
+                messageBody = actualMsg.conversation;
+            } else if (actualMsg.extendedTextMessage) {
+                messageBody = actualMsg.extendedTextMessage.text;
+            } else if (actualMsg.imageMessage) {
+                messageBody = actualMsg.imageMessage.caption || '';
                 messageType = 'media';
                 hasMedia = true;
-            } else if (msg.message.videoMessage) {
-                messageBody = msg.message.videoMessage.caption || '';
+            } else if (actualMsg.videoMessage) {
+                messageBody = actualMsg.videoMessage.caption || '';
                 messageType = 'media';
                 hasMedia = true;
-            } else if (msg.message.documentMessage) {
-                messageBody = msg.message.documentMessage.caption || msg.message.documentMessage.fileName || '';
+            } else if (actualMsg.documentMessage) {
+                messageBody = actualMsg.documentMessage.caption || actualMsg.documentMessage.fileName || '';
                 messageType = 'document';
                 hasMedia = true;
-            } else if (msg.message.audioMessage) {
+            } else if (actualMsg.audioMessage) {
                 messageType = 'audio';
                 hasMedia = true;
             }

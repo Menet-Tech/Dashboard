@@ -90,6 +90,15 @@ func (s Service) Create(ctx context.Context, customer Customer) (Customer, error
 		return Customer{}, err
 	}
 
+	// Check for existing User PPPoE to prevent duplicate insertions
+	if customer.UserPPPoE != "" {
+		var existingID int64
+		err := s.Repository.DB.QueryRowContext(ctx, "SELECT id FROM pelanggan WHERE user_pppoe = ?", customer.UserPPPoE).Scan(&existingID)
+		if err == nil && existingID > 0 {
+			return Customer{}, fmt.Errorf("user pppoe '%s' already exists", customer.UserPPPoE)
+		}
+	}
+
 	// Fetch trial settings
 	trialEnabled := true
 	trialPeriodDays := 3
@@ -1094,6 +1103,11 @@ func (r Repository) FindByIDs(ctx context.Context, ids []int64) ([]Customer, err
 		if odpPort.Valid { v := int(odpPort.Int64); item.OdpPort = &v }
 		items = append(items, item)
 	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return items, nil
 }
 

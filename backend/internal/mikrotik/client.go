@@ -873,6 +873,7 @@ func (c *Client) SyncPPPProfile(ctx context.Context, name, localAddr, remoteAddr
 		if rateLimit != "" {
 			args = append(args, "=rate-limit="+rateLimit)
 		}
+		args = append(args, "=queue-type=codel-down/codel-up")
 
 		setReply, err := c.run(ctx, args...)
 		if err != nil {
@@ -891,6 +892,7 @@ func (c *Client) SyncPPPProfile(ctx context.Context, name, localAddr, remoteAddr
 	if rateLimit != "" {
 		args = append(args, "=rate-limit="+rateLimit)
 	}
+	args = append(args, "=queue-type=codel-down/codel-up")
 
 	addReply, err := c.run(ctx, args...)
 	if err != nil {
