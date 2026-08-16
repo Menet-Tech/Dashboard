@@ -38,7 +38,7 @@ const setupEvents = (sock, accountId) => {
                     continue;
                 }
 
-                const recipient = (msg.key.remoteJid || '').replace(/@s\.whatsapp\.net$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62');
+                const recipient = (msg.key.remoteJid || '').replace(/@(s\.whatsapp\.net|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62');
                 lastAdminReplies.set(recipient, Date.now());
                 logger.debug(`[${accountId}] Tercatat balasan admin ke ${recipient} pada ${new Date().toISOString()}`);
                 continue;
@@ -54,7 +54,7 @@ const setupEvents = (sock, accountId) => {
             }
 
             const realFrom = msg.key.remoteJid;
-            const senderClean = realFrom.replace(/@s\.whatsapp\.net$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62');
+            const senderClean = realFrom.replace(/@(s\.whatsapp\.net|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62');
             const contactName = msg.pushName || '';
 
             // Extract body text
@@ -108,7 +108,7 @@ const setupEvents = (sock, accountId) => {
                 if (!chatbotEnabled) {
                     const adminNumbers = String(globalSettings.wa_admin_numbers || '')
                         .split(',')
-                        .map(n => n.trim().replace(/@s\.whatsapp\.net$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62'))
+                        .map(n => n.trim().replace(/@(s\.whatsapp\.net|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62'))
                         .filter(Boolean);
                     
                     const isAdmin = adminNumbers.includes(senderClean);
