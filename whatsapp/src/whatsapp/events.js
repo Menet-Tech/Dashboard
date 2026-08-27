@@ -319,7 +319,7 @@ const setupEvents = (sock, accountId) => {
                                         .map(n => n.trim().replace(/@(s\.whatsapp\.net|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62'))
                                         .filter(Boolean);
                                         
-                                    const customerPhone = primary.customer.phone.replace(/@(c\.us|s\.whatsapp\.net|lid)$/, '').replace(/^0/, '62');
+                                    const customerPhone = (primary.customer.whatsapp || primary.customer.phone || '').replace(/@(c\.us|s\.whatsapp\.net|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62');
                                     const caption = `🎫 *TICKET BARU: Konfirmasi Pembayaran*\n\n` +
                                                     `ID Tiket: #${ticketId}\n` +
                                                     `Pelanggan: ${primary.customer.name}\n` +
