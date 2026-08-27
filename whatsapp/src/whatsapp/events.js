@@ -53,7 +53,28 @@ const setupEvents = (sock, accountId) => {
                 continue;
             }
 
-            const realFrom = msg.key.remoteJid;
+            let realFrom = msg.key.remoteJid;
+            
+            // Resolve LID to real phone number using Baileys lidMapping if available
+            if (realFrom && realFrom.includes('@lid')) {
+                try {
+                    let resolvedPn = null;
+                    if (sock.signalRepository?.lidMapping?.getPNForLID) {
+                        const result = sock.signalRepository.lidMapping.getPNForLID(realFrom);
+                        resolvedPn = result instanceof Promise ? await result : result;
+                    }
+                    
+                    if (resolvedPn) {
+                        // Hilangkan suffix device id seperti :0
+                        resolvedPn = resolvedPn.replace(/:\d+/, '');
+                        logger.debug(`[${accountId}] Berhasil resolve LID ${realFrom} ke nomor asli ${resolvedPn}`);
+                        realFrom = resolvedPn; // overwrite with resolved phone number
+                    }
+                } catch (e) {
+                    logger.debug(`[${accountId}] Gagal resolve LID: ${e.message}`);
+                }
+            }
+
             const senderClean = realFrom.replace(/@(s\.whatsapp\.net|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62');
             const contactName = msg.pushName || '';
 
