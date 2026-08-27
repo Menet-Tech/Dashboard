@@ -1,0 +1,737 @@
+package acs
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math"
+	"strings"
+)
+
+type MapSettings struct {
+	ID          int64  `json:"id"`
+	CenterLat   string `json:"center_lat"`
+	CenterLng   string `json:"center_lng"`
+	MaxZoomIn   string `json:"max_zoom_in"`
+	MaxZoomOut  string `json:"max_zoom_out"`
+	DefaultZoom string `json:"default_zoom"`
+	CreatedAt   string `json:"created_at,omitempty"`
+	UpdatedAt   string `json:"updated_at,omitempty"`
+}
+
+type MappingNode struct {
+	ID           int64   `json:"id,omitempty"`
+	NodeID       string  `json:"node_id"`
+	Type         string  `json:"type"` // 'server', 'odc', 'odp', 'ont'
+	Name         string  `json:"name"`
+	Latitude     float64 `json:"latitude"`
+	Longitude    float64 `json:"longitude"`
+	Capacity     *int    `json:"capacity,omitempty"`
+	Splitter     *string `json:"splitter,omitempty"`
+	Pppoe        *string `json:"pppoe,omitempty"`
+	SerialNumber *string `json:"serialnumber,omitempty"`
+	Notes        *string `json:"notes,omitempty"`
+	Locked       bool    `json:"locked"`
+	CreatedAt    string  `json:"created_at,omitempty"`
+	UpdatedAt    string  `json:"updated_at,omitempty"`
+}
+
+type MappingEdge struct {
+	ID           int64           `json:"id,omitempty"`
+	EdgeID       string          `json:"edge_id"`
+	Source       string          `json:"source"`
+	Target       string          `json:"target"`
+	FiberType    *string         `json:"fiber_type,omitempty"` // 'feeder', 'distribution', 'drop', etc.
+	Distance     *float64        `json:"distance,omitempty"`
+	Waypoints    json.RawMessage `json:"waypoints,omitempty"` // coordinates JSON string
+	Notes        *string         `json:"notes,omitempty"`
+	CountsAsPort bool            `json:"counts_as_port"`
+	CreatedAt    string          `json:"created_at,omitempty"`
+	UpdatedAt    string          `json:"updated_at,omitempty"`
+}
+
+// GetMapSettings retrieves the Leaflet map configuration.
+func GetMapSettings(ctx context.Context, db *sql.DB) (*MapSettings, error) {
+	row := db.QueryRowContext(ctx, "SELECT id, center_lat, center_lng, max_zoom_in, max_zoom_out, default_zoom, created_at, updated_at FROM map_settings WHERE id = 1")
+	var s MapSettings
+	err := row.Scan(&s.ID, &s.CenterLat, &s.CenterLng, &s.MaxZoomIn, &s.MaxZoomOut, &s.DefaultZoom, &s.CreatedAt, &s.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// Fallback defaults
+			return &MapSettings{
+				CenterLat:   "-6.2088",
+				CenterLng:   "106.8456",
+				MaxZoomIn:   "18",
+				MaxZoomOut:  "5",
+				DefaultZoom: "13",
+			}, nil
+		}
+		return nil, err
+	}
+	return &s, nil
+}
+
+// UpdateMapSettings updates map config at ID 1 or inserts if missing.
+func UpdateMapSettings(ctx context.Context, db *sql.DB, s *MapSettings) error {
+	res, err := db.ExecContext(ctx, `
+		UPDATE map_settings SET 
+			center_lat = ?, center_lng = ?, max_zoom_in = ?, max_zoom_out = ?, default_zoom = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = 1`,
+		s.CenterLat, s.CenterLng, s.MaxZoomIn, s.MaxZoomOut, s.DefaultZoom,
+	)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		_, err = db.ExecContext(ctx, `
+			INSERT INTO map_settings (id, center_lat, center_lng, max_zoom_in, max_zoom_out, default_zoom)
+			VALUES (1, ?, ?, ?, ?, ?)`,
+			s.CenterLat, s.CenterLng, s.MaxZoomIn, s.MaxZoomOut, s.DefaultZoom,
+		)
+		return err
+	}
+	return nil
+}
+
+// ResetMapSettings resets the map configuration to defaults.
+func ResetMapSettings(ctx context.Context, db *sql.DB) (*MapSettings, error) {
+	_, err := db.ExecContext(ctx, `
+		UPDATE map_settings SET 
+			center_lat = '-6.2088', center_lng = '106.8456', max_zoom_in = '18', max_zoom_out = '5', default_zoom = '13', updated_at = CURRENT_TIMESTAMP
+		WHERE id = 1`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return GetMapSettings(ctx, db)
+}
+
+// GetNodes gets all mapping nodes.
+func GetNodes(ctx context.Context, db *sql.DB) ([]MappingNode, error) {
+	rows, err := db.QueryContext(ctx, "SELECT id, node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes, locked, created_at, updated_at FROM mapping_nodes ORDER BY created_at DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var nodes []MappingNode
+	for rows.Next() {
+		var n MappingNode
+		var lockedInt int
+		err = rows.Scan(&n.ID, &n.NodeID, &n.Type, &n.Name, &n.Latitude, &n.Longitude, &n.Capacity, &n.Splitter, &n.Pppoe, &n.SerialNumber, &n.Notes, &lockedInt, &n.CreatedAt, &n.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		n.Locked = lockedInt == 1
+		nodes = append(nodes, n)
+	}
+	return nodes, nil
+}
+
+// GetNode gets a single node by node ID.
+func GetNode(ctx context.Context, db *sql.DB, nodeID string) (*MappingNode, error) {
+	row := db.QueryRowContext(ctx, "SELECT id, node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes, locked, created_at, updated_at FROM mapping_nodes WHERE node_id = ?", nodeID)
+	var n MappingNode
+	var lockedInt int
+	err := row.Scan(&n.ID, &n.NodeID, &n.Type, &n.Name, &n.Latitude, &n.Longitude, &n.Capacity, &n.Splitter, &n.Pppoe, &n.SerialNumber, &n.Notes, &lockedInt, &n.CreatedAt, &n.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	n.Locked = lockedInt == 1
+	return &n, nil
+}
+
+// CreateNode inserts a new mapping node.
+func CreateNode(ctx context.Context, db *sql.DB, n *MappingNode) error {
+	lockedInt := 0
+	if n.Locked {
+		lockedInt = 1
+	}
+	res, err := db.ExecContext(ctx, `
+		INSERT INTO mapping_nodes (node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes, locked)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.NodeID, n.Type, n.Name, n.Latitude, n.Longitude, n.Capacity, n.Splitter, n.Pppoe, n.SerialNumber, n.Notes, lockedInt,
+	)
+	if err != nil {
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err == nil {
+		n.ID = id
+	}
+	return nil
+}
+
+// UpdateNode updates an existing mapping node.
+func UpdateNode(ctx context.Context, db *sql.DB, nodeID string, n *MappingNode) error {
+	lockedInt := 0
+	if n.Locked {
+		lockedInt = 1
+	}
+	res, err := db.ExecContext(ctx, `
+		UPDATE mapping_nodes SET
+			name = COALESCE(?, name),
+			latitude = COALESCE(?, latitude),
+			longitude = COALESCE(?, longitude),
+			capacity = COALESCE(?, capacity),
+			splitter = COALESCE(?, splitter),
+			pppoe = COALESCE(?, pppoe),
+			serialnumber = COALESCE(?, serialnumber),
+			notes = COALESCE(?, notes),
+			locked = ?,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE node_id = ?`,
+		n.Name, n.Latitude, n.Longitude, n.Capacity, n.Splitter, n.Pppoe, n.SerialNumber, n.Notes, lockedInt, nodeID,
+	)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("node not found")
+	}
+	return nil
+}
+
+// DeleteNode removes a node by node ID.
+func DeleteNode(ctx context.Context, db *sql.DB, nodeID string) error {
+	res, err := db.ExecContext(ctx, "DELETE FROM mapping_nodes WHERE node_id = ?", nodeID)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("node not found")
+	}
+	return nil
+}
+
+// GetEdges gets all edges.
+func GetEdges(ctx context.Context, db *sql.DB) ([]MappingEdge, error) {
+	rows, err := db.QueryContext(ctx, "SELECT id, edge_id, source, target, fiber_type, distance, waypoints, notes, counts_as_port, created_at, updated_at FROM mapping_edges ORDER BY created_at DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var edges []MappingEdge
+	for rows.Next() {
+		var e MappingEdge
+		var waypointsVal sql.NullString
+		var countsAsPortInt int
+		err = rows.Scan(&e.ID, &e.EdgeID, &e.Source, &e.Target, &e.FiberType, &e.Distance, &waypointsVal, &e.Notes, &countsAsPortInt, &e.CreatedAt, &e.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		e.CountsAsPort = countsAsPortInt == 1
+		if waypointsVal.Valid && waypointsVal.String != "" {
+			e.Waypoints = json.RawMessage(waypointsVal.String)
+		} else {
+			e.Waypoints = json.RawMessage("[]")
+		}
+		edges = append(edges, e)
+	}
+	return edges, nil
+}
+
+// GetEdge gets a single edge.
+func GetEdge(ctx context.Context, db *sql.DB, edgeID string) (*MappingEdge, error) {
+	row := db.QueryRowContext(ctx, "SELECT id, edge_id, source, target, fiber_type, distance, waypoints, notes, counts_as_port, created_at, updated_at FROM mapping_edges WHERE edge_id = ?", edgeID)
+	var e MappingEdge
+	var waypointsVal sql.NullString
+	var countsAsPortInt int
+	err := row.Scan(&e.ID, &e.EdgeID, &e.Source, &e.Target, &e.FiberType, &e.Distance, &waypointsVal, &e.Notes, &countsAsPortInt, &e.CreatedAt, &e.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	e.CountsAsPort = countsAsPortInt == 1
+	if waypointsVal.Valid && waypointsVal.String != "" {
+		e.Waypoints = json.RawMessage(waypointsVal.String)
+	} else {
+		e.Waypoints = json.RawMessage("[]")
+	}
+	return &e, nil
+}
+
+// ValidateEdgeCapacity checks if source node has available connection capacity.
+func ValidateEdgeCapacity(ctx context.Context, db *sql.DB, source, target string, fiberType *string, countsAsPort bool) error {
+	var srcType string
+	var srcCapacity sql.NullInt64
+	err := db.QueryRowContext(ctx, "SELECT type, capacity FROM mapping_nodes WHERE node_id = ?", source).Scan(&srcType, &srcCapacity)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("source node '%s' not found", source)
+		}
+		return err
+	}
+
+	var tgtType string
+	err = db.QueryRowContext(ctx, "SELECT type FROM mapping_nodes WHERE node_id = ?", target).Scan(&tgtType)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("target node '%s' not found", target)
+		}
+		return err
+	}
+
+	fType := ""
+	if fiberType != nil {
+		fType = *fiberType
+	}
+
+	// 1. Check ODC Capacity
+	if srcType == "odc" && (tgtType == "odp" || (tgtType == "odc" && fType == "odc_to_odc")) {
+		if srcCapacity.Valid && srcCapacity.Int64 > 0 {
+			query := "SELECT COUNT(*) FROM mapping_edges WHERE source = ?"
+			var count int
+			if tgtType == "odp" {
+				query += " AND target IN (SELECT node_id FROM mapping_nodes WHERE type = 'odp')"
+				err = db.QueryRowContext(ctx, query, source).Scan(&count)
+			} else {
+				query += " AND target IN (SELECT node_id FROM mapping_nodes WHERE type = 'odc') AND fiber_type = 'odc_to_odc'"
+				err = db.QueryRowContext(ctx, query, source).Scan(&count)
+			}
+			if err != nil {
+				return err
+			}
+			if int64(count) >= srcCapacity.Int64 {
+				return fmt.Errorf("ODC \"%s\" slots are full (%d/%d)", source, count, srcCapacity.Int64)
+			}
+		}
+	}
+
+	// 2. Check ODP Capacity — ONT yang memakai slot, ODP→ODP dihitung jika countsAsPort true
+	isPortUsage := tgtType == "ont" || (tgtType == "odp" && countsAsPort)
+	if srcType == "odp" && isPortUsage {
+		if srcCapacity.Valid && srcCapacity.Int64 > 0 {
+			query := `
+				SELECT COUNT(*) FROM mapping_edges 
+				WHERE source = ? 
+				AND (
+					target IN (SELECT node_id FROM mapping_nodes WHERE type = 'ont')
+					OR (target IN (SELECT node_id FROM mapping_nodes WHERE type = 'odp') AND counts_as_port = 1)
+				)
+			`
+			var count int
+			if err = db.QueryRowContext(ctx, query, source).Scan(&count); err != nil {
+				return err
+			}
+			if int64(count) >= srcCapacity.Int64 {
+				return fmt.Errorf("ODP \"%s\" slots are full (%d/%d)", source, count, srcCapacity.Int64)
+			}
+		}
+	}
+
+	return nil
+}
+
+// CreateEdge creates a new connection link after validating slot capacity.
+func CreateEdge(ctx context.Context, db *sql.DB, e *MappingEdge) error {
+	// First validate slot capacity
+	if err := ValidateEdgeCapacity(ctx, db, e.Source, e.Target, e.FiberType, e.CountsAsPort); err != nil {
+		return err
+	}
+
+	var waypointsStr *string
+	if len(e.Waypoints) > 0 {
+		str := string(e.Waypoints)
+		waypointsStr = &str
+	}
+
+	countsAsPortInt := 0
+	if e.CountsAsPort {
+		countsAsPortInt = 1
+	}
+
+	res, err := db.ExecContext(ctx, `
+		INSERT INTO mapping_edges (edge_id, source, target, fiber_type, distance, waypoints, notes, counts_as_port)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.EdgeID, e.Source, e.Target, e.FiberType, e.Distance, waypointsStr, e.Notes, countsAsPortInt,
+	)
+	if err != nil {
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err == nil {
+		e.ID = id
+	}
+	return nil
+}
+
+// UpdateEdge updates an existing edge.
+func UpdateEdge(ctx context.Context, db *sql.DB, edgeID string, e *MappingEdge) error {
+	var waypointsStr *string
+	if len(e.Waypoints) > 0 {
+		str := string(e.Waypoints)
+		waypointsStr = &str
+	}
+
+	countsAsPortInt := 0
+	if e.CountsAsPort {
+		countsAsPortInt = 1
+	}
+
+	res, err := db.ExecContext(ctx, `
+		UPDATE mapping_edges SET
+			fiber_type = COALESCE(?, fiber_type),
+			distance = COALESCE(?, distance),
+			waypoints = COALESCE(?, waypoints),
+			notes = COALESCE(?, notes),
+			counts_as_port = ?,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE edge_id = ?`,
+		e.FiberType, e.Distance, waypointsStr, e.Notes, countsAsPortInt, edgeID,
+	)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("edge not found")
+	}
+	return nil
+}
+
+// DeleteEdge deletes an edge.
+func DeleteEdge(ctx context.Context, db *sql.DB, edgeID string) error {
+	res, err := db.ExecContext(ctx, "DELETE FROM mapping_edges WHERE edge_id = ?", edgeID)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("edge not found")
+	}
+	return nil
+}
+
+// SyncMappingData deletes all nodes and edges and replaces them within a transaction.
+func SyncMappingData(ctx context.Context, db *sql.DB, nodes []MappingNode, edges []MappingEdge) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// NOTE: Removing an ODP node from the map does NOT delete the ODP record.
+	// ODP management (create/delete from odp table) is done exclusively via the ODP management page.
+
+	// Clear tables
+	_, err = tx.ExecContext(ctx, "DELETE FROM mapping_edges")
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, "DELETE FROM mapping_nodes")
+	if err != nil {
+		return err
+	}
+
+	// NOTE: Removing an ODP node from the map does NOT delete the ODP record.
+	// ODP management (create/delete from odp table) is done exclusively via the ODP management page.
+
+	// 1. Process ODP nodes first to assign correct node IDs and build redirection map
+	oldNodeIDToNewNodeID := make(map[string]string)
+	// odpNodeIDs tracks which ODP node IDs are present in this sync (for auto-edge generation)
+	odpNodeIDs := make(map[string]bool)
+	for i, n := range nodes {
+		if n.Type == "odp" {
+			loc := fmt.Sprintf("%f, %f", n.Latitude, n.Longitude)
+			desc := ""
+			if n.Notes != nil {
+				desc = *n.Notes
+			}
+			ports := 8
+			if n.Capacity != nil && *n.Capacity > 0 {
+				ports = *n.Capacity
+			}
+
+			var odpID int64
+			var hasOdpID bool
+			if strings.HasPrefix(n.NodeID, "odp-") {
+				if _, err := fmt.Sscanf(n.NodeID, "odp-%d", &odpID); err == nil {
+					hasOdpID = true
+				}
+			}
+
+			if hasOdpID {
+				odpNodeIDs[n.NodeID] = true
+				_, err = tx.ExecContext(ctx, `
+					INSERT INTO odp (id, nama, lokasi, deskripsi, ports, updated_at)
+					VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+					ON CONFLICT(id) DO UPDATE SET
+						nama = ?,
+						lokasi = ?,
+						deskripsi = ?,
+						ports = ?,
+						updated_at = CURRENT_TIMESTAMP`,
+					odpID, n.Name, loc, desc, ports,
+					n.Name, loc, desc, ports,
+				)
+				if err != nil {
+					return fmt.Errorf("sync odp node '%s' (ID %d) to odp table: %w", n.Name, odpID, err)
+				}
+			} else {
+				// Check if an ODP with this name already exists to avoid duplicate names and grab its ID
+				var existingID int64
+				err := tx.QueryRowContext(ctx, "SELECT id FROM odp WHERE nama = ?", n.Name).Scan(&existingID)
+				if err == nil {
+					// Exists: update it
+					_, err = tx.ExecContext(ctx, `
+						UPDATE odp SET lokasi = ?, deskripsi = ?, ports = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+						loc, desc, ports, existingID,
+					)
+					if err != nil {
+						return fmt.Errorf("update existing odp '%s': %w", n.Name, err)
+					}
+					odpID = existingID
+				} else {
+					// Does not exist: insert new
+					res, err := tx.ExecContext(ctx, `
+						INSERT INTO odp (nama, lokasi, deskripsi, ports, updated_at)
+						VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+						n.Name, loc, desc, ports,
+					)
+					if err != nil {
+						return fmt.Errorf("insert new odp '%s': %w", n.Name, err)
+					}
+					odpID, err = res.LastInsertId()
+					if err != nil {
+						return fmt.Errorf("get new odp last insert ID: %w", err)
+					}
+				}
+
+				// Update n.NodeID and map old ID to new ID
+				newNodeID := fmt.Sprintf("odp-%d", odpID)
+				oldNodeIDToNewNodeID[n.NodeID] = newNodeID
+				nodes[i].NodeID = newNodeID
+				odpNodeIDs[newNodeID] = true
+			}
+		}
+	}
+
+	// Auto-generate edges for mapped ONT nodes connected to mapped ODP nodes
+	nodeByID := make(map[string]MappingNode)
+	for _, n := range nodes {
+		nodeByID[n.NodeID] = n
+	}
+
+	for _, n := range nodes {
+		if n.Type == "ont" && n.Pppoe != nil && *n.Pppoe != "" {
+			var dbOdpID sql.NullInt64
+			err := tx.QueryRowContext(ctx, "SELECT odp_id FROM pelanggan WHERE user_pppoe = ?", *n.Pppoe).Scan(&dbOdpID)
+			if err == nil && dbOdpID.Valid {
+				targetOdpNodeID := fmt.Sprintf("odp-%d", dbOdpID.Int64)
+				// Check if the connected ODP is also on the map
+				if odpNodeIDs[targetOdpNodeID] {
+					// Check if there is already an edge between them
+					hasEdge := false
+					for _, e := range edges {
+						src := e.Source
+						if val, ok := oldNodeIDToNewNodeID[src]; ok {
+							src = val
+						}
+						tgt := e.Target
+						if val, ok := oldNodeIDToNewNodeID[tgt]; ok {
+							tgt = val
+						}
+						if (src == n.NodeID && tgt == targetOdpNodeID) || (src == targetOdpNodeID && tgt == n.NodeID) {
+							hasEdge = true
+							break
+						}
+					}
+
+					if !hasEdge {
+						// Create missing edge automatically
+						odpNode := nodeByID[targetOdpNodeID]
+						dist := calculateDistance(n.Latitude, n.Longitude, odpNode.Latitude, odpNode.Longitude)
+						
+						fiberTypeStr := "odp_ont"
+						newEdge := MappingEdge{
+							EdgeID:    fmt.Sprintf("edge-auto-%s-%s", n.NodeID, targetOdpNodeID),
+							Source:    targetOdpNodeID,
+							Target:    n.NodeID,
+							FiberType: &fiberTypeStr,
+							Distance:  &dist,
+						}
+						edges = append(edges, newEdge)
+					}
+				}
+			}
+		}
+	}
+
+	// 2. Insert nodes
+	nodeStmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO mapping_nodes (node_id, type, name, latitude, longitude, capacity, splitter, pppoe, serialnumber, notes, locked)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	)
+	if err != nil {
+		return err
+	}
+	defer nodeStmt.Close()
+
+	for _, n := range nodes {
+		lockedInt := 0
+		if n.Locked {
+			lockedInt = 1
+		}
+		_, err = nodeStmt.ExecContext(ctx, n.NodeID, n.Type, n.Name, n.Latitude, n.Longitude, n.Capacity, n.Splitter, n.Pppoe, n.SerialNumber, n.Notes, lockedInt)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 3. Insert edges
+	edgeStmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO mapping_edges (edge_id, source, target, fiber_type, distance, waypoints, notes, counts_as_port)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+	)
+	if err != nil {
+		return err
+	}
+	defer edgeStmt.Close()
+
+	for _, e := range edges {
+		var waypointsStr *string
+		if len(e.Waypoints) > 0 {
+			str := string(e.Waypoints)
+			waypointsStr = &str
+		}
+		source := e.Source
+		if newVal, exists := oldNodeIDToNewNodeID[source]; exists {
+			source = newVal
+		}
+		target := e.Target
+		if newVal, exists := oldNodeIDToNewNodeID[target]; exists {
+			target = newVal
+		}
+		countsAsPortInt := 0
+		if e.CountsAsPort {
+			countsAsPortInt = 1
+		}
+		_, err = edgeStmt.ExecContext(ctx, e.EdgeID, source, target, e.FiberType, e.Distance, waypointsStr, e.Notes, countsAsPortInt)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Sync Customer ODP references
+	// 1. Build a map of node_id -> Name for ODP nodes to resolve ODP name on the map
+	odpNodeNames := make(map[string]string)
+	for _, n := range nodes {
+		if n.Type == "odp" {
+			odpNodeNames[n.NodeID] = n.Name
+		}
+	}
+
+	// 2. Query all ODPs from the database to map their Name to their ID
+	rows, err := tx.QueryContext(ctx, "SELECT id, nama FROM odp")
+	if err != nil {
+		return fmt.Errorf("query odp table: %w", err)
+	}
+
+	odpNameToID := make(map[string]int64)
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan odp name/id: %w", err)
+		}
+		odpNameToID[name] = id
+	}
+	rows.Close()
+
+	// 3. Find edges and build mapping of Target (ONT) -> Source (ODP) or vice versa
+	ontToOdpNodeID := make(map[string]string)
+	for _, e := range edges {
+		if _, isOdp := odpNodeNames[e.Source]; isOdp {
+			ontToOdpNodeID[e.Target] = e.Source
+		} else if _, isOdp := odpNodeNames[e.Target]; isOdp {
+			ontToOdpNodeID[e.Source] = e.Target
+		}
+	}
+
+	// 4. Update each customer's odp_id based on their ONT node's connected ODP
+	for _, n := range nodes {
+		if n.Type == "ont" && n.Pppoe != nil && *n.Pppoe != "" {
+			var odpID *int64
+			if connectedOdpNodeID, exists := ontToOdpNodeID[n.NodeID]; exists {
+				if odpName, ok := odpNodeNames[connectedOdpNodeID]; ok {
+					if id, ok := odpNameToID[odpName]; ok {
+						val := id
+						odpID = &val
+					}
+				}
+			}
+
+			// Update customer in database
+			if odpID != nil {
+				_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET odp_id = ?, odp_port = COALESCE(odp_port, 1), updated_at = CURRENT_TIMESTAMP WHERE user_pppoe = ?", *odpID, *n.Pppoe)
+			} else {
+				_, err = tx.ExecContext(ctx, "UPDATE pelanggan SET odp_id = NULL, odp_port = NULL, updated_at = CURRENT_TIMESTAMP WHERE user_pppoe = ?", *n.Pppoe)
+			}
+			if err != nil {
+				return fmt.Errorf("update customer odp_id for pppoe '%s': %w", *n.Pppoe, err)
+			}
+		}
+	}
+
+	return tx.Commit()
+}
+
+// ResetMappingData clears all edges and nodes.
+func ResetMappingData(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.ExecContext(ctx, "DELETE FROM mapping_edges")
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, "DELETE FROM mapping_nodes")
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func calculateDistance(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371000 // Earth radius in meters
+	rad := math.Pi / 180
+	dLat := (lat2 - lat1) * rad
+	dLon := (lon2 - lon1) * rad
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*rad)*math.Cos(lat2*rad)*
+			math.Sin(dLon/2)*math.Sin(dLon/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	return R * c
+}

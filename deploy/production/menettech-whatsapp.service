@@ -1,0 +1,28 @@
+[Unit]
+Description=Menet-Tech WhatsApp Integration Gateway
+After=network.target menettech-api.service
+
+[Service]
+Type=simple
+User=menettech
+Group=menettech
+WorkingDirectory=/opt/menettech-go/integration/whatsapp
+EnvironmentFile=/opt/menettech-go/integration/whatsapp/.env
+Environment=DISABLE_SWAGGER=true
+ExecStart=/usr/bin/node --max-old-space-size=384 src/server.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/menettech-go/integration/whatsapp /opt/menettech-go/.cache
+MemoryHigh=400M
+MemoryMax=512M
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=15
+ExecStopPost=/bin/bash -c "pkill -9 -f chrome || true; rm -f /opt/menettech-go/integration/whatsapp/src/whatsapp/sessions/*/session/SingletonLock || true"
+
+[Install]
+WantedBy=multi-user.target
