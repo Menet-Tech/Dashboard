@@ -72,7 +72,6 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '',
                 }
 
                 if (unpaidBills.length > 0) {
-                    await sendFn(accountId, rawFrom, "🔄 Bukti transfer terdeteksi secara otomatis. Sedang memproses dan mengunggah bukti Anda, mohon tunggu...");
                     const media = await rawMsg.downloadMedia();
                     if (media && media.data) {
                         const { uploadProofBase64, createPaymentConfirmation } = require('../isp.service');
@@ -87,7 +86,7 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '',
                         const successTpl = await getTemplateByTrigger('auto_reply_payment_proof').catch(() => null);
                         const successMsg = successTpl 
                             ? renderTemplate(successTpl.content || successTpl.isi_template, { nama: primary.customer.name })
-                            : "Terima kasih! Bukti transfer Anda telah diterima secara otomatis dan sedang dalam proses verifikasi (pending) oleh admin.";
+                            : "Terima kasih telah melakukan pembayaran, kami akan cek terlebih dahulu, terimakasih";
 
                         // Reset session state
                         upsertSession(rawFrom, accountId, 'REG_MENU', { ...formData, hasBills: true, customerName: primary.customer.name });
