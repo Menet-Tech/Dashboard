@@ -915,6 +915,12 @@ func (s Service) sendGroupedNotifications(ctx context.Context, options Automatio
 		CustomBody:   sb.String(),
 	})
 
+	// Tandai sisa bill ID dalam grup ini sebagai "sent" agar worker tidak 
+	// mencoba mengirim ulang (infinite loop) karena belum ada di whatsapp_queue
+	for i := 1; i < len(unsent); i++ {
+		_ = s.Notifications.Record(ctx, unsent[i].ID, triggerKey, phone, "sent", fmt.Sprintf("Grouped with bill %d", unsent[0].ID))
+	}
+
 	key := fmt.Sprintf("%d-%s", unsent[0].ID, triggerKey)
 	if options.SendDiscord != nil && !discordSentThisCycle[key] {
 		var msg string
