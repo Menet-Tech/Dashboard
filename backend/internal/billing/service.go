@@ -680,6 +680,9 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 	}
 
 	// 2. Process isolir/limit and complete isolir (inactive) triggers individually for all candidates
+	limit5hariUnsentByPhone := make(map[string][]automationCandidate)
+	isolir20hariUnsentByPhone := make(map[string][]automationCandidate)
+	
 	for _, item := range candidates {
 		dueDate, err := time.Parse("2006-01-02", item.DueDate)
 		if err != nil {
@@ -721,10 +724,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 
 				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "isolir_20hari")
 				if err == nil && !sent {
-					if err := sendAutomationMessage(ctx, options, item, "isolir_20hari"); err != nil {
-						slog.Error("automation: send isolir_20hari WA failed, continuing",
-							"bill_id", item.ID, "customer", item.CustomerName, "error", err)
-					}
+					isolir20hariUnsentByPhone[item.CustomerPhone] = append(isolir20hariUnsentByPhone[item.CustomerPhone], item)
 				}
 
 				if !wasAlreadySuspended && options.SendDiscord != nil {
@@ -744,16 +744,61 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 
 				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "limit_5hari")
 				if err == nil && !sent {
-					if err := sendAutomationMessage(ctx, options, item, "limit_5hari"); err != nil {
-						slog.Error("automation: send limit WA failed, continuing",
-							"bill_id", item.ID, "customer", item.CustomerName, "error", err)
-					}
+					limit5hariUnsentByPhone[item.CustomerPhone] = append(limit5hariUnsentByPhone[item.CustomerPhone], item)
 				}
 
 				if !wasAlreadyLimited && options.SendDiscord != nil {
 					msg := fmt.Sprintf("🚫 **Isolir (Limit)**: Pelanggan **%s** telah otomatis dilimit karena menunggak > %d hari.", item.CustomerName, options.LimitDays)
 					_ = options.SendDiscord(ctx, msg)
 				}
+			}
+		}
+	}
+
+	// Send grouped notifications for limit_5hari
+	for phone, unsent := range limit5hariUnsentByPhone {
+		if phone == "" {
+			for _, item := range unsent {
+				waErr := sendAutomationMessage(ctx, options, item, "limit_5hari")
+				key := fmt.Sprintf("%d-limit_5hari", item.ID)
+				if options.SendDiscord != nil && !discordSentThisCycle[key] {
+					var msg string
+					if waErr != nil {
+						msg = fmt.Sprintf("⚠️ **Limit 5 Hari Gagal (WA)**: Gagal mengirim notifikasi limit **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
+					} else {
+						msg = fmt.Sprintf("⚠️ **Limit 5 Hari**: Notifikasi limit **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+					}
+					_ = options.SendDiscord(ctx, msg)
+					discordSentThisCycle[key] = true
+				}
+			}
+		} else {
+			if err := s.sendGroupedNotifications(ctx, options, phone, unsent, "limit_5hari", discordSentThisCycle); err != nil {
+				slog.Error("automation: send grouped limit_5hari failed", "phone", phone, "error", err)
+			}
+		}
+	}
+
+	// Send grouped notifications for isolir_20hari
+	for phone, unsent := range isolir20hariUnsentByPhone {
+		if phone == "" {
+			for _, item := range unsent {
+				waErr := sendAutomationMessage(ctx, options, item, "isolir_20hari")
+				key := fmt.Sprintf("%d-isolir_20hari", item.ID)
+				if options.SendDiscord != nil && !discordSentThisCycle[key] {
+					var msg string
+					if waErr != nil {
+						msg = fmt.Sprintf("⚠️ **Isolir 20 Hari Gagal (WA)**: Gagal mengirim notifikasi isolir **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
+					} else {
+						msg = fmt.Sprintf("⚠️ **Isolir 20 Hari**: Notifikasi isolir **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+					}
+					_ = options.SendDiscord(ctx, msg)
+					discordSentThisCycle[key] = true
+				}
+			}
+		} else {
+			if err := s.sendGroupedNotifications(ctx, options, phone, unsent, "isolir_20hari", discordSentThisCycle); err != nil {
+				slog.Error("automation: send grouped isolir_20hari failed", "phone", phone, "error", err)
 			}
 		}
 	}
