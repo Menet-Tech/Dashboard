@@ -74,13 +74,64 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '',
                 if (unpaidBills.length > 0) {
                     const media = await rawMsg.downloadMedia();
                     if (media && media.data) {
-                        const { uploadProofBase64, createPaymentConfirmation } = require('../isp.service');
+                        const { uploadProofBase64, createPaymentConfirmation, createTicket, getSettings } = require('../isp.service');
                         const uploadRes = await uploadProofBase64(media.data, media.mimetype, media.filename || 'payment_proof.png');
                         const proofPath = uploadRes.proof_path;
 
                         const primary = unpaidBills[0];
                         const linkedIds = unpaidBills.slice(1).map(item => item.bill.id).join(',');
-                        await createPaymentConfirmation(primary.bill.id, primary.customer.id, proofPath, text || "Terdeteksi & Diunggah via Chatbot WA otomatis", linkedIds);
+                        
+                        // Create Payment Confirmation (Pending)
+                        const confRes = await createPaymentConfirmation(primary.bill.id, primary.customer.id, proofPath, text || "Terdeteksi & Diunggah via Chatbot WA otomatis", linkedIds);
+                        const confId = confRes?.id;
+
+                        // Create Ticket
+                        let ticketId = '-';
+                        if (confId) {
+                            const ticketData = {
+                                pelanggan_id: primary.customer.id,
+                                kendala: `Konfirmasi Pembayaran - Tagihan ${primary.bill.periode} - ConfID ${confId}`,
+                                status: 'open'
+                            };
+                            const newTicket = await createTicket(ticketData);
+                            if (newTicket) ticketId = newTicket.id;
+                        }
+
+                        // Forward to Admin WA
+                        try {
+                            const settings = await getSettings();
+                            const adminNumbers = (settings.wa_admin_numbers || '').split(',').map(n => n.trim()).filter(n => n);
+                            const customerPhone = primary.customer.phone.replace(/@c\.us$/, '').replace(/^0/, '62');
+                            const caption = `🎫 *TICKET BARU: Konfirmasi Pembayaran*\n\n` +
+                                            `ID Tiket: #${ticketId}\n` +
+                                            `Pelanggan: ${primary.customer.name}\n` +
+                                            `No WA: wa.me/+${customerPhone}\n` +
+                                            `Username PPPoE: ${primary.customer.user_pppoe || '-'}\n` +
+                                            `Tagihan: ${primary.bill.periode}\n` +
+                                            `Total: Rp ${primary.bill.harga}\n` +
+                                            `Deskripsi: ${primary.customer.deskripsi || '-'}\n` +
+                                            `Catatan: ${text || '-'}\n\n` +
+                                            `📝 *Admin, balas pesan ini dengan format:*\n` +
+                                            `*ACC ${confId}* untuk menyetujui, atau\n` +
+                                            `*TOLAK ${confId}* untuk menolak.`;
+
+                            const path = require('path');
+                            const fullPath = path.join(__dirname, '../../../../storage/uploads', proofPath);
+                            
+                            const { sendMediaMessage } = require('../../../utils/baileys'); // or sendFn doesn't support media path?
+                            // Wait, sendFn only sends text?
+                            // Let's use the gateway's sendMediaMessage
+                            const { getSock } = require('../../../utils/baileys');
+                            const sock = getSock(accountId);
+                            if (sock) {
+                                for (const admin of adminNumbers) {
+                                    const adminJid = admin.includes('@') ? admin : `${admin}@s.whatsapp.net`;
+                                    await sock.sendMessage(adminJid, { image: { url: fullPath }, caption });
+                                }
+                            }
+                        } catch (forwardErr) {
+                            logger.error(`[Chatbot] Failed to forward payment proof to admin: ${forwardErr.message}`);
+                        }
 
                         // Load and render custom success message if configured
                         const successTpl = await getTemplateByTrigger('auto_reply_payment_proof').catch(() => null);

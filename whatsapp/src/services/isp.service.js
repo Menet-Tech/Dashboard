@@ -436,6 +436,52 @@ const saveChatbotFormToBackend = async (type, phone, accountId, data) => {
     }
 };
 
+const closeTicket = async (ticketId) => {
+    try {
+        const res = await client.patch(`/api/v1/tickets/${ticketId}/status`, { status: 'closed' });
+        return res.data;
+    } catch (err) {
+        logger.error(`[ISP] closeTicket failed for ${ticketId}:`, err.message);
+        throw new Error(err.response?.data?.error || err.message);
+    }
+};
+
+const closeTicketByConfId = async (confId) => {
+    try {
+        const res = await client.get('/api/v1/tickets');
+        const tickets = res.data?.data || [];
+        const target = tickets.find(t => (t.status === 'open' || t.status === 'pending') && t.kendala.includes(`ConfID ${confId}`));
+        if (target) {
+            await closeTicket(target.id);
+            return target.id;
+        }
+        return null;
+    } catch (err) {
+        logger.error(`[ISP] closeTicketByConfId failed for ${confId}:`, err.message);
+        return null;
+    }
+};
+
+const approvePaymentConfirmation = async (confirmationId) => {
+    try {
+        const res = await client.post(`/api/v1/bills/confirmations/${confirmationId}/approve`);
+        return res.data;
+    } catch (err) {
+        logger.error(`[ISP] approvePaymentConfirmation failed for ${confirmationId}:`, err.message);
+        throw new Error(err.response?.data?.error || err.message);
+    }
+};
+
+const rejectPaymentConfirmation = async (confirmationId) => {
+    try {
+        const res = await client.post(`/api/v1/bills/confirmations/${confirmationId}/reject`);
+        return res.data;
+    } catch (err) {
+        logger.error(`[ISP] rejectPaymentConfirmation failed for ${confirmationId}:`, err.message);
+        throw new Error(err.response?.data?.error || err.message);
+    }
+};
+
 module.exports = {
     findCustomerByPhone,
     findCustomersByPhone,
@@ -463,4 +509,8 @@ module.exports = {
     getPendingConfirmation,
     uploadProofBase64,
     createPaymentConfirmation,
+    closeTicket,
+    closeTicketByConfId,
+    approvePaymentConfirmation,
+    rejectPaymentConfirmation,
 };

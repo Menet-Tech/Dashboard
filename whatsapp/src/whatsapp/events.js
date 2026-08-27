@@ -120,20 +120,62 @@ const setupEvents = (sock, accountId) => {
 
             logger.debug(`[${accountId}] Pesan masuk dari ${realFrom}: ${messageBody}`);
 
+            const globalSettings = await getSettings().catch(() => ({}));
+            const adminNumbers = String(globalSettings.wa_admin_numbers || '')
+                .split(',')
+                .map(n => n.trim().replace(/@(s\.whatsapp\.net|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62'))
+                .filter(Boolean);
+            
+            const isAdmin = adminNumbers.includes(senderClean);
+
+            // Intercept Admin ACC / TOLAK Commands
+            if (isAdmin && messageBody) {
+                const textLower = messageBody.trim().toLowerCase();
+                if (textLower.startsWith('acc ') || textLower.startsWith('tolak ')) {
+                    const parts = textLower.split(' ');
+                    const command = parts[0];
+                    const confId = parts[1];
+
+                    if (confId && !isNaN(confId)) {
+                        const { approvePaymentConfirmation, rejectPaymentConfirmation, getPendingConfirmation, getSettings } = require('../services/isp.service');
+                        
+                        try {
+                            if (command === 'acc') {
+                                await approvePaymentConfirmation(confId);
+                                await sendTextMessage(accountId, realFrom, `✅ Konfirmasi #${confId} berhasil di-APPROVE. Tagihan telah lunas.`);
+                            } else if (command === 'tolak') {
+                                await rejectPaymentConfirmation(confId);
+                                await sendTextMessage(accountId, realFrom, `❌ Konfirmasi #${confId} berhasil di-TOLAK.`);
+                            }
+
+                            // Close the associated ticket
+                            try {
+                                const { client } = require('../services/isp.service'); // We need client or just an endpoint
+                                // Let's use an inline fetch or add a new function in isp.service
+                                // Wait, we can just use `client` directly if we require it. 
+                                // Actually, let's just make a new func in isp.service or inline it.
+                                // It's better to just call a function.
+                                const { closeTicketByConfId } = require('../services/isp.service');
+                                await closeTicketByConfId(confId);
+                            } catch (e) {
+                                logger.error(`Failed to close ticket for ConfID ${confId}:`, e.message);
+                            }
+
+                            return; // Stop processing further
+                        } catch (cmdErr) {
+                            await sendTextMessage(accountId, realFrom, `⚠️ Gagal memproses perintah: ${cmdErr.message}`);
+                            return;
+                        }
+                    }
+                }
+            }
+
             // Kirim alert ke Discord jika pengirim bukan nomor admin
             try {
-                const globalSettings = await getSettings().catch(() => ({}));
                 const globalChatbotEnabled = globalSettings.wa_chatbot_enabled !== '0';
                 const chatbotEnabled = (getGatewaySetting('chatbot_enabled', '1') !== '0') && globalChatbotEnabled;
 
                 if (!chatbotEnabled) {
-                    const adminNumbers = String(globalSettings.wa_admin_numbers || '')
-                        .split(',')
-                        .map(n => n.trim().replace(/@(s\.whatsapp\.net|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62'))
-                        .filter(Boolean);
-                    
-                    const isAdmin = adminNumbers.includes(senderClean);
-                    
                     if (!isAdmin) {
                         const lastReply = lastAdminReplies.get(senderClean) || 0;
                         const isCooldown = (Date.now() - lastReply) < (15 * 60 * 1000);
@@ -254,7 +296,50 @@ const setupEvents = (sock, accountId) => {
 
                                 const primary = unpaidBills[0];
                                 const linkedIds = unpaidBills.slice(1).map(item => item.bill.id).join(',');
-                                await createPaymentConfirmation(primary.bill.id, primary.customer.id, proofPath, messageBody || "Diunggah via WA (Chatbot Off)", linkedIds);
+                                const confRes = await createPaymentConfirmation(primary.bill.id, primary.customer.id, proofPath, messageBody || "Diunggah via WA (Chatbot Off)", linkedIds);
+                                const confId = confRes?.id;
+
+                                // Create Ticket
+                                let ticketId = '-';
+                                if (confId) {
+                                    const { createTicket } = require('../services/isp.service');
+                                    const ticketData = {
+                                        pelanggan_id: primary.customer.id,
+                                        kendala: `Konfirmasi Pembayaran - Tagihan ${primary.bill.periode} - ConfID ${confId}`,
+                                        status: 'open'
+                                    };
+                                    const newTicket = await createTicket(ticketData);
+                                    if (newTicket) ticketId = newTicket.id;
+                                }
+
+                                // Forward to Admin WA
+                                try {
+                                    const settings = await getSettings().catch(() => ({}));
+                                    const adminNumbers = (settings.wa_admin_numbers || '').split(',').map(n => n.trim()).filter(n => n);
+                                    const customerPhone = primary.customer.phone.replace(/@c\.us$/, '').replace(/^0/, '62');
+                                    const caption = `🎫 *TICKET BARU: Konfirmasi Pembayaran*\n\n` +
+                                                    `ID Tiket: #${ticketId}\n` +
+                                                    `Pelanggan: ${primary.customer.name}\n` +
+                                                    `No WA: wa.me/+${customerPhone}\n` +
+                                                    `Username PPPoE: ${primary.customer.user_pppoe || '-'}\n` +
+                                                    `Tagihan: ${primary.bill.periode}\n` +
+                                                    `Total: Rp ${primary.bill.harga}\n` +
+                                                    `Deskripsi: ${primary.customer.deskripsi || '-'}\n` +
+                                                    `Catatan: ${messageBody || '-'}\n\n` +
+                                                    `📝 *Admin, balas pesan ini dengan format:*\n` +
+                                                    `*ACC ${confId}* untuk menyetujui, atau\n` +
+                                                    `*TOLAK ${confId}* untuk menolak.`;
+
+                                    const path = require('path');
+                                    const fullPath = path.join(__dirname, '../../../storage/uploads', proofPath);
+                                    
+                                    for (const admin of adminNumbers) {
+                                        const adminJid = admin.includes('@') ? admin : `${admin}@s.whatsapp.net`;
+                                        await sock.sendMessage(adminJid, { image: { url: fullPath }, caption });
+                                    }
+                                } catch (forwardErr) {
+                                    logger.error(`[${accountId}] Failed to forward payment proof to admin: ${forwardErr.message}`);
+                                }
 
                                 try {
                                     const { getTemplateByTrigger } = require('../services/isp.service');
