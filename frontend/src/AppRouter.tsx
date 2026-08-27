@@ -537,6 +537,7 @@ export default function AppRouter() {
                   odp_id: customer.odp_id ?? 0,
                   odp_port: customer.odp_port ?? undefined,
                   is_trial: customer.is_trial ?? false,
+                  bypassed_isolir: customer.bypassed_isolir ?? false,
                   trial_days: customer.trial_days ?? 3,
                 });
               }}

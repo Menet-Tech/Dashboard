@@ -200,6 +200,10 @@ func (s Service) MarkPaid(ctx context.Context, billID int64, method string, user
 	// Trigger MikroTik Sync after payment to immediately lift isolir/limit limits
 	if billDetail, err := s.FindByID(ctx, billID); err == nil {
 		if customer, err := s.Customers.FindByID(ctx, billDetail.CustomerID); err == nil {
+			if customer.BypassedIsolir {
+				customer.BypassedIsolir = false
+				_, _ = s.Customers.Update(ctx, customer.ID, customer)
+			}
 			_ = s.Customers.SyncToMikrotik(ctx, customer)
 		}
 	}
@@ -699,6 +703,9 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 
 			// Phase 3: complete deactivation (inactive) -> options.LimitDays + 15 + suspendedDays
 			if od >= options.LimitDays+15+suspendedDays {
+				if item.BypassedIsolir {
+					continue
+				}
 				wasAlreadyInactive := item.CustomerStatus == "inactive"
 
 				if !wasAlreadyInactive {
@@ -714,6 +721,9 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 
 				// Phase 2: suspension -> options.LimitDays + 15
 			} else if od >= options.LimitDays+15 {
+				if item.BypassedIsolir {
+					continue
+				}
 				wasAlreadySuspended := item.CustomerStatus == "suspended" || item.CustomerStatus == "inactive"
 
 				if !wasAlreadySuspended {
@@ -734,6 +744,9 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 
 			} else if od >= options.LimitDays {
 				// H+5: limit stage
+				if item.BypassedIsolir {
+					continue
+				}
 				wasAlreadyLimited := item.CustomerStatus == "limit" || item.CustomerStatus == "suspended" || item.CustomerStatus == "inactive"
 
 				if !wasAlreadyLimited {
@@ -1080,6 +1093,7 @@ type automationCandidate struct {
 	TrialDays              int
 	HasODP                 bool
 	HasPendingConfirmation bool
+	BypassedIsolir         bool
 }
 
 func computeDisplayStatus(status string, dueDateRaw string, menunggakDays int, now time.Time) string {

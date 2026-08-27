@@ -35,6 +35,7 @@ export type CustomerFormState = {
   odp_id: number;
   odp_port?: number;
   is_trial: boolean;
+  bypassed_isolir: boolean;
   trial_days: number;
 };
 
@@ -56,6 +57,7 @@ export const defaultCustomerForm = (): CustomerFormState => ({
   odp_id: 0,
   odp_port: undefined,
   is_trial: false,
+  bypassed_isolir: false,
   trial_days: 3,
 });
 
