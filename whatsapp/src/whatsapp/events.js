@@ -264,7 +264,6 @@ const setupEvents = (sock, accountId) => {
                 }
             }
 
-            const globalSettings = await getSettings().catch(() => ({}));
             const globalChatbotEnabled = globalSettings.wa_chatbot_enabled !== '0';
             const chatbotEnabled = (getGatewaySetting('chatbot_enabled', '1') !== '0') && globalChatbotEnabled;
             
