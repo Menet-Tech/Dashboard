@@ -163,7 +163,7 @@ const getMessageById = (id) => {
 
 const getLastOutboundMessage = (toNumber) => {
     const db = getDb();
-    const cleanNum = toNumber.replace(/@(c\.us|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62');
+    const cleanNum = toNumber.replace(/@(c\.us|s\.whatsapp\.net|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62');
     return db.prepare(`
         SELECT * FROM messages
         WHERE (to_number = ? OR to_number LIKE ? OR to_number = ? OR to_number LIKE ?) AND direction = 'outbound'

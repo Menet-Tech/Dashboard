@@ -1,4 +1,4 @@
-const normalizePhone = (rawFrom) => rawFrom.replace(/@(c\.us|lid)$/, '').replace(/^0/, '62');
+const normalizePhone = (rawFrom) => rawFrom.replace(/@(c\.us|s\.whatsapp\.net|lid)$/, '').replace(/^0/, '62');
 
 const greeting = () => {
     const hour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })).getHours();

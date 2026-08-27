@@ -47,7 +47,7 @@ const findCustomerByPhone = async (rawPhone) => {
 };
 
 const findCustomersByPhone = async (rawPhone) => {
-    const phone = rawPhone.replace(/@(c\.us|lid)$/, '').replace(/^0/, '62');
+    const phone = rawPhone.replace(/@(c\.us|s\.whatsapp\.net|lid)$/, '').replace(/^0/, '62');
     try {
         const res = await client.get('/api/v1/customers', { params: { wa_number: phone } });
         const data = res.data?.data;
@@ -422,7 +422,7 @@ const createPaymentConfirmation = async (tagihanId, pelangganId, buktiTransfer, 
 
 const saveChatbotFormToBackend = async (type, phone, accountId, data) => {
     try {
-        const cleanPhone = phone.replace(/@(c\.us|lid)$/, '').replace(/^0/, '62');
+        const cleanPhone = phone.replace(/@(c\.us|s\.whatsapp\.net|lid)$/, '').replace(/^0/, '62');
         const res = await client.post('/api/v1/chatbot/forms', {
             type,
             phone: cleanPhone,
