@@ -336,9 +336,9 @@ const setupEvents = (sock, accountId) => {
                                     const path = require('path');
                                     const fullPath = path.join(__dirname, '../../../backend/storage', proofPath.replace(/^\/?/, ''));
                                     
+                                    const { sendMediaMessage } = require('../services/whatsapp.service');
                                     for (const admin of adminNumbers) {
-                                        const adminJid = `${admin}@s.whatsapp.net`;
-                                        await sock.sendMessage(adminJid, { image: { url: fullPath }, caption });
+                                        await sendMediaMessage(accountId, admin, fullPath, caption, null, true);
                                     }
                                 } catch (forwardErr) {
                                     logger.error(`[${accountId}] Failed to forward payment proof to admin: ${forwardErr.message}`);
