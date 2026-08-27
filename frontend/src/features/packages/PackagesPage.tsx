@@ -257,9 +257,9 @@ export function PackagesPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="primary" type="button"
+          <Button variant="outline" type="button"
             onClick={loadSyncProfiles}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300 font-semibold py-2.5 px-4 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
+            className="font-semibold py-2.5 px-4 rounded-xl text-xs transition-colors flex items-center gap-1.5"
             onClickCapture={() => setIsSyncOpen(true)}
           >
             <RefreshCw size={14} />

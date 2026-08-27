@@ -83,6 +83,7 @@ const (
 	KeyBackupEncryptionPassword          = "backup_encryption_password"
 	KeyBackupDiscordChannelID            = "backup_discord_channel_id"
 	KeyBackupEncryptionEnabled          = "backup_encryption_enabled"
+	KeyWAAdminNumbers                   = "wa_admin_numbers"
 )
 
 var defaults = map[string]string{
@@ -117,6 +118,7 @@ var defaults = map[string]string{
 	KeyBackupEncryptionPassword:          "",
 	KeyBackupDiscordChannelID:            "",
 	KeyBackupEncryptionEnabled:           "1",
+	KeyWAAdminNumbers:                    "",
 	KeyDiscordWebhookURL:                 "",
 	KeyDiscordNotifyPayment:              "1",
 	KeyDiscordNotifyGenerate:             "1",

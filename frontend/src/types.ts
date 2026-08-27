@@ -44,6 +44,7 @@ export type CustomerItem = {
   status: "active" | "limit" | "suspended" | "inactive" | "pending" | "wifi_umum" | "trial";
   address: string;
   is_trial?: boolean;
+  bypassed_isolir?: boolean;
   trial_started_at?: string;
   trial_days?: number;
   diskon: number;

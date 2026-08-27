@@ -59,7 +59,7 @@ const database = require('../src/utils/database');
 const { handleMessage } = require('../src/services/chatbot.service');
 
 describe('Chatbot ISP state machine', () => {
-    const phone = '628123@c.us';
+    const phone = '628123@s.whatsapp.net';
     let sendFn;
 
     beforeEach(() => {

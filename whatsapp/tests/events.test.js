@@ -3,6 +3,7 @@ const handlers = {};
 jest.mock('../src/utils/database', () => ({
     saveMessage: jest.fn(() => 'saved-inbound-id'),
     getGatewaySetting: jest.fn((key, fallback) => fallback),
+    getSession: jest.fn(() => ({ state: 'IDLE' })),
 }));
 
 jest.mock('../src/services/autoReply.service', () => ({
@@ -13,10 +14,21 @@ jest.mock('../src/services/autoReply.service', () => ({
 jest.mock('../src/services/whatsapp.service', () => ({
     sendTextMessage: jest.fn(),
     sendMediaMessage: jest.fn(),
+    isAutomatedMessage: jest.fn(() => false)
 }));
 
 jest.mock('../src/services/chatbot.service', () => ({
     handleMessage: jest.fn(),
+}));
+
+jest.mock('../src/services/isp.service', () => ({
+    getSettings: jest.fn().mockResolvedValue({ wa_chatbot_enabled: '1' }),
+    findCustomersByPhone: jest.fn().mockResolvedValue([]),
+    getActiveBill: jest.fn().mockResolvedValue(null),
+    getPendingConfirmation: jest.fn().mockResolvedValue(null),
+    uploadProofBase64: jest.fn(),
+    createPaymentConfirmation: jest.fn(),
+    notifyAdminViaDiscord: jest.fn()
 }));
 
 const database = require('../src/utils/database');
@@ -38,18 +50,30 @@ describe('WhatsApp inbound events', () => {
 
     function setupClient() {
         const client = {
-            on: jest.fn((event, cb) => {
-                handlers[event] = cb;
-            }),
+            ev: {
+                on: jest.fn((event, cb) => {
+                    handlers[event] = cb;
+                }),
+            }
         };
         setupEvents(client, 'billing');
         return client;
     }
 
+    const createMockMessage = (from, text, hasMedia = false, fromMe = false) => ({
+        messages: [{
+            key: { remoteJid: from, id: 'wa-id', fromMe },
+            messageTimestamp: Date.now() / 1000 + 10,
+            pushName: 'Budi',
+            message: hasMedia ? { imageMessage: { caption: text } } : { conversation: text }
+        }],
+        type: 'notify'
+    });
+
     it('mengabaikan pesan grup dan broadcast', async () => {
         setupClient();
-        await handlers.message({ from: '123@g.us', body: 'halo' });
-        await handlers.message({ from: 'status@broadcast', body: 'halo' });
+        await handlers['messages.upsert'](createMockMessage('123@g.us', 'halo'));
+        await handlers['messages.upsert'](createMockMessage('status@broadcast', 'halo'));
 
         expect(database.saveMessage).not.toHaveBeenCalled();
         expect(chatbotService.handleMessage).not.toHaveBeenCalled();
@@ -59,14 +83,7 @@ describe('WhatsApp inbound events', () => {
         setupClient();
         autoReply.findReply.mockReturnValue(null);
 
-        await handlers.message({
-            from: '628123@c.us',
-            to: 'me',
-            body: 'cek tagihan',
-            hasMedia: false,
-            id: { id: 'wa-id' },
-            getContact: jest.fn().mockResolvedValue({ pushname: 'Budi' }),
-        });
+        await handlers['messages.upsert'](createMockMessage('628123@s.whatsapp.net', 'cek tagihan'));
 
         expect(database.saveMessage).toHaveBeenCalledWith(
             'me',
@@ -74,7 +91,7 @@ describe('WhatsApp inbound events', () => {
             'text',
             'wa-id',
             'inbound',
-            '628123@c.us',
+            '628123@s.whatsapp.net',
             'billing'
         );
         expect(global.io.emit).toHaveBeenCalledWith('chat_message', expect.objectContaining({
@@ -89,16 +106,9 @@ describe('WhatsApp inbound events', () => {
         setupClient();
         autoReply.findReplyRule.mockReturnValue({ reply: 'Ini balasan otomatis' });
 
-        await handlers.message({
-            from: '628123@c.us',
-            to: 'me',
-            body: 'rekening',
-            hasMedia: false,
-            id: { id: 'wa-id' },
-            getContact: jest.fn(),
-        });
+        await handlers['messages.upsert'](createMockMessage('628123@s.whatsapp.net', 'rekening'));
 
-        expect(whatsappService.sendTextMessage).toHaveBeenCalledWith('billing', '628123@c.us', 'Ini balasan otomatis');
+        expect(whatsappService.sendTextMessage).toHaveBeenCalledWith('billing', '628123@s.whatsapp.net', 'Ini balasan otomatis');
         expect(chatbotService.handleMessage).not.toHaveBeenCalled();
     });
 
@@ -110,14 +120,7 @@ describe('WhatsApp inbound events', () => {
             return '*';
         });
 
-        await handlers.message({
-            from: '628123@c.us',
-            to: 'me',
-            body: 'halo',
-            hasMedia: false,
-            id: { id: 'wa-id' },
-            getContact: jest.fn(),
-        });
+        await handlers['messages.upsert'](createMockMessage('628123@s.whatsapp.net', 'halo'));
 
         expect(chatbotService.handleMessage).not.toHaveBeenCalled();
     });
@@ -126,18 +129,11 @@ describe('WhatsApp inbound events', () => {
         setupClient();
         autoReply.findReplyRule.mockReturnValue({ reply: 'Ini balasan gambar', image_path: 'test-image.png' });
 
-        await handlers.message({
-            from: '628123@c.us',
-            to: 'me',
-            body: 'qr',
-            hasMedia: false,
-            id: { id: 'wa-id' },
-            getContact: jest.fn(),
-        });
+        await handlers['messages.upsert'](createMockMessage('628123@s.whatsapp.net', 'qr'));
 
         expect(whatsappService.sendMediaMessage).toHaveBeenCalledWith(
             'billing',
-            '628123@c.us',
+            '628123@s.whatsapp.net',
             expect.stringContaining('test-image.png'),
             'Ini balasan gambar'
         );

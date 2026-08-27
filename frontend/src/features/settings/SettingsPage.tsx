@@ -1078,6 +1078,20 @@ export function SettingsPage({
                           </label>
 
                           <label className="flex flex-col gap-1.5">
+                            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Nomor Admin WA (Pisahkan dengan koma)</span>
+                            <input
+                              className={inputClassName()}
+                              type="text"
+                              value={settingsForm["wa_admin_numbers"] ?? ""}
+                              onChange={(e) => onFormChange({ ...settingsForm, wa_admin_numbers: e.target.value })}
+                              placeholder="0812..., 0877..."
+                            />
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                              Nomor WA Admin yang akan menerima bukti pembayaran (format: 0812... atau 628...).
+                            </span>
+                          </label>
+
+                          <label className="flex flex-col gap-1.5">
                             <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Jeda Pengiriman Antrean WhatsApp (Detik)</span>
                             <input
                               type="number"
@@ -1286,7 +1300,7 @@ export function SettingsPage({
                           type="button"
                           variant="primary"
                           onClick={() => saveSection("WhatsApp", [
-                            "wa_gateway_url", "wa_api_key", "wa_gateway_enabled", "wa_chatbot_enabled", "wa_account_id",
+                            "wa_gateway_url", "wa_api_key", "wa_gateway_enabled", "wa_chatbot_enabled", "wa_account_id", "wa_admin_numbers",
                             "wa_billing_account_id", "wa_reminder_account_id", "wa_due_account_id",
                             "wa_limit_account_id", "wa_payment_account_id"
                           ])}

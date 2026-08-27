@@ -5,14 +5,14 @@ const { getActiveTicket, getTicket, replyToTicket } = require('../../isp.service
 
 const requestAdmin = async (rawFrom, accountId, contactName, sendFn) => {
     // Send alert to technicians
-    const alertMsg = `⚠️ *Alert Admin:* Pelanggan *${contactName}* (${rawFrom.replace(/@c\.us$/, '')}) meminta bantuan admin.`;
+    const alertMsg = `⚠️ *Alert Admin:* Pelanggan *${contactName}* (${rawFrom.replace(/@(s\.whatsapp\.net|lid)$/, '')}) meminta bantuan admin.`;
     try {
-        await sendFn(accountId, '628987700897@c.us', alertMsg);
+        await sendFn(accountId, '628987700897@s.whatsapp.net', alertMsg);
     } catch (e) {
         logger.error('Failed to notify Elam via WA:', e.message);
     }
     try {
-        await sendFn(accountId, '6289621743796@c.us', alertMsg);
+        await sendFn(accountId, '6289621743796@s.whatsapp.net', alertMsg);
     } catch (e) {
         logger.error('Failed to notify Ipong via WA:', e.message);
     }

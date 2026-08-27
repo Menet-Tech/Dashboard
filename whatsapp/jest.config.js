@@ -5,4 +5,7 @@ module.exports = {
     collectCoverage: true,
     coverageDirectory: 'coverage',
     coveragePathIgnorePatterns: ['/node_modules/', '/src/whatsapp/sessions/'],
+    moduleNameMapper: {
+        '^@whiskeysockets/baileys$': '<rootDir>/__mocks__/@whiskeysockets/baileys.js'
+    }
 };

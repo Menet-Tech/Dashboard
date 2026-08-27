@@ -81,8 +81,8 @@ export function useBills({ withFeedback, askForConfirmation, onSuccess, onError 
     });
   }
 
-  async function handleUploadProof(id: number) {
-    const file = proofFiles[id];
+  async function handleUploadProof(id: number, providedFile?: File | null) {
+    const file = providedFile !== undefined ? providedFile : proofFiles[id];
     if (!file) { onError("Pilih file bukti bayar terlebih dahulu."); return; }
     await withFeedback(async () => {
       let fileToUpload = file;

@@ -406,7 +406,7 @@ export function TicketsPage({
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-1">{t.kendala}</p>
                   <div className="flex justify-between items-center w-full mt-1">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{t.no_hp.replace("@c.us", "")}</span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{t.no_hp.replace(/@(c\.us|s\.whatsapp\.net)/, "")}</span>
                     <StatusPill
                       label={t.status === "open" ? "Terbuka" : "Selesai"}
                       tone={t.status === "open" ? "gold" : "green"}
@@ -469,13 +469,13 @@ export function TicketsPage({
                     <p className="flex items-center gap-1">
                       <strong>WhatsApp:</strong>{" "}
                       <a
-                        href={`https://wa.me/${detail.no_hp.replace("@c.us", "").replace("@lid", "").replace(/[+\-\s]/g, "").replace(/^0/, "62")}`}
+                        href={`https://wa.me/${detail.no_hp.replace(/@(c\.us|s\.whatsapp\.net)/, "").replace("@lid", "").replace(/[+\-\s]/g, "").replace(/^0/, "62")}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 underline font-semibold inline-flex items-center gap-0.5"
                         title="Chat Manual via wa.me"
                       >
-                        {detail.no_hp.replace("@c.us", "").replace("@lid", "")}
+                        {detail.no_hp.replace(/@(c\.us|s\.whatsapp\.net)/, "").replace("@lid", "")}
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                       </a>
                       {detail.customer_name && ` (${detail.customer_name})`}
@@ -580,7 +580,7 @@ export function TicketsPage({
                       <div className="inline-flex items-center">
                         {/* Buka WA */}
                         <a
-                          href={`https://wa.me/${detail.no_hp.replace("@c.us", "").replace("@lid", "").replace(/[+\-\s]/g, "").replace(/^0/, "62")}?text=${encodeURIComponent(replyText)}`}
+                          href={`https://wa.me/${detail.no_hp.replace(/@(c\.us|s\.whatsapp\.net)/, "").replace("@lid", "").replace(/[+\-\s]/g, "").replace(/^0/, "62")}?text=${encodeURIComponent(replyText)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border border-emerald-250 dark:border-emerald-900/30 font-semibold py-2 px-3.5 rounded-l-xl text-xs shadow-sm transition-colors flex items-center justify-center cursor-pointer gap-1.5"
@@ -596,7 +596,7 @@ export function TicketsPage({
                           type="button"
                           variant="secondary"
                           onClick={async () => {
-                            const phone = detail.no_hp.replace("@c.us", "").replace("@lid", "").replace(/[+\-\s]/g, "").replace(/^0/, "62");
+                            const phone = detail.no_hp.replace(/@(c\.us|s\.whatsapp\.net)/, "").replace("@lid", "").replace(/[+\-\s]/g, "").replace(/^0/, "62");
                             const url = `https://wa.me/${phone}?text=${encodeURIComponent(replyText)}`;
                             try {
                               await copyToClipboard(url);

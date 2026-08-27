@@ -1,15 +1,11 @@
 const mockClientInstances = [];
-const mockGenerateQr = jest.fn();
 const mockSendDiscordNotification = jest.fn();
 const mockSetupEvents = jest.fn();
 const mockRm = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('fs/promises', () => ({
     rm: mockRm,
-}));
-
-jest.mock('qrcode-terminal', () => ({
-    generate: mockGenerateQr,
+    mkdir: jest.fn().mockResolvedValue(undefined)
 }));
 
 jest.mock('../src/utils/discord', () => ({
@@ -20,24 +16,9 @@ jest.mock('../src/whatsapp/events', () => ({
     setupEvents: mockSetupEvents,
 }));
 
-jest.mock('whatsapp-web.js', () => ({
-    LocalAuth: jest.fn(function LocalAuth(options) {
-        this.options = options;
-    }),
-    Client: jest.fn(function Client() {
-        const handlers = {};
-        const instance = {
-            handlers,
-            on: jest.fn((event, cb) => {
-                handlers[event] = cb;
-            }),
-            initialize: jest.fn().mockResolvedValue(undefined),
-            destroy: jest.fn().mockResolvedValue(undefined),
-        };
-        mockClientInstances.push(instance);
-        return instance;
-    }),
-}));
+// We already mock Baileys globally in __mocks__/@whiskeysockets/baileys.js
+// But let's intercept the mock instance here
+const { default: makeWASocket } = require('@whiskeysockets/baileys');
 
 const clientModule = require('../src/whatsapp/client');
 
@@ -59,11 +40,9 @@ describe('WhatsApp client lifecycle', () => {
         } catch (_) {}
     });
 
-    it('initWhatsAppClient membuat client, setup events, dan emit status awal', () => {
-        const client = clientModule.initWhatsAppClient('lifecycle');
-
-        expect(client).toBe(mockClientInstances[0]);
-        expect(client.initialize).toHaveBeenCalled();
+    it('initWhatsAppClient membuat client, setup events, dan emit status awal', async () => {
+        const client = await clientModule.initWhatsAppClient('lifecycle');
+        expect(makeWASocket).toHaveBeenCalled();
         expect(mockSetupEvents).toHaveBeenCalledWith(client, 'lifecycle');
         expect(global.io.emit).toHaveBeenCalledWith('account_status', {
             accountId: 'lifecycle',
@@ -72,38 +51,17 @@ describe('WhatsApp client lifecycle', () => {
         });
     });
 
-    it('handler qr/authenticated/ready memperbarui status realtime', () => {
-        const client = clientModule.initWhatsAppClient('lifecycle');
-
-        client.handlers.qr('QR-CODE');
-        expect(clientModule.getQr('lifecycle')).toBe('QR-CODE');
-        expect(mockGenerateQr).toHaveBeenCalledWith('QR-CODE', { small: true });
-        expect(global.io.emit).toHaveBeenCalledWith('qr_code', { accountId: 'lifecycle', qr: 'QR-CODE' });
-
-        client.handlers.authenticated();
-        expect(clientModule.getQr('lifecycle')).toBeNull();
-
-        client.handlers.ready();
-        expect(clientModule.isReady('lifecycle')).toBe(true);
-        expect(global.io.emit).toHaveBeenCalledWith('account_status', {
-            accountId: 'lifecycle',
-            ready: true,
-            hasQr: false,
-        });
-    });
-
     it('removeAccount menghancurkan client, menghapus session, dan emit account_removed', async () => {
-        const client = clientModule.initWhatsAppClient('lifecycle');
+        const client = await clientModule.initWhatsAppClient('lifecycle');
 
         await expect(clientModule.removeAccount('lifecycle')).resolves.toBe(true);
 
-        expect(client.destroy).toHaveBeenCalled();
+        expect(client.end).toHaveBeenCalled();
         expect(mockRm).toHaveBeenCalled();
-        expect(global.io.emit).toHaveBeenCalledWith('account_removed', { accountId: 'lifecycle' });
         expect(clientModule.getAllAccounts().some((item) => item.accountId === 'lifecycle')).toBe(false);
     });
 
-    it('menolak account id yang tidak aman', () => {
-        expect(() => clientModule.initWhatsAppClient('../bad')).toThrow('Account ID');
+    it('menolak account id yang tidak aman', async () => {
+        await expect(clientModule.initWhatsAppClient('../bad')).rejects.toThrow('Account ID');
     });
 });

@@ -49,10 +49,11 @@ type Customer struct {
 	PppoeIP         string  `json:"pppoe_ip"`
 	PppoeUptime     string  `json:"pppoe_uptime"`
 	LastSyncAt      string  `json:"last_sync_at"`
-	OdpID            *int64  `json:"odp_id,omitempty"`
-	OdpName          string  `json:"odp_name,omitempty"`
-	OdpPort          *int    `json:"odp_port,omitempty"`
-	VoucherAutoApply int     `json:"voucher_auto_apply"`
+	OdpID           *int64  `json:"odp_id,omitempty"`
+	OdpName         string  `json:"odp_name,omitempty"`
+	OdpPort         *int    `json:"odp_port,omitempty"`
+	VoucherAutoApply int    `json:"voucher_auto_apply"`
+	BypassedIsolir  bool    `json:"bypassed_isolir"`
 }
 
 type Repository struct {
@@ -88,6 +89,15 @@ func calculateTrialDueDay(trialDays int) int {
 func (s Service) Create(ctx context.Context, customer Customer) (Customer, error) {
 	if err := validateCustomer(customer); err != nil {
 		return Customer{}, err
+	}
+
+	// Check for existing User PPPoE to prevent duplicate insertions
+	if customer.UserPPPoE != "" {
+		var existingID int64
+		err := s.Repository.DB.QueryRowContext(ctx, "SELECT id FROM pelanggan WHERE user_pppoe = ?", customer.UserPPPoE).Scan(&existingID)
+		if err == nil && existingID > 0 {
+			return Customer{}, fmt.Errorf("user pppoe '%s' already exists", customer.UserPPPoE)
+		}
 	}
 
 	// Fetch trial settings
@@ -185,6 +195,15 @@ func (s Service) Update(ctx context.Context, id int64, customer Customer) (Custo
 		customer.IsTrial = false
 	}
 
+	if err == nil {
+		wasIsolated := oldCustomer.Status == "limit" || oldCustomer.Status == "suspended" || oldCustomer.Status == "inactive"
+		if wasIsolated && customer.Status == "active" {
+			customer.BypassedIsolir = true
+		} else if customer.Status != "active" {
+			customer.BypassedIsolir = false
+		}
+	}
+
 	updated, err := s.Repository.Update(ctx, id, normalizeCustomer(customer))
 	if err != nil {
 		return Customer{}, err
@@ -213,11 +232,24 @@ func (s Service) UpdateStatus(ctx context.Context, id int64, status string) erro
 		return errors.New("customer status is invalid")
 	}
 
-	if err := s.Repository.UpdateStatus(ctx, id, status); err != nil {
+	customer, err := s.FindByID(ctx, id)
+	if err != nil {
 		return err
 	}
 
-	customer, err := s.FindByID(ctx, id)
+	bypassedIsolir := customer.BypassedIsolir
+	wasIsolated := customer.Status == "limit" || customer.Status == "suspended" || customer.Status == "inactive"
+	if wasIsolated && status == "active" {
+		bypassedIsolir = true
+	} else if status != "active" {
+		bypassedIsolir = false
+	}
+
+	if err := s.Repository.UpdateStatus(ctx, id, status, bypassedIsolir); err != nil {
+		return err
+	}
+
+	customer, err = s.FindByID(ctx, id)
 	if err == nil {
 		go func(c Customer) {
 			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -331,11 +363,15 @@ func (s Service) SyncToMikrotik(ctx context.Context, customer Customer) error {
 
 	switch customer.Status {
 	case "limit":
-		isolirProfile, err := s.Settings.GetString(ctx, settings.KeyMikrotikIsolirProfile)
-		if err == nil && strings.TrimSpace(isolirProfile) != "" {
-			profileName = strings.TrimSpace(isolirProfile)
+		if customer.BypassedIsolir {
+			// Do not change profileName, let it stay as the package name
 		} else {
-			profileName = "isolir"
+			isolirProfile, err := s.Settings.GetString(ctx, settings.KeyMikrotikIsolirProfile)
+			if err == nil && strings.TrimSpace(isolirProfile) != "" {
+				profileName = strings.TrimSpace(isolirProfile)
+			} else {
+				profileName = "isolir"
+			}
 		}
 	case "suspended", "inactive":
 		inactiveProfile, err := s.Settings.GetString(ctx, settings.KeyMikrotikInactiveProfile)
@@ -490,7 +526,7 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
 		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
-		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port, COALESCE(c.email, '')
+		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port, COALESCE(c.email, ''), c.bypassed_isolir
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
@@ -560,6 +596,7 @@ func (r Repository) List(ctx context.Context) ([]Customer, error) {
 			&item.VoucherAutoApply,
 			&odpPort,
 			&email,
+			&item.BypassedIsolir,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
@@ -651,12 +688,12 @@ func (r Repository) Create(ctx context.Context, customer Customer) (Customer, er
 		INSERT INTO pelanggan (
 			nama, paket_id, user_pppoe, password_pppoe, nomor_wa, sn_ont, tgl_jatuh_tempo, status, alamat,
 			is_trial, trial_started_at, trial_days, diskon, tipe_diskon, referred_by_id, referral_balance, referral_code, voucher_discount,
-			ont_status, ont_ip, ont_uptime, ont_rx_power, ont_tx_power, pppoe_status, pppoe_ip, pppoe_uptime, last_sync_at, odp_id, odp_port, email, updated_at
+			ont_status, ont_ip, ont_uptime, ont_rx_power, ont_tx_power, pppoe_status, pppoe_ip, pppoe_uptime, last_sync_at, odp_id, odp_port, email, bypassed_isolir, updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address,
 		isTrialVal, trialStartedAt, trialDays, customer.Diskon, customer.TipeDiskon, customer.ReferredByID, customer.ReferralBalance, referralCode, customer.VoucherDiscount,
-		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt, customer.OdpID, customer.OdpPort, customer.Email)
+		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt, customer.OdpID, customer.OdpPort, customer.Email, customer.BypassedIsolir)
 	if err != nil {
 		_ = tx.Rollback()
 		return Customer{}, fmt.Errorf("create customer: %w", err)
@@ -719,13 +756,13 @@ func (r Repository) Update(ctx context.Context, id int64, customer Customer) (Cu
 		    diskon = ?, tipe_diskon = ?, referred_by_id = ?, referral_balance = ?, referral_code = ?, voucher_discount = ?,
 		    ont_status = ?, ont_ip = ?, ont_uptime = ?, ont_rx_power = ?, ont_tx_power = ?, pppoe_status = ?, pppoe_ip = ?, pppoe_uptime = ?, last_sync_at = ?,
 		    odp_id = ?, odp_port = ?, voucher_auto_apply = ?, email = ?,
-		    is_trial = ?, trial_started_at = ?, trial_days = ?, updated_at = CURRENT_TIMESTAMP
+		    is_trial = ?, trial_started_at = ?, trial_days = ?, bypassed_isolir = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, customer.Name, customer.PackageID, customer.UserPPPoE, customer.PasswordPPPoE, customer.WhatsApp, customer.SNOnt, customer.DueDay, customer.Status, customer.Address,
 		customer.Diskon, customer.TipeDiskon, customer.ReferredByID, customer.ReferralBalance, toNullString(customer.ReferralCode), customer.VoucherDiscount,
 		customer.OntStatus, customer.OntIP, customer.OntUptime, customer.OntRxPower, customer.OntTxPower, customer.PppoeStatus, customer.PppoeIP, customer.PppoeUptime, customer.LastSyncAt,
 		customer.OdpID, customer.OdpPort, customer.VoucherAutoApply, customer.Email,
-		isTrialVal, customer.TrialStartedAt, customer.TrialDays, id)
+		isTrialVal, customer.TrialStartedAt, customer.TrialDays, customer.BypassedIsolir, id)
 	if err != nil {
 		return Customer{}, fmt.Errorf("update customer: %w", err)
 	}
@@ -760,12 +797,12 @@ func (s Service) UpdateSyncFields(ctx context.Context, id int64, c Customer) err
 	return nil
 }
 
-func (r Repository) UpdateStatus(ctx context.Context, id int64, status string) error {
+func (r Repository) UpdateStatus(ctx context.Context, id int64, status string, bypassedIsolir bool) error {
 	result, err := r.DB.ExecContext(ctx, `
 		UPDATE pelanggan
-		SET status = ?, updated_at = CURRENT_TIMESTAMP
+		SET status = ?, bypassed_isolir = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, status, id)
+	`, status, bypassedIsolir, id)
 	if err != nil {
 		return fmt.Errorf("update customer status: %w", err)
 	}
@@ -1040,7 +1077,7 @@ func (r Repository) FindByIDs(ctx context.Context, ids []int64) ([]Customer, err
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
 		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
-		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port, COALESCE(c.email, '')
+		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port, COALESCE(c.email, ''), c.bypassed_isolir
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
@@ -1094,6 +1131,11 @@ func (r Repository) FindByIDs(ctx context.Context, ids []int64) ([]Customer, err
 		if odpPort.Valid { v := int(odpPort.Int64); item.OdpPort = &v }
 		items = append(items, item)
 	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return items, nil
 }
 
@@ -1110,7 +1152,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		       c.voucher_discount, COALESCE(c.ont_status, ''), COALESCE(c.ont_ip, ''), COALESCE(c.ont_uptime, ''),
 		       COALESCE(c.ont_rx_power, ''), COALESCE(c.ont_tx_power, ''), COALESCE(c.pppoe_status, ''),
 		       COALESCE(c.pppoe_ip, ''), COALESCE(c.pppoe_uptime, ''), COALESCE(c.last_sync_at, ''),
-		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port, COALESCE(c.email, '')
+		       c.odp_id, COALESCE(o.nama, ''), c.voucher_auto_apply, c.odp_port, COALESCE(c.email, ''), c.bypassed_isolir
 		FROM pelanggan c
 		INNER JOIN paket p ON p.id = c.paket_id
 		LEFT JOIN pelanggan ref ON ref.id = c.referred_by_id
@@ -1176,6 +1218,7 @@ func (r Repository) FindByID(ctx context.Context, id int64) (Customer, error) {
 		&item.VoucherAutoApply,
 		&odpPort,
 		&email,
+		&item.BypassedIsolir,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

@@ -40,7 +40,7 @@ describe('Status controller', () => {
     getClient.mockReturnValue({
       info: {
         pushname: 'Billing Bot',
-        wid: { _serialized: '628111111111@c.us' },
+        wid: { _serialized: '628111111111@s.whatsapp.net' },
       },
     });
     const req = { accountId: 'billing-main' };
@@ -56,7 +56,7 @@ describe('Status controller', () => {
       account_id: 'billing-main',
       whatsapp_ready: true,
       user: 'Billing Bot',
-      phone: '628111111111@c.us',
+      phone: '628111111111@s.whatsapp.net',
     });
     expect(next).not.toHaveBeenCalled();
   });

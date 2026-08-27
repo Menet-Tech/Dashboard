@@ -714,7 +714,8 @@ func (r Repository) AutomationCandidates(ctx context.Context) ([]automationCandi
 		       t.periode, t.invoice_number, t.nominal, t.jatuh_tempo, t.status, t.paid_at,
 		       COALESCE(t.payment_method, ''), t.proof_path, c.status, COALESCE(c.trial_started_at, ''), COALESCE(c.trial_days, 0),
 		       t.diskon, t.diskon_referral, (c.odp_id IS NOT NULL) AS has_odp,
-		       EXISTS(SELECT 1 FROM payment_confirmations pc WHERE pc.tagihan_id = t.id AND pc.status = 'pending_review') AS has_pending_confirmation
+		       EXISTS(SELECT 1 FROM payment_confirmations pc WHERE pc.tagihan_id = t.id AND pc.status = 'pending_review') AS has_pending_confirmation,
+		       c.bypassed_isolir
 		FROM tagihan t
 		INNER JOIN pelanggan c ON c.id = t.pelanggan_id
 		INNER JOIN paket p ON p.id = t.paket_id
@@ -756,6 +757,7 @@ func (r Repository) AutomationCandidates(ctx context.Context) ([]automationCandi
 			&item.DiskonReferral,
 			&item.HasODP,
 			&item.HasPendingConfirmation,
+			&item.BypassedIsolir,
 		); err != nil {
 			return nil, fmt.Errorf("scan automation candidate: %w", err)
 		}

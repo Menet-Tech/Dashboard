@@ -162,8 +162,8 @@ func (s Service) CreatePaymentConfirmation(ctx context.Context, tagihanID int64,
 				admin = strings.TrimSpace(admin)
 				if admin != "" {
 					toNum := admin
-					if !strings.HasSuffix(toNum, "@c.us") {
-						toNum = toNum + "@c.us"
+					if !strings.HasSuffix(toNum, "@s.whatsapp.net") && !strings.HasSuffix(toNum, "@c.us") {
+						toNum = toNum + "@s.whatsapp.net"
 					}
 					_ = s.WhatsApp.SendDirectMessage(bgCtx, "default", toNum, alertMsg)
 				}
@@ -291,10 +291,51 @@ func (s Service) ApprovePaymentConfirmation(ctx context.Context, confirmationID 
 }
 
 func (s Service) RejectPaymentConfirmation(ctx context.Context, confirmationID int64) error {
-	_, err := s.Repository.DB.ExecContext(ctx, "UPDATE payment_confirmations SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?", confirmationID)
+	var tagihanID int64
+	var pelangganID int64
+	err := s.Repository.DB.QueryRowContext(ctx, "SELECT tagihan_id, pelanggan_id FROM payment_confirmations WHERE id = ?", confirmationID).Scan(&tagihanID, &pelangganID)
+	if err != nil {
+		return fmt.Errorf("get confirmation: %w", err)
+	}
+
+	_, err = s.Repository.DB.ExecContext(ctx, "UPDATE payment_confirmations SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?", confirmationID)
 	if err != nil {
 		return fmt.Errorf("reject confirmation: %w", err)
 	}
+
+	// Trigger async WA alert to customer
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		cust, cErr := s.Customers.FindByID(bgCtx, pelangganID)
+		if cErr != nil || cust.WhatsApp == "" {
+			return
+		}
+
+		billDetail, bErr := s.FindByID(bgCtx, tagihanID)
+		var invoiceNumber string
+		if bErr == nil {
+			invoiceNumber = billDetail.InvoiceNumber
+		} else {
+			invoiceNumber = fmt.Sprintf("Invoice #%d", tagihanID)
+		}
+
+		alertMsg := fmt.Sprintf("❌ *Konfirmasi Pembayaran Ditolak*\n\nMaaf, bukti pembayaran Anda untuk %s telah ditolak oleh Admin. Silakan periksa kembali dan unggah bukti yang valid, atau hubungi kami untuk informasi lebih lanjut.", invoiceNumber)
+
+		if s.WhatsApp != nil {
+			toNum := cust.WhatsApp
+			if !strings.HasSuffix(toNum, "@s.whatsapp.net") && !strings.HasSuffix(toNum, "@c.us") {
+				toNum = toNum + "@s.whatsapp.net"
+			}
+			accountID, err := s.Settings.GetString(bgCtx, "wa_account_id")
+			if err != nil || strings.TrimSpace(accountID) == "" {
+				accountID = "default"
+			}
+			_ = s.WhatsApp.SendDirectMessage(bgCtx, accountID, toNum, alertMsg)
+		}
+	}()
+
 	return nil
 }
 

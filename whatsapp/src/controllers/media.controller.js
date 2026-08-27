@@ -11,7 +11,7 @@ const sendMedia = async (req, res, next) => {
         const result = await sendMediaMessage(req.accountId, to, filePath, caption);
 
         // Kita biarkan file berada di temp (akan otomatis dihapus oleh fileHandler.js cleanup)
-        res.json({ status: 'success', message: 'Media sent', id: result.id?.id });
+        res.json({ status: 'success', message: 'Media sent', id: result?.key?.id });
     } catch (err) {
         next(err);
     }

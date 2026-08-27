@@ -8,8 +8,6 @@ User=menettech
 Group=menettech
 WorkingDirectory=/opt/menettech-go/backend
 EnvironmentFile=/opt/menettech-go/backend/.env
-Environment=GOGC=20
-Environment=GOMEMLIMIT=80MiB
 ExecStart=/opt/menettech-go/backend/api api
 Restart=always
 RestartSec=5
@@ -18,9 +16,6 @@ PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
 ReadWritePaths=/opt/menettech-go
-# Soft memory warning at 90MB; hard ceiling 110MB (cgroup OOM killer)
-MemoryHigh=90M
-MemoryMax=110M
 
 [Install]
 WantedBy=multi-user.target

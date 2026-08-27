@@ -79,40 +79,32 @@ const getPairingCode = async (req, res, next) => {
         }
         
         const client = getClient(id);
+        if (!client) {
+            return res.status(404).json({ status: 'error', message: 'Akun belum diinisialisasi. Silakan refresh halaman.' });
+        }
+        
         if (isReady(id)) {
             return res.status(400).json({ status: 'error', message: 'Akun WhatsApp sudah siap (ready)' });
         }
         
         // Remove +, spaces, dashes, etc
-        const cleanPhone = String(phoneNumber).replace(/\D/g, '');
-        // Pastikan onCodeReceivedEvent diexpose ke puppeteer page (karena jika tidak diset di options saat init, fungsi ini tidak ada)
-        try {
-            await client.pupPage.exposeFunction('onCodeReceivedEvent', (code) => {
-                return code;
-            });
-        } catch (e) {
-            // Abaikan jika sudah terekspos
+        let cleanPhone = String(phoneNumber).replace(/\D/g, '');
+        if (cleanPhone.startsWith('0')) {
+            cleanPhone = '62' + cleanPhone.substring(1);
         }
-
-        // Wait until AuthStore and PairingCodeLinkUtils are injected by WhatsApp Web
-        try {
-            await client.pupPage.waitForFunction(() => {
-                return window.AuthStore && window.AuthStore.PairingCodeLinkUtils;
-            }, { timeout: 15000 });
-        } catch (e) {
-            // Debugging: what does AuthStore contain?
+        
+        // Timeout to allow socket to settle if just created
+        setTimeout(async () => {
             try {
-                const keys = await client.pupPage.evaluate(() => {
-                    return window.AuthStore ? Object.keys(window.AuthStore) : ['AuthStore is null/undefined'];
-                });
-                console.error("[DEBUG] AuthStore keys:", keys);
-            } catch (err) {}
-
-            return res.status(400).json({ status: 'error', message: 'Halaman WhatsApp belum siap untuk Tautkan Nomor. Coba beberapa saat lagi atau muat ulang QR code.' });
-        }
-
-        const code = await client.requestPairingCode(cleanPhone);
-        res.json({ status: 'success', data: { code } });
+                const code = await client.requestPairingCode(cleanPhone);
+                // Format code nicely
+                const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
+                res.json({ status: 'success', data: { code: formattedCode } });
+            } catch (err) {
+                // If it fails (e.g., rate limited, or invalid number)
+                res.status(500).json({ status: 'error', message: 'Gagal mendapatkan kode pairing: ' + err.message });
+            }
+        }, 1500);
     } catch (err) {
         next(err);
     }

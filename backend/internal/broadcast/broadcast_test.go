@@ -126,7 +126,7 @@ func TestBroadcastService(t *testing.T) {
 
 		// Verify Alice's message personalized name in WA Queue
 		var body string
-		err = db.QueryRow("SELECT body FROM whatsapp_queue WHERE to_number = '62811111@c.us'").Scan(&body)
+		err = db.QueryRow("SELECT body FROM whatsapp_queue WHERE to_number = '62811111@s.whatsapp.net'").Scan(&body)
 		if err != nil {
 			t.Fatalf("failed to query Alice's WA queue: %v", err)
 		}

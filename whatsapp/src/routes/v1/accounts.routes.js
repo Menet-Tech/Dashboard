@@ -28,7 +28,7 @@ const { postCreateAccount, getAccounts, deleteAccount, getAccountQr, getStatus, 
  */
 
 router.get('/status', getStatus);
-router.post('/create', postCreateAccount);
+router.post('/', postCreateAccount);
 router.get('/', getAccounts);
 router.delete('/:id', deleteAccount);
 router.get('/:id/qr', getAccountQr);

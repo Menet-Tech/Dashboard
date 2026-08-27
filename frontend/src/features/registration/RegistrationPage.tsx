@@ -164,6 +164,7 @@ export function RegistrationPage({
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [odps, setOdps] = useState<any[]>([]);
 
   const gatewayUrl = waGatewayUrl?.trim() || "http://localhost:3001";
@@ -502,7 +503,13 @@ export function RegistrationPage({
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">{d.nama || d.name || "-"}</span>
+                          <span 
+                            className="font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 underline decoration-indigo-200/50 underline-offset-4"
+                            onClick={() => setSelectedLead(lead)}
+                            title="Lihat Detail Registrasi"
+                          >
+                            {d.nama || d.name || "-"}
+                          </span>
                           <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
                             isManual
                               ? "bg-blue-50 text-blue-700 border border-blue-100"
@@ -1105,6 +1112,29 @@ export function RegistrationPage({
               </div>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {selectedLead && (
+        <Modal 
+          onClose={() => setSelectedLead(null)}
+          title="Detail Registrasi"
+        >
+          <div className="p-6">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4">
+              Data Registrasi - {selectedLead.data?.nama || selectedLead.data?.name || selectedLead.phone}
+            </h3>
+            <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-4 overflow-x-auto">
+              <pre className="text-xs font-mono text-slate-700 dark:text-slate-300">
+                {JSON.stringify(selectedLead.data, null, 2)}
+              </pre>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <Button type="button" onClick={() => setSelectedLead(null)} variant="secondary">
+                Tutup
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </section>
