@@ -314,8 +314,12 @@ const setupEvents = (sock, accountId) => {
                                 // Forward to Admin WA
                                 try {
                                     const settings = await getSettings().catch(() => ({}));
-                                    const adminNumbers = (settings.wa_admin_numbers || '').split(',').map(n => n.trim()).filter(n => n);
-                                    const customerPhone = primary.customer.phone.replace(/@c\.us$/, '').replace(/^0/, '62');
+                                    const adminNumbers = (settings.wa_admin_numbers || '')
+                                        .split(',')
+                                        .map(n => n.trim().replace(/@(s\.whatsapp\.net|lid)$/, '').replace(/[+\-\s]/g, '').replace(/^0/, '62'))
+                                        .filter(Boolean);
+                                        
+                                    const customerPhone = primary.customer.phone.replace(/@(c\.us|s\.whatsapp\.net|lid)$/, '').replace(/^0/, '62');
                                     const caption = `🎫 *TICKET BARU: Konfirmasi Pembayaran*\n\n` +
                                                     `ID Tiket: #${ticketId}\n` +
                                                     `Pelanggan: ${primary.customer.name}\n` +
@@ -330,10 +334,10 @@ const setupEvents = (sock, accountId) => {
                                                     `*TOLAK ${confId}* untuk menolak.`;
 
                                     const path = require('path');
-                                    const fullPath = path.join(__dirname, '../../../storage/uploads', proofPath);
+                                    const fullPath = path.join(__dirname, '../../../storage', proofPath.replace(/^\/?/, ''));
                                     
                                     for (const admin of adminNumbers) {
-                                        const adminJid = admin.includes('@') ? admin : `${admin}@s.whatsapp.net`;
+                                        const adminJid = `${admin}@s.whatsapp.net`;
                                         await sock.sendMessage(adminJid, { image: { url: fullPath }, caption });
                                     }
                                 } catch (forwardErr) {
