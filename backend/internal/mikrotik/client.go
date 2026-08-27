@@ -873,13 +873,27 @@ func (c *Client) SyncPPPProfile(ctx context.Context, name, localAddr, remoteAddr
 		if rateLimit != "" {
 			args = append(args, "=rate-limit="+rateLimit)
 		}
-		args = append(args, "=queue-type=codel-up/codel-down")
+		args = append(args, "=queue-type=codel-down/codel-up")
 
 		setReply, err := c.run(ctx, args...)
 		if err != nil {
 			return err
 		}
-		return hasError(setReply)
+		
+		if err := hasError(setReply); err != nil {
+			if strings.Contains(err.Error(), "upload-queue") || strings.Contains(err.Error(), "queue-type") {
+				// Fallback: router does not have codel-down/codel-up configured
+				// Remove the queue-type argument (last element) and try again
+				args = args[:len(args)-1]
+				setReplyFallback, errFallback := c.run(ctx, args...)
+				if errFallback != nil {
+					return errFallback
+				}
+				return hasError(setReplyFallback)
+			}
+			return err
+		}
+		return nil
 	}
 
 	args := []string{"/ppp/profile/add", "=name=" + name}
@@ -892,13 +906,26 @@ func (c *Client) SyncPPPProfile(ctx context.Context, name, localAddr, remoteAddr
 	if rateLimit != "" {
 		args = append(args, "=rate-limit="+rateLimit)
 	}
-	args = append(args, "=queue-type=codel-up/codel-down")
+	args = append(args, "=queue-type=codel-down/codel-up")
 
 	addReply, err := c.run(ctx, args...)
 	if err != nil {
 		return err
 	}
-	return hasError(addReply)
+	
+	if err := hasError(addReply); err != nil {
+		if strings.Contains(err.Error(), "upload-queue") || strings.Contains(err.Error(), "queue-type") {
+			// Fallback
+			args = args[:len(args)-1]
+			addReplyFallback, errFallback := c.run(ctx, args...)
+			if errFallback != nil {
+				return errFallback
+			}
+			return hasError(addReplyFallback)
+		}
+		return err
+	}
+	return nil
 }
 
 // DeletePPPProfile deletes a PPP profile by name if it exists.
