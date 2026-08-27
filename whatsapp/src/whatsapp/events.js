@@ -334,7 +334,7 @@ const setupEvents = (sock, accountId) => {
                                                     `*TOLAK ${confId}* untuk menolak.`;
 
                                     const path = require('path');
-                                    const fullPath = path.join(__dirname, '../../../storage', proofPath.replace(/^\/?/, ''));
+                                    const fullPath = path.join(__dirname, '../../../backend/storage', proofPath.replace(/^\/?/, ''));
                                     
                                     for (const admin of adminNumbers) {
                                         const adminJid = `${admin}@s.whatsapp.net`;
