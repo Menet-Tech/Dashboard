@@ -86,7 +86,7 @@ const handleMessage = async (rawFrom, body, accountId, sendFn, contactName = '',
                         const successTpl = await getTemplateByTrigger('auto_reply_payment_proof').catch(() => null);
                         const successMsg = successTpl 
                             ? renderTemplate(successTpl.content || successTpl.isi_template, { nama: primary.customer.name })
-                            : "Terima kasih telah melakukan pembayaran, kami akan cek terlebih dahulu, terimakasih";
+                            : "Terima kasih! Bukti transfer Anda telah kami terima dan sedang dalam proses verifikasi (pending) oleh admin. Terimakasih";
 
                         // Reset session state
                         upsertSession(rawFrom, accountId, 'REG_MENU', { ...formData, hasBills: true, customerName: primary.customer.name });

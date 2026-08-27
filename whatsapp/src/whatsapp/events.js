@@ -262,7 +262,7 @@ const setupEvents = (sock, accountId) => {
                                     const successTpl = await getTemplateByTrigger('auto_reply_payment_proof').catch(() => null);
                                     const successMsg = successTpl 
                                         ? renderTemplate(successTpl.content || successTpl.isi_template, { nama: primary.customer.name })
-                                        : "Terima kasih telah melakukan pembayaran, kami akan cek terlebih dahulu, terimakasih";
+                                        : "Terima kasih! Bukti transfer Anda telah kami terima dan sedang dalam proses verifikasi (pending) oleh admin. Terimakasih";
                                     
                                     await sendTextMessage(accountId, realFrom, successMsg);
                                 } catch (replyErr) {
