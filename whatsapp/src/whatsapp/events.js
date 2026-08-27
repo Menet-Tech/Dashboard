@@ -136,7 +136,10 @@ const setupEvents = (sock, accountId) => {
                             const isBillingState = chatbotState === 'WAITING_PROOF' || chatbotState === 'WAITING_PAYMENT_METHOD';
 
                             if (!(hasMedia || isBillingKeyword || isBillingState)) {
-                                const discordMsg = `💬 **Pesan Masuk Baru dari Pelanggan**\n• **Pengirim**: ${contactName || 'Tidak Diketahui'} (${senderClean})\n• **Pesan**: ${messageBody || '[Media/Gambar]'}\n• **Link Chat**: https://wa.me/${senderClean}`;
+                                const isLid = realFrom.includes('@lid');
+                                const chatLink = isLid ? 'Tidak tersedia via WA Web (Balas dari Dashboard)' : `https://wa.me/${senderClean}`;
+                                
+                                const discordMsg = `💬 **Pesan Masuk Baru dari Pelanggan**\n• **Pengirim**: ${contactName || 'Tidak Diketahui'} (${senderClean})\n• **Pesan**: ${messageBody || '[Media/Gambar]'}\n• **Link Chat**: ${chatLink}`;
                                 await notifyAdminViaDiscord({ phone: realFrom, contactName }, discordMsg);
                             } else {
                                 logger.debug(`[${accountId}] Notifikasi Discord dilewati karena pesan terdeteksi terkait tagihan/pembayaran (${senderClean})`);
