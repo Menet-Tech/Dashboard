@@ -968,10 +968,14 @@ func (r NotificationLogRepository) Record(ctx context.Context, billID int64, tri
 }
 
 func (r NotificationLogRepository) RecordWithMessage(ctx context.Context, billID int64, triggerKey, sentTo, status, response, message string) error {
+	var bID sql.NullInt64
+	if billID > 0 {
+		bID = sql.NullInt64{Int64: billID, Valid: true}
+	}
 	_, err := r.DB.ExecContext(ctx, `
 		INSERT INTO notification_logs (bill_id, trigger_key, sent_to, status, response_message, message)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`, billID, triggerKey, sentTo, status, response, message)
+	`, bID, triggerKey, sentTo, status, response, message)
 	if err != nil {
 		return fmt.Errorf("record notification log with message: %w", err)
 	}
@@ -991,7 +995,7 @@ type NotificationLog struct {
 
 func (r NotificationLogRepository) FindLogs(ctx context.Context, billID int64) ([]NotificationLog, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT id, bill_id, trigger_key, COALESCE(sent_to, '') AS sent_to, status, COALESCE(response_message, '') AS response_message, COALESCE(message, '') AS message, created_at
+		SELECT id, COALESCE(bill_id, 0) AS bill_id, trigger_key, COALESCE(sent_to, '') AS sent_to, status, COALESCE(response_message, '') AS response_message, COALESCE(message, '') AS message, created_at
 		FROM notification_logs
 		WHERE bill_id = ?
 		UNION ALL
