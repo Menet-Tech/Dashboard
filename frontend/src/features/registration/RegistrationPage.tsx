@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, type FormEvent } from "react";
 import { Button } from "../../components/ui/Button";
 import { StatusPill, EmptyTableRow, inputClassName, renderInlineError } from "../../components/ui";
-import { Trash2, CheckCircle2, UserPlus, Plus, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
+import { Trash2, CheckCircle2, UserPlus, Plus, ChevronUp, ChevronDown, ArrowUpDown, Copy } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
 import type { ConfirmDialogState } from "../../hooks/types";
 import type { ContactForm } from "../../lib/gatewayApi";
@@ -1129,10 +1129,31 @@ export function RegistrationPage({
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4">
               Data Registrasi - {selectedLead.data?.nama || selectedLead.data?.name || selectedLead.phone}
             </h3>
-            <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-4 overflow-x-auto">
-              <pre className="text-xs font-mono text-slate-700 dark:text-slate-300">
-                {JSON.stringify(selectedLead.data, null, 2)}
-              </pre>
+            <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6">
+                <DetailItem label="Nama Lengkap" value={selectedLead.data?.nama || selectedLead.data?.name} />
+                <DetailItem label="Nomor WhatsApp" value={selectedLead.phone} />
+                <DetailItem label="Pilihan Paket" value={selectedLead.data?.paket || selectedLead.data?.package_choice} />
+                <DetailItem label="Kode Referral" value={selectedLead.data?.referral || selectedLead.data?.referral_code} />
+                <DetailItem label="Alamat Pemasangan" value={selectedLead.data?.alamat || selectedLead.data?.address} className="col-span-full" />
+                
+                {/* ODP info if any */}
+                {(selectedLead.data?.odp_id || selectedLead.data?.sn_ont) && (
+                  <>
+                    <div className="col-span-full border-t border-slate-200 dark:border-slate-700/50 my-2"></div>
+                    <DetailItem label="SN ONT" value={selectedLead.data?.sn_ont} />
+                    <DetailItem label="ODP" value={selectedLead.data?.odp_id ? `ODP ID: ${selectedLead.data.odp_id} (Port: ${selectedLead.data.odp_port || '-'})` : undefined} />
+                  </>
+                )}
+
+                {(selectedLead.data?.ssid || selectedLead.data?.wifi || selectedLead.data?.password || selectedLead.data?.wifi_password) && (
+                  <>
+                    <div className="col-span-full border-t border-slate-200 dark:border-slate-700/50 my-2"></div>
+                    <DetailItem label="Nama WiFi (SSID)" value={selectedLead.data?.ssid || selectedLead.data?.wifi} copyable pushSuccess={pushSuccess} />
+                    <DetailItem label="Password WiFi" value={selectedLead.data?.password || selectedLead.data?.wifi_password} copyable pushSuccess={pushSuccess} />
+                  </>
+                )}
+              </div>
             </div>
             <div className="mt-6 flex justify-end">
               <Button type="button" onClick={() => setSelectedLead(null)} variant="secondary">
@@ -1186,4 +1207,29 @@ function formatWhatsAppNumber(val: string): string {
     return formatted;
   }
   return clean;
+}
+
+function DetailItem({ label, value, copyable, className, pushSuccess }: { label: string, value?: string, copyable?: boolean, className?: string, pushSuccess?: (m:string)=>void }) {
+  if (!value) return null;
+  return (
+    <div className={`flex flex-col gap-1 ${className || ""}`}>
+      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-slate-800 dark:text-slate-200 break-all">{value}</span>
+        {copyable && (
+          <button
+            type="button"
+            className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+            onClick={() => {
+              navigator.clipboard.writeText(value);
+              pushSuccess?.("Tersalin!");
+            }}
+            title={`Salin ${label}`}
+          >
+            <Copy size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }

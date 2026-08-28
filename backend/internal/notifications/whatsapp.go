@@ -57,7 +57,7 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 	}
 
 	if !payload.Force {
-		sent, err := s.Logs.AlreadySent(ctx, payload.BillID, payload.TriggerKey)
+		sent, err := s.Logs.AlreadySent(ctx, payload.BillID, payload.TriggerKey, payload.PhoneNumber)
 		if err != nil {
 			return err
 		}
@@ -798,6 +798,12 @@ func (msg QueuedMessage) NotificationBillIDs() []int64 {
 	if msg.BillID.Valid && msg.BillID.Int64 > 0 {
 		return []int64{msg.BillID.Int64}
 	}
+
+	// Fallback for non-billing triggers (like trial_started)
+	if msg.TriggerKey.Valid && strings.TrimSpace(msg.TriggerKey.String) != "" {
+		return []int64{0}
+	}
+
 	return nil
 }
 
@@ -902,30 +908,56 @@ func (s WhatsAppService) accountIDForTrigger(ctx context.Context, triggerKey str
 	return s.Settings.GetString(ctx, settings.KeyWAAccountID)
 }
 
-func (r NotificationLogRepository) AlreadySent(ctx context.Context, billID int64, triggerKey string) (bool, error) {
+func (r NotificationLogRepository) AlreadySent(ctx context.Context, billID int64, triggerKey string, phoneNumber string) (bool, error) {
 	var count int
-	if err := r.DB.QueryRowContext(ctx, `
-		SELECT COUNT(1)
-		FROM notification_logs
-		WHERE bill_id = ?
-		  AND trigger_key = ?
-		  AND status = 'sent'
-	`, billID, triggerKey).Scan(&count); err != nil {
-		return false, fmt.Errorf("check notification log: %w", err)
+	if billID > 0 {
+		if err := r.DB.QueryRowContext(ctx, `
+			SELECT COUNT(1)
+			FROM notification_logs
+			WHERE bill_id = ?
+			  AND trigger_key = ?
+			  AND status = 'sent'
+		`, billID, triggerKey).Scan(&count); err != nil {
+			return false, fmt.Errorf("check notification log: %w", err)
+		}
+	} else {
+		if err := r.DB.QueryRowContext(ctx, `
+			SELECT COUNT(1)
+			FROM notification_logs
+			WHERE (bill_id = 0 OR bill_id IS NULL)
+			  AND trigger_key = ?
+			  AND sent_to = ?
+			  AND status = 'sent'
+		`, triggerKey, phoneNumber).Scan(&count); err != nil {
+			return false, fmt.Errorf("check notification log by phone: %w", err)
+		}
 	}
 	if count > 0 {
 		return true, nil
 	}
 
 	var queueCount int
-	if err := r.DB.QueryRowContext(ctx, `
-		SELECT COUNT(1)
-		FROM whatsapp_queue
-		WHERE bill_id = ?
-		  AND trigger_key = ?
-		  AND status IN ('pending', 'failed')
-	`, billID, triggerKey).Scan(&queueCount); err != nil {
-		return false, fmt.Errorf("check whatsapp queue: %w", err)
+	if billID > 0 {
+		if err := r.DB.QueryRowContext(ctx, `
+			SELECT COUNT(1)
+			FROM whatsapp_queue
+			WHERE bill_id = ?
+			  AND trigger_key = ?
+			  AND status IN ('pending', 'failed')
+		`, billID, triggerKey).Scan(&queueCount); err != nil {
+			return false, fmt.Errorf("check queue: %w", err)
+		}
+	} else {
+		if err := r.DB.QueryRowContext(ctx, `
+			SELECT COUNT(1)
+			FROM whatsapp_queue
+			WHERE (bill_id = 0 OR bill_id IS NULL)
+			  AND trigger_key = ?
+			  AND to_number = ?
+			  AND status IN ('pending', 'failed')
+		`, triggerKey, phoneNumber).Scan(&queueCount); err != nil {
+			return false, fmt.Errorf("check queue by phone: %w", err)
+		}
 	}
 
 	return queueCount > 0, nil

@@ -548,7 +548,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 				if item.HasPendingConfirmation || item.CustomerStatus == "pending" {
 					continue
 				}
-				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "tagihan-h7")
+				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "tagihan-h7", item.CustomerPhone)
 				if err == nil && !sent {
 					tagihanH7Unsent = append(tagihanH7Unsent, item)
 				}
@@ -573,7 +573,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 				if item.HasPendingConfirmation || item.CustomerStatus == "pending" {
 					continue
 				}
-				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "reminder-h3")
+				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "reminder-h3", item.CustomerPhone)
 				if err == nil && !sent {
 					reminderH3Unsent = append(reminderH3Unsent, item)
 				}
@@ -598,7 +598,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 				if item.HasPendingConfirmation || item.CustomerStatus == "pending" {
 					continue
 				}
-				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "jatuh_tempo")
+				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "jatuh_tempo", item.CustomerPhone)
 				if err == nil && !sent {
 					jatuhTempoUnsent = append(jatuhTempoUnsent, item)
 				}
@@ -622,7 +622,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		// tagihan-h7
 		if sameDate(dueDate, options.Now.AddDate(0, 0, 7)) {
 			if !item.HasPendingConfirmation && item.CustomerStatus != "pending" {
-				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "tagihan-h7")
+				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "tagihan-h7", item.CustomerPhone)
 				if err == nil && !sent {
 					waErr := sendAutomationMessage(ctx, options, item, "tagihan-h7")
 					key := fmt.Sprintf("%d-tagihan-h7", item.ID)
@@ -643,7 +643,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		// reminder-h3
 		if sameDate(dueDate, options.Now.AddDate(0, 0, 3)) {
 			if !item.HasPendingConfirmation && item.CustomerStatus != "pending" {
-				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "reminder-h3")
+				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "reminder-h3", item.CustomerPhone)
 				if err == nil && !sent {
 					waErr := sendAutomationMessage(ctx, options, item, "reminder-h3")
 					key := fmt.Sprintf("%d-reminder-h3", item.ID)
@@ -664,7 +664,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		// jatuh_tempo
 		if sameDate(dueDate, options.Now) {
 			if !item.HasPendingConfirmation && item.CustomerStatus != "pending" {
-				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "jatuh_tempo")
+				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "jatuh_tempo", item.CustomerPhone)
 				if err == nil && !sent {
 					waErr := sendAutomationMessage(ctx, options, item, "jatuh_tempo")
 					key := fmt.Sprintf("%d-jatuh_tempo", item.ID)
@@ -732,7 +732,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 					}
 				}
 
-				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "isolir_20hari")
+				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "isolir_20hari", item.CustomerPhone)
 				if err == nil && !sent {
 					isolir20hariUnsentByPhone[item.CustomerPhone] = append(isolir20hariUnsentByPhone[item.CustomerPhone], item)
 				}
@@ -755,7 +755,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 					}
 				}
 
-				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "limit_5hari")
+				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "limit_5hari", item.CustomerPhone)
 				if err == nil && !sent {
 					limit5hariUnsentByPhone[item.CustomerPhone] = append(limit5hariUnsentByPhone[item.CustomerPhone], item)
 				}
