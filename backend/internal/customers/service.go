@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"menettech/dashboard/backend/internal/mikrotik"
@@ -86,7 +87,12 @@ func calculateTrialDueDay(trialDays int) int {
 	return rawTarget
 }
 
+var createMutex sync.Mutex
+
 func (s Service) Create(ctx context.Context, customer Customer) (Customer, error) {
+	createMutex.Lock()
+	defer createMutex.Unlock()
+
 	if err := validateCustomer(customer); err != nil {
 		return Customer{}, err
 	}

@@ -164,6 +164,7 @@ export function RegistrationPage({
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [odps, setOdps] = useState<any[]>([]);
 
@@ -277,6 +278,7 @@ export function RegistrationPage({
     if (Object.keys(errs).length > 0) { setConvertErrors(errs); return; }
 
     const lead = convertPreview;
+    setIsConverting(true);
 
     await withFeedback(async () => {
       try {
@@ -307,6 +309,8 @@ export function RegistrationPage({
         pushSuccess("Pelanggan berhasil ditambahkan!");
       } catch (err: any) {
         pushError(err.message || "Gagal melakukan konversi pelanggan");
+      } finally {
+        setIsConverting(false);
       }
     });
   };
@@ -875,9 +879,10 @@ export function RegistrationPage({
                 type="button"
                 variant="primary"
                 onClick={() => void handleConfirmConvert()}
+                disabled={isConverting}
               >
                 <UserPlus size={13} />
-                Simpan & Konversi Pelanggan
+                {isConverting ? "Menyimpan..." : "Simpan & Konversi Pelanggan"}
               </Button>
             </>
           }
