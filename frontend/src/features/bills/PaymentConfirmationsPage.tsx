@@ -174,7 +174,7 @@ export function PaymentConfirmationsPage({
       <article className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-card p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-55">Review Pembayaran</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 dark:text-slate-50">Review Pembayaran</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Verifikasi bukti transfer dan klaim pembayaran yang dikirimkan pelanggan melalui WhatsApp.
             </p>
@@ -197,7 +197,7 @@ export function PaymentConfirmationsPage({
 
         {loading ? (
           <div className="py-20 text-center">
-            <span className="text-sm text-slate-450">Memuat data review...</span>
+            <span className="text-sm text-slate-400">Memuat data review...</span>
           </div>
         ) : confirmations.length === 0 ? (
           <div className="py-20 flex flex-col items-center justify-center text-center bg-slate-50/50 dark:bg-slate-950/20 border border-dashed border-slate-200 dark:border-slate-800 rounded-card">
@@ -224,7 +224,7 @@ export function PaymentConfirmationsPage({
               return (
                 <div
                   key={item.id}
-                  className="bg-white dark:bg-slate-900 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-card overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-all duration-350"
+                  className="bg-white dark:bg-slate-900 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-card overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-all duration-350"
                 >
                   <div className="relative bg-slate-50 dark:bg-slate-950 dark:bg-slate-900 h-64 border-b border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden group">
                     {isImg ? (
@@ -239,7 +239,7 @@ export function PaymentConfirmationsPage({
                         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">File Non-Gambar</span>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center gap-2 p-6 text-slate-450">
+                      <div className="flex flex-col items-center gap-2 p-6 text-slate-400">
                         <AlertCircle className="w-12 h-12 text-amber-500" />
                         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Klaim Tanpa Bukti (Cash)</span>
                       </div>
@@ -251,7 +251,7 @@ export function PaymentConfirmationsPage({
                           href={item.bukti_transfer}
                           target="_blank"
                           rel="noreferrer"
-                          className="bg-white dark:bg-slate-900 hover:bg-slate-100 text-slate-850 p-2.5 rounded-xl shadow-lg transition-transform hover:scale-110 flex items-center gap-1.5 text-xs font-bold"
+                          className="bg-white dark:bg-slate-900 hover:bg-slate-100 text-slate-800 p-2.5 rounded-xl shadow-lg transition-transform hover:scale-110 flex items-center gap-1.5 text-xs font-bold"
                         >
                           <Eye className="w-4 h-4" /> Lihat Asli
                         </a>
@@ -266,7 +266,7 @@ export function PaymentConfirmationsPage({
                           <h4 className="font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 text-sm leading-tight">
                             {item.customer_name}
                           </h4>
-                          <span className="text-[10px] text-indigo-650 dark:text-indigo-400 font-semibold tracking-wide uppercase mt-1 inline-block">
+                          <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold tracking-wide uppercase mt-1 inline-block">
                             Invoice: {item.invoice_number}
                           </span>
                         </div>
@@ -285,12 +285,12 @@ export function PaymentConfirmationsPage({
 
                       {item.linked_bills && item.linked_bills.length > 0 && (
                         <div className="mt-2.5 mb-3 space-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-2">
-                          <span className="block text-[9px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider">
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
                             Akun Lain yang Ditautkan:
                           </span>
                           {item.linked_bills.map((lb) => (
                             <div key={lb.tagihan_id} className="flex justify-between items-center text-[11px] bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 px-2.5 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
-                              <span className="text-slate-650 dark:text-slate-400 font-semibold">
+                              <span className="text-slate-600 dark:text-slate-400 font-semibold">
                                 {lb.invoice_number}
                               </span>
                               <span className="font-extrabold text-slate-800 dark:text-slate-100 dark:text-slate-300">
@@ -301,8 +301,8 @@ export function PaymentConfirmationsPage({
                         </div>
                       )}
 
-                      <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 rounded-xl p-3 text-xs text-slate-650 dark:text-slate-350 border border-slate-100 dark:border-slate-800">
-                        <strong className="block text-[10px] text-slate-450 dark:text-slate-500 mb-1 tracking-wider uppercase">
+                      <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 rounded-xl p-3 text-xs text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-800">
+                        <strong className="block text-[10px] text-slate-400 dark:text-slate-500 mb-1 tracking-wider uppercase">
                           Keterangan:
                         </strong>
                         <p className="italic leading-relaxed break-words whitespace-pre-line">
@@ -368,7 +368,7 @@ export function PaymentConfirmationsPage({
 
             {relatedBills.length > 0 && (
               <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 space-y-2">
-                <span className="block text-[10px] font-bold text-indigo-650 dark:text-indigo-400 uppercase tracking-wider">
+                <span className="block text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                   Tautkan Tagihan Lain (Multi-Akun / Nomer WA Sama)
                 </span>
                 <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">

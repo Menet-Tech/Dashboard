@@ -133,13 +133,13 @@ export function ChatbotTab({
         <>
           {/* Gateway Accounts Configuration */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <form onSubmit={handleSettingsSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-card border border-slate-200 dark:border-slate-800 dark:border-slate-850/70 shadow-sm space-y-5">
-          <div className="flex items-start gap-3 border-b border-slate-100 dark:border-slate-800 dark:border-slate-850 pb-4">
+        <form onSubmit={handleSettingsSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-card border border-slate-200 dark:border-slate-800 dark:border-slate-800/70 shadow-sm space-y-5">
+          <div className="flex items-start gap-3 border-b border-slate-100 dark:border-slate-800 dark:border-slate-800 pb-4">
             <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl">
               <Sliders size={20} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-850 dark:text-slate-100 uppercase tracking-wider">Pengaturan Akun Bot</h3>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider">Pengaturan Akun Bot</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Pilih akun WA untuk chatbot dan auto-reply. Gunakan <code>*</code> untuk semua.</p>
             </div>
           </div>
@@ -205,13 +205,13 @@ export function ChatbotTab({
           </div>
         </form>
 
-        <form onSubmit={handleAddRuleSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-card border border-slate-200 dark:border-slate-800 dark:border-slate-850/70 shadow-sm space-y-5">
-          <div className="flex items-start gap-3 border-b border-slate-100 dark:border-slate-800 dark:border-slate-850 pb-4">
+        <form onSubmit={handleAddRuleSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-card border border-slate-200 dark:border-slate-800 dark:border-slate-800/70 shadow-sm space-y-5">
+          <div className="flex items-start gap-3 border-b border-slate-100 dark:border-slate-800 dark:border-slate-800 pb-4">
             <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl">
               <PlusCircle size={20} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-850 dark:text-slate-100 uppercase tracking-wider">Tambah Auto-Response</h3>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider">Tambah Auto-Response</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Balasan cepat kata kunci seperti: harga, jam layanan, rekening, dll.</p>
             </div>
           </div>
@@ -284,7 +284,7 @@ export function ChatbotTab({
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-md font-bold text-slate-900 dark:text-slate-50 dark:text-slate-150 flex items-center gap-1.5">
+        <h3 className="text-md font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-600" />
           Rule Auto-Response ({autoReplyRules.length})
         </h3>
@@ -372,17 +372,17 @@ export function ChatbotTab({
                     <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider">Kata Kunci</span>
                     <p className="font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 text-sm font-mono mt-0.5">{rule.keyword}</p>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${rule.enabled ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900" : "bg-slate-55 bg-slate-100 border-slate-250 text-slate-650 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-500"}`}>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${rule.enabled ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900" : "bg-slate-50 bg-slate-100 border-slate-200 text-slate-600 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-500"}`}>
                     {rule.enabled ? "AKTIF" : "NONAKTIF"}
                   </span>
                 </div>
                 
-                <div className="mt-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 dark:border-slate-850">
+                <div className="mt-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 dark:border-slate-800">
                   <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{rule.reply}</p>
                 </div>
                 
                 {rule.image_path && (
-                  <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800 dark:border-slate-850 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/50 flex items-center justify-center p-2">
+                  <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/50 flex items-center justify-center p-2">
                     <img 
                       src={`${gatewayUrl.replace(/\/$/, '')}/uploads/${rule.image_path}`} 
                       alt={`Lampiran untuk ${rule.keyword}`} 
@@ -391,13 +391,13 @@ export function ChatbotTab({
                   </div>
                 )}
                 
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 dark:border-slate-850">
-                  <div className="text-[10px] text-slate-450 dark:text-slate-500 flex flex-wrap gap-2">
-                    <span>Akun: <strong className="text-slate-700 dark:text-slate-300 dark:text-slate-350">{rule.account_id || "*"}</strong></span>
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 dark:border-slate-800">
+                  <div className="text-[10px] text-slate-400 dark:text-slate-500 flex flex-wrap gap-2">
+                    <span>Akun: <strong className="text-slate-700 dark:text-slate-300 dark:text-slate-300">{rule.account_id || "*"}</strong></span>
                     <span>•</span>
-                    <span>Tipe: <strong className="text-slate-700 dark:text-slate-300 dark:text-slate-350">{rule.match_type}</strong></span>
+                    <span>Tipe: <strong className="text-slate-700 dark:text-slate-300 dark:text-slate-300">{rule.match_type}</strong></span>
                     <span>•</span>
-                    <span>Prio: <strong className="text-slate-700 dark:text-slate-300 dark:text-slate-350">{rule.priority}</strong></span>
+                    <span>Prio: <strong className="text-slate-700 dark:text-slate-300 dark:text-slate-300">{rule.priority}</strong></span>
                   </div>
                   {canDecrypt ? (
                     <div className="flex gap-1">
@@ -446,7 +446,7 @@ export function ChatbotTab({
         <>
           {/* Active Sessions List */}
       <div className="space-y-4">
-        <h3 className="text-md font-bold text-slate-900 dark:text-slate-50 dark:text-slate-150 flex items-center gap-1.5">
+        <h3 className="text-md font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-indigo-600" />
           Sesi Chatbot Aktif ({chatbotSessions.length})
         </h3>
@@ -459,30 +459,30 @@ export function ChatbotTab({
             {chatbotSessions.map((session) => (
               <div
                 key={session.phone}
-                className="border border-slate-200 dark:border-slate-800 dark:border-slate-850 border-t-2 border-t-indigo-500 rounded-xl p-5 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between"
+                className="border border-slate-200 dark:border-slate-800 dark:border-slate-800 border-t-2 border-t-indigo-500 rounded-xl p-5 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between"
               >
                 <div>
                   <div className="flex justify-between items-center mb-3">
                     <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-650 dark:text-indigo-400 rounded-lg">
+                      <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-lg">
                         <Phone size={14} />
                       </div>
-                      <h4 className="font-bold text-slate-850 dark:text-slate-100 font-mono text-xs">
+                      <h4 className="font-bold text-slate-800 dark:text-slate-100 font-mono text-xs">
                         {maskPhone(session.phone, !canDecrypt)}
                       </h4>
                     </div>
-                    <span className="text-[9px] bg-indigo-50 border border-indigo-200 text-indigo-750 px-2 py-0.5 rounded-full font-bold dark:bg-indigo-950/45 dark:text-indigo-400 dark:border-indigo-900 uppercase tracking-wider">
+                    <span className="text-[9px] bg-indigo-50 border border-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full font-bold dark:bg-indigo-950/45 dark:text-indigo-400 dark:border-indigo-900 uppercase tracking-wider">
                       {session.state}
                     </span>
                   </div>
                   
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mb-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/30 py-1 px-2.5 rounded-lg border border-slate-100 dark:border-slate-800 dark:border-slate-850 w-fit">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mb-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/30 py-1 px-2.5 rounded-lg border border-slate-100 dark:border-slate-800 dark:border-slate-800 w-fit">
                     <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                     <span>Akun: <strong className="text-slate-755 dark:text-slate-300 font-mono">{session.account_id}</strong></span>
                   </div>
                   
                   {Object.keys(session.form_data).length > 0 && (
-                    <div className="bg-slate-50/50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-150 dark:border-slate-850/60 mb-3">
+                    <div className="bg-slate-50/50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800/60 mb-3">
                       <p className="text-[9px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider mb-2">Formulir Isian:</p>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         {Object.entries(session.form_data).map(([key, val]) => (
@@ -496,7 +496,7 @@ export function ChatbotTab({
                   )}
                 </div>
 
-                <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-800 dark:border-slate-850 mt-2">
+                <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-800 dark:border-slate-800 mt-2">
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
                     <Clock size={12} />
                     {new Date(session.updated_at).toLocaleTimeString("id-ID")}
@@ -521,7 +521,7 @@ export function ChatbotTab({
 
       {/* Submitted Forms List */}
       <div className="space-y-4">
-        <h3 className="text-md font-bold text-slate-900 dark:text-slate-50 dark:text-slate-150 flex items-center gap-1.5 border-t border-slate-100 dark:border-slate-800 dark:border-slate-850 pt-6">
+        <h3 className="text-md font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 flex items-center gap-1.5 border-t border-slate-100 dark:border-slate-800 dark:border-slate-800 pt-6">
           <span className="w-2 h-2 rounded-full bg-emerald-600" />
           Registrasi & Tiket Masuk via WhatsApp ({contactForms.length})
         </h3>
@@ -545,14 +545,14 @@ export function ChatbotTab({
                   {contactForms.map((form) => {
                     const dateStr = new Date(form.created_at).toLocaleString("id-ID");
                     return (
-                      <tr key={form.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/30 transition-colors">
-                        <td className="px-6 py-4 text-slate-550 dark:text-slate-400 text-xs whitespace-nowrap">{dateStr}</td>
+                      <tr key={form.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{dateStr}</td>
                         <td className="px-6 py-4">
                           <span
                             className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
                               form.type === "registration"
-                                ? "bg-emerald-50 border-emerald-250 text-emerald-700 dark:bg-emerald-950/45 dark:text-emerald-400 dark:border-emerald-900"
-                                : "bg-amber-50 border-amber-250 text-amber-700 dark:bg-amber-950/45 dark:text-amber-400 dark:border-amber-900"
+                                ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/45 dark:text-emerald-400 dark:border-emerald-900"
+                                : "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/45 dark:text-amber-400 dark:border-amber-900"
                             }`}
                           >
                             {form.type === "registration" ? "Registrasi" : "Support"}
@@ -562,9 +562,9 @@ export function ChatbotTab({
                         <td className="px-6 py-4">
                           <div className="flex flex-wrap gap-2 max-w-2xl">
                             {Object.entries(form.data).map(([k, v]) => (
-                              <div key={k} className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/55 rounded-xl border border-slate-200 dark:border-slate-800 dark:border-slate-850 text-xs shadow-sm">
+                              <div key={k} className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/55 rounded-xl border border-slate-200 dark:border-slate-800 dark:border-slate-800 text-xs shadow-sm">
                                 <span className="font-bold text-slate-400 dark:text-slate-500 uppercase text-[9px] tracking-wider">{k.replace(/_/g, " ")}:</span>
-                                <span className="font-semibold text-slate-750 dark:text-slate-200 font-sans">{String(v)}</span>
+                                <span className="font-semibold text-slate-700 dark:text-slate-200 font-sans">{String(v)}</span>
                               </div>
                             ))}
                           </div>

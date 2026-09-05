@@ -89,7 +89,7 @@ func (s WhatsAppService) SendTemplate(ctx context.Context, payload BillMessagePa
 
 	// If the admin has customized the template, use it directly.
 	// Otherwise fall back to the hardcoded billing builder.
-		renderedText, err = s.renderHardcodedTemplate(ctx, payload, accountID)
+		renderedText, err = s.renderHardcodedTemplate(ctx, payload)
 		if err != nil {
 			return err
 		}

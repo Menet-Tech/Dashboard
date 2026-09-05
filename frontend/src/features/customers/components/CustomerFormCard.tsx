@@ -86,7 +86,7 @@ export function CustomerFormCard({
 
       <form id="customer-form" onSubmit={handleSubmit} className="space-y-4">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">
             Nama Pelanggan *
           </span>
           <input
@@ -102,7 +102,7 @@ export function CustomerFormCard({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">
             Paket Layanan *
           </span>
           <select
@@ -130,7 +130,7 @@ export function CustomerFormCard({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">
               Username PPPoE
             </span>
             <input
@@ -144,7 +144,7 @@ export function CustomerFormCard({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">
               Password PPPoE
             </span>
             <input
@@ -163,7 +163,7 @@ export function CustomerFormCard({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">
               Nomor WhatsApp
             </span>
             <input
@@ -200,7 +200,7 @@ export function CustomerFormCard({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">
               Email
             </span>
             <input
@@ -216,7 +216,7 @@ export function CustomerFormCard({
         </div>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">
             Alamat Pelanggan
           </span>
           <textarea
@@ -231,7 +231,7 @@ export function CustomerFormCard({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">
             Serial Number ONT
           </span>
           <input
@@ -296,7 +296,7 @@ export function CustomerFormCard({
         </div>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Status Layanan</span>
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Status Layanan</span>
           <select
             className={inputClassName()}
             value={localForm.status}
@@ -332,7 +332,7 @@ export function CustomerFormCard({
         {/* Trial days — only visible when status is "trial" or is_trial is true */}
         {(localForm.status === "trial" || localForm.is_trial) && (
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">
               Durasi Trial (Hari)
             </span>
             <input
@@ -395,7 +395,7 @@ export function CustomerFormCard({
       {/* ODP Node selector */}
       <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Titik Distribusi ODP</span>
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Titik Distribusi ODP</span>
           <select
             className={inputClassName()}
             value={localForm.odp_id || 0}
@@ -434,7 +434,7 @@ export function CustomerFormCard({
 
         {(localForm.odp_id || 0) > 0 && (
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Port ODP</span>
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Port ODP</span>
             <select
               className={inputClassName()}
               value={localForm.odp_port || 1}
@@ -467,7 +467,7 @@ export function CustomerFormCard({
       </div>
 
       <label className="col-span-full flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Direkomendasikan Oleh (Referral)</span>
+        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Direkomendasikan Oleh (Referral)</span>
         <select
           className={inputClassName()}
           value={localForm.referred_by_id}
@@ -489,7 +489,7 @@ export function CustomerFormCard({
         </select>
       </label>
       <label className="col-span-full flex flex-col gap-1">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Alamat Pemasangan</span>
+        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Alamat Pemasangan</span>
         <textarea
           className={inputClassName()}
           rows={3}

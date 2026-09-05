@@ -103,7 +103,7 @@ export function AuditLogsPage({ auditLogs, submitting, onRefresh }: AuditLogsPag
               <input
                 type="text"
                 placeholder="Cari user, IP, aksi, atau detail..."
-                className="bg-white dark:bg-slate-900 border border-slate-250 text-slate-700 dark:text-slate-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+                className="bg-white dark:bg-slate-900 border border-slate-200 text-slate-700 dark:text-slate-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />

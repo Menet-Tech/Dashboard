@@ -1587,7 +1587,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                                 {connectedOnts.length} / {capacity}
                               </span>
                             </div>
-                            <div className="w-full bg-slate-150 dark:bg-slate-800/80 rounded-full h-2 overflow-hidden">
+                            <div className="w-full bg-slate-100 dark:bg-slate-800/80 rounded-full h-2 overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all duration-300 ${
                                   isFull ? "bg-red-500" : "bg-emerald-500"
@@ -1649,7 +1649,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                               void navigator.clipboard.writeText(info);
                               pushSuccess("Info ODP disalin ke clipboard!");
                             }}
-                            className="w-full bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 border border-slate-200 dark:border-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-750 dark:text-slate-300 text-[10px] font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                            className="w-full bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 border border-slate-200 dark:border-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
                           >
                             Copy Info
                           </Button>
@@ -2376,7 +2376,7 @@ export function NetworkMapPage({ pushSuccess, pushError }: NetworkMapPageProps) 
                         id="countsAsPort"
                         checked={edgeCountsAsPort}
                         onChange={(e) => setEdgeCountsAsPort(e.target.checked)}
-                        className="w-4 h-4 text-indigo-600 bg-white dark:bg-slate-900 border-slate-350 rounded focus:ring-indigo-500"
+                        className="w-4 h-4 text-indigo-600 bg-white dark:bg-slate-900 border-slate-300 rounded focus:ring-indigo-500"
                       />
                       <label htmlFor="countsAsPort" className="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                         🔌 Gunakan / Makan Port ODP (Default: Tidak)

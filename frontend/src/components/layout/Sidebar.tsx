@@ -138,7 +138,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`sticky top-0 w-72 bg-white dark:bg-slate-900 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 dark:border-slate-900 flex flex-col shadow-xl shrink-0 h-screen transition-all duration-300 z-40 ${navOpen ? "translate-x-0 fixed inset-y-0 left-0 shadow-2xl" : "hidden lg:flex"
+      className={`sticky top-0 w-72 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-900 flex flex-col shadow-xl shrink-0 h-screen transition-all duration-300 z-40 ${navOpen ? "translate-x-0 fixed inset-y-0 left-0 shadow-2xl" : "hidden lg:flex"
         }`}
       aria-label="Navigasi utama"
     >
@@ -218,7 +218,7 @@ export function Sidebar({
                       key={item.key}
                       className={`w-full text-left px-3 py-2 rounded-xl transition-all duration-200 flex items-center gap-3 group/item cursor-pointer ${isActive
                           ? "bg-indigo-600 text-white shadow shadow-indigo-600/25"
-                          : "hover:bg-slate-100/70 dark:hover:bg-slate-900/65 text-slate-650 dark:text-slate-350 hover:text-indigo-600 dark:hover:text-slate-100"
+                          : "hover:bg-slate-100/70 dark:hover:bg-slate-800/65 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-slate-100"
                         }`}
                       onClick={() => switchView(item.key)}
                       type="button"
@@ -233,7 +233,7 @@ export function Sidebar({
                       <div className="flex flex-col min-w-0">
                         <span className="font-bold text-xs font-sans tracking-wide leading-none">{item.label}</span>
                         <span
-                          className={`text-xs mt-0.5 truncate transition-colors leading-normal ${isActive ? "text-indigo-100" : "text-slate-450 dark:text-slate-500 group-hover/item:text-indigo-500/80 dark:group-hover/item:text-slate-400"
+                          className={`text-xs mt-0.5 truncate transition-colors leading-normal ${isActive ? "text-indigo-100" : "text-slate-500 dark:text-slate-500 group-hover/item:text-indigo-500/80 dark:group-hover/item:text-slate-400"
                             }`}
                         >
                           {item.caption}
@@ -255,8 +255,8 @@ export function Sidebar({
             {user.username.charAt(0)}
           </div>
           <div className="min-w-0">
-            <strong className="block text-xs font-bold text-slate-800 dark:text-slate-100 dark:text-slate-250 truncate">{user.username}</strong>
-            <span className="block text-[8px] uppercase font-black tracking-wider text-indigo-600 dark:text-indigo-450 truncate">
+            <strong className="block text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{user.username}</strong>
+            <span className="block text-[8px] uppercase font-black tracking-wider text-indigo-600 dark:text-indigo-400 truncate">
               {user.role}
             </span>
           </div>

@@ -290,7 +290,7 @@ export function MonitoringPage({
             </div>
             <div className="border-b border-slate-100 dark:border-slate-800 dark:border-slate-800/60 pb-3 flex justify-between items-center">
               <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Last Attempt</span>
-              <span className="text-sm font-mono text-slate-700 dark:text-slate-300 dark:text-slate-350">
+              <span className="text-sm font-mono text-slate-700 dark:text-slate-300 dark:text-slate-300">
                 {formatDateTime(health?.scheduler.billing_last_attempt_at)}
               </span>
             </div>
@@ -306,13 +306,13 @@ export function MonitoringPage({
             </div>
             <div className="border-b border-slate-100 dark:border-slate-800 dark:border-slate-800/60 pb-3 flex justify-between items-center">
               <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Tagihan Dibuat Terakhir</span>
-              <span className="text-sm font-bold text-slate-850 dark:text-slate-100">
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
                 {health?.scheduler.billing_last_generated_count ?? 0} invoice
               </span>
             </div>
             <div className="border-b border-slate-100 dark:border-slate-800 dark:border-slate-800/60 pb-3 flex justify-between items-center">
               <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Retry Policy</span>
-              <span className="text-sm font-semibold text-slate-750 dark:text-slate-300">
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                 {health?.scheduler.billing_retry_attempts ?? 0} percobaan / backoff{" "}
                 {health?.scheduler.billing_retry_backoff_seconds ?? 0} detik
               </span>
@@ -322,7 +322,7 @@ export function MonitoringPage({
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${
                 health?.scheduler.billing_last_error 
                   ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-100 dark:border-red-900/40" 
-                  : "text-slate-650 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 dark:bg-slate-850"
+                  : "text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 dark:bg-slate-800"
               }`}>
                 {health?.scheduler.billing_last_error || "Tidak ada"}
               </span>

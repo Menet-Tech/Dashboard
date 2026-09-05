@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func (s WhatsAppService) renderHardcodedTemplate(ctx context.Context, payload BillMessagePayload, accountID string) (string, error) {
+func (s WhatsAppService) renderHardcodedTemplate(ctx context.Context, payload BillMessagePayload) (string, error) {
 	var renderedText string
 
 	switch payload.TriggerKey {

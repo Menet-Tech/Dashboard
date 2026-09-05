@@ -43,7 +43,7 @@ export function Topbar({ navOpen, onToggleNav, health, user, theme, onToggleThem
             {user.username.charAt(0)}
           </div>
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{user.username}</span>
-          <span className="text-xs text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-850 px-2 py-0.5 rounded-full hidden sm:inline-block">{user.role}</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full hidden sm:inline-block">{user.role}</span>
         </div>
       </div>
     </header>

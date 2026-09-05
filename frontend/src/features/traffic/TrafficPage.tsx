@@ -52,7 +52,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
     const isSorted = sortField === field;
     return (
       <th 
-        className={`px-6 py-4 font-semibold select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-550 dark:text-slate-400 ${align === "center" ? "text-center" : "text-left"}`}
+        className={`px-6 py-4 font-semibold select-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 ${align === "center" ? "text-center" : "text-left"}`}
         onClick={() => requestSort(field)}
       >
         <div className={`inline-flex items-center gap-1.5 ${align === "center" ? "justify-center w-full" : ""}`}>
@@ -330,7 +330,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
           <input
             type="text"
             placeholder="Cari nama, PPPoE, atau paket..."
-            className="w-full pl-10 pr-4 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 dark:border-slate-850 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-800 dark:text-slate-100 dark:text-slate-200"
+            className="w-full pl-10 pr-4 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-800 dark:text-slate-100 dark:text-slate-200"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -391,10 +391,10 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
       </div>
 
       {/* Main Customers Traffic Table */}
-      <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 dark:border-slate-850 rounded-card shadow-sm overflow-hidden backdrop-blur-md">
+      <div className="bg-white dark:bg-slate-900 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 dark:border-slate-800 rounded-card shadow-sm overflow-hidden backdrop-blur-md">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
-            <thead className="bg-slate-55/60 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 dark:border-slate-850/80 text-slate-500 dark:text-slate-400 text-xs uppercase font-extrabold tracking-wider">
+            <thead className="bg-slate-50/60 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 text-xs uppercase font-extrabold tracking-wider">
               <tr>
                 {renderSortableHeader("Nama Pelanggan", "name")}
                 {renderSortableHeader("PPPoE Username", "user_pppoe")}
@@ -406,7 +406,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                 <th className="px-6 py-4 font-semibold text-center text-slate-500 dark:text-slate-400">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-850/40">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
               {sortedCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
@@ -433,13 +433,13 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                       <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200">{cust.name}</td>
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono text-xs">{cust.user_pppoe}</td>
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{cust.package_name || "-"}</td>
-                      <td className="px-6 py-4 font-semibold text-slate-700 dark:text-slate-300 dark:text-slate-350">
+                      <td className="px-6 py-4 font-semibold text-slate-700 dark:text-slate-300 dark:text-slate-300">
                         {cust.limitMbps === 0 ? "Bypass" : `${cust.limitMbps} Mbps`}
                       </td>
-                      <td className={`px-6 py-4 font-bold ${isRed ? "text-rose-600 dark:text-rose-450" : isYellow ? "text-amber-600 dark:text-amber-450" : "text-emerald-600 dark:text-emerald-450"}`}>
+                      <td className={`px-6 py-4 font-bold ${isRed ? "text-rose-600 dark:text-rose-400" : isYellow ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                         {formatBps(cust.stats.rx_rate)}
                       </td>
-                      <td className={`px-6 py-4 font-bold ${isRed ? "text-rose-600 dark:text-rose-450" : isYellow ? "text-amber-600 dark:text-amber-450" : "text-pink-600 dark:text-pink-450"}`}>
+                      <td className={`px-6 py-4 font-bold ${isRed ? "text-rose-600 dark:text-rose-400" : isYellow ? "text-amber-600 dark:text-amber-400" : "text-pink-600 dark:text-pink-400"}`}>
                         {formatBps(cust.stats.tx_rate)}
                       </td>
                       <td className="px-6 py-4 w-40">
@@ -485,7 +485,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                 <span className="inline-block bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-1.5">
                   Statistik Real-Time
                 </span>
-                <h3 className="text-lg font-extrabold text-slate-850 dark:text-slate-100">
+                <h3 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">
                   {selectedCust.name}
                 </h3>
                 <p className="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">
@@ -506,7 +506,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
             <div className="p-6 space-y-6">
               {/* Active Badges */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800 dark:border-slate-850 flex items-center gap-3">
+                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                     <ArrowDown size={18} />
                   </div>
@@ -518,7 +518,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
                   </div>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800 dark:border-slate-850 flex items-center gap-3">
+                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-pink-50 dark:bg-pink-950/40 text-pink-600 dark:text-pink-400 flex items-center justify-center shrink-0">
                     <ArrowUp size={18} />
                   </div>
@@ -532,7 +532,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
               </div>
 
               {/* Line Chart */}
-              <div className="h-72 border border-slate-100 dark:border-slate-800 dark:border-slate-850 p-3 rounded-xl bg-slate-50/50 dark:bg-slate-950/30">
+              <div className="h-72 border border-slate-100 dark:border-slate-800 dark:border-slate-800 p-3 rounded-xl bg-slate-50/50 dark:bg-slate-950/30">
                 <Line
                   data={chartData}
                   options={{
@@ -572,7 +572,7 @@ export function TrafficPage({ customers, packages }: TrafficPageProps) {
             </div>
 
             {/* Modal Footer */}
-            <div className="bg-slate-55 dark:bg-slate-950 px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+            <div className="bg-slate-50 dark:bg-slate-950 px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
               <Button
                 type="button"
                 variant="outline"

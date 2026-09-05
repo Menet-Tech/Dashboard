@@ -14,11 +14,11 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary: "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm border border-transparent",
-  secondary: "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-transparent",
+  secondary: "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-transparent dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-100 dark:border-transparent",
   danger: "bg-rose-600 hover:bg-rose-700 text-white shadow-sm border border-transparent",
-  ghost: "bg-transparent hover:bg-slate-100 text-slate-700 border border-transparent",
-  outline: "bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-sm",
-  link: "bg-transparent text-indigo-600 hover:text-indigo-700 hover:underline border-transparent shadow-none p-0 h-auto",
+  ghost: "bg-transparent hover:bg-slate-100 text-slate-700 border border-transparent dark:hover:bg-slate-700 dark:text-slate-200",
+  outline: "bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-sm dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 dark:border-slate-600",
+  link: "bg-transparent text-indigo-600 hover:text-indigo-700 hover:underline border-transparent shadow-none p-0 h-auto dark:text-indigo-400 dark:hover:text-indigo-300",
   success: "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm border border-transparent",
   warning: "bg-amber-500 hover:bg-amber-600 text-white shadow-sm border border-transparent",
 };

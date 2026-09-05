@@ -392,7 +392,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
             )}
 
             {/* Tab switcher */}
-            <div className="flex gap-1 mb-5 border-b border-slate-150">
+            <div className="flex gap-1 mb-5 border-b border-slate-100">
               {(["info", "wan", "wifi", "mikrotik", "params"] as const).map((tab) => (
                 <Button variant="primary"
                   key={tab}
@@ -400,7 +400,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                   onClick={() => setActiveTab(tab)}
                   className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
                     activeTab === tab
-                      ? "border-indigo-600 text-indigo-750"
+                      ? "border-indigo-600 text-indigo-700"
                       : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-705"
                   }`}
                 >
@@ -460,7 +460,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                             detail.customer.status === "active"  ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
                             detail.customer.status === "limit"   ? "bg-rose-50 text-rose-700 border border-rose-200" :
                             detail.customer.status === "pending" ? "bg-amber-50 text-amber-700 border border-amber-200" :
-                            "bg-slate-100 text-slate-650 border border-slate-200 dark:border-slate-800"
+                            "bg-slate-100 text-slate-600 border border-slate-200 dark:border-slate-800"
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${
                               detail.customer.status === "active"  ? "bg-emerald-500" :
@@ -497,7 +497,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                       </div>
                       <div className="sm:col-span-2">
                         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Alamat</span>
-                        <p className="text-slate-600 mt-1 leading-relaxed bg-white dark:bg-slate-900 border border-slate-150 p-2.5 rounded-xl">{detail.customer.address || "Belum ada alamat."}</p>
+                        <p className="text-slate-600 mt-1 leading-relaxed bg-white dark:bg-slate-900 border border-slate-100 p-2.5 rounded-xl">{detail.customer.address || "Belum ada alamat."}</p>
                       </div>
                     </div>
                   ) : (
@@ -550,11 +550,11 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                       </div>
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Last Logged Out</span>
-                        <span className="text-slate-750 block mt-0.5">{detail.mikrotikSecret.last_logged_out || "-"}</span>
+                        <span className="text-slate-700 block mt-0.5">{detail.mikrotikSecret.last_logged_out || "-"}</span>
                       </div>
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Last Disconnect Reason</span>
-                        <span className="text-slate-750 font-medium block mt-0.5">{detail.mikrotikSecret.last_disconnect_reason || "-"}</span>
+                        <span className="text-slate-700 font-medium block mt-0.5">{detail.mikrotikSecret.last_disconnect_reason || "-"}</span>
                       </div>
                     </div>
                   ) : (
@@ -578,7 +578,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Status Sesi PPPoE</span>
                         <span className="mt-1 block">
-                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-250 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1.5 animate-pulse">
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1.5 animate-pulse">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Online / Connected
                           </span>
@@ -721,7 +721,7 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
 
                             {/* LAN Port / SSID Bindings */}
                             {conn.lanBinding?.normalized && (
-                              <div className="bg-white dark:bg-slate-900 dark:bg-slate-950 p-3 rounded-xl border border-slate-150 dark:border-slate-800/60">
+                              <div className="bg-white dark:bg-slate-900 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800/60">
                                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block mb-2">Interface Port Bindings</span>
                                 <div className="flex flex-wrap gap-1.5">
                                   {Object.entries(conn.lanBinding.normalized).map(([key, enabled]) => (
@@ -729,8 +729,8 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                                       key={key} 
                                       className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono font-bold ${
                                         enabled 
-                                          ? "bg-indigo-650 text-indigo-100" 
-                                          : "bg-slate-150 text-slate-400 dark:text-slate-500 dark:bg-slate-850 dark:text-slate-600"
+                                          ? "bg-indigo-600 text-indigo-100" 
+                                          : "bg-slate-100 text-slate-400 dark:text-slate-500 dark:bg-slate-800 dark:text-slate-600"
                                       }`}
                                     >
                                       {key}
@@ -828,14 +828,14 @@ function DeviceDetailModal({ deviceId, onClose, pushSuccess, pushError }: Device
                   </h4>
                   <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-card">
                     <table className="w-full text-left border-collapse text-xs">
-                      <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 border-b border-slate-250 dark:border-slate-850 text-slate-500 dark:text-slate-400">
+                      <thead className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
                         <tr>
                           <th className="px-4 py-2.5 font-semibold">Nama Host (Device)</th>
                           <th className="px-4 py-2.5 font-semibold font-mono">Alamat IP</th>
                           <th className="px-4 py-2.5 font-semibold font-mono">Alamat MAC</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 dark:text-slate-350">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 dark:text-slate-300">
                         {detail.wifiClients && detail.wifiClients.length > 0 ? (
                           detail.wifiClients.map((client, idx) => (
                             <tr key={`${client.mac}-${idx}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
@@ -1155,7 +1155,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
           { label: "Offline", value: offlineCount, color: "text-rose-700", icon: <WifiOff className="text-rose-500 shrink-0" size={20} /> },
           { label: "Tidak Diketahui", value: devices.length - onlineCount - offlineCount, color: "text-slate-500", icon: <HelpCircle className="text-slate-400 dark:text-slate-500 shrink-0" size={20} /> },
         ].map(({ label, value, color, icon }) => (
-          <article key={label} className="bg-white dark:bg-slate-900 border border-slate-150 rounded-card p-5 shadow-sm flex items-center justify-between hover:shadow-md hover:border-slate-200 transition-all duration-300">
+          <article key={label} className="bg-white dark:bg-slate-900 border border-slate-100 rounded-card p-5 shadow-sm flex items-center justify-between hover:shadow-md hover:border-slate-200 transition-all duration-300">
             <div className="space-y-1">
               <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{label}</p>
               <p className={`text-2xl font-black ${color}`}>{loading ? "—" : value}</p>
@@ -1170,7 +1170,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
       {/* Main Card */}
       <article className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card shadow-sm overflow-hidden">
         {/* Tabs & Actions */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-slate-150 bg-slate-50/50">
+        <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-slate-100 bg-slate-50/50">
           <div className="flex gap-1">
             {(["registered", "all", "faults"] as const).map((tab) => (
               <Button variant="primary"
@@ -1179,7 +1179,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                 onClick={() => setActiveTab(tab)}
                 className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
                   activeTab === tab
-                    ? "border-indigo-600 text-indigo-750"
+                    ? "border-indigo-600 text-indigo-700"
                     : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-705"
                 }`}
               >
@@ -1219,9 +1219,9 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                   <p className="animate-pulse font-medium">Sinkronisasi perangkat dengan GenieACS...</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto border border-slate-150 rounded-xl">
+                <div className="overflow-x-auto border border-slate-100 rounded-xl">
                   <table className="compact-table w-full text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-950 text-slate-650 font-semibold border-b border-slate-200 dark:border-slate-800">
+                    <thead className="bg-slate-50 dark:bg-slate-950 text-slate-600 font-semibold border-b border-slate-200 dark:border-slate-800">
                       <tr>
                         {renderSortableHeader("Perangkat", "device")}
                         {renderSortableHeader("Serial Number", "serial")}
@@ -1233,7 +1233,7 @@ export function DevicesPage({ pushSuccess, pushError }: DevicesPageProps) {
                         <th className="px-5 py-3 text-left text-slate-500 dark:text-slate-400 font-semibold">Aksi</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-250 bg-white dark:bg-slate-900">
+                    <tbody className="divide-y divide-slate-200 bg-white dark:bg-slate-900">
                       {sortedDevices.length === 0 ? (
                         <tr>
                           <td colSpan={8} className="px-5 py-12 text-center text-slate-400 dark:text-slate-500 font-medium">

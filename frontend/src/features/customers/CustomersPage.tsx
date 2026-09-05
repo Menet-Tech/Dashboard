@@ -1,5 +1,5 @@
 import { Button } from "../../components/ui/Button";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { Loader2, Plus, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw } from "lucide-react";
 import { StatusPill, EmptyTableRow } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
@@ -89,7 +89,7 @@ type CustomersPageProps = {
   onEndTrial?: (id: number) => void;
 };
 
-export function CustomersPage({
+const CustomersPageComponent = function({
   user,
   packages,
   customers,
@@ -418,11 +418,11 @@ export function CustomersPage({
           <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-semibold">
             {customer.referral_balance > 0 ? `Rp ${customer.referral_balance.toLocaleString("id-ID")}` : "-"}
           </td>
-          <td className="px-4 py-4 text-slate-750 dark:text-slate-300 font-mono text-xs">{customer.referral_code || "-"}</td>
+          <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-mono text-xs">{customer.referral_code || "-"}</td>
           <td className="px-4 py-4 text-slate-600 dark:text-slate-400 font-semibold">{customer.referred_by_name || "-"}</td>
           <td className="px-4 py-4 text-center">
             <select
-              className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-slate-750 dark:text-slate-200 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
               value={customer.status}
               onChange={(e) => onStatusChange(customer.id, e.target.value as CustomerItem["status"])}
             >
@@ -565,7 +565,7 @@ export function CustomersPage({
               <input
                 type="text"
                 placeholder="Cari nama, pppoe, alamat..."
-                className="bg-transparent border-0 text-xs font-semibold text-slate-750 dark:text-slate-200 focus:outline-none focus:ring-0 w-full py-0 pl-1 pr-1"
+                className="bg-transparent border-0 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 w-full py-0 pl-1 pr-1"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -573,7 +573,7 @@ export function CustomersPage({
             <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl px-3 py-2 shadow-sm font-sans">
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Filter Role</span>
               <select
-                className="bg-transparent border-0 text-xs font-semibold text-slate-750 dark:text-slate-200 focus:outline-none focus:ring-0 cursor-pointer py-0 pl-1 pr-6"
+                className="bg-transparent border-0 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 cursor-pointer py-0 pl-1 pr-6"
                 value={customerLifecycleFilter}
                 onChange={(e) => onFilterChange(e.target.value as CustomerLifecycleFilter)}
                 aria-label="Filter role billing pelanggan"
@@ -746,7 +746,7 @@ export function CustomersPage({
         >
           <div className="space-y-4">
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilih Aksi Perubahan</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Pilih Aksi Perubahan</span>
               <select
                 className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 value={bulkActionType}
@@ -765,7 +765,7 @@ export function CustomersPage({
 
             {bulkActionType === "status" && (
               <div className="flex flex-col gap-2.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilih Status Baru</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Pilih Status Baru</span>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {(["active", "limit", "pending", "suspended", "inactive", "wifi_umum"] as const).map((st) => (
                     <Button variant="outline"
@@ -797,7 +797,7 @@ export function CustomersPage({
 
             {bulkActionType === "package" && (
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilih Paket Internet Baru</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Pilih Paket Internet Baru</span>
                 <input
                   type="text"
                   placeholder="Cari paket..."
@@ -805,7 +805,7 @@ export function CustomersPage({
                   value={bulkSearchQuery}
                   onChange={(e) => setBulkSearchQuery(e.target.value)}
                 />
-                <div className="border border-slate-150 dark:border-slate-800 rounded-xl max-h-48 overflow-y-auto p-1.5 space-y-1 bg-slate-50/50 dark:bg-slate-950/30">
+                <div className="border border-slate-100 dark:border-slate-800 rounded-xl max-h-48 overflow-y-auto p-1.5 space-y-1 bg-slate-50/50 dark:bg-slate-950/30">
                   {packages
                     .filter((pkg) => pkg.name.toLowerCase().includes(bulkSearchQuery.toLowerCase()))
                     .map((pkg) => (
@@ -831,7 +831,7 @@ export function CustomersPage({
 
             {bulkActionType === "odp" && (
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilih ODP Baru</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Pilih ODP Baru</span>
                 <input
                   type="text"
                   placeholder="Cari ODP..."
@@ -839,7 +839,7 @@ export function CustomersPage({
                   value={bulkSearchQuery}
                   onChange={(e) => setBulkSearchQuery(e.target.value)}
                 />
-                <div className="border border-slate-150 dark:border-slate-800 rounded-xl max-h-48 overflow-y-auto p-1.5 space-y-1 bg-slate-50/50 dark:bg-slate-950/30">
+                <div className="border border-slate-100 dark:border-slate-800 rounded-xl max-h-48 overflow-y-auto p-1.5 space-y-1 bg-slate-50/50 dark:bg-slate-950/30">
                   <Button variant="outline" type="button"
                     onClick={() => setSelectedOdpId(-1)}
                     className={`w-full text-left py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -873,7 +873,7 @@ export function CustomersPage({
 
             {bulkActionType === "referral" && (
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilih Pemberi Referral Baru</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Pilih Pemberi Referral Baru</span>
                 <input
                   type="text"
                   placeholder="Cari pelanggan..."
@@ -881,7 +881,7 @@ export function CustomersPage({
                   value={bulkSearchQuery}
                   onChange={(e) => setBulkSearchQuery(e.target.value)}
                 />
-                <div className="border border-slate-150 dark:border-slate-800 rounded-xl max-h-48 overflow-y-auto p-1.5 space-y-1 bg-slate-50/50 dark:bg-slate-950/30">
+                <div className="border border-slate-100 dark:border-slate-800 rounded-xl max-h-48 overflow-y-auto p-1.5 space-y-1 bg-slate-50/50 dark:bg-slate-950/30">
                   <Button variant="outline" type="button"
                     onClick={() => setSelectedReferredById(-1)}
                     className={`w-full text-left py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -932,4 +932,19 @@ export function CustomersPage({
       )}
     </section>
   );
-}
+};
+
+export const CustomersPage = memo(CustomersPageComponent, (prev, next) => {
+  return (
+    prev.customers === next.customers &&
+    prev.filteredCustomers === next.filteredCustomers &&
+    prev.customerForm === next.customerForm &&
+    prev.customerErrors === next.customerErrors &&
+    prev.editingCustomerId === next.editingCustomerId &&
+    prev.customerLifecycleFilter === next.customerLifecycleFilter &&
+    prev.customerLifecycleMap === next.customerLifecycleMap &&
+    prev.submitting === next.submitting &&
+    prev.busyAction === next.busyAction &&
+    prev.isFormOpen === next.isFormOpen
+  );
+});

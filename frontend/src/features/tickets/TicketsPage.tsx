@@ -437,7 +437,7 @@ export function TicketsPage({
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
               </svg>
             </div>
-            <h3 className="font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350 mb-1">Pilih Tiket Keluhan</h3>
+            <h3 className="font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300 mb-1">Pilih Tiket Keluhan</h3>
             <p className="text-xs text-slate-400 dark:text-slate-500 max-w-xs leading-relaxed">
               Klik salah satu tiket keluhan di samping kiri untuk melihat detail percakapan dan membalas via WhatsApp.
             </p>
@@ -556,7 +556,7 @@ export function TicketsPage({
                   </div>
                 )}
                 {detail.status === "closed" ? (
-                  <div className="p-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/20 text-slate-550 rounded-xl text-center text-xs font-medium border border-dashed border-slate-200 dark:border-slate-800">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/20 text-slate-500 rounded-xl text-center text-xs font-medium border border-dashed border-slate-200 dark:border-slate-800">
                     Tiket telah ditutup. Tanggapan baru tidak dapat dikirim ke tiket ini.
                   </div>
                 ) : (
@@ -583,7 +583,7 @@ export function TicketsPage({
                           href={`https://wa.me/${detail.no_hp.replace(/@(c\.us|s\.whatsapp\.net)/, "").replace("@lid", "").replace(/[+\-\s]/g, "").replace(/^0/, "62")}?text=${encodeURIComponent(replyText)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border border-emerald-250 dark:border-emerald-900/30 font-semibold py-2 px-3.5 rounded-l-xl text-xs shadow-sm transition-colors flex items-center justify-center cursor-pointer gap-1.5"
+                          className="bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30 font-semibold py-2 px-3.5 rounded-l-xl text-xs shadow-sm transition-colors flex items-center justify-center cursor-pointer gap-1.5"
                           title="Buka WhatsApp langsung"
                         >
                           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -626,7 +626,7 @@ export function TicketsPage({
               <div className="w-full lg:w-72 bg-slate-50/50 dark:bg-slate-950/30 flex flex-col h-full overflow-y-auto p-4 gap-4 border-t lg:border-t-0 border-slate-100 dark:border-slate-800 scrollbar-thin">
                 {/* Profile Card */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm">
-                  <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1 border-b border-slate-100 dark:border-slate-800 dark:border-slate-850 pb-1.5">
+                  <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1 border-b border-slate-100 dark:border-slate-800 dark:border-slate-800 pb-1.5">
                     <UserIcon size={11} className="text-slate-400 dark:text-slate-500" />
                     Detail Pelanggan
                   </h4>
@@ -638,15 +638,15 @@ export function TicketsPage({
                   ) : linkedCustomer ? (
                     <div className="space-y-3.5 text-xs">
                       <div>
-                        <span className="text-[9px] text-slate-450 font-bold uppercase block tracking-wide">NAMA</span>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase block tracking-wide">NAMA</span>
                         <strong className="text-slate-800 dark:text-slate-100 dark:text-slate-200 font-bold block mt-0.5">{linkedCustomer.name}</strong>
                       </div>
                       <div>
-                        <span className="text-[9px] text-slate-450 font-bold uppercase block tracking-wide">PPPoE USERNAME</span>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase block tracking-wide">PPPoE USERNAME</span>
                         <code className="text-slate-700 dark:text-slate-300 font-mono text-[10px] font-semibold block mt-0.5 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded w-max">{linkedCustomer.user_pppoe || "—"}</code>
                       </div>
                       <div>
-                        <span className="text-[9px] text-slate-450 font-bold uppercase block tracking-wide">STATUS AKUN</span>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase block tracking-wide">STATUS AKUN</span>
                         <span className="mt-1 block">
                           <StatusPill
                             label={
@@ -669,12 +669,12 @@ export function TicketsPage({
                         </span>
                       </div>
                       <div>
-                        <span className="text-[9px] text-slate-450 font-bold uppercase block tracking-wide">NOMOR WA</span>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase block tracking-wide">NOMOR WA</span>
                         <span className="text-slate-700 dark:text-slate-300 block mt-0.5">{linkedCustomer.whatsapp}</span>
                       </div>
                       <div>
-                        <span className="text-[9px] text-slate-450 font-bold uppercase block tracking-wide">ALAMAT</span>
-                        <span className="text-slate-650 dark:text-slate-400 block mt-0.5 leading-relaxed">{linkedCustomer.address || "—"}</span>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase block tracking-wide">ALAMAT</span>
+                        <span className="text-slate-600 dark:text-slate-400 block mt-0.5 leading-relaxed">{linkedCustomer.address || "—"}</span>
                       </div>
                     </div>
                   ) : (
@@ -732,11 +732,11 @@ export function TicketsPage({
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-400 dark:text-slate-500">Model</span>
-                            <span className="font-medium text-slate-850 dark:text-slate-200">{ontStatus.model}</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">{ontStatus.model}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-400 dark:text-slate-500">IP ONT</span>
-                            <code className="font-mono text-slate-700 dark:text-slate-300 dark:text-slate-350">{ontStatus.ip_address}</code>
+                            <code className="font-mono text-slate-700 dark:text-slate-300 dark:text-slate-300">{ontStatus.ip_address}</code>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-slate-400 dark:text-slate-500">Rx Power</span>
@@ -771,7 +771,7 @@ export function TicketsPage({
                                 onClick={handleFactoryResetOnt}
                                 disabled={resettingOnt || loadingOnt}
                                 isLoading={resettingOnt}
-                                className="w-full bg-slate-750 hover:bg-slate-800 text-white hover:text-white dark:bg-slate-700 !px-1 !py-1 !text-[9px]"
+                                className="w-full bg-slate-700 hover:bg-slate-800 text-white hover:text-white dark:bg-slate-700 !px-1 !py-1 !text-[9px]"
                               >
                                 Factory
                               </Button>
@@ -800,13 +800,13 @@ export function TicketsPage({
             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-950/20">
               <div>
                 <h3 className="text-xs font-bold text-slate-900 dark:text-slate-50 dark:text-white uppercase tracking-wider font-sans">Tambah Tiket Baru</h3>
-                <p className="text-[10px] text-slate-450 mt-0.5">Laporkan kendala support baru secara manual.</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Laporkan kendala support baru secara manual.</p>
               </div>
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="!p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-350"
+                className="!p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
               >
                 <X size={16} />
               </Button>
@@ -815,7 +815,7 @@ export function TicketsPage({
             {/* Content Form */}
             <form onSubmit={handleCreateTicketSubmit} className="p-5 flex flex-col gap-3.5">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Hubungkan ke Pelanggan</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Hubungkan ke Pelanggan</span>
                 <select
                   className="w-full text-xs px-3 py-2.5 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-800 text-slate-800 dark:text-slate-100 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500"
                   value={selectedCustomerIdForTicket || ""}
@@ -839,7 +839,7 @@ export function TicketsPage({
 
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Nama Pelapor</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Nama Pelapor</span>
                   <input
                     type="text"
                     required
@@ -851,7 +851,7 @@ export function TicketsPage({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">No WhatsApp</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">No WhatsApp</span>
                   <input
                     type="text"
                     required
@@ -865,7 +865,7 @@ export function TicketsPage({
               </div>
 
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Alamat Lengkap</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Alamat Lengkap</span>
                 <input
                   type="text"
                   className="w-full text-xs px-3 py-2 border rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-800 text-slate-800 dark:text-slate-100 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
@@ -877,7 +877,7 @@ export function TicketsPage({
               </label>
 
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Detail Kendala</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Detail Kendala</span>
                 <textarea
                   required
                   rows={3}

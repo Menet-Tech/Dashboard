@@ -524,15 +524,15 @@ export function RegistrationPage({
                         </div>
                         <div className="text-xs text-indigo-600 dark:text-indigo-400 font-mono">+{lead.phone}</div>
                       </td>
-                      <td className="px-6 py-4 text-slate-700 dark:text-slate-300 dark:text-slate-350 max-w-[200px] break-words">
+                      <td className="px-6 py-4 text-slate-700 dark:text-slate-300 dark:text-slate-300 max-w-[200px] break-words">
                         {d.alamat || d.address || "-"}
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 dark:text-slate-200">
-                          SSID: <span className="font-mono bg-slate-100 dark:bg-slate-850 px-1 rounded">{d.ssid || d.wifi || "-"}</span>
+                          SSID: <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">{d.ssid || d.wifi || "-"}</span>
                         </div>
                         <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          Pass: <span className="font-mono bg-slate-100 dark:bg-slate-850 px-1 rounded">{d.password || d.wifi_password || "-"}</span>
+                          Pass: <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">{d.password || d.wifi_password || "-"}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -654,7 +654,7 @@ export function RegistrationPage({
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Informasi Utama</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Nama Lengkap *</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Nama Lengkap *</span>
                   <input
                     type="text"
                     className={inputClassName(formErrors.nama)}
@@ -696,7 +696,7 @@ export function RegistrationPage({
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Paket & Akun PPPoE</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1 col-span-full">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Pilihan Paket Internet</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Pilihan Paket Internet</span>
                   <select
                     className={inputClassName()}
                     value={manualForm.paket}
@@ -712,7 +712,7 @@ export function RegistrationPage({
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">User PPPoE (Otomatis)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">User PPPoE (Otomatis)</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -723,7 +723,7 @@ export function RegistrationPage({
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Password PPPoE (Otomatis)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Password PPPoE (Otomatis)</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -786,7 +786,7 @@ export function RegistrationPage({
 
                 {manualForm.odp_id && (
                   <label className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Port ODP</span>
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Port ODP</span>
                     <select
                       className={inputClassName()}
                       value={manualForm.odp_port}
@@ -816,7 +816,7 @@ export function RegistrationPage({
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">SSID WiFi & Referral</h4>
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">SSID WiFi (Opsional)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">SSID WiFi (Opsional)</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -827,7 +827,7 @@ export function RegistrationPage({
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">WiFi Password (Opsional)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">WiFi Password (Opsional)</span>
                   <input
                     type="text"
                     className={inputClassName()}

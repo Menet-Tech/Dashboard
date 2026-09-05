@@ -231,9 +231,9 @@ export function CustomerDetailModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-card max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-slate-150 animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-white dark:bg-slate-900 rounded-card max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-150 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
           <div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50">Detail Pelanggan</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -244,7 +244,7 @@ export function CustomerDetailModal({
             type="button"
             variant="ghost"
             size="icon"
-            className="text-slate-400 dark:text-slate-500 hover:text-slate-650"
+            className="text-slate-400 dark:text-slate-500 hover:text-slate-600"
             onClick={onClose}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -257,12 +257,12 @@ export function CustomerDetailModal({
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
           {customer.is_trial && (
-            <div className="bg-amber-50 border border-amber-250 dark:bg-slate-900/60 dark:border-amber-500/30 rounded-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="bg-amber-50 border border-amber-200 dark:bg-slate-900/60 dark:border-amber-500/30 rounded-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-250 dark:border-amber-500/20">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20">
                   Masa Trial Aktif
                 </span>
-                <p className="text-xs text-amber-900 dark:text-amber-250 mt-1.5 leading-relaxed">
+                <p className="text-xs text-amber-900 dark:text-amber-200 mt-1.5 leading-relaxed">
                   Pelanggan ini sedang dalam masa trial. Masa trial dimulai pada{" "}
                   <strong className="font-semibold text-amber-950 dark:text-amber-100">
                     {customer.trial_started_at ? new Date(customer.trial_started_at).toLocaleDateString("id-ID", {
@@ -288,7 +288,7 @@ export function CustomerDetailModal({
           )}
 
           {/* Profile Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50 dark:bg-slate-950 p-5 rounded-card border border-slate-150">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50 dark:bg-slate-950 p-5 rounded-card border border-slate-100">
             <div>
               <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Nama Lengkap</span>
               <strong className="text-slate-800 dark:text-slate-100 text-sm mt-0.5 block">{customer.name}</strong>
@@ -332,7 +332,7 @@ export function CustomerDetailModal({
             </div>
             <div>
               <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Nomor WhatsApp</span>
-              <span className="text-slate-750 text-sm mt-0.5 block font-semibold">
+              <span className="text-slate-700 text-sm mt-0.5 block font-semibold">
                 {customer.whatsapp ? (
                   <a
                     href={`https://wa.me/+${customer.whatsapp.replace(/[+\-\s]/g, "").replace(/^0/, "62")}`}
@@ -371,7 +371,7 @@ export function CustomerDetailModal({
             </div>
             <div className="lg:col-span-3">
               <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Alamat Pemasangan</span>
-              <p className="text-slate-700 dark:text-slate-300 text-xs mt-1 leading-relaxed bg-white dark:bg-slate-900 border border-slate-150 p-3 rounded-xl">
+              <p className="text-slate-700 dark:text-slate-300 text-xs mt-1 leading-relaxed bg-white dark:bg-slate-900 border border-slate-100 p-3 rounded-xl">
                 {customer.address || "Belum ada informasi alamat."}
               </p>
             </div>
@@ -529,7 +529,7 @@ export function CustomerDetailModal({
                       </div>
                       <div className="col-span-2">
                         <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 block">Last Inform / Connect</span>
-                        <span className="text-slate-650 text-xs mt-0.5 block">
+                        <span className="text-slate-600 text-xs mt-0.5 block">
                           {ontStatus.last_inform_time ? new Date(ontStatus.last_inform_time).toLocaleString("id-ID") : "-"}
                         </span>
                       </div>
@@ -585,7 +585,7 @@ export function CustomerDetailModal({
                           <div className="grid grid-cols-2 gap-2 text-[11px]">
                             <div>
                               <span className="text-[9px] text-slate-400 dark:text-slate-500 block font-sans uppercase font-bold">Status Koneksi</span>
-                              <span className="inline-flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 border border-emerald-250 px-2 py-0.5 rounded-full mt-0.5 animate-pulse">
+                              <span className="inline-flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full mt-0.5 animate-pulse">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                 Connected
                               </span>
@@ -643,7 +643,7 @@ export function CustomerDetailModal({
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* PPPoE Cache Card */}
-              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-150 space-y-2 shadow-sm">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 space-y-2 shadow-sm">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-slate-700 dark:text-slate-300">PPPoE Status</span>
                   {customer.pppoe_status ? (
@@ -695,7 +695,7 @@ export function CustomerDetailModal({
               </div>
 
               {/* GPON ONT Cache Card */}
-              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-150 space-y-2 shadow-sm">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 space-y-2 shadow-sm">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-slate-700 dark:text-slate-300">GPON ONT Status</span>
                   {customer.ont_status ? (
@@ -741,19 +741,19 @@ export function CustomerDetailModal({
               </span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-150">
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100">
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase">Saldo Referral (Tarik Tunai)</span>
                 <strong className="text-base font-extrabold text-indigo-600 block mt-1">
                   {formatCurrency(customer.referral_balance)}
                 </strong>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-150">
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100">
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase">Voucher Diskon (Auto Billing)</span>
                 <strong className="text-base font-extrabold text-emerald-600 block mt-1">
                   {formatCurrency(customer.voucher_discount || 0)}
                 </strong>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-150">
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100">
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase">Diajak Oleh</span>
                 <strong className="text-slate-800 dark:text-slate-100 font-bold block mt-1.5 truncate">
                   {customer.referred_by_name || "-"}
@@ -797,7 +797,7 @@ export function CustomerDetailModal({
             ) : (
               <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
                 <table className="compact-table w-full text-xs">
-                  <thead className="bg-slate-100 text-slate-650 font-semibold border-b border-slate-200 dark:border-slate-800">
+                  <thead className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200 dark:border-slate-800">
                     <tr>
                       <th className="px-4 py-2 text-left">Invoice</th>
                       <th className="px-4 py-2 text-left">Periode</th>

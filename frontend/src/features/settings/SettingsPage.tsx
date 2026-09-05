@@ -1675,7 +1675,7 @@ export function SettingsPage({
 
                         {loadingRouters ? (
                           <div className="flex justify-center py-12">
-                            <Loader2 className="animate-spin text-indigo-650" />
+                            <Loader2 className="animate-spin text-indigo-600" />
                           </div>
                         ) : routers.length === 0 ? (
                           <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-card">
@@ -1686,7 +1686,7 @@ export function SettingsPage({
                             {routers.map((router) => (
                               <div
                                 key={router.id}
-                                className="border border-slate-200 dark:border-slate-800 dark:border-slate-850 rounded-card p-5 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between hover:border-slate-350 dark:hover:border-slate-755 transition-colors"
+                                className="border border-slate-200 dark:border-slate-800 dark:border-slate-800 rounded-card p-5 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-755 transition-colors"
                               >
                                 <div className="flex items-start justify-between gap-4">
                                   <div>
@@ -1821,7 +1821,7 @@ export function SettingsPage({
                     </article>
 
                     {/* Right: Add/Edit Account Router Form */}
-                    <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/40 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 dark:border-slate-850 h-fit space-y-4">
+                    <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/40 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 dark:border-slate-800 h-fit space-y-4">
                       <h3 className="text-xs font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100 uppercase tracking-wider">
                         {editingRouterId ? "Edit Akun Router" : "Tambah Router Baru"}
                       </h3>
@@ -1924,7 +1924,7 @@ export function SettingsPage({
                                     password: newRouterPass,
                                   })}
                                   disabled={fetchingInterfaces || !newRouterHost || !newRouterUser}
-                                  className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 p-2 rounded-xl text-slate-650 dark:text-slate-300 disabled:opacity-50 flex items-center justify-center cursor-pointer"
+                                  className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-800 p-2 rounded-xl text-slate-600 dark:text-slate-300 disabled:opacity-50 flex items-center justify-center cursor-pointer"
                                   title="Ambil Port dari Router"
                                 >
                                   <RefreshCw size={14} className={fetchingInterfaces ? "animate-spin" : ""} />
@@ -2122,7 +2122,7 @@ export function SettingsPage({
 
                             {showSetupForm ? (
                               <div className="mt-4 p-5 bg-white dark:bg-slate-900 rounded-card border border-slate-200 dark:border-slate-800 space-y-6 text-slate-800 dark:text-slate-100">
-                                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350 uppercase tracking-wider">Konfigurasi Setup Profile & Pool</h4>
+                                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300 uppercase tracking-wider">Konfigurasi Setup Profile & Pool</h4>
                                 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                   {/* Isolir Profile Setup */}
@@ -2184,7 +2184,7 @@ export function SettingsPage({
                                     </div>
 
                                     {setupIsolirPoolMode === "new" ? (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-800">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-xl border border-slate-100 dark:border-slate-800">
                                         <label className="block">
                                           <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block mb-1">Nama IP Pool</span>
                                           <input
@@ -2282,7 +2282,7 @@ export function SettingsPage({
                                     </div>
 
                                     {setupInactivePoolMode === "new" ? (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-800">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-950 dark:bg-slate-950/40 rounded-xl border border-slate-100 dark:border-slate-800">
                                         <label className="block">
                                           <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block mb-1">Nama IP Pool</span>
                                           <input
@@ -2425,7 +2425,7 @@ export function SettingsPage({
                       </div>
 
                       {syncError && (
-                        <div className="flex items-start gap-2 bg-rose-50 dark:bg-rose-955/20 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-450 text-xs rounded-xl px-4 py-3">
+                        <div className="flex items-start gap-2 bg-rose-50 dark:bg-rose-955/20 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 text-xs rounded-xl px-4 py-3">
                           <AlertCircle size={14} className="shrink-0 mt-0.5" />
                           <span>{syncError}</span>
                         </div>
@@ -2478,7 +2478,7 @@ export function SettingsPage({
                                   max={31}
                                   value={importDueDay}
                                   onChange={(e) => setImportDueDay(Number(e.target.value))}
-                                  className="w-16 text-center text-xs border border-slate-300 dark:border-slate-850 bg-white dark:bg-slate-900 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-50 dark:text-slate-100 font-mono"
+                                  className="w-16 text-center text-xs border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-50 dark:text-slate-100 font-mono"
                                 />
                               </div>
                               <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-2">
@@ -2511,7 +2511,7 @@ export function SettingsPage({
                                 {importResults.map((r) => (
                                   <div key={r.name} className={`flex items-center gap-2 text-xs rounded-lg px-3 py-1.5 ${r.status === "imported" ? "bg-emerald-50 dark:bg-emerald-955/20 text-emerald-700 dark:text-emerald-455" :
                                     r.status === "error" ? "bg-rose-50 dark:bg-rose-955/20 text-rose-700 dark:text-rose-455" :
-                                      "bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 dark:text-slate-450"
+                                      "bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 dark:text-slate-400"
                                     }`}>
                                     {r.status === "imported" ? <CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> : <AlertCircle size={12} className="text-rose-500 shrink-0" />}
                                     <span className="font-semibold truncate">{r.name}</span>
@@ -2837,7 +2837,7 @@ export function SettingsPage({
                         </div>
                         {smtpResult && (
                           <div className={`flex items-start gap-2 border text-xs rounded-xl px-4 py-3 ${smtpResult.success
-                            ? "bg-emerald-50 dark:bg-emerald-955/20 border-emerald-250 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-455"
+                            ? "bg-emerald-50 dark:bg-emerald-955/20 border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-455"
                             : "bg-rose-50 dark:bg-rose-955/20 border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-455"
                             }`}>
                             <AlertCircle size={14} className="shrink-0 mt-0.5" />
@@ -2958,7 +2958,7 @@ export function SettingsPage({
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Uji server GenieACS.</span>
                         <div className="flex items-center gap-2">
                           {acsResult && (
-                            <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${acsResult.success ? "bg-emerald-50 text-emerald-700 border-emerald-250 dark:bg-emerald-950/20 dark:text-emerald-455 dark:border-emerald-900/60" : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-955/20 dark:text-rose-455 dark:border-rose-900/60"
+                            <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${acsResult.success ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-455 dark:border-emerald-900/60" : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-955/20 dark:text-rose-455 dark:border-rose-900/60"
                               }`}>
                               {acsResult.success ? "Sukses" : "Gagal"}
                             </span>
@@ -3156,7 +3156,7 @@ export function SettingsPage({
                           </label>
 
                           <div className="col-span-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 dark:border-slate-800/80 rounded-card p-4 text-xs space-y-2">
-                            <p className="font-bold text-slate-850 dark:text-slate-200">How RX Power Thresholds Work:</p>
+                            <p className="font-bold text-slate-800 dark:text-slate-200">How RX Power Thresholds Work:</p>
                             <ul className="list-disc pl-4 space-y-1 text-slate-500 dark:text-slate-400">
                               <li><span className="text-emerald-600 font-semibold">Excellent (Green):</span> Signal &gt;= {settingsForm.gacs_rx_power_excellent || "-21"} dBm</li>
                               <li><span className="text-amber-600 font-semibold">Fair (Yellow):</span> {settingsForm.gacs_rx_power_excellent || "-21"} dBm &gt; Signal &gt;= {settingsForm.gacs_rx_power_fair || "-25"} dBm</li>
@@ -3333,7 +3333,7 @@ export function SettingsPage({
 
                         {loadingVendors ? (
                           <div className="flex justify-center py-12">
-                            <Loader2 className="animate-spin text-indigo-650" />
+                            <Loader2 className="animate-spin text-indigo-600" />
                           </div>
                         ) : vendors.length === 0 ? (
                           <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-card">
@@ -3362,11 +3362,11 @@ export function SettingsPage({
                                         </div>
                                         <div>
                                           <p className="font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">{vendor.name}</p>
-                                          <p className="text-[10px] text-slate-450 mt-0.5 truncate max-w-[200px]" title={vendor.description}>{vendor.description}</p>
+                                          <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[200px]" title={vendor.description}>{vendor.description}</p>
                                         </div>
                                       </div>
                                     </td>
-                                    <td className="py-3 px-4 space-y-1 text-[10px] text-slate-650 dark:text-slate-400">
+                                    <td className="py-3 px-4 space-y-1 text-[10px] text-slate-600 dark:text-slate-400">
                                       <p><strong className="text-slate-500 dark:text-slate-400">Prefix:</strong> {vendor.parameter_prefix}</p>
                                       {vendor.service_list_path && <p><strong className="text-slate-500 dark:text-slate-400">Svc List:</strong> {vendor.service_list_path}</p>}
                                       {vendor.lan_binding_path && <p><strong className="text-slate-500 dark:text-slate-400">LAN Interf:</strong> {vendor.lan_binding_path}</p>}
@@ -3452,7 +3452,7 @@ export function SettingsPage({
 
                         {loadingWifi ? (
                           <div className="flex justify-center py-12">
-                            <Loader2 className="animate-spin text-indigo-650" />
+                            <Loader2 className="animate-spin text-indigo-600" />
                           </div>
                         ) : wifiConfigs.length === 0 ? (
                           <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-card">
@@ -3478,7 +3478,7 @@ export function SettingsPage({
                                     <td className="py-3 px-4 space-y-1 text-[10px]">
                                       <p><strong className="text-slate-500 dark:text-slate-400">Path:</strong> <code className="bg-slate-100 dark:bg-slate-800/80 px-1 py-0.5 rounded font-mono">{item.password_param_path}</code></p>
                                     </td>
-                                    <td className="py-3 px-4 text-slate-700 dark:text-slate-300 dark:text-slate-350">
+                                    <td className="py-3 px-4 text-slate-700 dark:text-slate-300 dark:text-slate-300">
                                       <div className="flex flex-wrap gap-1">
                                         {item.security_types.map((type) => (
                                           <span key={type} className="inline-flex text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
@@ -3895,7 +3895,7 @@ export function SettingsPage({
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 Apakah Anda yakin ingin menghapus vendor <strong>{deletingVendorItem.name}</strong>?
               </p>
-              <p className="text-xs text-slate-450 mt-2 leading-relaxed">
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
                 Tindakan ini tidak dapat dibatalkan. Pengaturan pencocokan parameter ONT untuk prefix <strong>{deletingVendorItem.parameter_prefix}</strong> akan dihapus secara permanen.
               </p>
             </div>
@@ -4035,7 +4035,7 @@ export function SettingsPage({
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 Apakah Anda yakin ingin menghapus konfigurasi WiFi untuk <strong>{deletingWifiItem.product_class}</strong>?
               </p>
-              <p className="text-xs text-slate-450 mt-2 leading-relaxed">
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
                 Tindakan ini tidak dapat dibatalkan. Pengaturan path password untuk tipe ONT ini akan dihapus secara permanen.
               </p>
             </div>
@@ -4082,7 +4082,7 @@ export function SettingsPage({
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 Apakah Anda yakin ingin menghapus router <strong>{deletingRouter.name}</strong>?
               </p>
-              <p className="text-xs text-slate-450 mt-2 leading-relaxed">
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
                 Tindakan ini tidak dapat dibatalkan. Koneksi ke router <strong>{deletingRouter.host}</strong> akan dihentikan dan sinkronisasi secret tidak akan berjalan untuk router ini.
               </p>
             </div>

@@ -1,5 +1,5 @@
 import { Button } from "../../components/ui/Button";
-import { Fragment, useState, useMemo, useEffect, type FormEvent } from "react";
+import { Fragment, useState, useMemo, useEffect, type FormEvent, memo } from "react";
 import { ChevronUp, ChevronDown, ArrowUpDown, MoreVertical, MessageSquare, History, Clock, RotateCcw, Upload } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
 import { formatCurrency } from "../../utils/format";
@@ -48,7 +48,7 @@ type BillsPageProps = {
   askForConfirmation?: (config: ConfirmDialogState) => void;
 };
 
-export function BillsPage({
+const BillsPageComponent = function({
   user,
   bills,
   billPeriod,
@@ -147,12 +147,12 @@ export function BillsPage({
           <span>{label}</span>
           {isSorted ? (
             sortDirection === "asc" ? (
-              <ChevronUp size={12} className="text-indigo-650 dark:text-indigo-400 stroke-[3]" aria-hidden="true" />
+              <ChevronUp size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" aria-hidden="true" />
             ) : (
-              <ChevronDown size={12} className="text-indigo-650 dark:text-indigo-400 stroke-[3]" aria-hidden="true" />
+              <ChevronDown size={12} className="text-indigo-600 dark:text-indigo-400 stroke-[3]" aria-hidden="true" />
             )
           ) : (
-            <ArrowUpDown size={12} className="text-slate-350 dark:text-slate-600 opacity-50 transition-opacity" aria-hidden="true" />
+            <ArrowUpDown size={12} className="text-slate-300 dark:text-slate-600 opacity-50 transition-opacity" aria-hidden="true" />
           )}
         </div>
       </th>
@@ -183,7 +183,7 @@ export function BillsPage({
           </div>
           <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={onGenerateBills}>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold text-slate-650 dark:text-slate-400">Periode (YYYY-MM)</span>
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Periode (YYYY-MM)</span>
               <input
                 type="month"
                 className={inputClassName(billErrors.period)}
@@ -217,13 +217,13 @@ export function BillsPage({
           <div className="flex flex-wrap items-center gap-3">
             <input
               type="text"
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 text-xs rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors w-64"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 text-xs rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors w-64"
               placeholder="Cari Invoice atau Pelanggan..."
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
             />
             <select
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer"
               value={status}
               onChange={(e) => onStatusChange(e.target.value)}
             >
@@ -236,7 +236,7 @@ export function BillsPage({
             <div className="relative flex items-center">
               <input
                 type="month"
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-750 text-xs rounded-xl pl-3 pr-8 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer w-40"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 text-xs rounded-xl pl-3 pr-8 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer w-40"
                 value={filterPeriod}
                 onChange={(e) => onFilterPeriodChange(e.target.value)}
                 onClick={(e) => {
@@ -246,7 +246,7 @@ export function BillsPage({
               {filterPeriod && (
                 <Button variant="outline" type="button"
                   onClick={() => onFilterPeriodChange("")}
-                  className="absolute right-2.5 text-slate-400 dark:text-slate-500 hover:text-slate-650 p-1 flex items-center justify-center transition-colors cursor-pointer"
+                  className="absolute right-2.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 p-1 flex items-center justify-center transition-colors cursor-pointer"
                   title="Bersihkan Filter Bulan"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -467,7 +467,7 @@ export function BillsPage({
                         <td className="px-6 py-4 text-gray-700 dark:text-slate-300" colSpan={8}>
                           <div className="expanded-content p-5 bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/40 rounded-card border border-slate-100 dark:border-slate-800 dark:border-slate-900/60 shadow-inner">
                             <div className="flex items-center justify-between mb-3">
-                              <h4 className="font-bold text-xs text-slate-850 dark:text-slate-200 tracking-wide uppercase">Riwayat Notifikasi</h4>
+                              <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200 tracking-wide uppercase">Riwayat Notifikasi</h4>
                               {notificationLogs[bill.id]?.length ? (
                                 <span className="text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold px-2 py-0.5 rounded-full">
                                   {notificationLogs[bill.id].length} terkirim
@@ -495,11 +495,11 @@ export function BillsPage({
                                         </td>
                                         <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 font-medium">{log.sent_to}</td>
                                         <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 font-semibold">
-                                          <span className="bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-400 px-1.5 py-0.5 rounded text-[10px]">
+                                          <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded text-[10px]">
                                             {log.trigger_key}
                                           </span>
                                         </td>
-                                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 dark:text-slate-350">
+                                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 dark:text-slate-300">
                                           <StatusPill
                                             label={log.status.toUpperCase()}
                                             tone={log.status === "sent" ? "green" : log.status === "queued" ? "slate" : "red"}
@@ -546,7 +546,7 @@ export function BillsPage({
                                               type="button"
                                               variant="outline"
                                               size="sm"
-                                              className="bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 text-slate-650 dark:text-slate-400"
+                                              className="bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:bg-slate-900/40 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400"
                                               title="Salin link wa.me ke clipboard"
                                               onClick={async () => {
                                                 const cleanPhone = log.sent_to.replace(/[^0-9]/g, "");
@@ -686,4 +686,23 @@ export function BillsPage({
       )}
     </section>
   );
-}
+};
+
+export const BillsPage = memo(BillsPageComponent, (prev, next) => {
+  return (
+    prev.bills === next.bills &&
+    prev.billPeriod === next.billPeriod &&
+    prev.filterPeriod === next.filterPeriod &&
+    prev.billErrors === next.billErrors &&
+    prev.submitting === next.submitting &&
+    prev.busyAction === next.busyAction &&
+    prev.expandedBillId === next.expandedBillId &&
+    prev.notificationLogs === next.notificationLogs &&
+    prev.proofFiles === next.proofFiles &&
+    prev.search === next.search &&
+    prev.status === next.status &&
+    prev.page === next.page &&
+    prev.total === next.total &&
+    prev.limit === next.limit
+  );
+});

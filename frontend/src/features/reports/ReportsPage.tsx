@@ -400,7 +400,7 @@ export function ReportsPage({
             </div>
             <div>
               <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-semibold uppercase">Target Rasio Lunas</span>
-              <strong className="text-sm font-bold text-emerald-600 dark:text-emerald-450 mt-1 block">
+              <strong className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-1 block">
                 &gt; 90.0%
               </strong>
             </div>

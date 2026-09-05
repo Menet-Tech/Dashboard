@@ -380,36 +380,36 @@ export function TemplatesPage({
 
       {/* Tab Navigation */}
       <nav className="flex border-b border-slate-200 dark:border-slate-800 mb-6 overflow-x-auto gap-2">
-        <Button variant="outline"
+        <Button variant="ghost"
           onClick={() => setActiveTab("templates")}
           type="button"
           className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
             activeTab === "templates"
-              ? "border-indigo-600 text-indigo-605 dark:text-indigo-400 font-bold"
+              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold"
               : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           }`}
         >
           <FileText size={16} />
           Template Pesan
         </Button>
-        <Button variant="outline"
+        <Button variant="ghost"
           onClick={() => setActiveTab("autoreply")}
           type="button"
           className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
             activeTab === "autoreply"
-              ? "border-indigo-600 text-indigo-605 dark:text-indigo-400 font-bold"
+              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold"
               : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           }`}
         >
           <MessageSquare size={16} />
           Auto-Response Custom
         </Button>
-        <Button variant="outline"
+        <Button variant="ghost"
           onClick={() => setActiveTab("sessions")}
           type="button"
           className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
             activeTab === "sessions"
-              ? "border-indigo-600 text-indigo-605 dark:text-indigo-400 font-bold"
+              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold"
               : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           }`}
         >
@@ -478,7 +478,7 @@ export function TemplatesPage({
                     <EmptyTableRow message="Belum ada template WhatsApp Billing yang tersimpan." colSpan={5} />
                   ) : (
                     sortedBillingTemplates.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-850/40 transition-colors">
+                      <tr key={item.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
                         <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">{item.name}</td>
                         <td className="px-6 py-4 text-indigo-600 dark:text-indigo-400 font-mono text-xs font-semibold">{item.trigger_key}</td>
                         <td className="px-6 py-4">
@@ -493,7 +493,7 @@ export function TemplatesPage({
                         <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                           <div className="flex gap-2 justify-center">
                             <Button variant="outline" type="button"
-                              className="bg-white dark:bg-slate-900 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
+                              className="bg-white dark:bg-slate-900 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
                               onClick={() => {
                                 onEdit(item);
                                 setIsFormOpen(true);
@@ -560,7 +560,7 @@ export function TemplatesPage({
                     <EmptyTableRow message="Belum ada template WhatsApp Chatbot yang tersimpan." colSpan={6} />
                   ) : (
                     sortedChatbotTemplates.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-850/40 transition-colors">
+                      <tr key={item.id} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/40 transition-colors">
                         <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-50 dark:text-slate-100">{item.name}</td>
                         <td className="px-6 py-4 text-indigo-600 dark:text-indigo-400 font-mono text-xs font-semibold">{item.trigger_key}</td>
                         <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-semibold font-mono text-xs">
@@ -578,7 +578,7 @@ export function TemplatesPage({
                         <td className="px-6 py-4 text-gray-700 dark:text-slate-300">
                           <div className="flex gap-2 justify-center">
                             <Button variant="outline" type="button"
-                              className="bg-white dark:bg-slate-900 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
+                              className="bg-white dark:bg-slate-900 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-200 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors cursor-pointer"
                               onClick={() => {
                                 onEdit(item);
                                 setIsFormOpen(true);
@@ -609,20 +609,20 @@ export function TemplatesPage({
               Anda dapat menggunakan tag placeholder kurung kurawal di bawah ini agar data dinamis pelanggan terisi otomatis saat pesan dikirim:
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
-              <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-150 dark:border-slate-800">
+              <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase mb-1">Informasi Pelanggan</span>
                 <code>{"{nama}"}</code> - Nama pelanggan<br />
                 <code>{"{alamat}"}</code> - Alamat pemasangan<br />
                 <code>{"{no_hp}"}</code> - Nomor WhatsApp
               </div>
-              <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-150 dark:border-slate-800">
+              <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase mb-1">Informasi Billing</span>
                 <code>{"{invoice_number}"}</code> - No. Invoice<br />
                 <code>{"{periode}"}</code> - Periode tagihan<br />
                 <code>{"{nominal}"}</code> - Nominal tagihan<br />
                 <code>{"{jatuh_tempo}"}</code> - Tgl Jatuh tempo
               </div>
-              <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-150 dark:border-slate-800">
+              <div className="bg-slate-50 dark:bg-slate-950 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase mb-1">Status Keterlambatan</span>
                 <code>{"{hari_limit}"}</code> - Hari isolir
               </div>
@@ -700,7 +700,7 @@ export function TemplatesPage({
         >
           <form id="template-form" className="flex flex-col gap-4" onSubmit={onSubmit}>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Nama Template</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Nama Template</span>
               <input
                 type="text"
                 className={inputClassName(templateErrors.name)}
@@ -712,7 +712,7 @@ export function TemplatesPage({
               {renderInlineError(templateErrors.name)}
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Trigger Key (Unik untuk Sistem)</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Trigger Key (Unik untuk Sistem)</span>
               <input
                 type="text"
                 className={inputClassName(templateErrors.trigger_key)}
@@ -731,7 +731,7 @@ export function TemplatesPage({
             </label>
             {templateForm.trigger_key.startsWith("chatbot_") && (
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Kata Kunci Trigger</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Kata Kunci Trigger</span>
                 <input
                   type="text"
                   className={inputClassName(templateErrors.trigger_keywords)}
@@ -752,7 +752,7 @@ export function TemplatesPage({
             )}
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Isi Pesan</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Isi Pesan</span>
               <textarea
                 className={`${inputClassName(templateErrors.content)} min-h-[200px] resize-y`}
                 rows={12}
@@ -764,7 +764,7 @@ export function TemplatesPage({
               {renderInlineError(templateErrors.content)}
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Status</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Status</span>
               <select
                 className={inputClassName()}
                 value={templateForm.is_active ? "1" : "0"}

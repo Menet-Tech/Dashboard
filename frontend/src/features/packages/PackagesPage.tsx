@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type FormEvent } from "react";
+import { useState, useEffect, useMemo, type FormEvent, memo } from "react";
 import { formatCurrency } from "../../utils/format";
 import { StatusPill, inputClassName, renderInlineError, EmptyTableRow, RupiahInput } from "../../components/ui";
 import { Modal } from "../../components/ui/Modal";
@@ -51,7 +51,7 @@ type MikrotikProfileSync = {
   parsed_speed: number;
 };
 
-export function PackagesPage({
+const PackagesPageComponent = function({
   packages,
   packageForm,
   packageErrors,
@@ -119,7 +119,7 @@ export function PackagesPage({
               <ChevronDown size={12} className="text-indigo-660 dark:text-indigo-400 stroke-[3]" />
             )
           ) : (
-            <ArrowUpDown size={12} className="text-slate-350 dark:text-slate-600 opacity-50 transition-opacity" />
+            <ArrowUpDown size={12} className="text-slate-300 dark:text-slate-600 opacity-50 transition-opacity" />
           )}
         </div>
       </th>
@@ -310,7 +310,7 @@ export function PackagesPage({
                           ? "Bypass / Tanpa Limit"
                           : `${pkg.speed_mbps} Mbps`}
                     </td>
-                    <td className="px-6 py-4 text-slate-950 dark:text-slate-150 font-bold">{formatCurrency(pkg.price)}</td>
+                    <td className="px-6 py-4 text-slate-950 dark:text-slate-100 font-bold">{formatCurrency(pkg.price)}</td>
                     <td className="px-6 py-4 text-slate-800 dark:text-slate-100 dark:text-slate-200 font-bold text-center">
                       <span className="bg-slate-100 px-2.5 py-1 rounded-full text-xs font-semibold">
                         {pkg.customer_count} Pelanggan
@@ -374,7 +374,7 @@ export function PackagesPage({
         >
           <form id="package-form" className="flex flex-col gap-5" onSubmit={onSubmit}>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Nama Paket (Wajib Sama dengan Profil MikroTik)</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Nama Paket (Wajib Sama dengan Profil MikroTik)</span>
               <input
                 autoFocus={true}
                 className={inputClassName(packageErrors.name)}
@@ -386,7 +386,7 @@ export function PackagesPage({
               {renderInlineError(packageErrors.name)}
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Rate Limit Bandwidth (Format MikroTik)</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Rate Limit Bandwidth (Format MikroTik)</span>
               <input
                 className={inputClassName(packageErrors.rate_limit ?? packageErrors.speed_mbps)}
                 type="text"
@@ -417,7 +417,7 @@ export function PackagesPage({
             {/* IP Pool selection */}
             {!isCreatingNewPool ? (
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">IP Pool MikroTik</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">IP Pool MikroTik</span>
                 {loadingPools ? (
                   <div className="text-xs text-slate-400 dark:text-slate-500 italic">Memuat IP Pool dari MikroTik...</div>
                 ) : (
@@ -450,7 +450,7 @@ export function PackagesPage({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-100 dark:text-slate-200">Buat IP Pool Baru di MikroTik</span>
                   <Button variant="primary" type="button"
-                    className="text-xs font-bold text-indigo-650 hover:text-indigo-700"
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700"
                     onClick={() => {
                       setIsCreatingNewPool(false);
                       onFormChange((curr) => ({ ...curr, ip_pool: "", ip_pool_range: "" }));
@@ -460,7 +460,7 @@ export function PackagesPage({
                   </Button>
                 </div>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Nama IP Pool Baru</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Nama IP Pool Baru</span>
                   <input
                     type="text"
                     className={inputClassName()}
@@ -471,7 +471,7 @@ export function PackagesPage({
                   />
                 </label>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Range IP Address (Contoh: 10.10.10.1-10.10.10.253)</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Range IP Address (Contoh: 10.10.10.1-10.10.10.253)</span>
                   <input
                     type="text"
                     className={inputClassName(packageErrors.ip_pool_range)}
@@ -486,7 +486,7 @@ export function PackagesPage({
             )}
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">Deskripsi Paket</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">Deskripsi Paket</span>
               <textarea
                 className={inputClassName()}
                 rows={3}
@@ -541,7 +541,7 @@ export function PackagesPage({
             ) : (
               <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-96 overflow-y-auto scrollbar-thin">
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-slate-650 sticky top-0">
+                  <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-slate-600 sticky top-0">
                     <tr>
                       <th className="px-4 py-2.5 text-center w-8">
                         <input
@@ -560,7 +560,7 @@ export function PackagesPage({
                   <tbody className="divide-y divide-slate-200 bg-white dark:bg-slate-900">
                     {syncProfiles.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-6 text-slate-450">
+                        <td colSpan={5} className="text-center py-6 text-slate-400">
                           Tidak ada profil PPPoE yang terdeteksi di MikroTik.
                         </td>
                       </tr>
@@ -655,4 +655,15 @@ export function PackagesPage({
       )}
     </section>
   );
-}
+};
+
+export const PackagesPage = memo(PackagesPageComponent, (prev, next) => {
+  return (
+    prev.packages === next.packages &&
+    prev.packageForm === next.packageForm &&
+    prev.packageErrors === next.packageErrors &&
+    prev.editingPackageId === next.editingPackageId &&
+    prev.submitting === next.submitting &&
+    prev.busyAction === next.busyAction
+  );
+});

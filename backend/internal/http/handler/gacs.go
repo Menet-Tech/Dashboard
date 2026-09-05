@@ -114,52 +114,59 @@ func (h GacsHandler) GetDevices(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Automatically attach devices to matching customers/nodes
-	ctx := r.Context()
-	for _, dev := range devices {
-		sn, _ := dev["SerialNumber"].(string)
-		pppoe, _ := dev["pppoe"].(string)
+	// ponytail: Do NOT block the HTTP request with 4,000 synchronous SQLite updates.
+	// We offload this to a background goroutine so the UI loads instantly.
+	go func(devs []map[string]any) {
+		bgCtx := context.Background()
+		for _, dev := range devs {
+			sn, _ := dev["SerialNumber"].(string)
+			pppoe, _ := dev["pppoe"].(string)
 
-		sn = strings.TrimSpace(sn)
-		pppoe = strings.TrimSpace(pppoe)
+			sn = strings.TrimSpace(sn)
+			pppoe = strings.TrimSpace(pppoe)
 
-		if sn == "" || pppoe == "" {
-			continue
+			if sn == "" || pppoe == "" {
+				continue
+			}
+
+			// 1. Sync pelanggan (customer) table
+			// If customer has this PPPoE, sync Serial Number
+			_, _ = h.DB.ExecContext(bgCtx, `
+				UPDATE pelanggan 
+				SET sn_ont = ?, updated_at = CURRENT_TIMESTAMP 
+				WHERE user_pppoe = ? AND (sn_ont IS NULL OR sn_ont = '')`,
+				sn, pppoe,
+			)
+
+			// If customer has this Serial Number, sync PPPoE username
+			_, _ = h.DB.ExecContext(bgCtx, `
+				UPDATE pelanggan 
+				SET user_pppoe = ?, updated_at = CURRENT_TIMESTAMP 
+				WHERE sn_ont = ? AND (user_pppoe IS NULL OR user_pppoe = '')`,
+				pppoe, sn,
+			)
+
+			// 2. Sync mapping_nodes table
+			// If node has this PPPoE, sync Serial Number
+			_, _ = h.DB.ExecContext(bgCtx, `
+				UPDATE mapping_nodes 
+				SET serialnumber = ?, updated_at = CURRENT_TIMESTAMP 
+				WHERE type = 'ont' AND pppoe = ? AND (serialnumber IS NULL OR serialnumber = '')`,
+				sn, pppoe,
+			)
+
+			// If node has this Serial Number, sync PPPoE username
+			_, _ = h.DB.ExecContext(bgCtx, `
+				UPDATE mapping_nodes 
+				SET pppoe = ?, updated_at = CURRENT_TIMESTAMP 
+				WHERE type = 'ont' AND serialnumber = ? AND (pppoe IS NULL OR pppoe = '')`,
+				pppoe, sn,
+			)
+			
+			// Optional: sleep tiny bit to prevent locking out other SQLite writers
+			time.Sleep(2 * time.Millisecond)
 		}
-
-		// 1. Sync pelanggan (customer) table
-		// If customer has this PPPoE, sync Serial Number
-		_, _ = h.DB.ExecContext(ctx, `
-			UPDATE pelanggan 
-			SET sn_ont = ?, updated_at = CURRENT_TIMESTAMP 
-			WHERE user_pppoe = ? AND (sn_ont IS NULL OR sn_ont = '')`,
-			sn, pppoe,
-		)
-
-		// If customer has this Serial Number, sync PPPoE username
-		_, _ = h.DB.ExecContext(ctx, `
-			UPDATE pelanggan 
-			SET user_pppoe = ?, updated_at = CURRENT_TIMESTAMP 
-			WHERE sn_ont = ? AND (user_pppoe IS NULL OR user_pppoe = '')`,
-			pppoe, sn,
-		)
-
-		// 2. Sync mapping_nodes table
-		// If node has this PPPoE, sync Serial Number
-		_, _ = h.DB.ExecContext(ctx, `
-			UPDATE mapping_nodes 
-			SET serialnumber = ?, updated_at = CURRENT_TIMESTAMP 
-			WHERE type = 'ont' AND pppoe = ? AND (serialnumber IS NULL OR serialnumber = '')`,
-			sn, pppoe,
-		)
-
-		// If node has this Serial Number, sync PPPoE username
-		_, _ = h.DB.ExecContext(ctx, `
-			UPDATE mapping_nodes 
-			SET pppoe = ?, updated_at = CURRENT_TIMESTAMP 
-			WHERE type = 'ont' AND serialnumber = ? AND (pppoe IS NULL OR pppoe = '')`,
-			pppoe, sn,
-		)
-	}
+	}(devices)
 
 	WriteJSON(w, http.StatusOK, devices)
 }

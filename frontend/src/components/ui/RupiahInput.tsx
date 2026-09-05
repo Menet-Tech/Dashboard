@@ -60,7 +60,7 @@ export function RupiahInput({
 
   return (
     <label className="flex flex-col gap-1 w-full">
-      {label && <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-350">{label}</span>}
+      {label && <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">{label}</span>}
       <div className="relative rounded-lg shadow-sm">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-sm font-semibold pointer-events-none select-none">
           Rp

@@ -426,7 +426,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
         >
           <form id="odp-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-750">Nama ODP</span>
+              <span className="text-xs font-bold text-slate-700">Nama ODP</span>
               <input
                 type="text"
                 className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -438,7 +438,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
             </label>
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-750">Lokasi / Area</span>
+              <span className="text-xs font-bold text-slate-700">Lokasi / Area</span>
               <input
                 type="text"
                 className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -487,7 +487,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
             {/* Splitter Ratio & Ports */}
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold text-slate-750">Splitter Ratio</span>
+                <span className="text-xs font-bold text-slate-700">Splitter Ratio</span>
                 <select
                   className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   value={formSplitterRatio}
@@ -502,7 +502,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
                 </select>
               </label>
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold text-slate-750">Jumlah Port ODP</span>
+                <span className="text-xs font-bold text-slate-700">Jumlah Port ODP</span>
                 <input
                   type="number"
                   min={1}
@@ -517,7 +517,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
             </div>
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-750">Deskripsi / Catatan</span>
+              <span className="text-xs font-bold text-slate-700">Deskripsi / Catatan</span>
               <textarea
                 className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 value={formDescription}
@@ -603,7 +603,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
               Pemberitahuan ini akan dikirimkan secara otomatis via WhatsApp ke seluruh pelanggan yang terhubung dengan node ODP <strong>{broadcastingOdp.nama}</strong>. Gunakan <code>{"{nama}"}</code> untuk personalisasi nama pelanggan.
             </div>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-750">Pesan WhatsApp</span>
+              <span className="text-xs font-bold text-slate-700">Pesan WhatsApp</span>
               <textarea
                 className="block w-full rounded-lg border border-gray-300 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans"
                 value={broadcastMessage}
@@ -632,7 +632,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
           }
         >
           <div className="flex flex-col gap-4">
-            <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 border border-slate-150 p-3.5 rounded-xl leading-relaxed">
+            <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 border border-slate-100 p-3.5 rounded-xl leading-relaxed">
               <p><strong>Lokasi:</strong> {selectedOdpForDetail.lokasi}</p>
               {selectedOdpForDetail.latitude !== 0 && (
                 <p className="mt-1"><strong>Koordinat:</strong> {selectedOdpForDetail.latitude?.toFixed(6)}, {selectedOdpForDetail.longitude?.toFixed(6)}</p>
@@ -695,7 +695,7 @@ export function OdpPage({ user, pushSuccess, pushError, onEndTrial }: OdpPagePro
                             <td className="px-4 py-3 text-slate-400 dark:text-slate-500 italic" colSpan={3}>
                               Kosong (Belum terpakai)
                             </td>
-                            <td className="px-4 py-3 text-center text-slate-350">-</td>
+                            <td className="px-4 py-3 text-center text-slate-300">-</td>
                           </>
                         )}
                       </tr>

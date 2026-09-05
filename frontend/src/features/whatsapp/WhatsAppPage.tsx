@@ -297,34 +297,34 @@ export function WhatsAppPage({
 
         {/* Navigation Tabs */}
         <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 overflow-x-auto gap-2">
-          <Button type="button" variant="outline"
+          <Button type="button" variant="ghost"
             onClick={() => setActiveTab("accounts")}
             className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "accounts"
                 ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-slate-600 hover:text-slate-900"
+                : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
             }`}
           >
             <MessageSquare size={16} />
             Akun Gateway ({accounts.length})
           </Button>
-          <Button type="button" variant="outline"
+          <Button type="button" variant="ghost"
             onClick={() => setActiveTab("qr")}
             className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "qr"
                 ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-slate-600 hover:text-slate-900"
+                : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
             }`}
           >
             <Wifi size={16} />
             Scan QR Code
           </Button>
-          <Button type="button" variant="outline"
+          <Button type="button" variant="ghost"
             onClick={() => setActiveTab("history")}
             className={`py-3 px-4 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "history"
                 ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-slate-600 hover:text-slate-900"
+                : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
             }`}
           >
             <ShieldAlert size={16} />
