@@ -10,6 +10,3 @@
 
 # lumayan ke pake
 - [x] di registrasi list waktu di pencet namanya muncul detail registrasinya
-
-# Besok
-- [ ] ngilangin search di devices page

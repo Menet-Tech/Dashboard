@@ -625,17 +625,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "tagihan-h7", item.CustomerPhone)
 				if err == nil && !sent {
 					waErr := sendAutomationMessage(ctx, options, item, "tagihan-h7")
-					key := fmt.Sprintf("%d-tagihan-h7", item.ID)
-					if options.SendDiscord != nil && !discordSentThisCycle[key] {
-						var msg string
-						if waErr != nil {
-							msg = fmt.Sprintf("⚠️ **Tagihan H-7 Gagal (WA)**: Gagal mengirim tagihan **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
-						} else {
-							msg = fmt.Sprintf("⏳ **Tagihan H-7 Terkirim**: Tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
-						}
-						_ = options.SendDiscord(ctx, msg)
-						discordSentThisCycle[key] = true
-					}
+					notifyDiscordAutomation(ctx, options, item, "tagihan-h7", waErr, discordSentThisCycle)
 				}
 			}
 		}
@@ -646,17 +636,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "reminder-h3", item.CustomerPhone)
 				if err == nil && !sent {
 					waErr := sendAutomationMessage(ctx, options, item, "reminder-h3")
-					key := fmt.Sprintf("%d-reminder-h3", item.ID)
-					if options.SendDiscord != nil && !discordSentThisCycle[key] {
-						var msg string
-						if waErr != nil {
-							msg = fmt.Sprintf("⚠️ **Reminder H-3 Gagal (WA)**: Gagal mengirim pengingat **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
-						} else {
-							msg = fmt.Sprintf("⏳ **Reminder H-3 Terkirim**: Pengingat **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
-						}
-						_ = options.SendDiscord(ctx, msg)
-						discordSentThisCycle[key] = true
-					}
+					notifyDiscordAutomation(ctx, options, item, "reminder-h3", waErr, discordSentThisCycle)
 				}
 			}
 		}
@@ -667,17 +647,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 				sent, err := s.Notifications.AlreadySent(ctx, item.ID, "jatuh_tempo", item.CustomerPhone)
 				if err == nil && !sent {
 					waErr := sendAutomationMessage(ctx, options, item, "jatuh_tempo")
-					key := fmt.Sprintf("%d-jatuh_tempo", item.ID)
-					if options.SendDiscord != nil && !discordSentThisCycle[key] {
-						var msg string
-						if waErr != nil {
-							msg = fmt.Sprintf("⚠️ **Jatuh Tempo Gagal (WA)**: Gagal mengirim notifikasi jatuh tempo **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
-						} else {
-							msg = fmt.Sprintf("⚠️ **Jatuh Tempo**: Notifikasi jatuh tempo **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
-						}
-						_ = options.SendDiscord(ctx, msg)
-						discordSentThisCycle[key] = true
-					}
+					notifyDiscordAutomation(ctx, options, item, "jatuh_tempo", waErr, discordSentThisCycle)
 				}
 			}
 		}
@@ -773,17 +743,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		if phone == "" {
 			for _, item := range unsent {
 				waErr := sendAutomationMessage(ctx, options, item, "limit_5hari")
-				key := fmt.Sprintf("%d-limit_5hari", item.ID)
-				if options.SendDiscord != nil && !discordSentThisCycle[key] {
-					var msg string
-					if waErr != nil {
-						msg = fmt.Sprintf("⚠️ **Limit 5 Hari Gagal (WA)**: Gagal mengirim notifikasi limit **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
-					} else {
-						msg = fmt.Sprintf("⚠️ **Limit 5 Hari**: Notifikasi limit **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
-					}
-					_ = options.SendDiscord(ctx, msg)
-					discordSentThisCycle[key] = true
-				}
+				notifyDiscordAutomation(ctx, options, item, "limit_5hari", waErr, discordSentThisCycle)
 			}
 		} else {
 			if err := s.sendGroupedNotifications(ctx, options, phone, unsent, "limit_5hari", discordSentThisCycle); err != nil {
@@ -797,17 +757,7 @@ func (s Service) ProcessAutomation(ctx context.Context, options AutomationOption
 		if phone == "" {
 			for _, item := range unsent {
 				waErr := sendAutomationMessage(ctx, options, item, "isolir_20hari")
-				key := fmt.Sprintf("%d-isolir_20hari", item.ID)
-				if options.SendDiscord != nil && !discordSentThisCycle[key] {
-					var msg string
-					if waErr != nil {
-						msg = fmt.Sprintf("⚠️ **Isolir 20 Hari Gagal (WA)**: Gagal mengirim notifikasi isolir **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
-					} else {
-						msg = fmt.Sprintf("⚠️ **Isolir 20 Hari**: Notifikasi isolir **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
-					}
-					_ = options.SendDiscord(ctx, msg)
-					discordSentThisCycle[key] = true
-				}
+				notifyDiscordAutomation(ctx, options, item, "isolir_20hari", waErr, discordSentThisCycle)
 			}
 		} else {
 			if err := s.sendGroupedNotifications(ctx, options, phone, unsent, "isolir_20hari", discordSentThisCycle); err != nil {
@@ -829,17 +779,7 @@ func (s Service) sendGroupedNotifications(ctx context.Context, options Automatio
 		if waErr != nil {
 			slog.Error("automation: send WA failed", "trigger", triggerKey, "bill_id", unsent[0].ID, "customer", unsent[0].CustomerName, "error", waErr)
 		}
-		key := fmt.Sprintf("%d-%s", unsent[0].ID, triggerKey)
-		if options.SendDiscord != nil && !discordSentThisCycle[key] {
-			var msg string
-			if waErr != nil {
-				msg = fmt.Sprintf("⚠️ **%s Gagal (WA)**: Gagal mengirim %s tagihan **%s** ke **%s**: %v", triggerKey, triggerKey, unsent[0].InvoiceNumber, unsent[0].CustomerName, waErr)
-			} else {
-				msg = fmt.Sprintf("⏳ **%s Terkirim**: %s tagihan **%s** telah dikirim ke **%s**", triggerKey, triggerKey, unsent[0].InvoiceNumber, unsent[0].CustomerName)
-			}
-			_ = options.SendDiscord(ctx, msg)
-			discordSentThisCycle[key] = true
-		}
+		notifyDiscordAutomation(ctx, options, unsent[0], triggerKey, waErr, discordSentThisCycle)
 		return waErr
 	}
 
@@ -934,17 +874,7 @@ func (s Service) sendGroupedNotifications(ctx context.Context, options Automatio
 		_ = s.Notifications.Record(ctx, unsent[i].ID, triggerKey, phone, "sent", fmt.Sprintf("Grouped with bill %d", unsent[0].ID))
 	}
 
-	key := fmt.Sprintf("%d-%s", unsent[0].ID, triggerKey)
-	if options.SendDiscord != nil && !discordSentThisCycle[key] {
-		var msg string
-		if waErr != nil {
-			msg = fmt.Sprintf("⚠️ **Combined %s Gagal (WA)**: Gagal mengirim tagihan gabungan ke %s (%s): %v", triggerKey, unsent[0].CustomerName, phone, waErr)
-		} else {
-			msg = fmt.Sprintf("⏳ **Combined %s Terkirim**: Tagihan gabungan telah dikirim ke %s (%s)", triggerKey, unsent[0].CustomerName, phone)
-		}
-		_ = options.SendDiscord(ctx, msg)
-		discordSentThisCycle[key] = true
-	}
+	notifyGroupedDiscordAutomation(ctx, options, phone, unsent, triggerKey, waErr, discordSentThisCycle)
 
 	return waErr
 }
@@ -1445,3 +1375,79 @@ func formatThousandSeparator(amount int) string {
 
 	return string(parts)
 }
+
+func notifyDiscordAutomation(ctx context.Context, options AutomationOptions, item automationCandidate, triggerKey string, waErr error, sentTracker map[string]bool) {
+	if options.SendDiscord == nil {
+		return
+	}
+	key := fmt.Sprintf("%d-%s", item.ID, triggerKey)
+	if sentTracker[key] {
+		return
+	}
+
+	var msg string
+	switch triggerKey {
+	case "tagihan-h7":
+		if waErr != nil {
+			msg = fmt.Sprintf("⚠️ **Tagihan H-7 Gagal (WA)**: Gagal mengirim tagihan **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
+		} else {
+			msg = fmt.Sprintf("⏳ **Tagihan H-7 Terkirim**: Tagihan **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+		}
+	case "reminder-h3":
+		if waErr != nil {
+			msg = fmt.Sprintf("⚠️ **Reminder H-3 Gagal (WA)**: Gagal mengirim pengingat **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
+		} else {
+			msg = fmt.Sprintf("⏳ **Reminder H-3 Terkirim**: Pengingat **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+		}
+	case "jatuh_tempo":
+		if waErr != nil {
+			msg = fmt.Sprintf("⚠️ **Jatuh Tempo Gagal (WA)**: Gagal mengirim notifikasi jatuh tempo **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
+		} else {
+			msg = fmt.Sprintf("⚠️ **Jatuh Tempo**: Notifikasi jatuh tempo **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+		}
+	case "limit_5hari":
+		if waErr != nil {
+			msg = fmt.Sprintf("⚠️ **Limit 5 Hari Gagal (WA)**: Gagal mengirim notifikasi limit **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
+		} else {
+			msg = fmt.Sprintf("⚠️ **Limit 5 Hari**: Notifikasi limit **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+		}
+	case "isolir_20hari":
+		if waErr != nil {
+			msg = fmt.Sprintf("⚠️ **Isolir 20 Hari Gagal (WA)**: Gagal mengirim notifikasi isolir **%s** ke **%s**: %v", item.InvoiceNumber, item.CustomerName, waErr)
+		} else {
+			msg = fmt.Sprintf("⚠️ **Isolir 20 Hari**: Notifikasi isolir **%s** telah dikirim ke **%s**", item.InvoiceNumber, item.CustomerName)
+		}
+	default:
+		if waErr != nil {
+			msg = fmt.Sprintf("⚠️ **%s Gagal (WA)**: Gagal mengirim %s tagihan **%s** ke **%s**: %v", triggerKey, triggerKey, item.InvoiceNumber, item.CustomerName, waErr)
+		} else {
+			msg = fmt.Sprintf("⏳ **%s Terkirim**: %s tagihan **%s** telah dikirim ke **%s**", triggerKey, triggerKey, item.InvoiceNumber, item.CustomerName)
+		}
+	}
+
+	if msg != "" {
+		_ = options.SendDiscord(ctx, msg)
+		sentTracker[key] = true
+	}
+}
+
+func notifyGroupedDiscordAutomation(ctx context.Context, options AutomationOptions, phone string, unsent []automationCandidate, triggerKey string, waErr error, sentTracker map[string]bool) {
+	if options.SendDiscord == nil {
+		return
+	}
+	key := fmt.Sprintf("%d-%s", unsent[0].ID, triggerKey)
+	if sentTracker[key] {
+		return
+	}
+
+	var msg string
+	if waErr != nil {
+		msg = fmt.Sprintf("⚠️ **Combined %s Gagal (WA)**: Gagal mengirim tagihan gabungan ke %s (%s): %v", triggerKey, unsent[0].CustomerName, phone, waErr)
+	} else {
+		msg = fmt.Sprintf("⏳ **Combined %s Terkirim**: Tagihan gabungan telah dikirim ke %s (%s)", triggerKey, unsent[0].CustomerName, phone)
+	}
+	
+	_ = options.SendDiscord(ctx, msg)
+	sentTracker[key] = true
+}
+

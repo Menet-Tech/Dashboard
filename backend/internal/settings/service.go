@@ -217,15 +217,11 @@ func (s Service) resolveWAAPIKeyFallback(ctx context.Context) string {
 		}
 	}
 	paths := []string{
+		".env",
+		"../.env",
+		"../../.env",
 		"/opt/menettech-go/whatsapp/.env",
-		"/opt/menettech-go/integration/whatsapp/.env",
 		"/opt/menettech-go/backend/.env",
-		"../whatsapp/.env",
-		"../../whatsapp/.env",
-		"../integration/whatsapp/.env",
-		"../../integration/whatsapp/.env",
-		"../../../integration/whatsapp/.env",
-		"whatsapp/.env",
 	}
 	for _, p := range paths {
 		data, err := os.ReadFile(p)

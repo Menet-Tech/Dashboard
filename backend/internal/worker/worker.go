@@ -47,19 +47,35 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 		lockTTLSeconds = int(interval.Seconds())*3 + 60
 	}
 
-	// Start queue processors in background
-	go s.startQueueProcessor(ctx)
-	go s.startEmailQueueProcessor(ctx)
+	var queueCtx context.Context
+	var cancelQueue context.CancelFunc
+
+	startQueues := func() {
+		if cancelQueue == nil {
+			queueCtx, cancelQueue = context.WithCancel(ctx)
+			go s.startQueueProcessor(queueCtx)
+			go s.startEmailQueueProcessor(queueCtx)
+		}
+	}
+	stopQueues := func() {
+		if cancelQueue != nil {
+			cancelQueue()
+			cancelQueue = nil
+		}
+	}
 
 	acquiredLease, err := s.acquireWorkerLease(ctx, owner, lockTTLSeconds)
 	if err != nil {
 		return err
 	}
 	defer func() {
+		stopQueues()
 		_ = s.Settings.ReleaseLease(context.Background(), "worker_lock", owner)
 	}()
 
 	if acquiredLease {
+		startQueues()
+
 		if err := s.RunOnce(ctx); err != nil {
 			s.Logger.Error("worker run failed", "error", err)
 			if s.Discord != nil && s.Discord.IsEventEnabled(ctx, "discord_notify_worker") {
@@ -98,12 +114,14 @@ func (s Service) RunLoop(ctx context.Context, interval time.Duration) error {
 			if !acquired {
 				if acquiredLease {
 					s.Logger.Warn("worker lease lost, waiting to reacquire", "owner", owner)
+					stopQueues()
 				}
 				acquiredLease = false
 				continue
 			}
 			if !acquiredLease {
 				s.Logger.Info("worker lease acquired", "owner", owner)
+				startQueues()
 			}
 			acquiredLease = true
 			if err := s.RunOnce(ctx); err != nil {

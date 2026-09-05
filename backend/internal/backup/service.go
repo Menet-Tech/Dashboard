@@ -254,7 +254,7 @@ func (s *Service) getBackupPassword(ctx context.Context) string {
 		return envVal
 	}
 
-	return "menettech_backup_pass"
+	return ""
 }
 
 func (s *Service) ExtractBackupDatabase(filename, destPath string, password string) error {
